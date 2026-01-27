@@ -11,6 +11,7 @@ export function Logo({ className, variant = "dark", size = "md" }: LogoProps) {
     sm: "w-8 h-8",
     md: "w-12 h-12",
     lg: "w-16 h-16",
+    xl: "w-32 h-32",
   };
 
   const textSizes = {
@@ -39,11 +40,7 @@ export function Logo({ className, variant = "dark", size = "md" }: LogoProps) {
             className={variant === "light" ? "fill-sidebar-primary" : "fill-primary"}
           />
           {/* Book pages */}
-          <path
-            d="M24 34V10"
-            className="stroke-white"
-            strokeWidth="2"
-          />
+          <path d="M24 34V10" className="stroke-white" strokeWidth="2" />
           {/* Antenna/signal */}
           <circle cx="24" cy="6" r="2" className={variant === "light" ? "fill-sidebar-primary" : "fill-primary"} />
           <path
@@ -67,9 +64,7 @@ export function Logo({ className, variant = "dark", size = "md" }: LogoProps) {
       </div>
       {/* Text */}
       <div className="flex flex-col">
-        <span className={cn("font-bold tracking-wide leading-none", textSizes[size], textColor)}>
-          SAT
-        </span>
+        <span className={cn("font-bold tracking-wide leading-none", textSizes[size], textColor)}>SAT</span>
         <span className={cn("tracking-widest uppercase leading-none", subtitleSizes[size], subtitleColor)}>
           Escolar
         </span>
