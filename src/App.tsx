@@ -9,6 +9,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
+import UsersList from "./pages/admin/UsersList";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/admin/colegios" element={<SchoolsList />} />
             <Route path="/admin/colegios/crear" element={<SchoolForm />} />
             <Route path="/admin/colegios/:id/editar" element={<SchoolForm />} />
+            <Route path="/admin/usuarios" element={<UsersList />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

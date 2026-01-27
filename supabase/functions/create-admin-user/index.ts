@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, password, full_name, role } = await req.json();
+    const { email, password, full_name, role, school_id } = await req.json();
 
     // Validate required fields
     if (!email || !password) {
@@ -57,7 +57,7 @@ serve(async (req) => {
         .insert({
           user_id: userData.user.id,
           role: role,
-          school_id: null, // Admin has no school assignment
+          school_id: school_id || null,
         });
 
       if (roleError) {
