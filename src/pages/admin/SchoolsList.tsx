@@ -24,8 +24,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Pagination } from "@/components/ui/data-pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const ITEMS_PER_PAGE = 10;
 
 interface School {
   id: string;
@@ -40,6 +43,7 @@ export default function SchoolsList() {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchSchools = async () => {
     try {
@@ -81,6 +85,16 @@ export default function SchoolsList() {
       school.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       school.rif.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredSchools.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedSchools = filteredSchools.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <DashboardLayout>
@@ -141,7 +155,7 @@ export default function SchoolsList() {
                   </div>
                 </TableCell>
               </TableRow>
-            ) : filteredSchools.length === 0 ? (
+            ) : paginatedSchools.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   {searchTerm
@@ -150,7 +164,7 @@ export default function SchoolsList() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredSchools.map((school) => (
+              paginatedSchools.map((school) => (
                 <TableRow key={school.id}>
                   <TableCell className="font-medium">{school.name}</TableCell>
                   <TableCell className="max-w-xs truncate">{school.address}</TableCell>
@@ -201,6 +215,15 @@ export default function SchoolsList() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={filteredSchools.length}
+          itemsPerPage={ITEMS_PER_PAGE}
+        />
       </div>
     </DashboardLayout>
   );
