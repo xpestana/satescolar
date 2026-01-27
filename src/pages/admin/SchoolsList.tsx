@@ -1,0 +1,207 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Plus, Search, Pencil, Trash2, Eye } from "lucide-react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface School {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  rif: string;
+}
+
+export default function SchoolsList() {
+  const [schools, setSchools] = useState<School[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const fetchSchools = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("schools")
+        .select("id, name, address, phone, email, rif")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setSchools(data || []);
+    } catch (error) {
+      console.error("Error fetching schools:", error);
+      toast.error("Error al cargar los colegios");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSchools();
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    try {
+      const { error } = await supabase.from("schools").delete().eq("id", id);
+      if (error) throw error;
+      
+      setSchools(schools.filter((school) => school.id !== id));
+      toast.success("Colegio eliminado correctamente");
+    } catch (error) {
+      console.error("Error deleting school:", error);
+      toast.error("Error al eliminar el colegio");
+    }
+  };
+
+  const filteredSchools = schools.filter(
+    (school) =>
+      school.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      school.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      school.rif.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <DashboardLayout>
+      <PageHeader
+        title="Colegios"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Colegios" },
+        ]}
+        imageUrl="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=300&h=200&fit=crop"
+      />
+
+      <div className="bg-card rounded-lg shadow-sm border">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between p-4 border-b">
+          <Link to="/admin/colegios/crear">
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Colegio
+            </Button>
+          </Link>
+
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar colegios..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 w-64"
+              />
+            </div>
+            <span className="text-sm text-muted-foreground">
+              Colegios - Lista de Colegios Registrados
+            </span>
+          </div>
+        </div>
+
+        {/* Table */}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Dirección</TableHead>
+              <TableHead>Teléfono</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>RIF</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    Cargando...
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredSchools.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  {searchTerm
+                    ? "No se encontraron colegios con ese criterio de búsqueda"
+                    : "No hay colegios registrados. ¡Crea el primero!"}
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredSchools.map((school) => (
+                <TableRow key={school.id}>
+                  <TableCell className="font-medium">{school.name}</TableCell>
+                  <TableCell className="max-w-xs truncate">{school.address}</TableCell>
+                  <TableCell>{school.phone}</TableCell>
+                  <TableCell>{school.email}</TableCell>
+                  <TableCell>{school.rif}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Link to={`/admin/colegios/${school.id}`}>
+                        <Button variant="ghost" size="icon" title="Ver detalles">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Link to={`/admin/colegios/${school.id}/editar`}>
+                        <Button variant="ghost" size="icon" title="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" title="Eliminar">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Eliminar colegio?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción no se puede deshacer. Se eliminará permanentemente
+                              el colegio "{school.name}" y todos sus datos asociados.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDelete(school.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </DashboardLayout>
+  );
+}
