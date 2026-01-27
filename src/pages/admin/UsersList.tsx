@@ -95,7 +95,7 @@ export default function UsersList() {
           school_id,
           schools(name)
         `)
-        .in("role", ["school", "admin"]);
+        .eq("role", "school");
 
       if (rolesError) throw rolesError;
 
