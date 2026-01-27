@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 interface LogoProps {
   className?: string;
   variant?: "light" | "dark";
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg";
 }
 
 export function Logo({ className, variant = "dark", size = "md" }: LogoProps) {
@@ -18,14 +18,12 @@ export function Logo({ className, variant = "dark", size = "md" }: LogoProps) {
     sm: "text-lg",
     md: "text-2xl",
     lg: "text-3xl",
-    xl: "text-4xl",
   };
 
   const subtitleSizes = {
     sm: "text-[8px]",
     md: "text-xs",
     lg: "text-sm",
-    xl: "text-base",
   };
 
   const textColor = variant === "light" ? "text-white" : "text-primary";
