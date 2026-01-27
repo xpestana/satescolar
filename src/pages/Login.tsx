@@ -15,8 +15,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
+import logoBlack from "@/assets/logo-black.svg";
+import futuristicBg from "@/assets/futuristic.jpg";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -70,11 +71,11 @@ export default function Login() {
         <div 
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop')`,
+            backgroundImage: `url(${futuristicBg})`,
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/40" />
-        <div className="absolute inset-0 bg-gradient-to-t from-primary/30 via-transparent to-transparent" />
+        {/* White gradient from right (form side) fading to the left */}
+        <div className="absolute inset-0 bg-gradient-to-l from-card via-card/50 to-transparent" />
       </div>
 
       {/* Right side - Form */}
@@ -82,7 +83,7 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <div className="flex justify-center">
-            <Logo size="lg" />
+            <img src={logoBlack} alt="SAT Escolar" className="h-16" />
           </div>
 
           {/* Welcome text */}

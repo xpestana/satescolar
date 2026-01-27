@@ -9,8 +9,8 @@ import {
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
+import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
@@ -84,7 +84,7 @@ export function AppSidebar() {
     <aside className="fixed right-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
       <div className="flex items-center justify-center py-6">
-        <Logo variant="light" size="md" />
+        <img src={logo} alt="SAT Escolar" className="h-12" />
       </div>
 
       {/* Navigation */}
