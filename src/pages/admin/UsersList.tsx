@@ -468,16 +468,16 @@ export default function UsersList() {
               <div className="space-y-2">
                 <Label htmlFor="school_id">Institución</Label>
                 <Select
-                  value={formData.school_id}
+                  value={formData.school_id || "__none__"}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, school_id: value })
+                    setFormData({ ...formData, school_id: value === "__none__" ? "" : value })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar institución" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin asignar</SelectItem>
+                    <SelectItem value="__none__">Sin asignar</SelectItem>
                     {schools.map((school) => (
                       <SelectItem key={school.id} value={school.id}>
                         {school.name}
