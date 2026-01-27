@@ -7,17 +7,9 @@ import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Logo } from "@/components/Logo";
 import { useAuth } from "@/hooks/useAuth";
-import logoBlack from "@/assets/logo-black.svg";
-import futuristicBg from "@/assets/futuristic.jpg";
 import { toast } from "sonner";
 
 const loginSchema = z.object({
@@ -68,14 +60,14 @@ export default function Login() {
     <div className="flex min-h-screen">
       {/* Left side - Image */}
       <div className="hidden lg:flex lg:w-3/5 relative overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
-            backgroundImage: `url(${futuristicBg})`,
+            backgroundImage: `url('https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop')`,
           }}
         />
-        {/* White gradient from right (form side) fading to the left */}
-        <div className="absolute inset-0 bg-gradient-to-l from-card via-card/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-primary/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/30 via-transparent to-transparent" />
       </div>
 
       {/* Right side - Form */}
@@ -83,25 +75,19 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <div className="flex justify-center">
-            <img src={logoBlack} alt="SAT Escolar" className="h-16" />
+            <Logo size="xl" />
           </div>
 
           {/* Welcome text */}
           <div className="text-center space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">
-              Bienvenido a SAT Escolar
-            </h1>
-            <p className="text-muted-foreground">
-              Gestiona, organiza y transforma tu institución educativa.
-            </p>
+            <h1 className="text-2xl font-bold text-foreground">Bienvenido a SAT Escolar</h1>
+            <p className="text-muted-foreground">Gestiona, organiza y transforma tu institución educativa.</p>
           </div>
 
           {/* Divider */}
           <div className="flex items-center gap-4">
             <div className="h-px flex-1 bg-border" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Iniciar sesión
-            </span>
+            <span className="text-sm font-medium text-muted-foreground">Iniciar sesión</span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
@@ -115,11 +101,7 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>Correo electrónico</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="correo@ejemplo.com"
-                        type="email"
-                        {...field}
-                      />
+                      <Input placeholder="correo@ejemplo.com" type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -167,31 +149,18 @@ export default function Login() {
                   render={({ field }) => (
                     <FormItem className="flex items-center space-x-2 space-y-0">
                       <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                      <FormLabel className="text-sm font-normal cursor-pointer">
-                        Recordarme
-                      </FormLabel>
+                      <FormLabel className="text-sm font-normal cursor-pointer">Recordarme</FormLabel>
                     </FormItem>
                   )}
                 />
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
+                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
                   ¿Olvidó su contraseña?
                 </Link>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
                 {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
               </Button>
             </form>
