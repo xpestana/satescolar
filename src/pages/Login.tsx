@@ -7,14 +7,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
 import logoBlack from "@/assets/logo-black.svg";
 import futuristicBg from "@/assets/futuristic.jpg";
@@ -68,7 +61,7 @@ export default function Login() {
     <div className="flex min-h-screen">
       {/* Left side - Image */}
       <div className="hidden lg:flex lg:w-3/5 relative overflow-hidden">
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center"
           style={{
             backgroundImage: `url(${futuristicBg})`,
@@ -83,25 +76,19 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8">
           {/* Logo */}
           <div className="flex justify-center">
-            <img src={logoBlack} alt="SAT Escolar" className="h-16" />
+            <img src={logoBlack} alt="SAT Escolar" className="h-32" />
           </div>
 
           {/* Welcome text */}
           <div className="text-center space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">
-              Bienvenido a SAT Escolar
-            </h1>
-            <p className="text-muted-foreground">
-              Gestiona, organiza y transforma tu institución educativa.
-            </p>
+            <h1 className="text-2xl font-bold text-foreground">Bienvenido a SAT Escolar</h1>
+            <p className="text-muted-foreground">Gestiona, organiza y transforma tu institución educativa.</p>
           </div>
 
           {/* Divider */}
           <div className="flex items-center gap-4">
             <div className="h-px flex-1 bg-border" />
-            <span className="text-sm font-medium text-muted-foreground">
-              Iniciar sesión
-            </span>
+            <span className="text-sm font-medium text-muted-foreground">Iniciar sesión</span>
             <div className="h-px flex-1 bg-border" />
           </div>
 
@@ -115,11 +102,7 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>Correo electrónico</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="correo@ejemplo.com"
-                        type="email"
-                        {...field}
-                      />
+                      <Input placeholder="correo@ejemplo.com" type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -167,31 +150,18 @@ export default function Login() {
                   render={({ field }) => (
                     <FormItem className="flex items-center space-x-2 space-y-0">
                       <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                      <FormLabel className="text-sm font-normal cursor-pointer">
-                        Recordarme
-                      </FormLabel>
+                      <FormLabel className="text-sm font-normal cursor-pointer">Recordarme</FormLabel>
                     </FormItem>
                   )}
                 />
-                <Link
-                  to="/forgot-password"
-                  className="text-sm text-primary hover:underline"
-                >
+                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
                   ¿Olvidó su contraseña?
                 </Link>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full"
-                size="lg"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
                 {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
               </Button>
             </form>
