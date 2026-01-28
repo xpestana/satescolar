@@ -33,7 +33,7 @@ export function TopBar() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-64 z-30 h-16 bg-[#01051e] flex items-center px-6">
+    <header className="fixed top-0 left-0 right-64 z-30 h-16 bg-transparent flex items-center px-6">
       <div className="flex items-center gap-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
