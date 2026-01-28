@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
+  GraduationCap,
   UsersRound,
   CreditCard,
   Settings,
@@ -11,14 +12,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import logo from "@/assets/logo.svg";
-import bookIcon from "@/assets/book-icon.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-
-// Custom Book Icon component
-const BookIcon = ({ className }: { className?: string }) => (
-  <img src={bookIcon} alt="" className={className} />
-);
 
 interface NavItem {
   label: string;
@@ -41,7 +36,7 @@ const navSections: NavSection[] = [
     title: "REGISTROS ADMIN",
     items: [
       { label: "Usuarios", href: "/admin/usuarios", icon: Users },
-      { label: "Colegios", href: "/admin/colegios", icon: BookIcon },
+      { label: "Colegios", href: "/admin/colegios", icon: GraduationCap },
     ],
   },
   {
