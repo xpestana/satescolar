@@ -316,26 +316,26 @@ export default function UsersList() {
         imageUrl="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=300&h=200&fit=crop"
       />
 
-      <div className="bg-card rounded-lg shadow-sm border">
+      <div className="bg-card rounded-xl shadow-sm border">
         {/* Toolbar */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <Button onClick={() => handleOpenDialog()}>
+        <div className="flex items-center justify-between p-5 border-b">
+          <Button onClick={() => handleOpenDialog()} className="shadow-sm">
             <Plus className="h-4 w-4 mr-2" />
             Agregar Usuario
           </Button>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar usuarios..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-64"
+                className="pl-10 w-72 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
               />
             </div>
-            <span className="text-sm text-muted-foreground">
-              Usuarios - Lista de Usuarios Registrados
+            <span className="text-sm text-muted-foreground hidden lg:block">
+              Lista de Usuarios Registrados
             </span>
           </div>
         </div>

@@ -7,6 +7,7 @@ import {
   CreditCard,
   Settings,
   LogOut,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -81,18 +82,18 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed right-0 top-0 z-40 flex h-screen w-64 flex-col bg-[#01051e] text-sidebar-foreground">
-      {/* Logo */}
-      <div className="flex items-center justify-center py-6">
-        <img src={logo} alt="SAT Escolar" className="h-32" />
+    <aside className="fixed right-0 top-0 z-40 flex h-screen w-64 flex-col">
+      {/* Logo Section - Dark Blue */}
+      <div className="flex items-center justify-center py-6 bg-[#01051e]">
+        <img src={logo} alt="SAT Escolar" className="h-28" />
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-4 pb-4">
+      {/* Navigation - White Background */}
+      <nav className="flex-1 overflow-y-auto px-4 py-4 bg-white border-l border-border">
         {navSections.map((section, sectionIndex) => (
           <div key={sectionIndex} className="mb-4">
             {section.title && (
-              <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+              <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {section.title}
               </h3>
             )}
@@ -107,8 +108,8 @@ export function AppSidebar() {
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                         isActive
-                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                          : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground hover:bg-muted"
                       )}
                     >
                       <Icon className="h-5 w-5" />
@@ -122,6 +123,34 @@ export function AppSidebar() {
         ))}
       </nav>
 
+      {/* User Card - Dark Blue */}
+      <div className="bg-[#01051e] p-4 border-l border-border">
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10 border-2 border-primary">
+            <AvatarImage src="" />
+            <AvatarFallback className="bg-primary/20 text-primary-foreground text-sm font-medium">
+              {getInitials(user?.email)}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate">
+              Colegio
+            </p>
+            <p className="text-xs text-white/70">
+              {getRoleLabel(userRole)}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={signOut}
+            className="text-white/70 hover:text-white hover:bg-white/10"
+            title="Cerrar sesión"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
     </aside>
   );
 }
