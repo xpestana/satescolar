@@ -22,14 +22,9 @@ export function PageHeader({ title, breadcrumbs, imageUrl }: PageHeaderProps) {
           <nav className="flex items-center gap-1.5 text-sm">
             {breadcrumbs.map((crumb, index) => (
               <span key={index} className="flex items-center gap-1.5">
-                {index > 0 && (
-                  <ChevronRight className="h-3.5 w-3.5 text-white/50" />
-                )}
+                {index > 0 && <ChevronRight className="h-3.5 w-3.5 text-white/50" />}
                 {crumb.href ? (
-                  <Link
-                    to={crumb.href}
-                    className="text-white/80 hover:text-white transition-colors"
-                  >
+                  <Link to={crumb.href} className="text-white/80 hover:text-white transition-colors">
                     {crumb.label}
                   </Link>
                 ) : (
@@ -40,11 +35,7 @@ export function PageHeader({ title, breadcrumbs, imageUrl }: PageHeaderProps) {
           </nav>
         </div>
         <div className="hidden md:block">
-          <img
-            src={bookImage}
-            alt=""
-            className="h-24 w-auto object-contain"
-          />
+          <img src={bookImage} alt="" className="h-32 w-auto object-contain" />
         </div>
       </div>
       {/* Decorative gradient */}
