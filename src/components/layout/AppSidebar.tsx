@@ -84,7 +84,7 @@ export function AppSidebar() {
     <aside className="fixed right-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
       {/* Logo */}
       <div className="flex items-center justify-center py-6">
-        <img src={logo} alt="SAT Escolar" className="h-12" />
+        <img src={logo} alt="SAT Escolar" className="h-32" />
       </div>
 
       {/* Navigation */}
