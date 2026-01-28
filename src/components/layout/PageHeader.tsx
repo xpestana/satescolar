@@ -14,15 +14,15 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, breadcrumbs, imageUrl }: PageHeaderProps) {
   return (
-    <div className="relative overflow-hidden rounded-xl bg-primary mb-8">
-      <div className="relative z-10 flex items-center justify-between px-8 py-8">
+    <div className="relative overflow-hidden rounded-xl bg-primary mb-6">
+      <div className="relative z-10 flex items-center justify-between px-6 py-5">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-3">{title}</h1>
-          <nav className="flex items-center gap-2 text-sm">
+          <h1 className="text-2xl font-bold text-white mb-1">{title}</h1>
+          <nav className="flex items-center gap-1.5 text-sm">
             {breadcrumbs.map((crumb, index) => (
-              <span key={index} className="flex items-center gap-2">
+              <span key={index} className="flex items-center gap-1.5">
                 {index > 0 && (
-                  <ChevronRight className="h-4 w-4 text-white/60" />
+                  <ChevronRight className="h-3.5 w-3.5 text-white/50" />
                 )}
                 {crumb.href ? (
                   <Link
@@ -43,13 +43,13 @@ export function PageHeader({ title, breadcrumbs, imageUrl }: PageHeaderProps) {
             <img
               src={imageUrl}
               alt=""
-              className="h-28 w-auto object-contain rounded-lg"
+              className="h-20 w-auto object-contain rounded-lg shadow-lg"
             />
           </div>
         )}
       </div>
       {/* Decorative gradient */}
-      <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/90 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/95 to-primary/80" />
     </div>
   );
 }
