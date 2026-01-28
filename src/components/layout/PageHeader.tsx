@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
+import bookImage from "@/assets/book-2.svg";
 
 interface Breadcrumb {
   label: string;
@@ -38,15 +39,13 @@ export function PageHeader({ title, breadcrumbs, imageUrl }: PageHeaderProps) {
             ))}
           </nav>
         </div>
-        {imageUrl && (
-          <div className="hidden md:block">
-            <img
-              src={imageUrl}
-              alt=""
-              className="h-20 w-auto object-contain rounded-lg shadow-lg"
-            />
-          </div>
-        )}
+        <div className="hidden md:block">
+          <img
+            src={bookImage}
+            alt=""
+            className="h-24 w-auto object-contain"
+          />
+        </div>
       </div>
       {/* Decorative gradient */}
       <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/95 to-primary/80" />
