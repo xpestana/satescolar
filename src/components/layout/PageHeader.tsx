@@ -35,7 +35,7 @@ export function PageHeader({ title, breadcrumbs, imageUrl }: PageHeaderProps) {
           </nav>
         </div>
         <div className="hidden md:block">
-          <img src={bookImage} alt="" className="h-16 w-32 object-contain" />
+          <img src={bookImage} alt="" className="h-16 w-full object-contain" />
         </div>
       </div>
       {/* Decorative gradient */}
