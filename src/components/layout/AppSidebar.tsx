@@ -81,7 +81,7 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed right-0 top-0 z-40 flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
+    <aside className="fixed right-0 top-0 z-40 flex h-screen w-64 flex-col bg-[#01051e] text-sidebar-foreground">
       {/* Logo */}
       <div className="flex items-center justify-center py-6">
         <img src={logo} alt="SAT Escolar" className="h-32" />
@@ -122,34 +122,6 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      {/* User section */}
-      <div className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarImage src="" />
-            <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground">
-              {getInitials(user?.email)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium text-sidebar-foreground">
-              {user?.email?.split("@")[0] || "Usuario"}
-            </p>
-            <p className="text-xs text-sidebar-foreground/60">
-              {getRoleLabel(userRole)}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            onClick={signOut}
-            title="Cerrar sesión"
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
     </aside>
   );
 }
