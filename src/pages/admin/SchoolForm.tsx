@@ -579,7 +579,7 @@ export default function SchoolForm() {
                     <Select
                       onValueChange={handleCityChange}
                       value={cityId || ""}
-                      disabled={!municipalityId || cities.length === 0}
+                      disabled={!stateId || cities.length === 0}
                     >
                       <FormControl>
                         <SelectTrigger>
