@@ -149,32 +149,33 @@ export default function SchoolForm() {
     setParishes(data || []);
   }, []);
 
-  // Handle state change
+  // Handle state change - now loads both municipalities AND cities
   const handleStateChange = useCallback((stateId: string) => {
     form.setValue("state_id", stateId);
     form.setValue("municipality_id", "");
     form.setValue("city_id", "");
     form.setValue("parish_id", "");
-    setCities([]);
     setParishes([]);
     fetchMunicipalities(stateId);
-  }, [form, fetchMunicipalities]);
+    fetchCities(stateId);
+  }, [form, fetchMunicipalities, fetchCities]);
 
-  // Handle municipality change
+  // Handle municipality change - now loads parishes directly
   const handleMunicipalityChange = useCallback((municipalityId: string) => {
     form.setValue("municipality_id", municipalityId);
-    form.setValue("city_id", "");
     form.setValue("parish_id", "");
-    setParishes([]);
-    fetchCities(municipalityId);
-  }, [form, fetchCities]);
+    fetchParishes(municipalityId);
+  }, [form, fetchParishes]);
 
   // Handle city change
   const handleCityChange = useCallback((cityId: string) => {
     form.setValue("city_id", cityId);
-    form.setValue("parish_id", "");
-    fetchParishes(cityId);
-  }, [form, fetchParishes]);
+  }, [form]);
+
+  // Handle parish change
+  const handleParishChange = useCallback((parishId: string) => {
+    form.setValue("parish_id", parishId);
+  }, [form]);
 
   // Handle parish change
   const handleParishChange = useCallback((parishId: string) => {
