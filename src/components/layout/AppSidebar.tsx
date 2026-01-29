@@ -19,11 +19,13 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
+  requiredRole?: "admin" | "school" | "representative";
 }
 
 interface NavSection {
   title?: string;
   items: NavItem[];
+  requiredRole?: "admin" | "school" | "representative";
 }
 
 const navSections: NavSection[] = [
@@ -34,9 +36,10 @@ const navSections: NavSection[] = [
   },
   {
     title: "REGISTROS ADMIN",
+    requiredRole: "admin",
     items: [
-      { label: "Usuarios", href: "/admin/usuarios", icon: Users },
-      { label: "Colegios", href: "/admin/colegios", icon: GraduationCap },
+      { label: "Usuarios", href: "/admin/usuarios", icon: Users, requiredRole: "admin" },
+      { label: "Colegios", href: "/admin/colegios", icon: GraduationCap, requiredRole: "admin" },
     ],
   },
   {
@@ -90,37 +93,53 @@ export function AppSidebar() {
 
       {/* Navigation - White Background */}
       <nav className="flex-1 overflow-y-auto px-4 py-4 bg-white border-l border-border">
-        {navSections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="mb-4">
-            {section.title && (
-              <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {section.title}
-              </h3>
-            )}
-            <ul className="space-y-1">
-              {section.items.map((item) => {
-                const isActive = location.pathname === item.href;
-                const Icon = item.icon;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      to={item.href}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "text-foreground hover:bg-muted"
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+        {navSections.map((section, sectionIndex) => {
+          // Hide entire section if it requires a role the user doesn't have
+          if (section.requiredRole && userRole !== section.requiredRole) {
+            return null;
+          }
+          
+          // Filter items based on required role
+          const visibleItems = section.items.filter(
+            (item) => !item.requiredRole || item.requiredRole === userRole
+          );
+          
+          if (visibleItems.length === 0) {
+            return null;
+          }
+          
+          return (
+            <div key={sectionIndex} className="mb-4">
+              {section.title && (
+                <h3 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {section.title}
+                </h3>
+              )}
+              <ul className="space-y-1">
+                {visibleItems.map((item) => {
+                  const isActive = location.pathname === item.href;
+                  const Icon = item.icon;
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        to={item.href}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-primary text-primary-foreground"
+                            : "text-foreground hover:bg-muted"
+                        )}
+                      >
+                        <Icon className="h-5 w-5" />
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
       {/* User Card - Dark Blue */}

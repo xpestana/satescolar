@@ -12,15 +12,6 @@ serve(async (req) => {
   }
 
   try {
-    const { user_ids } = await req.json();
-
-    if (!user_ids || !Array.isArray(user_ids)) {
-      return new Response(
-        JSON.stringify({ error: "user_ids array is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -31,6 +22,63 @@ serve(async (req) => {
         },
       }
     );
+
+    // Verify authorization header exists
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "No authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify the requesting user's token
+    const { data: { user: requestingUser } } = await supabaseAdmin.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+
+    if (!requestingUser) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if requesting user is admin
+    const { data: roleData } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", requestingUser.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!roleData) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Admin access required" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Now parse the request body
+    const { user_ids } = await req.json();
+
+    if (!user_ids || !Array.isArray(user_ids)) {
+      return new Response(
+        JSON.stringify({ error: "user_ids array is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate user_ids are valid UUIDs
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    for (const userId of user_ids) {
+      if (typeof userId !== "string" || !uuidRegex.test(userId)) {
+        return new Response(
+          JSON.stringify({ error: "Invalid user_id format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     // Get users from auth
     const users = [];
