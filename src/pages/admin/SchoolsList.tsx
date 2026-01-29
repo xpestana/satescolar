@@ -25,6 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Pagination } from "@/components/ui/data-pagination";
+import { SchoolDetailsModal } from "@/components/admin/SchoolDetailsModal";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -37,6 +38,12 @@ interface School {
   phone: string;
   email: string;
   rif: string;
+  logo_url?: string | null;
+  dea_code?: string;
+  statistical_code?: string;
+  fax?: string | null;
+  url?: string | null;
+  institution_type?: string;
 }
 
 export default function SchoolsList() {
@@ -44,12 +51,14 @@ export default function SchoolsList() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
 
   const fetchSchools = async () => {
     try {
       const { data, error } = await supabase
         .from("schools")
-        .select("id, name, address, phone, email, rif")
+        .select("id, name, address, phone, email, rif, logo_url, dea_code, statistical_code, fax, url, institution_type")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -173,11 +182,17 @@ export default function SchoolsList() {
                   <TableCell>{school.rif}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Link to={`/admin/colegios/${school.id}`}>
-                        <Button variant="ghost" size="icon" title="Ver detalles">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        title="Ver detalles"
+                        onClick={() => {
+                          setSelectedSchool(school);
+                          setDetailsModalOpen(true);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Link to={`/admin/colegios/${school.id}/editar`}>
                         <Button variant="ghost" size="icon" title="Editar">
                           <Pencil className="h-4 w-4" />
@@ -225,6 +240,12 @@ export default function SchoolsList() {
           itemsPerPage={ITEMS_PER_PAGE}
         />
       </div>
+
+      <SchoolDetailsModal
+        school={selectedSchool}
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
+      />
     </DashboardLayout>
   );
 }
