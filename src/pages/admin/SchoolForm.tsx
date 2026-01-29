@@ -121,30 +121,30 @@ export default function SchoolForm() {
     setMunicipalities(data || []);
   }, []);
 
-  // Fetch cities when municipality changes
-  const fetchCities = useCallback(async (municipalityId: string) => {
-    if (!municipalityId) {
+  // Fetch cities when state changes (cities now reference state_id directly)
+  const fetchCities = useCallback(async (stateId: string) => {
+    if (!stateId) {
       setCities([]);
       return;
     }
     const { data } = await supabase
       .from("cities")
       .select("id, name")
-      .eq("municipality_id", municipalityId)
+      .eq("state_id", stateId)
       .order("name");
     setCities(data || []);
   }, []);
 
-  // Fetch parishes when city changes
-  const fetchParishes = useCallback(async (cityId: string) => {
-    if (!cityId) {
+  // Fetch parishes when municipality changes (parishes now reference municipality_id directly)
+  const fetchParishes = useCallback(async (municipalityId: string) => {
+    if (!municipalityId) {
       setParishes([]);
       return;
     }
     const { data } = await supabase
       .from("parishes")
       .select("id, name")
-      .eq("city_id", cityId)
+      .eq("municipality_id", municipalityId)
       .order("name");
     setParishes(data || []);
   }, []);
