@@ -18,27 +18,30 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          municipality_id: string
+          legacy_id: number | null
           name: string
+          state_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
-          municipality_id: string
+          legacy_id?: number | null
           name: string
+          state_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
-          municipality_id?: string
+          legacy_id?: number | null
           name?: string
+          state_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "cities_municipality_id_fkey"
-            columns: ["municipality_id"]
+            foreignKeyName: "cities_state_id_fkey"
+            columns: ["state_id"]
             isOneToOne: false
-            referencedRelation: "municipalities"
+            referencedRelation: "states"
             referencedColumns: ["id"]
           },
         ]
@@ -47,18 +50,21 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          legacy_id: number | null
           name: string
           state_id: string
         }
         Insert: {
           created_at?: string
           id?: string
+          legacy_id?: number | null
           name: string
           state_id: string
         }
         Update: {
           created_at?: string
           id?: string
+          legacy_id?: number | null
           name?: string
           state_id?: string
         }
@@ -74,29 +80,32 @@ export type Database = {
       }
       parishes: {
         Row: {
-          city_id: string
           created_at: string
           id: string
+          legacy_id: number | null
+          municipality_id: string | null
           name: string
         }
         Insert: {
-          city_id: string
           created_at?: string
           id?: string
+          legacy_id?: number | null
+          municipality_id?: string | null
           name: string
         }
         Update: {
-          city_id?: string
           created_at?: string
           id?: string
+          legacy_id?: number | null
+          municipality_id?: string | null
           name?: string
         }
         Relationships: [
           {
-            foreignKeyName: "parishes_city_id_fkey"
-            columns: ["city_id"]
+            foreignKeyName: "parishes_municipality_id_fkey"
+            columns: ["municipality_id"]
             isOneToOne: false
-            referencedRelation: "cities"
+            referencedRelation: "municipalities"
             referencedColumns: ["id"]
           },
         ]
@@ -230,16 +239,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          legacy_id: number | null
           name: string
         }
         Insert: {
           created_at?: string
           id?: string
+          legacy_id?: number | null
           name: string
         }
         Update: {
           created_at?: string
           id?: string
+          legacy_id?: number | null
           name?: string
         }
         Relationships: []
