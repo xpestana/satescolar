@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Ban, CheckCircle } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -52,6 +53,7 @@ interface SchoolUser {
   school_id: string | null;
   school_name: string | null;
   role: string;
+  is_suspended: boolean;
 }
 
 interface School {
@@ -120,6 +122,7 @@ export default function UsersList() {
           school_id: role.school_id,
           school_name: role.schools?.name || null,
           role: role.role,
+          is_suspended: false, // Will be fetched
         });
       });
 
@@ -131,10 +134,11 @@ export default function UsersList() {
         });
 
         if (emailsData?.users) {
-          emailsData.users.forEach((u: { id: string; email: string }) => {
+          emailsData.users.forEach((u: { id: string; email: string; banned_until: string | null }) => {
             const user = usersMap.get(u.id);
             if (user) {
               user.email = u.email;
+              user.is_suspended = u.banned_until ? new Date(u.banned_until) > new Date() : false;
             }
           });
         }
@@ -288,6 +292,32 @@ export default function UsersList() {
     }
   };
 
+  const handleSuspendToggle = async (userId: string, currentlySuspended: boolean) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("suspend-user", {
+        body: { user_id: userId, suspend: !currentlySuspended },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setUsers(users.map((user) =>
+        user.user_id === userId
+          ? { ...user, is_suspended: !currentlySuspended }
+          : user
+      ));
+      
+      toast.success(
+        currentlySuspended
+          ? "Usuario reactivado correctamente"
+          : "Usuario suspendido correctamente"
+      );
+    } catch (error: any) {
+      console.error("Error toggling suspension:", error);
+      toast.error(error.message || "Error al cambiar el estado del usuario");
+    }
+  };
+
   const filteredUsers = users.filter(
     (user) =>
       user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -370,14 +400,33 @@ export default function UsersList() {
               </TableRow>
             ) : (
               paginatedUsers.map((user) => (
-                <TableRow key={user.id}>
+                <TableRow key={user.id} className={user.is_suspended ? "opacity-60 bg-muted/30" : ""}>
                   <TableCell className="font-medium max-w-xs truncate">
-                    {user.full_name}
+                    <div className="flex items-center gap-2">
+                      {user.full_name}
+                      {user.is_suspended && (
+                        <Badge variant="destructive" className="text-xs">
+                          Suspendido
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>{user.school_name || "—"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title={user.is_suspended ? "Reactivar usuario" : "Suspender usuario"}
+                        onClick={() => handleSuspendToggle(user.user_id, user.is_suspended)}
+                      >
+                        {user.is_suspended ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Ban className="h-4 w-4 text-orange-500" />
+                        )}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

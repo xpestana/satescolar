@@ -30,8 +30,10 @@ interface NavSection {
 
 const navSections: NavSection[] = [
   {
+    // Dashboard solo para admin
+    requiredRole: "admin",
     items: [
-      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, requiredRole: "admin" },
     ],
   },
   {
@@ -44,20 +46,23 @@ const navSections: NavSection[] = [
   },
   {
     title: "ÁREA DE REGISTROS",
+    requiredRole: "school",
     items: [
-      { label: "Familias", href: "/registros/familias", icon: UsersRound },
+      { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school" },
     ],
   },
   {
     title: "ÁREA ADMINISTRATIVA",
+    requiredRole: "school",
     items: [
-      { label: "Pagos", href: "/admin/pagos", icon: CreditCard },
+      { label: "Pagos", href: "/admin/pagos", icon: CreditCard, requiredRole: "school" },
     ],
   },
   {
     title: "ÁREA DE GESTIÓN DEL COLEGIO",
+    requiredRole: "school",
     items: [
-      { label: "Ajustes", href: "/gestion/ajustes", icon: Settings },
+      { label: "Ajustes", href: "/gestion/ajustes", icon: Settings, requiredRole: "school" },
     ],
   },
 ];

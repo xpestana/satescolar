@@ -88,6 +88,7 @@ serve(async (req) => {
         users.push({
           id: userData.user.id,
           email: userData.user.email,
+          banned_until: userData.user.banned_until,
         });
       }
     }
