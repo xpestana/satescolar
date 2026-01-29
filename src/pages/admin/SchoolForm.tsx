@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,6 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ImageCropModal } from "@/components/ImageCropModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -69,6 +71,9 @@ export default function SchoolForm() {
   const [municipalities, setMunicipalities] = useState<LocationOption[]>([]);
   const [cities, setCities] = useState<LocationOption[]>([]);
   const [parishes, setParishes] = useState<LocationOption[]>([]);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [logoBlob, setLogoBlob] = useState<Blob | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   const form = useForm<SchoolFormValues>({
     resolver: zodResolver(schoolSchema),
@@ -103,61 +108,78 @@ export default function SchoolForm() {
   }, []);
 
   // Fetch municipalities when state changes
-  const selectedStateId = form.watch("state_id");
-  useEffect(() => {
-    if (selectedStateId) {
-      const fetchMunicipalities = async () => {
-        const { data } = await supabase
-          .from("municipalities")
-          .select("id, name")
-          .eq("state_id", selectedStateId)
-          .order("name");
-        setMunicipalities(data || []);
-        form.setValue("municipality_id", "");
-        form.setValue("city_id", "");
-        form.setValue("parish_id", "");
-        setCities([]);
-        setParishes([]);
-      };
-      fetchMunicipalities();
+  const fetchMunicipalities = useCallback(async (stateId: string) => {
+    if (!stateId) {
+      setMunicipalities([]);
+      return;
     }
-  }, [selectedStateId, form]);
+    const { data } = await supabase
+      .from("municipalities")
+      .select("id, name")
+      .eq("state_id", stateId)
+      .order("name");
+    setMunicipalities(data || []);
+  }, []);
 
   // Fetch cities when municipality changes
-  const selectedMunicipalityId = form.watch("municipality_id");
-  useEffect(() => {
-    if (selectedMunicipalityId) {
-      const fetchCities = async () => {
-        const { data } = await supabase
-          .from("cities")
-          .select("id, name")
-          .eq("municipality_id", selectedMunicipalityId)
-          .order("name");
-        setCities(data || []);
-        form.setValue("city_id", "");
-        form.setValue("parish_id", "");
-        setParishes([]);
-      };
-      fetchCities();
+  const fetchCities = useCallback(async (municipalityId: string) => {
+    if (!municipalityId) {
+      setCities([]);
+      return;
     }
-  }, [selectedMunicipalityId, form]);
+    const { data } = await supabase
+      .from("cities")
+      .select("id, name")
+      .eq("municipality_id", municipalityId)
+      .order("name");
+    setCities(data || []);
+  }, []);
 
   // Fetch parishes when city changes
-  const selectedCityId = form.watch("city_id");
-  useEffect(() => {
-    if (selectedCityId) {
-      const fetchParishes = async () => {
-        const { data } = await supabase
-          .from("parishes")
-          .select("id, name")
-          .eq("city_id", selectedCityId)
-          .order("name");
-        setParishes(data || []);
-        form.setValue("parish_id", "");
-      };
-      fetchParishes();
+  const fetchParishes = useCallback(async (cityId: string) => {
+    if (!cityId) {
+      setParishes([]);
+      return;
     }
-  }, [selectedCityId, form]);
+    const { data } = await supabase
+      .from("parishes")
+      .select("id, name")
+      .eq("city_id", cityId)
+      .order("name");
+    setParishes(data || []);
+  }, []);
+
+  // Handle state change
+  const handleStateChange = useCallback((stateId: string) => {
+    form.setValue("state_id", stateId);
+    form.setValue("municipality_id", "");
+    form.setValue("city_id", "");
+    form.setValue("parish_id", "");
+    setCities([]);
+    setParishes([]);
+    fetchMunicipalities(stateId);
+  }, [form, fetchMunicipalities]);
+
+  // Handle municipality change
+  const handleMunicipalityChange = useCallback((municipalityId: string) => {
+    form.setValue("municipality_id", municipalityId);
+    form.setValue("city_id", "");
+    form.setValue("parish_id", "");
+    setParishes([]);
+    fetchCities(municipalityId);
+  }, [form, fetchCities]);
+
+  // Handle city change
+  const handleCityChange = useCallback((cityId: string) => {
+    form.setValue("city_id", cityId);
+    form.setValue("parish_id", "");
+    fetchParishes(cityId);
+  }, [form, fetchParishes]);
+
+  // Handle parish change
+  const handleParishChange = useCallback((parishId: string) => {
+    form.setValue("parish_id", parishId);
+  }, [form]);
 
   // Fetch school data if editing
   useEffect(() => {
@@ -191,14 +213,56 @@ export default function SchoolForm() {
           city_id: data.city_id || "",
           parish_id: data.parish_id || "",
         });
+
+        setLogoUrl(data.logo_url);
+
+        // Load cascading location data
+        if (data.state_id) {
+          await fetchMunicipalities(data.state_id);
+        }
+        if (data.municipality_id) {
+          await fetchCities(data.municipality_id);
+        }
+        if (data.city_id) {
+          await fetchParishes(data.city_id);
+        }
       };
       fetchSchool();
     }
-  }, [isEditing, id, form, navigate]);
+  }, [isEditing, id, form, navigate, fetchMunicipalities, fetchCities, fetchParishes]);
+
+  // Handle image crop save
+  const handleImageSave = (blob: Blob) => {
+    setLogoBlob(blob);
+    setLogoUrl(URL.createObjectURL(blob));
+  };
 
   const onSubmit = async (data: SchoolFormValues) => {
     setLoading(true);
     try {
+      let uploadedLogoUrl = logoUrl;
+
+      // Upload logo if there's a new one
+      if (logoBlob) {
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("school-logos")
+          .upload(fileName, logoBlob, {
+            contentType: "image/png",
+            upsert: false,
+          });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from("school-logos")
+          .getPublicUrl(uploadData.path);
+
+        uploadedLogoUrl = publicUrlData.publicUrl;
+      }
+
       const schoolData = {
         name: data.name,
         phone: data.phone,
@@ -214,6 +278,7 @@ export default function SchoolForm() {
         municipality_id: data.municipality_id || null,
         city_id: data.city_id || null,
         parish_id: data.parish_id || null,
+        logo_url: uploadedLogoUrl,
         created_by: user?.id,
       };
 
@@ -243,6 +308,11 @@ export default function SchoolForm() {
     }
   };
 
+  const stateId = form.watch("state_id");
+  const municipalityId = form.watch("municipality_id");
+  const cityId = form.watch("city_id");
+  const parishId = form.watch("parish_id");
+
   return (
     <DashboardLayout>
       <PageHeader
@@ -251,7 +321,6 @@ export default function SchoolForm() {
           { label: "Colegios", href: "/admin/colegios" },
           { label: isEditing ? "Editar Colegio" : "Crear Colegio" },
         ]}
-        imageUrl="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=300&h=200&fit=crop"
       />
 
       <div className="bg-card rounded-lg shadow-sm border">
@@ -271,12 +340,24 @@ export default function SchoolForm() {
         {/* Form */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 space-y-6">
-            {/* Image upload area */}
-            <div className="bg-muted rounded-lg p-8 flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 cursor-pointer hover:border-muted-foreground/50 transition-colors">
-              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Haz click o arrastra una imagen para continuar
-              </p>
+            {/* Logo upload area */}
+            <div 
+              className="bg-muted rounded-lg p-8 flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/25 cursor-pointer hover:border-muted-foreground/50 transition-colors"
+              onClick={() => setShowImageModal(true)}
+            >
+              {logoUrl ? (
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={logoUrl} alt="Logo" />
+                  <AvatarFallback>Logo</AvatarFallback>
+                </Avatar>
+              ) : (
+                <>
+                  <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    Haz click para agregar el logo
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Form fields grid */}
@@ -442,10 +523,10 @@ export default function SchoolForm() {
               <FormField
                 control={form.control}
                 name="state_id"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <FormLabel>Estado</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={handleStateChange} value={stateId || ""}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Estado" />
@@ -467,17 +548,17 @@ export default function SchoolForm() {
               <FormField
                 control={form.control}
                 name="municipality_id"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <FormLabel>Municipio</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={!selectedStateId}
+                      onValueChange={handleMunicipalityChange}
+                      value={municipalityId || ""}
+                      disabled={!stateId || municipalities.length === 0}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Municipio" />
+                          <SelectValue placeholder={municipalities.length === 0 && stateId ? "Sin municipios" : "Municipio"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -496,17 +577,17 @@ export default function SchoolForm() {
               <FormField
                 control={form.control}
                 name="city_id"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <FormLabel>Ciudad</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={!selectedMunicipalityId}
+                      onValueChange={handleCityChange}
+                      value={cityId || ""}
+                      disabled={!municipalityId || cities.length === 0}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Ciudad" />
+                          <SelectValue placeholder={cities.length === 0 && municipalityId ? "Sin ciudades" : "Ciudad"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -525,17 +606,17 @@ export default function SchoolForm() {
               <FormField
                 control={form.control}
                 name="parish_id"
-                render={({ field }) => (
+                render={() => (
                   <FormItem>
                     <FormLabel>Parroquia</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      disabled={!selectedCityId}
+                      onValueChange={handleParishChange}
+                      value={parishId || ""}
+                      disabled={!cityId || parishes.length === 0}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Parroquia" />
+                          <SelectValue placeholder={parishes.length === 0 && cityId ? "Sin parroquias" : "Parroquia"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -561,6 +642,14 @@ export default function SchoolForm() {
           </form>
         </Form>
       </div>
+
+      {/* Image crop modal */}
+      <ImageCropModal
+        open={showImageModal}
+        onClose={() => setShowImageModal(false)}
+        onSave={handleImageSave}
+        currentImage={logoUrl}
+      />
     </DashboardLayout>
   );
 }
