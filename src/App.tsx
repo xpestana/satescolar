@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
@@ -25,11 +26,46 @@ const App = () => (
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/admin/colegios" element={<SchoolsList />} />
-            <Route path="/admin/colegios/crear" element={<SchoolForm />} />
-            <Route path="/admin/colegios/:id/editar" element={<SchoolForm />} />
-            <Route path="/admin/usuarios" element={<UsersList />} />
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/colegios" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <SchoolsList />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/colegios/crear" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <SchoolForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/colegios/:id/editar" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <SchoolForm />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/usuarios" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <UsersList />
+                </ProtectedRoute>
+              } 
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
