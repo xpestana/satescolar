@@ -177,11 +177,6 @@ export default function SchoolForm() {
     form.setValue("parish_id", parishId);
   }, [form]);
 
-  // Handle parish change
-  const handleParishChange = useCallback((parishId: string) => {
-    form.setValue("parish_id", parishId);
-  }, [form]);
-
   // Fetch school data if editing
   useEffect(() => {
     if (isEditing && id) {
