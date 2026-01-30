@@ -128,7 +128,15 @@ export default function FormFieldsEditor() {
   const queryClient = useQueryClient();
   const { schoolId, isLoading: isLoadingSchool } = useSchoolId();
   
-  const formType = type as FormType;
+  // Map Spanish URLs to English form types
+  const typeMapping: Record<string, FormType> = {
+    "representantes": "representative",
+    "representative": "representative",
+    "estudiantes": "student",
+    "student": "student",
+  };
+  
+  const formType = typeMapping[type || ""] || null;
   const isValidType = formType === "representative" || formType === "student";
 
   const [isModalOpen, setIsModalOpen] = useState(false);

@@ -42,7 +42,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserPlus, Trash2, Info, X } from "lucide-react";
+import { UserPlus, Trash2, Info, X, Edit, Check } from "lucide-react";
 
 interface SchoolYear {
   id: string;
@@ -78,7 +78,6 @@ export default function SchoolYearsSections() {
   const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState<GradeLevel | null>(null);
   const [yearRange, setYearRange] = useState("");
-  const [deleteYearId, setDeleteYearId] = useState<string | null>(null);
   const [userSchoolId, setUserSchoolId] = useState<string | null>(null);
   
   // Section modal state
@@ -86,6 +85,10 @@ export default function SchoolYearsSections() {
   const [sectionsToCreate, setSectionsToCreate] = useState<string[]>([]);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionName, setEditingSectionName] = useState("");
+  
+  // School year editing state
+  const [editingYearId, setEditingYearId] = useState<string | null>(null);
+  const [editingYearRange, setEditingYearRange] = useState("");
 
   // Get user's school_id
   const { data: userRole } = useQuery({
@@ -176,29 +179,32 @@ export default function SchoolYearsSections() {
     },
   });
 
-  // Delete school year mutation
-  const deleteYearMutation = useMutation({
-    mutationFn: async (id: string) => {
+  // Update school year mutation
+  const updateYearMutation = useMutation({
+    mutationFn: async ({ id, yearRange }: { id: string; yearRange: string }) => {
       const { error } = await supabase
         .from("school_years")
-        .delete()
+        .update({ year_range: yearRange })
         .eq("id", id);
       
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["school-years"] });
-      setDeleteYearId(null);
+      setEditingYearId(null);
+      setEditingYearRange("");
       toast({
-        title: "Año escolar eliminado",
-        description: "El año escolar se ha eliminado correctamente.",
+        title: "Año escolar actualizado",
+        description: "El año escolar se ha actualizado correctamente.",
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudo eliminar el año escolar.",
+        description: error.message.includes("duplicate")
+          ? "Este año escolar ya existe."
+          : "No se pudo actualizar el año escolar.",
       });
     },
   });
@@ -453,11 +459,64 @@ export default function SchoolYearsSections() {
               ) : (
                 schoolYears.map((year) => (
                   <TableRow key={year.id}>
-                    <TableCell className="font-medium">{year.year_range}</TableCell>
+                    <TableCell className="font-medium">
+                      {editingYearId === year.id ? (
+                        <Input
+                          value={editingYearRange}
+                          onChange={(e) => setEditingYearRange(e.target.value)}
+                          placeholder="Ej: 2025-2026"
+                          className="w-40"
+                        />
+                      ) : (
+                        year.year_range
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <span className="text-xs text-muted-foreground">
-                        No se puede eliminar
-                      </span>
+                      {editingYearId === year.id ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              const regex = /^\d{4}\s*-\s*\d{4}$/;
+                              if (!regex.test(editingYearRange.trim())) {
+                                toast({
+                                  variant: "destructive",
+                                  title: "Formato inválido",
+                                  description: "El formato debe ser YYYY-YYYY (ej: 2025-2026)",
+                                });
+                                return;
+                              }
+                              const normalized = editingYearRange.replace(/\s/g, "").replace("-", " - ");
+                              updateYearMutation.mutate({ id: year.id, yearRange: normalized });
+                            }}
+                            disabled={updateYearMutation.isPending}
+                          >
+                            <Check className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setEditingYearId(null);
+                              setEditingYearRange("");
+                            }}
+                          >
+                            <X className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setEditingYearId(year.id);
+                            setEditingYearRange(year.year_range);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -588,11 +647,15 @@ export default function SchoolYearsSections() {
                     <div className="space-y-2">
                       <div className="flex gap-2">
                         <Input
-                          placeholder="Sección..."
+                          placeholder="Ej: A"
                           value={newSectionName}
-                          onChange={(e) => setNewSectionName(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+                            setNewSectionName(value);
+                          }}
+                          maxLength={1}
                           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSectionToCreate())}
-                          className="h-8 text-sm"
+                          className="h-8 text-sm text-center uppercase w-16"
                         />
                         <Button 
                           type="button" 
@@ -699,29 +762,6 @@ export default function SchoolYearsSections() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Year Confirmation Dialog */}
-      <AlertDialog open={!!deleteYearId} onOpenChange={() => setDeleteYearId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar año escolar?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente este año escolar.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteYearMutation.isPending}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteYearId && deleteYearMutation.mutate(deleteYearId)}
-              disabled={deleteYearMutation.isPending}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {deleteYearMutation.isPending ? "Eliminando..." : "Eliminar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </DashboardLayout>
   );
 }
