@@ -269,7 +269,7 @@ export default function UsersList() {
       fetchUsers();
     } catch (error: any) {
       console.error("Error saving user:", error);
-      toast.error(error.message || "Error al guardar el usuario");
+      toast.error("Error al guardar el usuario");
     } finally {
       setIsSaving(false);
     }

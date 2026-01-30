@@ -6,6 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Map internal errors to safe user-facing messages
+function getSafeErrorMessage(error: any): string {
+  console.error('Server error:', error);
+  
+  if (error.message?.includes('not found')) {
+    return 'Usuario no encontrado';
+  }
+  
+  return 'Error al actualizar el estado del usuario';
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -32,7 +43,7 @@ serve(async (req) => {
     
     if (authError || !requestingUser) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "No autorizado" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -47,7 +58,7 @@ serve(async (req) => {
 
     if (!roleData) {
       return new Response(
-        JSON.stringify({ error: "Forbidden - Admin access required" }),
+        JSON.stringify({ error: "Acceso denegado: se requiere rol de administrador" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -56,23 +67,19 @@ serve(async (req) => {
 
     if (!user_id) {
       return new Response(
-        JSON.stringify({ error: "user_id is required" }),
+        JSON.stringify({ error: "user_id es requerido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Ban or unban the user
-    // banned_until: null means not banned, a far future date means banned
-    const bannedUntil = suspend ? new Date("2099-12-31").toISOString() : null;
-
     const { data, error } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
       ban_duration: suspend ? "876000h" : "none", // 100 years or none
     });
 
     if (error) {
-      console.error("Error updating user ban status:", error);
       return new Response(
-        JSON.stringify({ error: error.message }),
+        JSON.stringify({ error: getSafeErrorMessage(error) }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -87,9 +94,8 @@ serve(async (req) => {
     );
   } catch (error: unknown) {
     console.error("Error:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Error interno del servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
