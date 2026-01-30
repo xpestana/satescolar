@@ -46,6 +46,62 @@ export type Database = {
           },
         ]
       }
+      form_fields: {
+        Row: {
+          created_at: string
+          field_label: string
+          field_name: string
+          field_order: number
+          field_type: Database["public"]["Enums"]["field_type"]
+          form_type: Database["public"]["Enums"]["form_type"]
+          id: string
+          is_required: boolean
+          is_visible: boolean
+          options: Json | null
+          placeholder: string | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          field_label: string
+          field_name: string
+          field_order?: number
+          field_type?: Database["public"]["Enums"]["field_type"]
+          form_type: Database["public"]["Enums"]["form_type"]
+          id?: string
+          is_required?: boolean
+          is_visible?: boolean
+          options?: Json | null
+          placeholder?: string | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          field_label?: string
+          field_name?: string
+          field_order?: number
+          field_type?: Database["public"]["Enums"]["field_type"]
+          form_type?: Database["public"]["Enums"]["form_type"]
+          id?: string
+          is_required?: boolean
+          is_visible?: boolean
+          options?: Json | null
+          placeholder?: string | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_fields_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       municipalities: {
         Row: {
           created_at: string
@@ -339,6 +395,17 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "school" | "representative"
+      field_type:
+        | "text"
+        | "email"
+        | "phone"
+        | "number"
+        | "date"
+        | "select"
+        | "textarea"
+        | "checkbox"
+        | "file"
+      form_type: "representative" | "student"
       institution_type: "public" | "private" | "subsidized" | "other"
     }
     CompositeTypes: {
@@ -468,6 +535,18 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "school", "representative"],
+      field_type: [
+        "text",
+        "email",
+        "phone",
+        "number",
+        "date",
+        "select",
+        "textarea",
+        "checkbox",
+        "file",
+      ],
+      form_type: ["representative", "student"],
       institution_type: ["public", "private", "subsidized", "other"],
     },
   },

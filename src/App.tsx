@@ -10,6 +10,8 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import SchoolDashboard from "./pages/school/SchoolDashboard";
 import SchoolYearsSections from "./pages/school/SchoolYearsSections";
+import FormBuilder from "./pages/school/FormBuilder";
+import FormFieldsEditor from "./pages/school/FormFieldsEditor";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import UsersList from "./pages/admin/UsersList";
@@ -49,6 +51,22 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="school">
                   <SchoolYearsSections />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/school/configuraciones/formularios" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <FormBuilder />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/school/configuraciones/formularios/:type" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <FormFieldsEditor />
                 </ProtectedRoute>
               } 
             />
