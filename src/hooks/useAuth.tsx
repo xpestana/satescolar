@@ -47,36 +47,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Get initial session first
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          const role = await fetchUserRole(session.user.id);
-          if (mounted) {
-            setUserRole(role);
-          }
-        }
-      } catch (error) {
-        console.error("Error initializing auth:", error);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    initAuth();
-
-    // Set up auth state listener
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log("Auth state change:", event, session?.user?.email);
         
         if (!mounted) return;
@@ -85,18 +58,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user role
-          const role = await fetchUserRole(session.user.id);
-          if (mounted) {
-            setUserRole(role);
-            setLoading(false);
-          }
+          // Fetch user role - use setTimeout to avoid Supabase deadlock
+          setTimeout(async () => {
+            if (!mounted) return;
+            const role = await fetchUserRole(session.user.id);
+            if (mounted) {
+              setUserRole(role);
+              setLoading(false);
+            }
+          }, 0);
         } else {
           setUserRole(null);
           setLoading(false);
         }
       }
     );
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserRole(session.user.id).then((role) => {
+          if (mounted) {
+            setUserRole(role);
+            setLoading(false);
+          }
+        });
+      } else {
+        setLoading(false);
+      }
+    });
 
     return () => {
       mounted = false;
