@@ -334,6 +334,17 @@ export default function SchoolYearsSections() {
     if (!newSectionName.trim()) return;
     
     const normalized = newSectionName.trim().toUpperCase();
+    
+    // Validate: must be a single letter A-Z
+    if (!/^[A-Z]$/.test(normalized)) {
+      toast({
+        variant: "destructive",
+        title: "Formato inválido",
+        description: "La sección debe ser una sola letra (A-Z).",
+      });
+      return;
+    }
+    
     if (sectionsToCreate.includes(normalized)) {
       toast({
         variant: "destructive",
@@ -444,14 +455,9 @@ export default function SchoolYearsSections() {
                   <TableRow key={year.id}>
                     <TableCell className="font-medium">{year.year_range}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteYearId(year.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        No se puede eliminar
+                      </span>
                     </TableCell>
                   </TableRow>
                 ))
