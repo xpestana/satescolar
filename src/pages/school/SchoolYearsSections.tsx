@@ -662,160 +662,151 @@ export default function SchoolYearsSections() {
 
       {/* Sections Modal */}
       <Dialog open={isSectionModalOpen} onOpenChange={(open) => !open && closeSectionModal()}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader className="bg-primary -m-6 mb-4 p-6 rounded-t-lg">
-            <DialogTitle className="text-white text-xl">Agregar sección</DialogTitle>
+            <DialogTitle className="text-white text-xl">
+              {editingSectionId ? "Modificar sección" : "Agregar sección"}
+            </DialogTitle>
           </DialogHeader>
           
-          <div className="py-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[150px]">Grado</TableHead>
-                  <TableHead>Secciones creadas</TableHead>
-                  <TableHead>Secciones a crear</TableHead>
-                  <TableHead>Secciones a modificar</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium align-top">
-                    {selectedGrade && getGradeLabel(selectedGrade)}
-                  </TableCell>
-                  <TableCell className="align-top">
-                    {currentGradeSections.length === 0 ? (
-                      <span className="text-muted-foreground text-sm">Sin secciones</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1">
-                        {currentGradeSections.map(s => (
-                          <Badge 
-                            key={s.id} 
-                            variant="secondary"
-                            className="cursor-pointer hover:bg-secondary/80"
-                            onClick={() => startEditingSection(s)}
-                          >
-                            {s.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="align-top">
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Ej: A"
-                          value={newSectionName}
-                          onChange={(e) => {
-                            const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
-                            setNewSectionName(value);
-                          }}
-                          maxLength={1}
-                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSectionToCreate())}
-                          className="h-8 text-sm text-center uppercase w-16"
-                        />
-                        <Button 
-                          type="button" 
-                          size="sm" 
-                          onClick={addSectionToCreate}
-                          disabled={!newSectionName.trim()}
+          <div className="py-4 space-y-4">
+            <div className="flex items-center gap-4">
+              <Label className="font-medium w-20">Grado:</Label>
+              <span className="text-muted-foreground">
+                {selectedGrade && getGradeLabel(selectedGrade)}
+              </span>
+            </div>
+            
+            {editingSectionId ? (
+              // Editing existing section
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Label className="font-medium w-20">Sección:</Label>
+                  <Input
+                    value={editingSectionName}
+                    onChange={(e) => {
+                      const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+                      setEditingSectionName(value);
+                    }}
+                    maxLength={1}
+                    className="h-9 text-center uppercase w-16"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={cancelEditingSection}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="button"
+                    onClick={saveEditingSection}
+                    disabled={updateSectionMutation.isPending || !editingSectionName.trim()}
+                  >
+                    {updateSectionMutation.isPending ? "Guardando..." : "Guardar"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // Creating new sections
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Label className="font-medium w-20">Sección:</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Ej: A"
+                      value={newSectionName}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+                        setNewSectionName(value);
+                      }}
+                      maxLength={1}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSectionToCreate())}
+                      className="h-9 text-center uppercase w-16"
+                      autoFocus
+                    />
+                    <Button 
+                      type="button" 
+                      size="sm" 
+                      onClick={addSectionToCreate}
+                      disabled={!newSectionName.trim()}
+                      className="h-9"
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+                
+                {sectionsToCreate.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Secciones a crear:</Label>
+                    <div className="flex flex-wrap gap-1">
+                      {sectionsToCreate.map(name => (
+                        <Badge 
+                          key={name} 
+                          variant="default"
+                          className="gap-1"
                         >
-                          +
-                        </Button>
-                      </div>
-                      {sectionsToCreate.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {sectionsToCreate.map(name => (
-                            <Badge 
-                              key={name} 
-                              variant="default"
-                              className="gap-1"
-                            >
-                              {name}
-                              <button
-                                type="button"
-                                onClick={() => removeSectionToCreate(name)}
-                                className="ml-1 hover:text-destructive"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
+                          {name}
+                          <button
+                            type="button"
+                            onClick={() => removeSectionToCreate(name)}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
                     </div>
-                  </TableCell>
-                  <TableCell className="align-top">
-                    {editingSectionId ? (
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <Input
-                            value={editingSectionName}
-                            onChange={(e) => setEditingSectionName(e.target.value)}
-                            className="h-8 text-sm"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button 
-                            type="button" 
-                            size="sm" 
-                            variant="outline"
-                            onClick={cancelEditingSection}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button 
-                            type="button" 
-                            size="sm"
-                            onClick={saveEditingSection}
-                            disabled={updateSectionMutation.isPending}
-                          >
-                            Guardar
-                          </Button>
-                          <Button 
-                            type="button" 
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => {
-                              deleteSectionMutation.mutate(editingSectionId);
-                              setEditingSectionId(null);
-                            }}
-                            disabled={deleteSectionMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">
-                        Selecciona una sección para editar
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+                  </div>
+                )}
+                
+                {currentGradeSections.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label className="text-sm text-muted-foreground">
+                      Secciones existentes (clic para editar):
+                    </Label>
+                    <div className="flex flex-wrap gap-1">
+                      {currentGradeSections.map(s => (
+                        <Badge 
+                          key={s.id} 
+                          variant="secondary"
+                          className="cursor-pointer hover:bg-secondary/80"
+                          onClick={() => startEditingSection(s)}
+                        >
+                          {s.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              className="text-destructive hover:text-destructive"
-              onClick={closeSectionModal}
-            >
-              Cancelar
-            </Button>
-            {sectionsToCreate.length > 0 && (
+          {!editingSectionId && (
+            <DialogFooter>
               <Button
                 type="button"
-                onClick={handleSaveSections}
-                disabled={createSectionsMutation.isPending}
+                variant="ghost"
+                onClick={closeSectionModal}
               >
-                {createSectionsMutation.isPending ? "Guardando..." : "Guardar secciones"}
+                Cancelar
               </Button>
-            )}
-          </DialogFooter>
+              {sectionsToCreate.length > 0 && (
+                <Button
+                  type="button"
+                  onClick={handleSaveSections}
+                  disabled={createSectionsMutation.isPending}
+                >
+                  {createSectionsMutation.isPending ? "Guardando..." : "Guardar secciones"}
+                </Button>
+              )}
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
