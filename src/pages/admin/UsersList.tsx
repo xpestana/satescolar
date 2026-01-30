@@ -332,22 +332,37 @@ export default function UsersList() {
         body: { user_id: userId },
       });
 
+      console.log("Impersonate response:", { data, error });
+
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
       if (data?.session) {
+        console.log("Setting session with tokens...");
+        
         // Set the new session directly (replaces current session)
-        const { error: sessionError } = await supabase.auth.setSession({
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
 
-        if (sessionError) throw sessionError;
+        console.log("setSession result:", { sessionData, sessionError });
+
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          throw sessionError;
+        }
+
+        if (!sessionData.session) {
+          throw new Error("No se pudo establecer la sesión");
+        }
 
         toast.success(`Sesión iniciada como ${userName}`);
         
-        // Use window.location for a full page reload to ensure clean state
-        window.location.href = "/school/dashboard";
+        // Small delay to ensure session is persisted, then redirect
+        setTimeout(() => {
+          window.location.href = "/school/dashboard";
+        }, 100);
       } else {
         throw new Error("No se recibió la sesión del servidor");
       }
