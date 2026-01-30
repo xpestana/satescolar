@@ -18,7 +18,14 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
       navigate("/login");
     }
     if (!loading && user && requiredRole && userRole !== requiredRole) {
-      navigate("/dashboard");
+      // Redirect to appropriate dashboard based on role
+      if (userRole === "admin") {
+        navigate("/dashboard");
+      } else if (userRole === "school") {
+        navigate("/school/dashboard");
+      } else {
+        navigate("/login");
+      }
     }
   }, [user, loading, userRole, requiredRole, navigate]);
 

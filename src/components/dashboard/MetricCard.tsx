@@ -7,6 +7,7 @@ interface MetricCardProps {
   value: string | number;
   icon: ReactNode;
   variant: "purple" | "orange" | "blue" | "pink" | "green" | "cyan";
+  subtitle?: string;
 }
 
 const variantStyles = {
@@ -42,7 +43,7 @@ const variantStyles = {
   },
 };
 
-export function MetricCard({ title, value, icon, variant }: MetricCardProps) {
+export function MetricCard({ title, value, icon, variant, subtitle }: MetricCardProps) {
   const styles = variantStyles[variant];
 
   return (
@@ -53,6 +54,9 @@ export function MetricCard({ title, value, icon, variant }: MetricCardProps) {
         </div>
         <p className={cn("text-sm font-medium mb-1", styles.title)}>{title}</p>
         <p className="text-2xl font-bold text-foreground">{value}</p>
+        {subtitle && (
+          <p className={cn("text-xs mt-1", styles.title)}>{subtitle}</p>
+        )}
       </CardContent>
     </Card>
   );
