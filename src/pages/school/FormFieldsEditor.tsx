@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -321,8 +321,14 @@ export default function FormFieldsEditor() {
     return option?.label || type;
   };
 
+  // Handle invalid type redirect with useEffect
+  useEffect(() => {
+    if (!isValidType) {
+      navigate("/school/configuraciones/formularios");
+    }
+  }, [isValidType, navigate]);
+
   if (!isValidType) {
-    navigate("/school/configuraciones/formularios");
     return null;
   }
 
