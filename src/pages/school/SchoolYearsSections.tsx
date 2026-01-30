@@ -42,7 +42,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserPlus, Trash2, Info, X, Edit, Check } from "lucide-react";
+import { UserPlus, Trash2, Info, X, Edit, Check, Power } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface SchoolYear {
   id: string;
@@ -205,6 +206,47 @@ export default function SchoolYearsSections() {
         description: error.message.includes("duplicate")
           ? "Este año escolar ya existe."
           : "No se pudo actualizar el año escolar.",
+      });
+    },
+  });
+
+  // Toggle active school year mutation
+  const toggleActiveYearMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      if (!userSchoolId) throw new Error("No school assigned");
+      
+      if (isActive) {
+        // First, deactivate all other years for this school
+        const { error: deactivateError } = await supabase
+          .from("school_years")
+          .update({ is_active: false })
+          .eq("school_id", userSchoolId);
+        
+        if (deactivateError) throw deactivateError;
+      }
+      
+      // Then, set the selected year's active status
+      const { error } = await supabase
+        .from("school_years")
+        .update({ is_active: isActive })
+        .eq("id", id);
+      
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["school-years"] });
+      toast({
+        title: variables.isActive ? "Año escolar activado" : "Año escolar desactivado",
+        description: variables.isActive 
+          ? "Este año escolar es ahora el activo." 
+          : "El año escolar ha sido desactivado.",
+      });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo cambiar el estado del año escolar.",
       });
     },
   });
@@ -440,19 +482,20 @@ export default function SchoolYearsSections() {
             <TableHeader>
               <TableRow>
                 <TableHead>Año Escolar</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : schoolYears.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                     No hay datos disponibles.
                   </TableCell>
                 </TableRow>
@@ -470,6 +513,20 @@ export default function SchoolYearsSections() {
                       ) : (
                         year.year_range
                       )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Switch
+                          checked={year.is_active}
+                          onCheckedChange={(checked) => 
+                            toggleActiveYearMutation.mutate({ id: year.id, isActive: checked })
+                          }
+                          disabled={toggleActiveYearMutation.isPending}
+                        />
+                        <Badge variant={year.is_active ? "default" : "secondary"}>
+                          {year.is_active ? "Activo" : "Inactivo"}
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       {editingYearId === year.id ? (
