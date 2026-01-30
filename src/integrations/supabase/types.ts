@@ -326,6 +326,41 @@ export type Database = {
           },
         ]
       }
+      sections: {
+        Row: {
+          created_at: string
+          grade_level: Database["public"]["Enums"]["grade_level"]
+          id: string
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          grade_level: Database["public"]["Enums"]["grade_level"]
+          id?: string
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          grade_level?: Database["public"]["Enums"]["grade_level"]
+          id?: string
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sections_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       states: {
         Row: {
           created_at: string
@@ -406,6 +441,13 @@ export type Database = {
         | "checkbox"
         | "file"
       form_type: "representative" | "student"
+      grade_level:
+        | "pre_maternal"
+        | "maternal"
+        | "inicial"
+        | "primaria"
+        | "media_general"
+        | "media_tecnica"
       institution_type: "public" | "private" | "subsidized" | "other"
     }
     CompositeTypes: {
@@ -547,6 +589,14 @@ export const Constants = {
         "file",
       ],
       form_type: ["representative", "student"],
+      grade_level: [
+        "pre_maternal",
+        "maternal",
+        "inicial",
+        "primaria",
+        "media_general",
+        "media_tecnica",
+      ],
       institution_type: ["public", "private", "subsidized", "other"],
     },
   },
