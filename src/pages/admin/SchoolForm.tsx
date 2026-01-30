@@ -296,9 +296,7 @@ export default function SchoolForm() {
       navigate("/admin/colegios");
     } catch (error: any) {
       console.error("Error saving school:", error);
-      toast.error("Error al guardar el colegio", {
-        description: error.message,
-      });
+      toast.error("Error al guardar el colegio");
     } finally {
       setLoading(false);
     }

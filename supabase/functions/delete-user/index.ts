@@ -6,6 +6,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Map internal errors to safe user-facing messages
+function getSafeErrorMessage(error: any): string {
+  console.error('Server error:', error);
+  
+  if (error.message?.includes('not found')) {
+    return 'Usuario no encontrado';
+  }
+  if (error.message?.includes('foreign key') || error.message?.includes('referenced')) {
+    return 'No se puede eliminar el usuario debido a datos relacionados';
+  }
+  
+  return 'Error al eliminar el usuario';
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -16,7 +30,7 @@ serve(async (req) => {
 
     if (!user_id) {
       return new Response(
-        JSON.stringify({ error: "user_id is required" }),
+        JSON.stringify({ error: "user_id es requerido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -36,7 +50,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: "No authorization header" }),
+        JSON.stringify({ error: "No autorizado" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -48,7 +62,7 @@ serve(async (req) => {
 
     if (!requestingUser) {
       return new Response(
-        JSON.stringify({ error: "Invalid token" }),
+        JSON.stringify({ error: "Token inválido" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -63,7 +77,7 @@ serve(async (req) => {
 
     if (!roleData) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized: Admin access required" }),
+        JSON.stringify({ error: "Acceso denegado: se requiere rol de administrador" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -73,7 +87,7 @@ serve(async (req) => {
 
     if (deleteError) {
       return new Response(
-        JSON.stringify({ error: deleteError.message }),
+        JSON.stringify({ error: getSafeErrorMessage(deleteError) }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -85,7 +99,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: "Error interno del servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

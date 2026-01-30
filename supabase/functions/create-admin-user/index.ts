@@ -6,6 +6,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Allowed roles that can be assigned via this endpoint (excludes 'admin' for security)
+const ALLOWED_ROLES = ['school', 'representative'];
+
+// Map internal errors to safe user-facing messages
+function getSafeErrorMessage(error: any): string {
+  console.error('Server error:', error);
+  
+  if (error.message?.includes('duplicate') || error.message?.includes('already registered')) {
+    return 'Ya existe un usuario con ese correo electrónico';
+  }
+  if (error.message?.includes('invalid email')) {
+    return 'El correo electrónico no es válido';
+  }
+  if (error.message?.includes('password')) {
+    return 'La contraseña no cumple con los requisitos de seguridad';
+  }
+  
+  return 'Error al procesar la solicitud';
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -29,7 +49,7 @@ serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: "No authorization header" }),
+        JSON.stringify({ error: "No autorizado" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -41,7 +61,7 @@ serve(async (req) => {
 
     if (authError || !requestingUser) {
       return new Response(
-        JSON.stringify({ error: "Invalid token" }),
+        JSON.stringify({ error: "Token inválido" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -56,7 +76,7 @@ serve(async (req) => {
 
     if (!roleData) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized: Admin access required" }),
+        JSON.stringify({ error: "Acceso denegado: se requiere rol de administrador" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -67,7 +87,30 @@ serve(async (req) => {
     // Validate required fields
     if (!email || !password) {
       return new Response(
-        JSON.stringify({ error: "Email and password are required" }),
+        JSON.stringify({ error: "Email y contraseña son requeridos" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate role parameter - prevent admin creation via this endpoint
+    if (!role) {
+      return new Response(
+        JSON.stringify({ error: "El rol es requerido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!ALLOWED_ROLES.includes(role)) {
+      return new Response(
+        JSON.stringify({ error: "Rol no válido. Solo se permiten los roles 'school' y 'representative'" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate school_id is provided for school role
+    if (role === 'school' && !school_id) {
+      return new Response(
+        JSON.stringify({ error: "school_id es requerido para el rol 'school'" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -82,7 +125,7 @@ serve(async (req) => {
 
     if (createError) {
       return new Response(
-        JSON.stringify({ error: createError.message }),
+        JSON.stringify({ error: getSafeErrorMessage(createError) }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -99,6 +142,7 @@ serve(async (req) => {
 
       if (roleError) {
         console.error("Error assigning role:", roleError);
+        // Don't expose role error details to client
       }
     }
 
@@ -112,7 +156,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({ error: "Error interno del servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
