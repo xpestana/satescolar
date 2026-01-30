@@ -325,6 +325,8 @@ export default function UsersList() {
     if (isImpersonating) return;
     
     setIsImpersonating(true);
+    toast.info(`Iniciando sesión como ${userName}...`);
+    
     try {
       const { data, error } = await supabase.functions.invoke("impersonate-user", {
         body: { user_id: userId },
@@ -334,24 +336,24 @@ export default function UsersList() {
       if (data?.error) throw new Error(data.error);
 
       if (data?.session) {
-        // Sign out current admin
-        await supabase.auth.signOut();
-        
-        // Set the new session
-        await supabase.auth.setSession({
+        // Set the new session directly (replaces current session)
+        const { error: sessionError } = await supabase.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
 
-        toast.success(`Iniciando sesión como ${userName}`);
+        if (sessionError) throw sessionError;
+
+        toast.success(`Sesión iniciada como ${userName}`);
         
-        // Redirect to school dashboard
-        navigate("/school/dashboard");
+        // Use window.location for a full page reload to ensure clean state
+        window.location.href = "/school/dashboard";
+      } else {
+        throw new Error("No se recibió la sesión del servidor");
       }
     } catch (error: any) {
       console.error("Error impersonating user:", error);
-      toast.error("Error al iniciar sesión como usuario");
-    } finally {
+      toast.error(error.message || "Error al iniciar sesión como usuario");
       setIsImpersonating(false);
     }
   };
