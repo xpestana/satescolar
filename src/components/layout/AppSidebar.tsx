@@ -45,6 +45,13 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    // Dashboard para school
+    requiredRole: "school",
+    items: [
+      { label: "Inicio", href: "/school/dashboard", icon: LayoutDashboard, requiredRole: "school" },
+    ],
+  },
+  {
     title: "ÁREA DE REGISTROS",
     requiredRole: "school",
     items: [

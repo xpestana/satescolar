@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,8 +24,22 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, userRole, user } = useAuth();
+
+  // Redirect after login when role is available
+  useEffect(() => {
+    if (loginSuccess && user && userRole) {
+      if (userRole === "admin") {
+        navigate("/dashboard");
+      } else if (userRole === "school") {
+        navigate("/school/dashboard");
+      } else {
+        navigate("/dashboard");
+      }
+    }
+  }, [loginSuccess, user, userRole, navigate]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -46,7 +60,7 @@ export default function Login() {
         });
       } else {
         toast.success("¡Bienvenido!");
-        navigate("/dashboard");
+        setLoginSuccess(true);
       }
     } catch (error) {
       toast.error("Error inesperado", {
