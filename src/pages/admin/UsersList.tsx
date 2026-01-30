@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Pencil, Trash2, Ban, CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Search, Pencil, Trash2, Ban, CheckCircle, LogIn } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,7 @@ interface UserFormData {
 }
 
 export default function UsersList() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<SchoolUser[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,7 @@ export default function UsersList() {
     school_id: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isImpersonating, setIsImpersonating] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -318,6 +321,41 @@ export default function UsersList() {
     }
   };
 
+  const handleImpersonate = async (userId: string, userName: string) => {
+    if (isImpersonating) return;
+    
+    setIsImpersonating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("impersonate-user", {
+        body: { user_id: userId },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.session) {
+        // Sign out current admin
+        await supabase.auth.signOut();
+        
+        // Set the new session
+        await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+
+        toast.success(`Iniciando sesión como ${userName}`);
+        
+        // Redirect to school dashboard
+        navigate("/school/dashboard");
+      }
+    } catch (error: any) {
+      console.error("Error impersonating user:", error);
+      toast.error("Error al iniciar sesión como usuario");
+    } finally {
+      setIsImpersonating(false);
+    }
+  };
+
   const filteredUsers = users.filter(
     (user) =>
       user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -415,6 +453,15 @@ export default function UsersList() {
                   <TableCell>{user.school_name || "—"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Iniciar sesión como este usuario"
+                        onClick={() => handleImpersonate(user.user_id, user.full_name)}
+                        disabled={user.is_suspended || isImpersonating}
+                      >
+                        <LogIn className="h-4 w-4 text-primary" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
