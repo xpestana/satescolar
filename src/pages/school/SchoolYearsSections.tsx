@@ -15,7 +15,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -30,12 +29,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserPlus, Trash2, Info } from "lucide-react";
+import { UserPlus, Trash2, Info, X } from "lucide-react";
 
 interface SchoolYear {
   id: string;
@@ -45,14 +52,40 @@ interface SchoolYear {
   created_at: string;
 }
 
+type GradeLevel = "pre_maternal" | "maternal" | "inicial" | "primaria" | "media_general" | "media_tecnica";
+
+interface Section {
+  id: string;
+  school_id: string;
+  grade_level: GradeLevel;
+  name: string;
+}
+
+const GRADE_LEVELS: { value: GradeLevel; label: string }[] = [
+  { value: "pre_maternal", label: "Pre-Maternal" },
+  { value: "maternal", label: "Maternal" },
+  { value: "inicial", label: "Inicial" },
+  { value: "primaria", label: "Primaria" },
+  { value: "media_general", label: "Media General" },
+  { value: "media_tecnica", label: "Media Técnica" },
+];
+
 export default function SchoolYearsSections() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isYearModalOpen, setIsYearModalOpen] = useState(false);
+  const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
+  const [selectedGrade, setSelectedGrade] = useState<GradeLevel | null>(null);
   const [yearRange, setYearRange] = useState("");
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteYearId, setDeleteYearId] = useState<string | null>(null);
   const [userSchoolId, setUserSchoolId] = useState<string | null>(null);
+  
+  // Section modal state
+  const [newSectionName, setNewSectionName] = useState("");
+  const [sectionsToCreate, setSectionsToCreate] = useState<string[]>([]);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionName, setEditingSectionName] = useState("");
 
   // Get user's school_id
   const { data: userRole } = useQuery({
@@ -89,8 +122,28 @@ export default function SchoolYearsSections() {
     enabled: !!userSchoolId,
   });
 
+  // Fetch all sections
+  const { data: allSections = [] } = useQuery({
+    queryKey: ["sections", userSchoolId],
+    queryFn: async () => {
+      if (!userSchoolId) return [];
+      const { data, error } = await supabase
+        .from("sections")
+        .select("*")
+        .eq("school_id", userSchoolId)
+        .order("name", { ascending: true });
+      
+      if (error) throw error;
+      return data as Section[];
+    },
+    enabled: !!userSchoolId,
+  });
+
+  // Get sections for current grade
+  const currentGradeSections = allSections.filter(s => s.grade_level === selectedGrade);
+
   // Create school year mutation
-  const createMutation = useMutation({
+  const createYearMutation = useMutation({
     mutationFn: async (yearRange: string) => {
       if (!userSchoolId) throw new Error("No school assigned");
       
@@ -105,7 +158,7 @@ export default function SchoolYearsSections() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["school-years"] });
-      setIsModalOpen(false);
+      setIsYearModalOpen(false);
       setYearRange("");
       toast({
         title: "Año escolar creado",
@@ -124,7 +177,7 @@ export default function SchoolYearsSections() {
   });
 
   // Delete school year mutation
-  const deleteMutation = useMutation({
+  const deleteYearMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("school_years")
@@ -135,7 +188,7 @@ export default function SchoolYearsSections() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["school-years"] });
-      setDeleteId(null);
+      setDeleteYearId(null);
       toast({
         title: "Año escolar eliminado",
         description: "El año escolar se ha eliminado correctamente.",
@@ -150,10 +203,101 @@ export default function SchoolYearsSections() {
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Create sections mutation
+  const createSectionsMutation = useMutation({
+    mutationFn: async (names: string[]) => {
+      if (!userSchoolId || !selectedGrade) throw new Error("No school or grade selected");
+      
+      const sectionsToInsert = names.map(name => ({
+        school_id: userSchoolId,
+        grade_level: selectedGrade,
+        name: name.trim().toUpperCase(),
+      }));
+      
+      const { error } = await supabase
+        .from("sections")
+        .insert(sectionsToInsert);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sections"] });
+      setSectionsToCreate([]);
+      toast({
+        title: "Secciones creadas",
+        description: "Las secciones se han creado correctamente.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message.includes("duplicate")
+          ? "Una o más secciones ya existen."
+          : "No se pudieron crear las secciones.",
+      });
+    },
+  });
+
+  // Update section mutation
+  const updateSectionMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase
+        .from("sections")
+        .update({ name: name.trim().toUpperCase() })
+        .eq("id", id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sections"] });
+      setEditingSectionId(null);
+      setEditingSectionName("");
+      toast({
+        title: "Sección actualizada",
+        description: "La sección se ha actualizado correctamente.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message.includes("duplicate")
+          ? "Ya existe una sección con ese nombre."
+          : "No se pudo actualizar la sección.",
+      });
+    },
+  });
+
+  // Delete section mutation
+  const deleteSectionMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("sections")
+        .delete()
+        .eq("id", id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sections"] });
+      toast({
+        title: "Sección eliminada",
+        description: "La sección se ha eliminado correctamente.",
+      });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo eliminar la sección.",
+      });
+    },
+  });
+
+  const handleYearSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate format: YYYY-YYYY or YYYY - YYYY
     const regex = /^\d{4}\s*-\s*\d{4}$/;
     if (!regex.test(yearRange.trim())) {
       toast({
@@ -164,23 +308,89 @@ export default function SchoolYearsSections() {
       return;
     }
     
-    // Normalize format
     const normalized = yearRange.replace(/\s/g, "").replace("-", " - ");
-    createMutation.mutate(normalized);
+    createYearMutation.mutate(normalized);
+  };
+
+  const openSectionModal = (grade: GradeLevel) => {
+    setSelectedGrade(grade);
+    setSectionsToCreate([]);
+    setNewSectionName("");
+    setEditingSectionId(null);
+    setEditingSectionName("");
+    setIsSectionModalOpen(true);
+  };
+
+  const closeSectionModal = () => {
+    setIsSectionModalOpen(false);
+    setSelectedGrade(null);
+    setSectionsToCreate([]);
+    setNewSectionName("");
+    setEditingSectionId(null);
+    setEditingSectionName("");
+  };
+
+  const addSectionToCreate = () => {
+    if (!newSectionName.trim()) return;
+    
+    const normalized = newSectionName.trim().toUpperCase();
+    if (sectionsToCreate.includes(normalized)) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Ya agregaste esta sección.",
+      });
+      return;
+    }
+    if (currentGradeSections.some(s => s.name === normalized)) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Esta sección ya existe.",
+      });
+      return;
+    }
+    
+    setSectionsToCreate([...sectionsToCreate, normalized]);
+    setNewSectionName("");
+  };
+
+  const removeSectionToCreate = (name: string) => {
+    setSectionsToCreate(sectionsToCreate.filter(s => s !== name));
+  };
+
+  const handleSaveSections = () => {
+    if (sectionsToCreate.length > 0) {
+      createSectionsMutation.mutate(sectionsToCreate);
+    }
+  };
+
+  const startEditingSection = (section: Section) => {
+    setEditingSectionId(section.id);
+    setEditingSectionName(section.name);
+  };
+
+  const cancelEditingSection = () => {
+    setEditingSectionId(null);
+    setEditingSectionName("");
+  };
+
+  const saveEditingSection = () => {
+    if (!editingSectionId || !editingSectionName.trim()) return;
+    updateSectionMutation.mutate({ id: editingSectionId, name: editingSectionName });
+  };
+
+  const getGradeLabel = (grade: GradeLevel) => {
+    return GRADE_LEVELS.find(g => g.value === grade)?.label || grade;
+  };
+
+  const getSectionsForGrade = (grade: GradeLevel) => {
+    return allSections.filter(s => s.grade_level === grade);
   };
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/school/dashboard" },
     { label: "Configuraciones - Años Escolares y Secciones del Colegio" },
-  ];
-
-  const sectionTypes = [
-    "Pre-Maternal",
-    "Maternal",
-    "Inicial",
-    "Primaria",
-    "Media General",
-    "Media Técnica",
   ];
 
   return (
@@ -190,7 +400,7 @@ export default function SchoolYearsSections() {
       {/* School Years Section */}
       <Card className="mb-6">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <Button onClick={() => setIsModalOpen(true)} className="gap-2">
+          <Button onClick={() => setIsYearModalOpen(true)} className="gap-2">
             <UserPlus className="h-4 w-4" />
             Agregar Año Escolar
           </Button>
@@ -237,7 +447,7 @@ export default function SchoolYearsSections() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setDeleteId(year.id)}
+                        onClick={() => setDeleteYearId(year.id)}
                         className="text-destructive hover:text-destructive hover:bg-destructive/10"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -258,26 +468,40 @@ export default function SchoolYearsSections() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sectionTypes.map((section) => (
-              <Button
-                key={section}
-                variant="outline"
-                className="h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
-              >
-                Agregar Sección En {section}
-              </Button>
-            ))}
+            {GRADE_LEVELS.map((grade) => {
+              const sections = getSectionsForGrade(grade.value);
+              return (
+                <div key={grade.value} className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
+                    onClick={() => openSectionModal(grade.value)}
+                  >
+                    Agregar Sección En {grade.label}
+                  </Button>
+                  {sections.length > 0 && (
+                    <div className="flex flex-wrap gap-1 px-2">
+                      {sections.map(s => (
+                        <Badge key={s.id} variant="secondary" className="text-xs">
+                          {s.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
 
-      {/* Create Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      {/* Create Year Modal */}
+      <Dialog open={isYearModalOpen} onOpenChange={setIsYearModalOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader className="bg-primary -m-6 mb-4 p-6 rounded-t-lg">
             <DialogTitle className="text-white text-xl">Nuevo Año Escolar</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleYearSubmit}>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Input
@@ -296,8 +520,8 @@ export default function SchoolYearsSections() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => setIsModalOpen(false)}
-                disabled={createMutation.isPending}
+                onClick={() => setIsYearModalOpen(false)}
+                disabled={createYearMutation.isPending}
               >
                 Cancelar
               </Button>
@@ -305,17 +529,172 @@ export default function SchoolYearsSections() {
                 type="submit"
                 variant="ghost"
                 className="text-primary hover:text-primary"
-                disabled={createMutation.isPending}
+                disabled={createYearMutation.isPending}
               >
-                {createMutation.isPending ? "Guardando..." : "Guardar"}
+                {createYearMutation.isPending ? "Guardando..." : "Guardar"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+      {/* Sections Modal */}
+      <Dialog open={isSectionModalOpen} onOpenChange={(open) => !open && closeSectionModal()}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader className="bg-primary -m-6 mb-4 p-6 rounded-t-lg">
+            <DialogTitle className="text-white text-xl">Agregar sección</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[150px]">Grado</TableHead>
+                  <TableHead>Secciones creadas</TableHead>
+                  <TableHead>Secciones a crear</TableHead>
+                  <TableHead>Secciones a modificar</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium align-top">
+                    {selectedGrade && getGradeLabel(selectedGrade)}
+                  </TableCell>
+                  <TableCell className="align-top">
+                    {currentGradeSections.length === 0 ? (
+                      <span className="text-muted-foreground text-sm">Sin secciones</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {currentGradeSections.map(s => (
+                          <Badge 
+                            key={s.id} 
+                            variant="secondary"
+                            className="cursor-pointer hover:bg-secondary/80"
+                            onClick={() => startEditingSection(s)}
+                          >
+                            {s.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Sección..."
+                          value={newSectionName}
+                          onChange={(e) => setNewSectionName(e.target.value)}
+                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSectionToCreate())}
+                          className="h-8 text-sm"
+                        />
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          onClick={addSectionToCreate}
+                          disabled={!newSectionName.trim()}
+                        >
+                          +
+                        </Button>
+                      </div>
+                      {sectionsToCreate.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {sectionsToCreate.map(name => (
+                            <Badge 
+                              key={name} 
+                              variant="default"
+                              className="gap-1"
+                            >
+                              {name}
+                              <button
+                                type="button"
+                                onClick={() => removeSectionToCreate(name)}
+                                className="ml-1 hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    {editingSectionId ? (
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            value={editingSectionName}
+                            onChange={(e) => setEditingSectionName(e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="outline"
+                            onClick={cancelEditingSection}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button 
+                            type="button" 
+                            size="sm"
+                            onClick={saveEditingSection}
+                            disabled={updateSectionMutation.isPending}
+                          >
+                            Guardar
+                          </Button>
+                          <Button 
+                            type="button" 
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => {
+                              deleteSectionMutation.mutate(editingSectionId);
+                              setEditingSectionId(null);
+                            }}
+                            disabled={deleteSectionMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">
+                        Selecciona una sección para editar
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              onClick={closeSectionModal}
+            >
+              Cancelar
+            </Button>
+            {sectionsToCreate.length > 0 && (
+              <Button
+                type="button"
+                onClick={handleSaveSections}
+                disabled={createSectionsMutation.isPending}
+              >
+                {createSectionsMutation.isPending ? "Guardando..." : "Guardar secciones"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Year Confirmation Dialog */}
+      <AlertDialog open={!!deleteYearId} onOpenChange={() => setDeleteYearId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar año escolar?</AlertDialogTitle>
@@ -324,15 +703,15 @@ export default function SchoolYearsSections() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
+            <AlertDialogCancel disabled={deleteYearMutation.isPending}>
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteId && deleteMutation.mutate(deleteId)}
-              disabled={deleteMutation.isPending}
+              onClick={() => deleteYearId && deleteYearMutation.mutate(deleteYearId)}
+              disabled={deleteYearMutation.isPending}
               className="bg-destructive hover:bg-destructive/90"
             >
-              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+              {deleteYearMutation.isPending ? "Eliminando..." : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
