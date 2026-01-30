@@ -27,25 +27,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener BEFORE getting session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("Auth state change:", event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user role
-          setTimeout(async () => {
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id)
-              .maybeSingle();
-            
-            setUserRole(roleData?.role as AppRole || null);
-          }, 0);
+          // Fetch user role - DON'T set loading to false until role is loaded
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          
+          console.log("Role loaded:", roleData?.role);
+          setUserRole(roleData?.role as AppRole || null);
+          setLoading(false);
         } else {
           setUserRole(null);
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
