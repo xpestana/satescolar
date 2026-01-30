@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import SchoolDashboard from "./pages/school/SchoolDashboard";
+import SchoolYearsSections from "./pages/school/SchoolYearsSections";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import UsersList from "./pages/admin/UsersList";
@@ -40,6 +41,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="school">
                   <SchoolDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/school/configuraciones/anos-secciones" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <SchoolYearsSections />
                 </ProtectedRoute>
               } 
             />

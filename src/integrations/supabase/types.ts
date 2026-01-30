@@ -140,6 +140,41 @@ export type Database = {
         }
         Relationships: []
       }
+      school_years: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          school_id: string
+          updated_at: string
+          year_range: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          updated_at?: string
+          year_range: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          updated_at?: string
+          year_range?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_years_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schools: {
         Row: {
           address: string
