@@ -12,6 +12,10 @@ import SchoolDashboard from "./pages/school/SchoolDashboard";
 import SchoolYearsSections from "./pages/school/SchoolYearsSections";
 import FormBuilder from "./pages/school/FormBuilder";
 import FormFieldsEditor from "./pages/school/FormFieldsEditor";
+import FamiliesList from "./pages/school/FamiliesList";
+import EditFamily from "./pages/school/EditFamily";
+import AddStudent from "./pages/school/AddStudent";
+import AddRepresentative from "./pages/school/AddRepresentative";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import UsersList from "./pages/admin/UsersList";
@@ -67,6 +71,54 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="school">
                   <FormFieldsEditor />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/familias" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <FamiliesList />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/familias/:familyId/editar" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <EditFamily />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/familias/:familyId/estudiante/nuevo" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <AddStudent />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/familias/:familyId/estudiante/:studentId/editar" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <AddStudent />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/familias/:familyId/representante/nuevo" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <AddRepresentative />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/familias/:familyId/representante/:representativeId/editar" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <AddRepresentative />
                 </ProtectedRoute>
               } 
             />
