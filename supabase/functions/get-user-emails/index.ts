@@ -44,23 +44,24 @@ serve(async (req) => {
       );
     }
 
-    // Check if requesting user is admin
+    // Check if requesting user is admin or school
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", requestingUser.id)
-      .eq("role", "admin")
+      .in("role", ["admin", "school"])
       .maybeSingle();
 
     if (!roleData) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized: Admin access required" }),
+        JSON.stringify({ error: "Unauthorized: Access denied" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Now parse the request body
-    const { user_ids } = await req.json();
+    // Now parse the request body - support both userIds and user_ids
+    const body = await req.json();
+    const user_ids = body.user_ids || body.userIds;
 
     if (!user_ids || !Array.isArray(user_ids)) {
       return new Response(
@@ -93,8 +94,14 @@ serve(async (req) => {
       }
     }
 
+    // Return as both users array and emails map for compatibility
+    const emails: Record<string, string> = {};
+    for (const user of users) {
+      emails[user.id] = user.email || "";
+    }
+
     return new Response(
-      JSON.stringify({ users }),
+      JSON.stringify({ users, emails }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
