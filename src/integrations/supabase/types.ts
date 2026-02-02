@@ -46,6 +46,138 @@ export type Database = {
           },
         ]
       }
+      families: {
+        Row: {
+          additional_phone: string | null
+          address: string | null
+          city_id: string | null
+          contact_phone: string | null
+          created_at: string
+          dependents_count: number | null
+          emergency_contact: string | null
+          father_last_name: string | null
+          housing_details: string | null
+          housing_sector: string | null
+          housing_type: string | null
+          id: string
+          income_contributor: string | null
+          is_suspended: boolean
+          monthly_housing_payment: string | null
+          monthly_income: number | null
+          mother_last_name: string | null
+          municipality_id: string | null
+          parents_marital_status: string | null
+          parish_id: string | null
+          property_ownership: string | null
+          religion: string | null
+          rooms_count: number | null
+          school_id: string
+          state_id: string | null
+          transport_companion: string | null
+          transport_method: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          additional_phone?: string | null
+          address?: string | null
+          city_id?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          dependents_count?: number | null
+          emergency_contact?: string | null
+          father_last_name?: string | null
+          housing_details?: string | null
+          housing_sector?: string | null
+          housing_type?: string | null
+          id?: string
+          income_contributor?: string | null
+          is_suspended?: boolean
+          monthly_housing_payment?: string | null
+          monthly_income?: number | null
+          mother_last_name?: string | null
+          municipality_id?: string | null
+          parents_marital_status?: string | null
+          parish_id?: string | null
+          property_ownership?: string | null
+          religion?: string | null
+          rooms_count?: number | null
+          school_id: string
+          state_id?: string | null
+          transport_companion?: string | null
+          transport_method?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          additional_phone?: string | null
+          address?: string | null
+          city_id?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          dependents_count?: number | null
+          emergency_contact?: string | null
+          father_last_name?: string | null
+          housing_details?: string | null
+          housing_sector?: string | null
+          housing_type?: string | null
+          id?: string
+          income_contributor?: string | null
+          is_suspended?: boolean
+          monthly_housing_payment?: string | null
+          monthly_income?: number | null
+          mother_last_name?: string | null
+          municipality_id?: string | null
+          parents_marital_status?: string | null
+          parish_id?: string | null
+          property_ownership?: string | null
+          religion?: string | null
+          rooms_count?: number | null
+          school_id?: string
+          state_id?: string | null
+          transport_companion?: string | null
+          transport_method?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "families_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "cities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "families_municipality_id_fkey"
+            columns: ["municipality_id"]
+            isOneToOne: false
+            referencedRelation: "municipalities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "families_parish_id_fkey"
+            columns: ["parish_id"]
+            isOneToOne: false
+            referencedRelation: "parishes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "families_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "families_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_fields: {
         Row: {
           created_at: string
@@ -195,6 +327,60 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      representatives: {
+        Row: {
+          created_at: string
+          document_id: string | null
+          email: string | null
+          family_id: string
+          form_data: Json | null
+          id: string
+          phone: string | null
+          photo_url: string | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_id?: string | null
+          email?: string | null
+          family_id: string
+          form_data?: Json | null
+          id?: string
+          phone?: string | null
+          photo_url?: string | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string | null
+          email?: string | null
+          family_id?: string
+          form_data?: Json | null
+          id?: string
+          phone?: string | null
+          photo_url?: string | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "representatives_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "representatives_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       school_years: {
         Row: {
@@ -382,6 +568,57 @@ export type Database = {
         }
         Relationships: []
       }
+      students: {
+        Row: {
+          created_at: string
+          document_id: string | null
+          family_id: string
+          form_data: Json | null
+          id: string
+          photo_url: string | null
+          school_id: string
+          status: Database["public"]["Enums"]["student_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_id?: string | null
+          family_id: string
+          form_data?: Json | null
+          id?: string
+          photo_url?: string | null
+          school_id: string
+          status?: Database["public"]["Enums"]["student_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string | null
+          family_id?: string
+          form_data?: Json | null
+          id?: string
+          photo_url?: string | null
+          school_id?: string
+          status?: Database["public"]["Enums"]["student_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -449,6 +686,7 @@ export type Database = {
         | "media_general"
         | "media_tecnica"
       institution_type: "public" | "private" | "subsidized" | "other"
+      student_status: "active" | "suspended" | "graduated" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -598,6 +836,7 @@ export const Constants = {
         "media_tecnica",
       ],
       institution_type: ["public", "private", "subsidized", "other"],
+      student_status: ["active", "suspended", "graduated", "completed"],
     },
   },
 } as const
