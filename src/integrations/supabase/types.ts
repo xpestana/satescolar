@@ -178,6 +178,47 @@ export type Database = {
           },
         ]
       }
+      form_field_groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          form_type: Database["public"]["Enums"]["form_type"]
+          id: string
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          form_type: Database["public"]["Enums"]["form_type"]
+          id?: string
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          form_type?: Database["public"]["Enums"]["form_type"]
+          id?: string
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_field_groups_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_fields: {
         Row: {
           created_at: string
@@ -186,6 +227,7 @@ export type Database = {
           field_order: number
           field_type: Database["public"]["Enums"]["field_type"]
           form_type: Database["public"]["Enums"]["form_type"]
+          group_id: string | null
           id: string
           is_required: boolean
           is_visible: boolean
@@ -201,6 +243,7 @@ export type Database = {
           field_order?: number
           field_type?: Database["public"]["Enums"]["field_type"]
           form_type: Database["public"]["Enums"]["form_type"]
+          group_id?: string | null
           id?: string
           is_required?: boolean
           is_visible?: boolean
@@ -216,6 +259,7 @@ export type Database = {
           field_order?: number
           field_type?: Database["public"]["Enums"]["field_type"]
           form_type?: Database["public"]["Enums"]["form_type"]
+          group_id?: string | null
           id?: string
           is_required?: boolean
           is_visible?: boolean
@@ -225,6 +269,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "form_fields_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "form_field_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "form_fields_school_id_fkey"
             columns: ["school_id"]
