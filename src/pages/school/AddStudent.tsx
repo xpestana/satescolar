@@ -6,8 +6,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -16,11 +14,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, AlertCircle, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/families/PhotoUpload";
+import { GroupedFormFields } from "@/components/forms/GroupedFormFields";
 import type { Json } from "@/integrations/supabase/types";
 
 interface FormField {
@@ -33,6 +33,14 @@ interface FormField {
   placeholder: string | null;
   options: Json | null;
   field_order: number;
+  group_id: string | null;
+}
+
+interface FormFieldGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  display_order: number;
 }
 
 export default function AddStudent() {
@@ -64,7 +72,7 @@ export default function AddStudent() {
   });
 
   // Fetch form fields for student form
-  const { data: formFields } = useQuery({
+  const { data: formFields = [] } = useQuery({
     queryKey: ["form-fields", schoolId, "student"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -76,6 +84,22 @@ export default function AddStudent() {
         .order("field_order");
       if (error) throw error;
       return data as FormField[];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch form field groups
+  const { data: formGroups = [] } = useQuery({
+    queryKey: ["form-field-groups", schoolId, "student"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("form_field_groups")
+        .select("*")
+        .eq("school_id", schoolId)
+        .eq("form_type", "student")
+        .order("display_order");
+      if (error) throw error;
+      return data as FormFieldGroup[];
     },
     enabled: !!schoolId,
   });
@@ -194,97 +218,6 @@ export default function AddStudent() {
     return "Por definir";
   };
 
-  const renderField = (field: FormField) => {
-    const value = formData[field.field_name] || "";
-
-    switch (field.field_type) {
-      case "textarea":
-        return (
-          <Textarea
-            placeholder={field.placeholder || field.field_label}
-            value={value}
-            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-          />
-        );
-      case "select":
-        const options = Array.isArray(field.options) ? field.options : [];
-        return (
-          <Select
-            value={value}
-            onValueChange={(val) => handleFieldChange(field.field_name, val)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={field.placeholder || field.field_label} />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((opt: any, idx: number) => (
-                <SelectItem key={idx} value={String(opt)}>
-                  {String(opt)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        );
-      case "checkbox":
-        return (
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id={field.field_name}
-              checked={!!value}
-              onCheckedChange={(checked) => handleFieldChange(field.field_name, checked)}
-            />
-            <label htmlFor={field.field_name} className="text-sm">
-              {field.field_label}
-            </label>
-          </div>
-        );
-      case "date":
-        return (
-          <Input
-            type="date"
-            value={value}
-            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-          />
-        );
-      case "number":
-        return (
-          <Input
-            type="number"
-            placeholder={field.placeholder || field.field_label}
-            value={value}
-            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-          />
-        );
-      case "email":
-        return (
-          <Input
-            type="email"
-            placeholder={field.placeholder || field.field_label}
-            value={value}
-            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-          />
-        );
-      case "phone":
-        return (
-          <Input
-            type="tel"
-            placeholder={field.placeholder || field.field_label}
-            value={value}
-            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-          />
-        );
-      default:
-        return (
-          <Input
-            type="text"
-            placeholder={field.placeholder || field.field_label}
-            value={value}
-            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
-          />
-        );
-    }
-  };
-
   return (
     <DashboardLayout>
       <PageHeader
@@ -296,66 +229,65 @@ export default function AddStudent() {
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Header */}
-        <div className="bg-card rounded-lg shadow-sm border p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">
-              {isEditing ? "Editar" : "Agregar"} Estudiante - Familia {getFamilyName()}
-            </h2>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => navigate("/registros/familias")}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver
-            </Button>
-          </div>
-
-          <Alert className="border-orange-200 bg-orange-50 mb-4">
-            <AlertCircle className="h-4 w-4 text-orange-500" />
-            <AlertDescription className="text-orange-700">
-              Es importante que sus datos de estudiante estén actualizados para una mejor comunicación.
-            </AlertDescription>
-          </Alert>
-
-          <div className="flex items-start gap-2 p-4 bg-muted/50 rounded-lg">
-            <Home className="h-5 w-5 text-muted-foreground mt-0.5" />
-            <div>
-              <p className="font-medium">Importante:</p>
-              <p className="text-sm text-muted-foreground">
-                Lea cuidadosamente cada campo antes de completarlo. Es fundamental ingresar la información de manera clara y precisa para garantizar la correcta gestión de los datos y el adecuado registro en el sistema.
-              </p>
+        {/* Header Card */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">
+                {isEditing ? "Editar" : "Agregar"} Estudiante - Familia {getFamilyName()}
+              </h2>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => navigate("/registros/familias")}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Volver
+              </Button>
             </div>
-          </div>
-        </div>
 
-        {/* Student Form */}
-        <div className="bg-card rounded-lg shadow-sm border p-6">
-          <h3 className="text-lg font-semibold mb-4">
-            {isEditing ? "Modificar Estudiante" : "Nuevo Estudiante"}
-          </h3>
+            <Alert className="border-orange-200 bg-orange-50 mb-4">
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+              <AlertDescription className="text-orange-700">
+                Es importante que sus datos de estudiante estén actualizados para una mejor comunicación.
+              </AlertDescription>
+            </Alert>
 
-          <div className="space-y-6">
-            <div>
-              <h4 className="font-semibold mb-2">Datos Básicos</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Por favor, indique la cédula de identidad o la cédula estudiantil del estudiante. En caso de no contar con una, puede ingresar la cédula del representante legal.
-              </p>
-
-              {/* Photo Upload */}
-              <div className="flex justify-center mb-6">
-                <div className="w-full max-w-md">
-                  <PhotoUpload
-                    value={existingStudent?.photo_url}
-                    onChange={setPhotoBlob}
-                    label="Ingrese la foto de perfil"
-                  />
-                </div>
+            <div className="flex items-start gap-2 p-4 bg-muted/50 rounded-lg">
+              <Home className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div>
+                <p className="font-medium">Importante:</p>
+                <p className="text-sm text-muted-foreground">
+                  Lea cuidadosamente cada campo antes de completarlo. Es fundamental ingresar la información de manera clara y precisa para garantizar la correcta gestión de los datos y el adecuado registro en el sistema.
+                </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
 
-              {/* Document ID */}
-              <div className="space-y-2 mb-4">
+        {/* Photo and Base Fields Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Foto y Documento</CardTitle>
+            <CardDescription>
+              Por favor, indique la cédula de identidad o la cédula estudiantil del estudiante.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Photo Upload */}
+            <div className="flex justify-center mb-6">
+              <div className="w-full max-w-md">
+                <PhotoUpload
+                  value={existingStudent?.photo_url}
+                  onChange={setPhotoBlob}
+                  label="Ingrese la foto de perfil"
+                />
+              </div>
+            </div>
+
+            {/* Document ID and Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="document_id">Documento de Identidad</Label>
                 <Input
                   id="document_id"
@@ -365,9 +297,8 @@ export default function AddStudent() {
                 />
               </div>
 
-              {/* Status (only for editing) */}
               {isEditing && (
-                <div className="space-y-2 mb-4">
+                <div className="space-y-2">
                   <Label>Estado del Estudiante</Label>
                   <Select value={status} onValueChange={setStatus}>
                     <SelectTrigger>
@@ -382,40 +313,35 @@ export default function AddStudent() {
                   </Select>
                 </div>
               )}
-
-              {/* Dynamic Fields */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {formFields?.map((field) => (
-                  <div key={field.id} className="space-y-2">
-                    {field.field_type !== "checkbox" && (
-                      <Label htmlFor={field.field_name}>
-                        {field.field_label}
-                        {field.is_required && <span className="text-destructive ml-1">*</span>}
-                      </Label>
-                    )}
-                    {renderField(field)}
-                  </div>
-                ))}
-              </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Submit */}
-        <div className="bg-card rounded-lg shadow-sm border p-6">
-          <div className="flex items-center justify-between">
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => navigate("/registros/familias")}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? "Guardando..." : "Guardar Y Continuar"}
-            </Button>
-          </div>
-        </div>
+        {/* Dynamic Grouped Fields */}
+        <GroupedFormFields
+          fields={formFields}
+          groups={formGroups}
+          formData={formData}
+          onFieldChange={handleFieldChange}
+        />
+
+        {/* Submit Card */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => navigate("/registros/familias")}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Guardando..." : "Guardar Y Continuar"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </form>
     </DashboardLayout>
   );

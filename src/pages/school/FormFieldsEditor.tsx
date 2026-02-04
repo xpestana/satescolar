@@ -80,6 +80,16 @@ interface FormField {
   is_visible: boolean;
   field_order: number;
   options: string[] | null;
+  group_id: string | null;
+}
+
+interface FormFieldGroup {
+  id: string;
+  school_id: string;
+  form_type: FormType;
+  name: string;
+  description: string | null;
+  display_order: number;
 }
 
 const FIELD_TYPE_OPTIONS: { value: FieldType; label: string; icon: React.ElementType }[] = [
@@ -150,6 +160,7 @@ export default function FormFieldsEditor() {
   const [fieldType, setFieldType] = useState<FieldType>("text");
   const [placeholder, setPlaceholder] = useState("");
   const [isRequired, setIsRequired] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   // Fetch form fields
   const { data: fields = [], isLoading } = useQuery({
@@ -165,6 +176,24 @@ export default function FormFieldsEditor() {
       
       if (error) throw error;
       return data as FormField[];
+    },
+    enabled: !!schoolId && isValidType,
+  });
+
+  // Fetch form field groups
+  const { data: groups = [] } = useQuery({
+    queryKey: ["form-field-groups", schoolId, formType],
+    queryFn: async () => {
+      if (!schoolId || !isValidType) return [];
+      const { data, error } = await supabase
+        .from("form_field_groups")
+        .select("*")
+        .eq("school_id", schoolId)
+        .eq("form_type", formType)
+        .order("display_order", { ascending: true });
+      
+      if (error) throw error;
+      return data as FormFieldGroup[];
     },
     enabled: !!schoolId && isValidType,
   });
@@ -269,6 +298,7 @@ export default function FormFieldsEditor() {
     setFieldType("text");
     setPlaceholder("");
     setIsRequired(false);
+    setSelectedGroupId(null);
   };
 
   const openCreateModal = () => {
@@ -283,6 +313,7 @@ export default function FormFieldsEditor() {
     setFieldType(field.field_type);
     setPlaceholder(field.placeholder || "");
     setIsRequired(field.is_required);
+    setSelectedGroupId(field.group_id);
     setIsModalOpen(true);
   };
 
@@ -310,6 +341,7 @@ export default function FormFieldsEditor() {
       field_type: fieldType,
       placeholder: placeholder.trim() || null,
       is_required: isRequired,
+      group_id: selectedGroupId,
     };
 
     if (editingField) {
@@ -379,8 +411,8 @@ export default function FormFieldsEditor() {
               <TableRow>
                 <TableHead className="w-[50px]">Orden</TableHead>
                 <TableHead>Nombre del Campo</TableHead>
+                <TableHead>Grupo</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Placeholder</TableHead>
                 <TableHead className="text-center">Requerido</TableHead>
                 <TableHead className="text-center">Visible</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
@@ -389,13 +421,13 @@ export default function FormFieldsEditor() {
             <TableBody>
               {isLoading || isLoadingSchool ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     Cargando...
                   </TableCell>
                 </TableRow>
               ) : fields.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No hay campos configurados. Haz clic en "Agregar Campo" para comenzar.
                   </TableCell>
                 </TableRow>
@@ -417,13 +449,15 @@ export default function FormFieldsEditor() {
                         </div>
                       </TableCell>
                       <TableCell>
+                        <Badge variant="secondary">
+                          {groups.find(g => g.id === field.group_id)?.name || "Sin grupo"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-2">
                           <TypeIcon className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm">{getFieldTypeLabel(field.field_type)}</span>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {field.placeholder || "-"}
                       </TableCell>
                       <TableCell className="text-center">
                         {field.is_required ? (
@@ -566,13 +600,33 @@ export default function FormFieldsEditor() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Placeholder</Label>
-                  <Input
-                    value={placeholder}
-                    onChange={(e) => setPlaceholder(e.target.value)}
-                    placeholder="Texto de ayuda..."
-                  />
+                  <Label>Grupo</Label>
+                  <Select 
+                    value={selectedGroupId || "none"} 
+                    onValueChange={(v) => setSelectedGroupId(v === "none" ? null : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar grupo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin grupo</SelectItem>
+                      {groups.map((group) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          {group.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Placeholder</Label>
+                <Input
+                  value={placeholder}
+                  onChange={(e) => setPlaceholder(e.target.value)}
+                  placeholder="Texto de ayuda..."
+                />
               </div>
             </div>
             
