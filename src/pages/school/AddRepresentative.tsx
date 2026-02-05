@@ -4,8 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, AlertCircle, Home } from "lucide-react";
@@ -46,9 +44,6 @@ export default function AddRepresentative() {
   const isEditing = !!representativeId;
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
-  const [documentId, setDocumentId] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
 
   // Fetch family name
   const { data: family } = useQuery({
@@ -117,9 +112,6 @@ export default function AddRepresentative() {
   useEffect(() => {
     if (existingRep) {
       setFormData(existingRep.form_data as Record<string, any> || {});
-      setDocumentId(existingRep.document_id || "");
-      setPhone(existingRep.phone || "");
-      setEmail(existingRep.email || "");
     }
   }, [existingRep]);
 
@@ -148,9 +140,6 @@ export default function AddRepresentative() {
         family_id: familyId,
         school_id: schoolId,
         photo_url: photoUrl,
-        document_id: documentId || null,
-        phone: phone || null,
-        email: email || null,
         form_data: formData,
       };
 
@@ -261,55 +250,21 @@ export default function AddRepresentative() {
           </CardContent>
         </Card>
 
-        {/* Photo and Base Fields Card */}
+        {/* Photo Card */}
         <Card>
           <CardHeader>
-            <CardTitle>Foto y Datos de Contacto</CardTitle>
+            <CardTitle>Foto del Representante</CardTitle>
             <CardDescription>
-              Por favor, complete los datos básicos del representante.
+              Por favor, suba la foto de perfil del representante.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Photo Upload */}
-            <div className="flex justify-center mb-6">
+            <div className="flex justify-center">
               <div className="w-full max-w-md">
                 <PhotoUpload
                   value={existingRep?.photo_url}
                   onChange={setPhotoBlob}
                   label="Ingrese la foto de perfil"
-                />
-              </div>
-            </div>
-
-            {/* Base fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="document_id">Documento de Identidad</Label>
-                <Input
-                  id="document_id"
-                  placeholder="Cédula o documento"
-                  value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="Teléfono"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Correo electrónico"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
             </div>
