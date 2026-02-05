@@ -1,6 +1,23 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -31,7 +48,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, FolderOpen } from "lucide-react";
+import { Plus, Edit, Trash2, FolderOpen, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -55,6 +72,75 @@ interface FormGroupsManagerProps {
   fieldsCount: Record<string, number>;
 }
 
+// Sortable row component
+function SortableGroupRow({
+  group,
+  index,
+  fieldsCount,
+  onEdit,
+  onDelete,
+}: {
+  group: FormFieldGroup;
+  index: number;
+  fieldsCount: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: group.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style}>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <span className="text-muted-foreground">{index + 1}</span>
+        </div>
+      </TableCell>
+      <TableCell className="font-medium">{group.name}</TableCell>
+      <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+        {group.description || "-"}
+      </TableCell>
+      <TableCell className="text-center">
+        <Badge variant="secondary">{fieldsCount || 0} campos</Badge>
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="icon" onClick={onEdit}>
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDelete}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export function FormGroupsManager({
   isOpen,
   onClose,
@@ -65,16 +151,25 @@ export function FormGroupsManager({
 }: FormGroupsManagerProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<FormFieldGroup | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  
+
   // Form state
   const [groupName, setGroupName] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
 
-  const formTypeLabel = formType === "representative" ? "Representantes" : "Estudiantes";
+  const formTypeLabel =
+    formType === "representative" ? "Representantes" : "Estudiantes";
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const resetForm = () => {
     setGroupName("");
@@ -95,22 +190,57 @@ export function FormGroupsManager({
     setIsEditModalOpen(true);
   };
 
+  // Reorder mutation
+  const reorderMutation = useMutation({
+    mutationFn: async (reorderedGroups: FormFieldGroup[]) => {
+      const updates = reorderedGroups.map((group, index) => ({
+        id: group.id,
+        display_order: index,
+      }));
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from("form_field_groups")
+          .update({ display_order: update.display_order })
+          .eq("id", update.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["form-field-groups"] });
+      toast({ title: "Orden actualizado", description: "El orden de los grupos se guardó correctamente." });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el orden." });
+    },
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = groups.findIndex((g) => g.id === active.id);
+      const newIndex = groups.findIndex((g) => g.id === over.id);
+      const reorderedGroups = arrayMove(groups, oldIndex, newIndex);
+      reorderMutation.mutate(reorderedGroups);
+    }
+  };
+
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async () => {
-      const maxOrder = groups.length > 0
-        ? Math.max(...groups.map(g => g.display_order)) + 1
-        : 0;
+      const maxOrder =
+        groups.length > 0
+          ? Math.max(...groups.map((g) => g.display_order)) + 1
+          : 0;
 
-      const { error } = await supabase
-        .from("form_field_groups")
-        .insert({
-          school_id: schoolId,
-          form_type: formType,
-          name: groupName.trim(),
-          description: groupDescription.trim() || null,
-          display_order: maxOrder,
-        });
+      const { error } = await supabase.from("form_field_groups").insert({
+        school_id: schoolId,
+        form_type: formType,
+        name: groupName.trim(),
+        description: groupDescription.trim() || null,
+        display_order: maxOrder,
+      });
 
       if (error) throw error;
     },
@@ -153,15 +283,9 @@ export function FormGroupsManager({
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       // First, remove group_id from all fields in this group
-      await supabase
-        .from("form_fields")
-        .update({ group_id: null })
-        .eq("group_id", id);
+      await supabase.from("form_fields").update({ group_id: null }).eq("group_id", id);
 
-      const { error } = await supabase
-        .from("form_field_groups")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("form_field_groups").delete().eq("id", id);
 
       if (error) throw error;
     },
@@ -193,6 +317,9 @@ export function FormGroupsManager({
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  // Sort groups by display_order
+  const sortedGroups = [...groups].sort((a, b) => a.display_order - b.display_order);
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -203,7 +330,8 @@ export function FormGroupsManager({
               Gestionar Grupos - {formTypeLabel}
             </DialogTitle>
             <DialogDescription className="text-white/80">
-              Crea y administra los grupos para organizar los campos del formulario.
+              Crea y administra los grupos para organizar los campos del formulario. 
+              Arrastra para reordenar.
             </DialogDescription>
           </DialogHeader>
 
@@ -215,60 +343,48 @@ export function FormGroupsManager({
               </Button>
             </div>
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Orden</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead className="text-center">Campos</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {groups.length === 0 ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      No hay grupos creados. Haz clic en "Nuevo Grupo" para comenzar.
-                    </TableCell>
+                    <TableHead className="w-[80px]">Orden</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="text-center">Campos</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
-                ) : (
-                  groups.map((group, index) => (
-                    <TableRow key={group.id}>
-                      <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                      <TableCell className="font-medium">{group.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
-                        {group.description || "-"}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary">
-                          {fieldsCount[group.id] || 0} campos
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditModal(group)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteId(group.id)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                </TableHeader>
+                <TableBody>
+                  {sortedGroups.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No hay grupos creados. Haz clic en "Nuevo Grupo" para comenzar.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  ) : (
+                    <SortableContext
+                      items={sortedGroups.map((g) => g.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {sortedGroups.map((group, index) => (
+                        <SortableGroupRow
+                          key={group.id}
+                          group={group}
+                          index={index}
+                          fieldsCount={fieldsCount[group.id] || 0}
+                          onEdit={() => openEditModal(group)}
+                          onDelete={() => setDeleteId(group.id)}
+                        />
+                      ))}
+                    </SortableContext>
+                  )}
+                </TableBody>
+              </Table>
+            </DndContext>
           </div>
 
           <DialogFooter>
@@ -283,9 +399,7 @@ export function FormGroupsManager({
       <Dialog open={isEditModalOpen} onOpenChange={(open) => !open && resetForm()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {editingGroup ? "Editar Grupo" : "Nuevo Grupo"}
-            </DialogTitle>
+            <DialogTitle>{editingGroup ? "Editar Grupo" : "Nuevo Grupo"}</DialogTitle>
             <DialogDescription>
               {editingGroup
                 ? "Modifica los datos del grupo."
@@ -333,8 +447,8 @@ export function FormGroupsManager({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar este grupo?</AlertDialogTitle>
             <AlertDialogDescription>
-              El grupo se eliminará pero los campos que pertenecen a él no se borrarán, 
-              solo quedarán sin grupo asignado.
+              El grupo se eliminará pero los campos que pertenecen a él no se borrarán, solo
+              quedarán sin grupo asignado.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
