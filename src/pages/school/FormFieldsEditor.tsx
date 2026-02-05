@@ -62,8 +62,10 @@ import {
   FileText,
   CheckSquare,
   Upload,
-  ArrowLeft
+  ArrowLeft,
+  FolderOpen
 } from "lucide-react";
+import { FormGroupsManager } from "@/components/forms/FormGroupsManager";
 
 type FormType = "representative" | "student";
 type FieldType = "text" | "email" | "phone" | "number" | "date" | "select" | "textarea" | "checkbox" | "file";
@@ -150,6 +152,7 @@ export default function FormFieldsEditor() {
   const isValidType = formType === "representative" || formType === "student";
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isGroupsModalOpen, setIsGroupsModalOpen] = useState(false);
   const [editingField, setEditingField] = useState<FormField | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   
@@ -384,6 +387,13 @@ export default function FormFieldsEditor() {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  // Compute fields count per group
+  const fieldsCountByGroup = fields.reduce((acc, field) => {
+    if (field.group_id) {
+      acc[field.group_id] = (acc[field.group_id] || 0) + 1;
+    }
+    return acc;
+  }, {} as Record<string, number>);
   return (
     <DashboardLayout>
       <PageHeader title="Configuraciones - Formularios" breadcrumbs={breadcrumbs} />
@@ -400,10 +410,16 @@ export default function FormFieldsEditor() {
             </Button>
             <CardTitle className="text-lg font-semibold">{title}</CardTitle>
           </div>
-          <Button onClick={openCreateModal} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Agregar Campo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setIsGroupsModalOpen(true)} className="gap-2">
+              <FolderOpen className="h-4 w-4" />
+              Gestionar Grupos
+            </Button>
+            <Button onClick={openCreateModal} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Agregar Campo
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -663,6 +679,16 @@ export default function FormFieldsEditor() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Groups Manager Modal */}
+      <FormGroupsManager
+        isOpen={isGroupsModalOpen}
+        onClose={() => setIsGroupsModalOpen(false)}
+        groups={groups}
+        schoolId={schoolId || ""}
+        formType={formType}
+        fieldsCount={fieldsCountByGroup}
+      />
     </DashboardLayout>
   );
 }
