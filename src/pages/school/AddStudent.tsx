@@ -4,14 +4,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, AlertCircle, Home } from "lucide-react";
@@ -52,7 +44,6 @@ export default function AddStudent() {
   const isEditing = !!studentId;
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
-  const [status, setStatus] = useState<string>("active");
 
   // Fetch family name
   const { data: family } = useQuery({
@@ -121,7 +112,6 @@ export default function AddStudent() {
   useEffect(() => {
     if (existingStudent) {
       setFormData(existingStudent.form_data as Record<string, any> || {});
-      setStatus(existingStudent.status || "active");
     }
   }, [existingStudent]);
 
@@ -150,7 +140,6 @@ export default function AddStudent() {
         family_id: familyId,
         school_id: schoolId,
         photo_url: photoUrl,
-        status: status as any,
         form_data: formData,
       };
 
@@ -280,22 +269,6 @@ export default function AddStudent() {
               </div>
             </div>
 
-            {isEditing && (
-              <div className="mt-6 max-w-xs">
-                <Label>Estado del Estudiante</Label>
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="mt-2">
-                    <SelectValue placeholder="Estado" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Activo</SelectItem>
-                    <SelectItem value="suspended">Suspendido</SelectItem>
-                    <SelectItem value="graduated">Egresado</SelectItem>
-                    <SelectItem value="completed">Culminado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </CardContent>
         </Card>
 
