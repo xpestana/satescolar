@@ -80,9 +80,11 @@ export default function EditFamily() {
     },
   });
 
-  // Use the actual state_id from family data or formData
+  // Use the actual values from formData or fall back to family data for initial load
   const effectiveStateId = formData.state_id || family?.state_id || "";
   const effectiveMunicipalityId = formData.municipality_id || family?.municipality_id || "";
+  const effectiveCityId = formData.city_id || family?.city_id || "";
+  const effectiveParishId = formData.parish_id || family?.parish_id || "";
 
   // Fetch municipalities
   const { data: municipalities } = useQuery({
@@ -349,7 +351,7 @@ export default function EditFamily() {
             <div className="space-y-2">
               <Label>Estado</Label>
               <Select
-                value={formData.state_id}
+                value={effectiveStateId}
                 onValueChange={(value) => handleChange("state_id", value)}
               >
                 <SelectTrigger>
@@ -368,9 +370,9 @@ export default function EditFamily() {
             <div className="space-y-2">
               <Label>Municipio</Label>
               <Select
-                value={formData.municipality_id}
+                value={effectiveMunicipalityId}
                 onValueChange={(value) => handleChange("municipality_id", value)}
-                disabled={!formData.state_id}
+                disabled={!effectiveStateId}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar municipio" />
@@ -388,9 +390,9 @@ export default function EditFamily() {
             <div className="space-y-2">
               <Label>Ciudad</Label>
               <Select
-                value={formData.city_id}
+                value={effectiveCityId}
                 onValueChange={(value) => handleChange("city_id", value)}
-                disabled={!formData.state_id}
+                disabled={!effectiveStateId}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar ciudad" />
@@ -410,9 +412,9 @@ export default function EditFamily() {
             <div className="space-y-2">
               <Label>Parroquia</Label>
               <Select
-                value={formData.parish_id}
+                value={effectiveParishId}
                 onValueChange={(value) => handleChange("parish_id", value)}
-                disabled={!formData.municipality_id}
+                disabled={!effectiveMunicipalityId}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar parroquia" />
