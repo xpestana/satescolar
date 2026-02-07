@@ -80,49 +80,53 @@ export default function EditFamily() {
     },
   });
 
+  // Use the actual state_id from family data or formData
+  const effectiveStateId = formData.state_id || family?.state_id || "";
+  const effectiveMunicipalityId = formData.municipality_id || family?.municipality_id || "";
+
   // Fetch municipalities
   const { data: municipalities } = useQuery({
-    queryKey: ["municipalities", formData.state_id],
+    queryKey: ["municipalities", effectiveStateId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("municipalities")
         .select("*")
-        .eq("state_id", formData.state_id)
+        .eq("state_id", effectiveStateId)
         .order("name");
       if (error) throw error;
       return data;
     },
-    enabled: !!formData.state_id,
+    enabled: !!effectiveStateId,
   });
 
   // Fetch cities
   const { data: cities } = useQuery({
-    queryKey: ["cities", formData.state_id],
+    queryKey: ["cities", effectiveStateId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("cities")
         .select("*")
-        .eq("state_id", formData.state_id)
+        .eq("state_id", effectiveStateId)
         .order("name");
       if (error) throw error;
       return data;
     },
-    enabled: !!formData.state_id,
+    enabled: !!effectiveStateId,
   });
 
   // Fetch parishes
   const { data: parishes } = useQuery({
-    queryKey: ["parishes", formData.municipality_id],
+    queryKey: ["parishes", effectiveMunicipalityId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("parishes")
         .select("*")
-        .eq("municipality_id", formData.municipality_id)
+        .eq("municipality_id", effectiveMunicipalityId)
         .order("name");
       if (error) throw error;
       return data;
     },
-    enabled: !!formData.municipality_id,
+    enabled: !!effectiveMunicipalityId,
   });
 
   // Load family data into form
