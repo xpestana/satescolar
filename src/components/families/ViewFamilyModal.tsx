@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -17,10 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Edit, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { DeleteRepresentativeDialog } from "./DeleteRepresentativeDialog";
+import { useToast } from "@/hooks/use-toast";
 
 interface ViewFamilyModalProps {
   open: boolean;
@@ -38,6 +46,8 @@ export function ViewFamilyModal({
   onSuspendToggle,
 }: ViewFamilyModalProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [deleteRepId, setDeleteRepId] = useState<string | null>(null);
   const [deleteRepName, setDeleteRepName] = useState<string>("");
 
@@ -107,15 +117,17 @@ export function ViewFamilyModal({
 
   const getStudentName = (student: any) => {
     const formData = student.form_data || {};
-    const firstName = formData.first_name || formData.nombre || "";
-    const lastName = formData.last_name || formData.apellido || "";
+    // Support both Spanish and English field names
+    const firstName = formData.primer_nombre || formData.first_name || formData.nombre || "";
+    const lastName = formData.primer_apellido || formData.last_name || formData.apellido || "";
     return `${firstName} ${lastName}`.trim() || "Sin nombre";
   };
 
   const getRepresentativeName = (rep: any) => {
     const formData = rep.form_data || {};
-    const firstName = formData.first_name || formData.nombre || "";
-    const lastName = formData.last_name || formData.apellido || "";
+    // Support both Spanish and English field names
+    const firstName = formData.primer_nombre || formData.first_name || formData.nombre || "";
+    const lastName = formData.primer_apellido || formData.last_name || formData.apellido || "";
     return `${firstName} ${lastName}`.trim() || "Sin nombre";
   };
 
@@ -133,6 +145,31 @@ export function ViewFamilyModal({
         return "Sin inscribir en año escolar actual";
     }
   };
+
+  // Mutation to update student status
+  const updateStudentStatusMutation = useMutation({
+    mutationFn: async ({ studentId, status }: { studentId: string; status: string }) => {
+      const { error } = await supabase
+        .from("students")
+        .update({ status: status as any })
+        .eq("id", studentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["students", familyId] });
+      toast({
+        title: "Estado actualizado",
+        description: "El estado del estudiante ha sido actualizado",
+      });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo actualizar el estado del estudiante",
+      });
+    },
+  });
 
   const handleEditFamily = () => {
     onClose();
@@ -255,15 +292,32 @@ export function ViewFamilyModal({
                       <TableRow key={student.id}>
                         <TableCell>{getStudentName(student)}</TableCell>
                         <TableCell>{student.document_id || "Sin documento"}</TableCell>
-                        <TableCell>{getStudentStatusLabel(student.status)}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={student.status}
+                            onValueChange={(value) => 
+                              updateStudentStatusMutation.mutate({ studentId: student.id, status: value })
+                            }
+                          >
+                            <SelectTrigger className="w-[130px] h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Activo</SelectItem>
+                              <SelectItem value="suspended">Suspendido</SelectItem>
+                              <SelectItem value="graduated">Egresado</SelectItem>
+                              <SelectItem value="completed">Culminado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => handleEditStudent(student.id)}
+                            title="Editar estudiante"
                           >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Editar
+                            <Edit className="h-4 w-4" />
                           </Button>
                         </TableCell>
                       </TableRow>
