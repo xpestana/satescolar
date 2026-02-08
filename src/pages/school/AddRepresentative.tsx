@@ -45,13 +45,13 @@ export default function AddRepresentative() {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
 
-  // Fetch family name
+  // Fetch family data including geographic info
   const { data: family } = useQuery({
     queryKey: ["family", familyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("families")
-        .select("father_last_name, mother_last_name")
+        .select("father_last_name, mother_last_name, state_id, municipality_id, city_id, parish_id")
         .eq("id", familyId)
         .single();
       if (error) throw error;
@@ -277,6 +277,10 @@ export default function AddRepresentative() {
           groups={formGroups}
           formData={formData}
           onFieldChange={handleFieldChange}
+          initialStateId={family?.state_id}
+          initialMunicipalityId={family?.municipality_id}
+          initialCityId={family?.city_id}
+          initialParishId={family?.parish_id}
         />
 
         {/* Submit Card */}

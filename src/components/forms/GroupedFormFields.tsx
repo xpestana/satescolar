@@ -1,3 +1,6 @@
+import { useEffect, useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { GeographicSelect } from "./GeographicSelect";
 import type { Json } from "@/integrations/supabase/types";
 
 interface FormField {
@@ -33,11 +35,20 @@ interface FormFieldGroup {
   display_order: number;
 }
 
+interface LocationOption {
+  id: string;
+  name: string;
+}
+
 interface GroupedFormFieldsProps {
   fields: FormField[];
   groups: FormFieldGroup[];
   formData: Record<string, any>;
   onFieldChange: (fieldName: string, value: any) => void;
+  initialStateId?: string | null;
+  initialMunicipalityId?: string | null;
+  initialCityId?: string | null;
+  initialParishId?: string | null;
 }
 
 // Geographic field names that need special handling
@@ -47,17 +58,149 @@ export function GroupedFormFields({
   fields, 
   groups, 
   formData, 
-  onFieldChange 
+  onFieldChange,
+  initialStateId,
+  initialMunicipalityId,
+  initialCityId,
+  initialParishId,
 }: GroupedFormFieldsProps) {
-  
+  const [municipalities, setMunicipalities] = useState<LocationOption[]>([]);
+  const [cities, setCities] = useState<LocationOption[]>([]);
+  const [parishes, setParishes] = useState<LocationOption[]>([]);
+  const [geoInitialized, setGeoInitialized] = useState(false);
+
+  // Fetch states
+  const { data: states = [] } = useQuery({
+    queryKey: ["states"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("states")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data as LocationOption[];
+    },
+  });
+
+  // Fetch municipalities when state changes
+  const fetchMunicipalities = useCallback(async (stateId: string) => {
+    if (!stateId) {
+      setMunicipalities([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("municipalities")
+      .select("id, name")
+      .eq("state_id", stateId)
+      .order("name");
+    setMunicipalities(data || []);
+  }, []);
+
+  // Fetch cities when state changes
+  const fetchCities = useCallback(async (stateId: string) => {
+    if (!stateId) {
+      setCities([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("cities")
+      .select("id, name")
+      .eq("state_id", stateId)
+      .order("name");
+    setCities(data || []);
+  }, []);
+
+  // Fetch parishes when municipality changes
+  const fetchParishes = useCallback(async (municipalityId: string) => {
+    if (!municipalityId) {
+      setParishes([]);
+      return;
+    }
+    const { data } = await supabase
+      .from("parishes")
+      .select("id, name")
+      .eq("municipality_id", municipalityId)
+      .order("name");
+    setParishes(data || []);
+  }, []);
+
+  // Initialize geographic data with family/existing values
+  useEffect(() => {
+    if (geoInitialized) return;
+    
+    const initGeo = async () => {
+      const stateId = formData.estado || initialStateId;
+      const municipalityId = formData.municipio || initialMunicipalityId;
+      
+      if (stateId) {
+        await fetchMunicipalities(stateId);
+        await fetchCities(stateId);
+        
+        // Set initial value if not already set in formData
+        if (!formData.estado && initialStateId) {
+          onFieldChange("estado", initialStateId);
+        }
+      }
+      
+      if (municipalityId) {
+        await fetchParishes(municipalityId);
+        
+        if (!formData.municipio && initialMunicipalityId) {
+          onFieldChange("municipio", initialMunicipalityId);
+        }
+      }
+      
+      if (!formData.ciudad && initialCityId) {
+        onFieldChange("ciudad", initialCityId);
+      }
+      
+      if (!formData.parroquia && initialParishId) {
+        onFieldChange("parroquia", initialParishId);
+      }
+      
+      setGeoInitialized(true);
+    };
+    
+    if (initialStateId || formData.estado) {
+      initGeo();
+    }
+  }, [
+    geoInitialized,
+    formData,
+    initialStateId,
+    initialMunicipalityId,
+    initialCityId,
+    initialParishId,
+    onFieldChange,
+    fetchMunicipalities,
+    fetchCities,
+    fetchParishes,
+  ]);
+
   const isGeographicField = (fieldName: string) => GEOGRAPHIC_FIELDS.includes(fieldName);
 
-  const renderGeographicField = (field: FormField) => {
-    const value = formData[field.field_name] || "";
-    const stateId = formData["estado"] || "";
-    const municipalityId = formData["municipio"] || "";
+  const handleStateChange = (value: string) => {
+    onFieldChange("estado", value);
+    onFieldChange("municipio", "");
+    onFieldChange("ciudad", "");
+    onFieldChange("parroquia", "");
+    setParishes([]);
+    fetchMunicipalities(value);
+    fetchCities(value);
+  };
 
-    // For "pais" field, just show Venezuela as read-only
+  const handleMunicipalityChange = (value: string) => {
+    onFieldChange("municipio", value);
+    onFieldChange("parroquia", "");
+    fetchParishes(value);
+  };
+
+  const renderGeographicField = (field: FormField) => {
+    const stateId = formData.estado || "";
+    const municipalityId = formData.municipio || "";
+    const cityId = formData.ciudad || "";
+    const parishId = formData.parroquia || "";
+
     if (field.field_name === "pais") {
       return (
         <Select value="Venezuela" disabled>
@@ -71,31 +214,90 @@ export function GroupedFormFields({
       );
     }
 
-    return (
-      <GeographicSelect
-        fieldName={field.field_name}
-        placeholder={field.placeholder || field.field_label}
-        value={value}
-        onChange={(val) => {
-          onFieldChange(field.field_name, val);
-          // Clear dependent fields when parent changes
-          if (field.field_name === "estado") {
-            onFieldChange("municipio", "");
-            onFieldChange("ciudad", "");
-            onFieldChange("parroquia", "");
-          }
-          if (field.field_name === "municipio") {
-            onFieldChange("parroquia", "");
-          }
-        }}
-        stateId={stateId}
-        municipalityId={municipalityId}
-      />
-    );
+    if (field.field_name === "estado") {
+      return (
+        <Select value={stateId} onValueChange={handleStateChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="Seleccione estado" />
+          </SelectTrigger>
+          <SelectContent>
+            {states.map((state) => (
+              <SelectItem key={state.id} value={state.id}>
+                {state.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    if (field.field_name === "municipio") {
+      return (
+        <Select 
+          value={municipalityId} 
+          onValueChange={handleMunicipalityChange}
+          disabled={!stateId || municipalities.length === 0}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={!stateId ? "Seleccione estado primero" : "Seleccione municipio"} />
+          </SelectTrigger>
+          <SelectContent>
+            {municipalities.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                {m.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    if (field.field_name === "ciudad") {
+      return (
+        <Select 
+          value={cityId} 
+          onValueChange={(val) => onFieldChange("ciudad", val)}
+          disabled={!stateId || cities.length === 0}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={!stateId ? "Seleccione estado primero" : "Seleccione ciudad"} />
+          </SelectTrigger>
+          <SelectContent>
+            {cities.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    if (field.field_name === "parroquia") {
+      return (
+        <Select 
+          value={parishId} 
+          onValueChange={(val) => onFieldChange("parroquia", val)}
+          disabled={!municipalityId || parishes.length === 0}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={!municipalityId ? "Seleccione municipio primero" : "Seleccione parroquia"} />
+          </SelectTrigger>
+          <SelectContent>
+            {parishes.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    return null;
   };
   
   const renderField = (field: FormField) => {
-    // Check if it's a geographic field
     if (isGeographicField(field.field_name)) {
       return renderGeographicField(field);
     }
