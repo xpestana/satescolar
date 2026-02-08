@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { GeographicSelect } from "./GeographicSelect";
 import type { Json } from "@/integrations/supabase/types";
 
 interface FormField {
@@ -39,6 +40,9 @@ interface GroupedFormFieldsProps {
   onFieldChange: (fieldName: string, value: any) => void;
 }
 
+// Geographic field names that need special handling
+const GEOGRAPHIC_FIELDS = ["pais", "estado", "municipio", "ciudad", "parroquia"];
+
 export function GroupedFormFields({ 
   fields, 
   groups, 
@@ -46,7 +50,56 @@ export function GroupedFormFields({
   onFieldChange 
 }: GroupedFormFieldsProps) {
   
+  const isGeographicField = (fieldName: string) => GEOGRAPHIC_FIELDS.includes(fieldName);
+
+  const renderGeographicField = (field: FormField) => {
+    const value = formData[field.field_name] || "";
+    const stateId = formData["estado"] || "";
+    const municipalityId = formData["municipio"] || "";
+
+    // For "pais" field, just show Venezuela as read-only
+    if (field.field_name === "pais") {
+      return (
+        <Select value="Venezuela" disabled>
+          <SelectTrigger>
+            <SelectValue placeholder="Venezuela" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Venezuela">Venezuela</SelectItem>
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    return (
+      <GeographicSelect
+        fieldName={field.field_name}
+        placeholder={field.placeholder || field.field_label}
+        value={value}
+        onChange={(val) => {
+          onFieldChange(field.field_name, val);
+          // Clear dependent fields when parent changes
+          if (field.field_name === "estado") {
+            onFieldChange("municipio", "");
+            onFieldChange("ciudad", "");
+            onFieldChange("parroquia", "");
+          }
+          if (field.field_name === "municipio") {
+            onFieldChange("parroquia", "");
+          }
+        }}
+        stateId={stateId}
+        municipalityId={municipalityId}
+      />
+    );
+  };
+  
   const renderField = (field: FormField) => {
+    // Check if it's a geographic field
+    if (isGeographicField(field.field_name)) {
+      return renderGeographicField(field);
+    }
+
     const value = formData[field.field_name] || "";
 
     switch (field.field_type) {
