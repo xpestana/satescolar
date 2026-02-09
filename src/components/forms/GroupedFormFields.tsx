@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -51,8 +51,22 @@ interface GroupedFormFieldsProps {
   initialParishId?: string | null;
 }
 
-// Geographic field names that need special handling
-const GEOGRAPHIC_FIELDS = ["pais", "estado", "municipio", "ciudad", "parroquia"];
+// Base geographic types we recognize
+const GEO_BASES = ["pais", "estado", "municipio", "ciudad", "parroquia"] as const;
+type GeoBase = typeof GEO_BASES[number];
+
+/**
+ * Detects whether a field_name corresponds to a geographic base.
+ * Matches both "estado" and "estado_nacimiento" (or any suffix like "estado_residencia").
+ */
+function getGeoBase(fieldName: string): GeoBase | null {
+  for (const base of GEO_BASES) {
+    if (fieldName === base || fieldName.startsWith(base + "_")) {
+      return base;
+    }
+  }
+  return null;
+}
 
 export function GroupedFormFields({ 
   fields, 
@@ -68,11 +82,27 @@ export function GroupedFormFields({
   const [cities, setCities] = useState<LocationOption[]>([]);
   const [parishes, setParishes] = useState<LocationOption[]>([]);
 
-  // Compute effective geographic values (formData takes priority, then initial from family)
-  const effectiveStateId = formData.estado || initialStateId || "";
-  const effectiveMunicipalityId = formData.municipio || initialMunicipalityId || "";
-  const effectiveCityId = formData.ciudad || initialCityId || "";
-  const effectiveParishId = formData.parroquia || initialParishId || "";
+  // Build a map from geo base -> actual field_name in this form
+  // e.g. { estado: "estado_nacimiento", municipio: "municipio_nacimiento", ... }
+  const geoKeyMap = useMemo(() => {
+    const map: Partial<Record<GeoBase, string>> = {};
+    for (const field of fields) {
+      const base = getGeoBase(field.field_name);
+      if (base) {
+        map[base] = field.field_name;
+      }
+    }
+    return map;
+  }, [fields]);
+
+  // Helper to get the actual formData key for a geo base
+  const geoKey = (base: GeoBase): string => geoKeyMap[base] || base;
+
+  // Effective IDs: formData (using actual key) > initial prop > ""
+  const effectiveStateId = formData[geoKey("estado")] || initialStateId || "";
+  const effectiveMunicipalityId = formData[geoKey("municipio")] || initialMunicipalityId || "";
+  const effectiveCityId = formData[geoKey("ciudad")] || initialCityId || "";
+  const effectiveParishId = formData[geoKey("parroquia")] || initialParishId || "";
 
   // Fetch states
   const { data: states = [] } = useQuery({
@@ -129,24 +159,21 @@ export function GroupedFormFields({
       .then(({ data }) => setParishes(data || []));
   }, [effectiveMunicipalityId]);
 
-  const isGeographicField = (fieldName: string) => GEOGRAPHIC_FIELDS.includes(fieldName);
-
   const handleStateChange = (value: string) => {
-    onFieldChange("estado", value);
-    onFieldChange("municipio", "");
-    onFieldChange("ciudad", "");
-    onFieldChange("parroquia", "");
+    onFieldChange(geoKey("estado"), value);
+    onFieldChange(geoKey("municipio"), "");
+    onFieldChange(geoKey("ciudad"), "");
+    onFieldChange(geoKey("parroquia"), "");
     setParishes([]);
   };
 
   const handleMunicipalityChange = (value: string) => {
-    onFieldChange("municipio", value);
-    onFieldChange("parroquia", "");
+    onFieldChange(geoKey("municipio"), value);
+    onFieldChange(geoKey("parroquia"), "");
   };
 
-  const renderGeographicField = (field: FormField) => {
-
-    if (field.field_name === "pais") {
+  const renderGeographicField = (field: FormField, base: GeoBase) => {
+    if (base === "pais") {
       return (
         <Select value="Venezuela" disabled>
           <SelectTrigger>
@@ -159,7 +186,7 @@ export function GroupedFormFields({
       );
     }
 
-    if (field.field_name === "estado") {
+    if (base === "estado") {
       return (
         <Select value={effectiveStateId} onValueChange={handleStateChange}>
           <SelectTrigger>
@@ -176,7 +203,7 @@ export function GroupedFormFields({
       );
     }
 
-    if (field.field_name === "municipio") {
+    if (base === "municipio") {
       return (
         <Select 
           value={effectiveMunicipalityId} 
@@ -197,11 +224,11 @@ export function GroupedFormFields({
       );
     }
 
-    if (field.field_name === "ciudad") {
+    if (base === "ciudad") {
       return (
         <Select 
           value={effectiveCityId} 
-          onValueChange={(val) => onFieldChange("ciudad", val)}
+          onValueChange={(val) => onFieldChange(geoKey("ciudad"), val)}
           disabled={!effectiveStateId || cities.length === 0}
         >
           <SelectTrigger>
@@ -218,11 +245,11 @@ export function GroupedFormFields({
       );
     }
 
-    if (field.field_name === "parroquia") {
+    if (base === "parroquia") {
       return (
         <Select 
           value={effectiveParishId} 
-          onValueChange={(val) => onFieldChange("parroquia", val)}
+          onValueChange={(val) => onFieldChange(geoKey("parroquia"), val)}
           disabled={!effectiveMunicipalityId || parishes.length === 0}
         >
           <SelectTrigger>
@@ -243,8 +270,9 @@ export function GroupedFormFields({
   };
   
   const renderField = (field: FormField) => {
-    if (isGeographicField(field.field_name)) {
-      return renderGeographicField(field);
+    const base = getGeoBase(field.field_name);
+    if (base) {
+      return renderGeographicField(field, base);
     }
 
     const value = formData[field.field_name] || "";
