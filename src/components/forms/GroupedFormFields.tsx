@@ -98,12 +98,6 @@ export function GroupedFormFields({
   // Helper to get the actual formData key for a geo base
   const geoKey = (base: GeoBase): string => geoKeyMap[base] || base;
 
-  // Effective IDs: formData (using actual key) > initial prop > ""
-  const effectiveStateId = formData[geoKey("estado")] || initialStateId || "";
-  const effectiveMunicipalityId = formData[geoKey("municipio")] || initialMunicipalityId || "";
-  const effectiveCityId = formData[geoKey("ciudad")] || initialCityId || "";
-  const effectiveParishId = formData[geoKey("parroquia")] || initialParishId || "";
-
   // Fetch states
   const { data: states = [] } = useQuery({
     queryKey: ["states"],
@@ -116,6 +110,13 @@ export function GroupedFormFields({
       return data as LocationOption[];
     },
   });
+
+  // Effective IDs: formData (using actual key) > initial prop > ""
+  const effectiveStateId = formData[geoKey("estado")] || initialStateId || "";
+  const effectiveMunicipalityId = formData[geoKey("municipio")] || initialMunicipalityId || "";
+  const effectiveCityId = formData[geoKey("ciudad")] || initialCityId || "";
+  const effectiveParishId = formData[geoKey("parroquia")] || initialParishId || "";
+
 
   // Fetch municipalities when effective state changes
   useEffect(() => {
@@ -188,8 +189,8 @@ export function GroupedFormFields({
 
     if (base === "estado") {
       return (
-        <Select value={effectiveStateId} onValueChange={handleStateChange}>
-          <SelectTrigger>
+        <Select value={effectiveStateId || undefined} onValueChange={handleStateChange}>
+          <SelectTrigger translate="no">
             <SelectValue placeholder="Seleccione estado" />
           </SelectTrigger>
           <SelectContent>
@@ -206,11 +207,11 @@ export function GroupedFormFields({
     if (base === "municipio") {
       return (
         <Select 
-          value={effectiveMunicipalityId} 
+          value={effectiveMunicipalityId || undefined} 
           onValueChange={handleMunicipalityChange}
           disabled={!effectiveStateId || municipalities.length === 0}
         >
-          <SelectTrigger>
+          <SelectTrigger translate="no">
             <SelectValue placeholder={!effectiveStateId ? "Seleccione estado primero" : "Seleccione municipio"} />
           </SelectTrigger>
           <SelectContent>
@@ -227,11 +228,11 @@ export function GroupedFormFields({
     if (base === "ciudad") {
       return (
         <Select 
-          value={effectiveCityId} 
+          value={effectiveCityId || undefined} 
           onValueChange={(val) => onFieldChange(geoKey("ciudad"), val)}
           disabled={!effectiveStateId || cities.length === 0}
         >
-          <SelectTrigger>
+          <SelectTrigger translate="no">
             <SelectValue placeholder={!effectiveStateId ? "Seleccione estado primero" : "Seleccione ciudad"} />
           </SelectTrigger>
           <SelectContent>
@@ -248,11 +249,11 @@ export function GroupedFormFields({
     if (base === "parroquia") {
       return (
         <Select 
-          value={effectiveParishId} 
+          value={effectiveParishId || undefined} 
           onValueChange={(val) => onFieldChange(geoKey("parroquia"), val)}
           disabled={!effectiveMunicipalityId || parishes.length === 0}
         >
-          <SelectTrigger>
+          <SelectTrigger translate="no">
             <SelectValue placeholder={!effectiveMunicipalityId ? "Seleccione municipio primero" : "Seleccione parroquia"} />
           </SelectTrigger>
           <SelectContent>
