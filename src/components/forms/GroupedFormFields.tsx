@@ -67,7 +67,12 @@ export function GroupedFormFields({
   const [municipalities, setMunicipalities] = useState<LocationOption[]>([]);
   const [cities, setCities] = useState<LocationOption[]>([]);
   const [parishes, setParishes] = useState<LocationOption[]>([]);
-  const [geoInitialized, setGeoInitialized] = useState(false);
+
+  // Compute effective geographic values (formData takes priority, then initial from family)
+  const effectiveStateId = formData.estado || initialStateId || "";
+  const effectiveMunicipalityId = formData.municipio || initialMunicipalityId || "";
+  const effectiveCityId = formData.ciudad || initialCityId || "";
+  const effectiveParishId = formData.parroquia || initialParishId || "";
 
   // Fetch states
   const { data: states = [] } = useQuery({
@@ -82,100 +87,47 @@ export function GroupedFormFields({
     },
   });
 
-  // Fetch municipalities when state changes
-  const fetchMunicipalities = useCallback(async (stateId: string) => {
-    if (!stateId) {
+  // Fetch municipalities when effective state changes
+  useEffect(() => {
+    if (!effectiveStateId) {
       setMunicipalities([]);
       return;
     }
-    const { data } = await supabase
+    supabase
       .from("municipalities")
       .select("id, name")
-      .eq("state_id", stateId)
-      .order("name");
-    setMunicipalities(data || []);
-  }, []);
+      .eq("state_id", effectiveStateId)
+      .order("name")
+      .then(({ data }) => setMunicipalities(data || []));
+  }, [effectiveStateId]);
 
-  // Fetch cities when state changes
-  const fetchCities = useCallback(async (stateId: string) => {
-    if (!stateId) {
+  // Fetch cities when effective state changes
+  useEffect(() => {
+    if (!effectiveStateId) {
       setCities([]);
       return;
     }
-    const { data } = await supabase
+    supabase
       .from("cities")
       .select("id, name")
-      .eq("state_id", stateId)
-      .order("name");
-    setCities(data || []);
-  }, []);
+      .eq("state_id", effectiveStateId)
+      .order("name")
+      .then(({ data }) => setCities(data || []));
+  }, [effectiveStateId]);
 
-  // Fetch parishes when municipality changes
-  const fetchParishes = useCallback(async (municipalityId: string) => {
-    if (!municipalityId) {
+  // Fetch parishes when effective municipality changes
+  useEffect(() => {
+    if (!effectiveMunicipalityId) {
       setParishes([]);
       return;
     }
-    const { data } = await supabase
+    supabase
       .from("parishes")
       .select("id, name")
-      .eq("municipality_id", municipalityId)
-      .order("name");
-    setParishes(data || []);
-  }, []);
-
-  // Initialize geographic data with family/existing values
-  useEffect(() => {
-    if (geoInitialized) return;
-    
-    const initGeo = async () => {
-      const stateId = formData.estado || initialStateId;
-      const municipalityId = formData.municipio || initialMunicipalityId;
-      
-      if (stateId) {
-        await fetchMunicipalities(stateId);
-        await fetchCities(stateId);
-        
-        // Set initial value if not already set in formData
-        if (!formData.estado && initialStateId) {
-          onFieldChange("estado", initialStateId);
-        }
-      }
-      
-      if (municipalityId) {
-        await fetchParishes(municipalityId);
-        
-        if (!formData.municipio && initialMunicipalityId) {
-          onFieldChange("municipio", initialMunicipalityId);
-        }
-      }
-      
-      if (!formData.ciudad && initialCityId) {
-        onFieldChange("ciudad", initialCityId);
-      }
-      
-      if (!formData.parroquia && initialParishId) {
-        onFieldChange("parroquia", initialParishId);
-      }
-      
-      setGeoInitialized(true);
-    };
-    
-    if (initialStateId || formData.estado) {
-      initGeo();
-    }
-  }, [
-    geoInitialized,
-    formData,
-    initialStateId,
-    initialMunicipalityId,
-    initialCityId,
-    initialParishId,
-    onFieldChange,
-    fetchMunicipalities,
-    fetchCities,
-    fetchParishes,
-  ]);
+      .eq("municipality_id", effectiveMunicipalityId)
+      .order("name")
+      .then(({ data }) => setParishes(data || []));
+  }, [effectiveMunicipalityId]);
 
   const isGeographicField = (fieldName: string) => GEOGRAPHIC_FIELDS.includes(fieldName);
 
@@ -185,21 +137,14 @@ export function GroupedFormFields({
     onFieldChange("ciudad", "");
     onFieldChange("parroquia", "");
     setParishes([]);
-    fetchMunicipalities(value);
-    fetchCities(value);
   };
 
   const handleMunicipalityChange = (value: string) => {
     onFieldChange("municipio", value);
     onFieldChange("parroquia", "");
-    fetchParishes(value);
   };
 
   const renderGeographicField = (field: FormField) => {
-    const stateId = formData.estado || "";
-    const municipalityId = formData.municipio || "";
-    const cityId = formData.ciudad || "";
-    const parishId = formData.parroquia || "";
 
     if (field.field_name === "pais") {
       return (
@@ -216,7 +161,7 @@ export function GroupedFormFields({
 
     if (field.field_name === "estado") {
       return (
-        <Select value={stateId} onValueChange={handleStateChange}>
+        <Select value={effectiveStateId} onValueChange={handleStateChange}>
           <SelectTrigger>
             <SelectValue placeholder="Seleccione estado" />
           </SelectTrigger>
@@ -234,12 +179,12 @@ export function GroupedFormFields({
     if (field.field_name === "municipio") {
       return (
         <Select 
-          value={municipalityId} 
+          value={effectiveMunicipalityId} 
           onValueChange={handleMunicipalityChange}
-          disabled={!stateId || municipalities.length === 0}
+          disabled={!effectiveStateId || municipalities.length === 0}
         >
           <SelectTrigger>
-            <SelectValue placeholder={!stateId ? "Seleccione estado primero" : "Seleccione municipio"} />
+            <SelectValue placeholder={!effectiveStateId ? "Seleccione estado primero" : "Seleccione municipio"} />
           </SelectTrigger>
           <SelectContent>
             {municipalities.map((m) => (
@@ -255,12 +200,12 @@ export function GroupedFormFields({
     if (field.field_name === "ciudad") {
       return (
         <Select 
-          value={cityId} 
+          value={effectiveCityId} 
           onValueChange={(val) => onFieldChange("ciudad", val)}
-          disabled={!stateId || cities.length === 0}
+          disabled={!effectiveStateId || cities.length === 0}
         >
           <SelectTrigger>
-            <SelectValue placeholder={!stateId ? "Seleccione estado primero" : "Seleccione ciudad"} />
+            <SelectValue placeholder={!effectiveStateId ? "Seleccione estado primero" : "Seleccione ciudad"} />
           </SelectTrigger>
           <SelectContent>
             {cities.map((c) => (
@@ -276,12 +221,12 @@ export function GroupedFormFields({
     if (field.field_name === "parroquia") {
       return (
         <Select 
-          value={parishId} 
+          value={effectiveParishId} 
           onValueChange={(val) => onFieldChange("parroquia", val)}
-          disabled={!municipalityId || parishes.length === 0}
+          disabled={!effectiveMunicipalityId || parishes.length === 0}
         >
           <SelectTrigger>
-            <SelectValue placeholder={!municipalityId ? "Seleccione municipio primero" : "Seleccione parroquia"} />
+            <SelectValue placeholder={!effectiveMunicipalityId ? "Seleccione municipio primero" : "Seleccione parroquia"} />
           </SelectTrigger>
           <SelectContent>
             {parishes.map((p) => (
