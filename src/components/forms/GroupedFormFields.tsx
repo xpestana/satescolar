@@ -114,14 +114,6 @@ export function GroupedFormFields({
   const effectiveCityId = formData[geoKey("ciudad")] || initialCityId || "";
   const effectiveParishId = formData[geoKey("parroquia")] || initialParishId || "";
 
-  // Debug logging
-  console.log("[GEO DEBUG] geoKeyMap:", geoKeyMap);
-  console.log("[GEO DEBUG] geoKey estado:", geoKey("estado"), "municipio:", geoKey("municipio"), "ciudad:", geoKey("ciudad"), "parroquia:", geoKey("parroquia"));
-  console.log("[GEO DEBUG] formData keys:", Object.keys(formData));
-  console.log("[GEO DEBUG] formData[estado_key]:", formData[geoKey("estado")], "initialStateId:", initialStateId);
-  console.log("[GEO DEBUG] effectiveStateId:", effectiveStateId, "effectiveMunId:", effectiveMunicipalityId, "effectiveCityId:", effectiveCityId, "effectiveParishId:", effectiveParishId);
-  console.log("[GEO DEBUG] states loaded:", states.length);
-
 
   // Fetch municipalities using useQuery for proper caching and race condition handling
   const { data: municipalities = [] } = useQuery({
@@ -169,15 +161,22 @@ export function GroupedFormFields({
   });
 
   const handleStateChange = (value: string) => {
+    const currentState = formData[geoKey("estado")];
     onFieldChange(geoKey("estado"), value);
-    onFieldChange(geoKey("municipio"), "");
-    onFieldChange(geoKey("ciudad"), "");
-    onFieldChange(geoKey("parroquia"), "");
+    // Only clear dependents if state actually changed (not on programmatic value sync)
+    if (!currentState || currentState !== value) {
+      onFieldChange(geoKey("municipio"), "");
+      onFieldChange(geoKey("ciudad"), "");
+      onFieldChange(geoKey("parroquia"), "");
+    }
   };
 
   const handleMunicipalityChange = (value: string) => {
+    const currentMun = formData[geoKey("municipio")];
     onFieldChange(geoKey("municipio"), value);
-    onFieldChange(geoKey("parroquia"), "");
+    if (!currentMun || currentMun !== value) {
+      onFieldChange(geoKey("parroquia"), "");
+    }
   };
 
   const renderGeographicField = (field: FormField, base: GeoBase) => {
