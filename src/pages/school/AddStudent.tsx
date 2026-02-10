@@ -115,6 +115,9 @@ export default function AddStudent() {
     }
   }, [existingStudent]);
 
+  // Don't render form until student data is loaded (when editing)
+  const isStudentDataReady = !isEditing || !!existingStudent;
+
   // Create/Update mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -273,16 +276,25 @@ export default function AddStudent() {
         </Card>
 
         {/* Dynamic Grouped Fields */}
-        <GroupedFormFields
-          fields={formFields}
-          groups={formGroups}
-          formData={formData}
-          onFieldChange={handleFieldChange}
-          initialStateId={family?.state_id}
-          initialMunicipalityId={family?.municipality_id}
-          initialCityId={family?.city_id}
-          initialParishId={family?.parish_id}
-        />
+        {isStudentDataReady ? (
+          <GroupedFormFields
+            key={isEditing ? existingStudent?.id : 'new'}
+            fields={formFields}
+            groups={formGroups}
+            formData={formData}
+            onFieldChange={handleFieldChange}
+            initialStateId={family?.state_id}
+            initialMunicipalityId={family?.municipality_id}
+            initialCityId={family?.city_id}
+            initialParishId={family?.parish_id}
+          />
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-muted-foreground text-center">Cargando datos del estudiante...</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Submit Card */}
         <Card>
