@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -78,9 +78,6 @@ export function GroupedFormFields({
   initialCityId,
   initialParishId,
 }: GroupedFormFieldsProps) {
-  const [municipalities, setMunicipalities] = useState<LocationOption[]>([]);
-  const [cities, setCities] = useState<LocationOption[]>([]);
-  const [parishes, setParishes] = useState<LocationOption[]>([]);
 
   // Build a map from geo base -> actual field_name in this form
   // e.g. { estado: "estado_nacimiento", municipio: "municipio_nacimiento", ... }
@@ -118,54 +115,56 @@ export function GroupedFormFields({
   const effectiveParishId = formData[geoKey("parroquia")] || initialParishId || "";
 
 
-  // Fetch municipalities when effective state changes
-  useEffect(() => {
-    if (!effectiveStateId) {
-      setMunicipalities([]);
-      return;
-    }
-    supabase
-      .from("municipalities")
-      .select("id, name")
-      .eq("state_id", effectiveStateId)
-      .order("name")
-      .then(({ data }) => setMunicipalities(data || []));
-  }, [effectiveStateId]);
+  // Fetch municipalities using useQuery for proper caching and race condition handling
+  const { data: municipalities = [] } = useQuery({
+    queryKey: ["municipalities", effectiveStateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("municipalities")
+        .select("id, name")
+        .eq("state_id", effectiveStateId)
+        .order("name");
+      if (error) throw error;
+      return data as LocationOption[];
+    },
+    enabled: !!effectiveStateId,
+  });
 
-  // Fetch cities when effective state changes
-  useEffect(() => {
-    if (!effectiveStateId) {
-      setCities([]);
-      return;
-    }
-    supabase
-      .from("cities")
-      .select("id, name")
-      .eq("state_id", effectiveStateId)
-      .order("name")
-      .then(({ data }) => setCities(data || []));
-  }, [effectiveStateId]);
+  // Fetch cities using useQuery
+  const { data: cities = [] } = useQuery({
+    queryKey: ["cities", effectiveStateId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cities")
+        .select("id, name")
+        .eq("state_id", effectiveStateId)
+        .order("name");
+      if (error) throw error;
+      return data as LocationOption[];
+    },
+    enabled: !!effectiveStateId,
+  });
 
-  // Fetch parishes when effective municipality changes
-  useEffect(() => {
-    if (!effectiveMunicipalityId) {
-      setParishes([]);
-      return;
-    }
-    supabase
-      .from("parishes")
-      .select("id, name")
-      .eq("municipality_id", effectiveMunicipalityId)
-      .order("name")
-      .then(({ data }) => setParishes(data || []));
-  }, [effectiveMunicipalityId]);
+  // Fetch parishes using useQuery
+  const { data: parishes = [] } = useQuery({
+    queryKey: ["parishes", effectiveMunicipalityId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("parishes")
+        .select("id, name")
+        .eq("municipality_id", effectiveMunicipalityId)
+        .order("name");
+      if (error) throw error;
+      return data as LocationOption[];
+    },
+    enabled: !!effectiveMunicipalityId,
+  });
 
   const handleStateChange = (value: string) => {
     onFieldChange(geoKey("estado"), value);
     onFieldChange(geoKey("municipio"), "");
     onFieldChange(geoKey("ciudad"), "");
     onFieldChange(geoKey("parroquia"), "");
-    setParishes([]);
   };
 
   const handleMunicipalityChange = (value: string) => {
