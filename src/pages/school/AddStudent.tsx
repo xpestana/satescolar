@@ -109,6 +109,13 @@ export default function AddStudent() {
     enabled: !!studentId,
   });
 
+  // Reset form state when studentId changes (navigation between students)
+  useEffect(() => {
+    setFormData({});
+    setFormDataInitialized(false);
+    setPhotoBlob(null);
+  }, [studentId]);
+
   // Load existing data when editing
   useEffect(() => {
     if (existingStudent && !formDataInitialized) {
