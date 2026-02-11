@@ -297,7 +297,7 @@ export function GroupedFormFields({
         const options = Array.isArray(field.options) ? field.options : [];
         return (
           <Select
-            value={value}
+            value={value || undefined}
             onValueChange={(val) => onFieldChange(field.field_name, val)}
           >
             <SelectTrigger>
