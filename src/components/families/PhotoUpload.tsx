@@ -12,7 +12,7 @@ export function PhotoUpload({ value, onChange, label = "Ingrese la foto de perfi
 
   // Sync previewUrl when value prop changes (e.g. after data loads)
   useEffect(() => {
-    if (value && !previewUrl) {
+    if (value) {
       setPreviewUrl(value);
     }
   }, [value]);
