@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { ImageCropModal } from "@/components/ImageCropModal";
 
 interface PhotoUploadProps {
@@ -9,6 +9,13 @@ interface PhotoUploadProps {
 
 export function PhotoUpload({ value, onChange, label = "Ingrese la foto de perfil" }: PhotoUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(value || null);
+
+  // Sync previewUrl when value prop changes (e.g. after data loads)
+  useEffect(() => {
+    if (value && !previewUrl) {
+      setPreviewUrl(value);
+    }
+  }, [value]);
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
