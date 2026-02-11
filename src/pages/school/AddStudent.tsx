@@ -43,6 +43,7 @@ export default function AddStudent() {
 
   const isEditing = !!studentId;
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formDataInitialized, setFormDataInitialized] = useState(false);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
 
   // Fetch family data including geographic info
@@ -110,13 +111,14 @@ export default function AddStudent() {
 
   // Load existing data when editing
   useEffect(() => {
-    if (existingStudent) {
+    if (existingStudent && !formDataInitialized) {
       setFormData(existingStudent.form_data as Record<string, any> || {});
+      setFormDataInitialized(true);
     }
-  }, [existingStudent]);
+  }, [existingStudent, formDataInitialized]);
 
-  // Don't render form until student data is loaded (when editing)
-  const isStudentDataReady = !isEditing || !!existingStudent;
+  // Don't render form until student data is loaded AND formData is initialized
+  const isStudentDataReady = !isEditing || (!!existingStudent && formDataInitialized);
 
   // Create/Update mutation
   const saveMutation = useMutation({
