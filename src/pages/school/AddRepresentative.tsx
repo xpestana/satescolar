@@ -43,6 +43,7 @@ export default function AddRepresentative() {
 
   const isEditing = !!representativeId;
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formDataInitialized, setFormDataInitialized] = useState(false);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
 
   // Fetch family data including geographic info
@@ -108,12 +109,23 @@ export default function AddRepresentative() {
     enabled: !!representativeId,
   });
 
+  // Reset form state when representativeId changes
+  useEffect(() => {
+    setFormData({});
+    setFormDataInitialized(false);
+    setPhotoBlob(null);
+  }, [representativeId]);
+
   // Load existing data when editing
   useEffect(() => {
-    if (existingRep) {
+    if (existingRep && !formDataInitialized) {
       setFormData(existingRep.form_data as Record<string, any> || {});
+      setFormDataInitialized(true);
     }
-  }, [existingRep]);
+  }, [existingRep, formDataInitialized]);
+
+  // Don't render form until rep data is loaded AND formData is initialized
+  const isRepDataReady = !isEditing || (!!existingRep && formDataInitialized);
 
   // Create/Update mutation
   const saveMutation = useMutation({
@@ -272,16 +284,25 @@ export default function AddRepresentative() {
         </Card>
 
         {/* Dynamic Grouped Fields */}
-        <GroupedFormFields
-          fields={formFields}
-          groups={formGroups}
-          formData={formData}
-          onFieldChange={handleFieldChange}
-          initialStateId={family?.state_id}
-          initialMunicipalityId={family?.municipality_id}
-          initialCityId={family?.city_id}
-          initialParishId={family?.parish_id}
-        />
+        {isRepDataReady ? (
+          <GroupedFormFields
+            key={isEditing ? existingRep?.id : 'new'}
+            fields={formFields}
+            groups={formGroups}
+            formData={formData}
+            onFieldChange={handleFieldChange}
+            initialStateId={family?.state_id}
+            initialMunicipalityId={family?.municipality_id}
+            initialCityId={family?.city_id}
+            initialParishId={family?.parish_id}
+          />
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-muted-foreground text-center">Cargando datos del representante...</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Submit Card */}
         <Card>
