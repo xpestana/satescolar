@@ -11,6 +11,7 @@ import {
   ChevronDown,
   SlidersHorizontal,
   FileText,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -75,6 +76,7 @@ const navSections: NavSection[] = [
     requiredRole: "school",
     items: [
       { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school" },
+      { label: "Búsqueda Avanzada", href: "/registros/busqueda-avanzada", icon: Search, requiredRole: "school" },
     ],
   },
   {

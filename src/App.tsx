@@ -16,6 +16,7 @@ import FamiliesList from "./pages/school/FamiliesList";
 import EditFamily from "./pages/school/EditFamily";
 import AddStudent from "./pages/school/AddStudent";
 import AddRepresentative from "./pages/school/AddRepresentative";
+import AdvancedSearch from "./pages/school/AdvancedSearch";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import UsersList from "./pages/admin/UsersList";
@@ -83,7 +84,15 @@ const App = () => (
               } 
             />
             <Route 
-              path="/registros/familias/:familyId/editar" 
+              path="/registros/busqueda-avanzada" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <AdvancedSearch />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/familias/:familyId/editar"
               element={
                 <ProtectedRoute requiredRole="school">
                   <EditFamily />
