@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -11,8 +11,24 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Pagination } from "@/components/ui/data-pagination";
-import { Search, SlidersHorizontal, Loader2 } from "lucide-react";
+import { Search, SlidersHorizontal, Loader2, GripVertical } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type FormType = "student" | "representative";
 
@@ -38,12 +54,40 @@ const FIXED_COLUMNS_REP: ColumnDef[] = [
 
 const PAGE_SIZE = 10;
 
+// Sortable table header cell
+function SortableHeaderCell({ col }: { col: ColumnDef }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: col.key });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    cursor: "grab",
+  };
+
+  return (
+    <TableHead ref={setNodeRef} style={style} className="select-none whitespace-nowrap">
+      <span className="inline-flex items-center gap-1" {...attributes} {...listeners}>
+        <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
+        {col.label}
+      </span>
+    </TableHead>
+  );
+}
+
 export default function AdvancedSearch() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
   const [formType, setFormType] = useState<FormType>("student");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [visibleColumns, setVisibleColumns] = useState<string[] | null>(null);
+  const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
 
   // Fetch form fields to build dynamic columns
   const { data: formFields } = useQuery({
@@ -62,7 +106,7 @@ export default function AdvancedSearch() {
     enabled: !!schoolId,
   });
 
-  // Build all columns
+  // Build all columns (unordered master list)
   const allColumns = useMemo<ColumnDef[]>(() => {
     const fixed = formType === "student" ? FIXED_COLUMNS_STUDENT : FIXED_COLUMNS_REP;
     const dynamic: ColumnDef[] = (formFields ?? []).map((f) => ({
@@ -73,38 +117,91 @@ export default function AdvancedSearch() {
     return [...fixed, ...dynamic];
   }, [formType, formFields]);
 
-  // localStorage persistence
-  const storageKey = `adv-search-cols-${schoolId}-${formType}`;
+  // localStorage keys
+  const visibilityKey = `adv-search-cols-${schoolId}-${formType}`;
+  const orderKey = `adv-search-order-${schoolId}-${formType}`;
 
+  // Load saved visibility & order
   useEffect(() => {
     if (!schoolId) return;
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        setVisibleColumns(JSON.parse(saved));
-      } catch {
-        setVisibleColumns(null);
-      }
-    } else {
+    try {
+      const savedVis = localStorage.getItem(visibilityKey);
+      setVisibleColumns(savedVis ? JSON.parse(savedVis) : null);
+    } catch {
       setVisibleColumns(null);
     }
-  }, [storageKey, schoolId]);
+    try {
+      const savedOrd = localStorage.getItem(orderKey);
+      setColumnOrder(savedOrd ? JSON.parse(savedOrd) : null);
+    } catch {
+      setColumnOrder(null);
+    }
+  }, [visibilityKey, orderKey, schoolId]);
 
   const activeColumnKeys = visibleColumns ?? allColumns.map((c) => c.key);
-  const activeColumns = allColumns.filter((c) => activeColumnKeys.includes(c.key));
+
+  // Apply order: use saved order, filtering to only visible keys, then append any new visible keys
+  const orderedActiveColumns = useMemo(() => {
+    const visibleSet = new Set(activeColumnKeys);
+    if (columnOrder) {
+      const ordered = columnOrder.filter((k) => visibleSet.has(k));
+      const remaining = activeColumnKeys.filter((k) => !columnOrder.includes(k));
+      const keys = [...ordered, ...remaining];
+      return keys.map((k) => allColumns.find((c) => c.key === k)!).filter(Boolean);
+    }
+    return allColumns.filter((c) => visibleSet.has(c.key));
+  }, [activeColumnKeys, columnOrder, allColumns]);
+
+  const saveVisibility = useCallback(
+    (cols: string[] | null) => {
+      setVisibleColumns(cols);
+      if (cols) {
+        localStorage.setItem(visibilityKey, JSON.stringify(cols));
+      } else {
+        localStorage.removeItem(visibilityKey);
+      }
+    },
+    [visibilityKey]
+  );
+
+  const saveOrder = useCallback(
+    (order: string[] | null) => {
+      setColumnOrder(order);
+      if (order) {
+        localStorage.setItem(orderKey, JSON.stringify(order));
+      } else {
+        localStorage.removeItem(orderKey);
+      }
+    },
+    [orderKey]
+  );
 
   const toggleColumn = (key: string) => {
     const current = activeColumnKeys;
     const next = current.includes(key)
       ? current.filter((k) => k !== key)
       : [...current, key];
-    setVisibleColumns(next);
-    localStorage.setItem(storageKey, JSON.stringify(next));
+    saveVisibility(next);
   };
 
   const resetColumns = () => {
-    setVisibleColumns(null);
-    localStorage.removeItem(storageKey);
+    saveVisibility(null);
+    saveOrder(null);
+  };
+
+  const deselectAll = () => {
+    saveVisibility([]);
+  };
+
+  // Drag & drop handler for column reorder
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const currentKeys = orderedActiveColumns.map((c) => c.key);
+    const oldIndex = currentKeys.indexOf(active.id as string);
+    const newIndex = currentKeys.indexOf(over.id as string);
+    const newOrder = arrayMove(currentKeys, oldIndex, newIndex);
+    saveOrder(newOrder);
   };
 
   // Fetch data
@@ -128,7 +225,6 @@ export default function AdvancedSearch() {
     if (!searchTerm.trim()) return records;
     const term = searchTerm.toLowerCase();
     return records.filter((r: any) => {
-      // Search in fixed fields
       const fixedVals = [r.document_id, r.email, r.phone].filter(Boolean);
       const familyName = [
         (r.families as any)?.father_last_name,
@@ -138,7 +234,6 @@ export default function AdvancedSearch() {
         .join(" ");
       fixedVals.push(familyName);
 
-      // Search in form_data
       const formData = (r.form_data ?? {}) as Record<string, any>;
       const formVals = activeColumnKeys
         .filter((k) => allColumns.find((c) => c.key === k)?.isFormData)
@@ -221,13 +316,18 @@ export default function AdvancedSearch() {
                 Columnas
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-64 max-h-80 overflow-y-auto" align="end">
+            <PopoverContent className="w-64 max-h-80 overflow-y-auto bg-background z-50" align="end">
               <div className="space-y-2">
-                <div className="flex items-center justify-between pb-2 border-b">
+                <div className="flex items-center justify-between pb-2 border-b gap-1">
                   <span className="text-sm font-medium">Columnas visibles</span>
-                  <Button variant="ghost" size="sm" onClick={resetColumns} className="text-xs h-7">
-                    Mostrar todas
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={deselectAll} className="text-xs h-7">
+                      Ninguna
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={resetColumns} className="text-xs h-7">
+                      Todas
+                    </Button>
+                  </div>
                 </div>
                 {allColumns.map((col) => (
                   <label
@@ -254,37 +354,48 @@ export default function AdvancedSearch() {
         ) : (
           <>
             <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {activeColumns.map((col) => (
-                      <TableHead key={col.key}>{col.label}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginated.length === 0 ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell
-                        colSpan={activeColumns.length}
-                        className="text-center py-8 text-muted-foreground"
+                      <SortableContext
+                        items={orderedActiveColumns.map((c) => c.key)}
+                        strategy={horizontalListSortingStrategy}
                       >
-                        No se encontraron registros
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    paginated.map((record: any) => (
-                      <TableRow key={record.id}>
-                        {activeColumns.map((col) => (
-                          <TableCell key={col.key}>
-                            {getCellValue(record, col)}
-                          </TableCell>
+                        {orderedActiveColumns.map((col) => (
+                          <SortableHeaderCell key={col.key} col={col} />
                         ))}
+                      </SortableContext>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginated.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={orderedActiveColumns.length || 1}
+                          className="text-center py-8 text-muted-foreground"
+                        >
+                          No se encontraron registros
+                        </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      paginated.map((record: any) => (
+                        <TableRow key={record.id}>
+                          {orderedActiveColumns.map((col) => (
+                            <TableCell key={col.key}>
+                              {getCellValue(record, col)}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </DndContext>
             </div>
 
             {totalPages > 1 && (
