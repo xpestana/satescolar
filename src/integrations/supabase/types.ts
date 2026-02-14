@@ -757,6 +757,14 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      user_has_school_access_to_family: {
+        Args: { _family_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_has_school_access_to_student: {
+        Args: { _student_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "school" | "representative"
