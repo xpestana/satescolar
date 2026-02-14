@@ -1,80 +1,60 @@
 
 
-# Busqueda Avanzada - Plan de Implementacion
+# Paginacion y Botones de Descarga - Plan
 
 ## Resumen
-Crear una nueva seccion "Busqueda Avanzada" en el menu lateral bajo "AREA DE REGISTROS" que permita buscar y filtrar estudiantes o representantes del colegio, con columnas configurables guardadas en cookies.
+Agregar paginacion visible siempre (ya existe pero solo aparece con mas de 1 pagina) y tres botones de descarga (PDF, Excel, CSV) con un selector de columnas independiente para exportar.
 
 ## Cambios a realizar
 
-### 1. Nuevo item en el sidebar
-Agregar "Busqueda Avanzada" con icono `Search` en la seccion "AREA DE REGISTROS" del `AppSidebar.tsx`, apuntando a `/registros/busqueda-avanzada`.
+### 1. Paginacion siempre visible
+La paginacion ya funciona correctamente con el componente `data-pagination`. Solo se necesita asegurar que siempre se muestre el conteo de resultados y la paginacion cuando haya datos.
 
-### 2. Nueva ruta en App.tsx
-Agregar la ruta protegida `/registros/busqueda-avanzada` con rol `school`.
+### 2. Botones de descarga (PDF, Excel, CSV)
+Agregar tres botones en la barra de controles:
+- **CSV**: Genera archivo `.csv` con los datos filtrados
+- **Excel**: Genera archivo `.xlsx` usando los datos filtrados
+- **PDF**: Genera archivo `.pdf` con tabla formateada
 
-### 3. Nueva pagina: `src/pages/school/AdvancedSearch.tsx`
-Pagina principal con:
-- **Toggle Estudiantes/Representantes**: Tabs para elegir que listado ver
-- **Tabla dinamica**: Muestra los datos de `form_data` (JSON) junto con campos fijos como `document_id`, `photo_url`, `email`, `phone`
-- **Barra de busqueda**: Input de texto que filtra en todos los campos visibles
-- **Selector de columnas**: Dropdown con checkboxes para elegir que columnas mostrar/ocultar
-- **Paginacion**: 10 registros por pagina
+### 3. Selector de columnas independiente para exportacion
+Un segundo popover (junto a los botones de descarga) que permite elegir que columnas incluir en la exportacion, sin afectar las columnas visibles en la tabla de busqueda. Por defecto, hereda las columnas activas de la tabla, pero se pueden modificar de forma independiente. Este estado se mantiene en memoria (no se persiste).
 
-### 4. Persistencia de columnas en cookies
-- Al cambiar las columnas visibles, guardar la configuracion en `localStorage` (mas confiable que cookies para este caso) con clave por colegio: `adv-search-columns-{schoolId}-{tipo}`
-- Si no existe configuracion guardada, mostrar todas las columnas por defecto
-- Las columnas disponibles se obtienen dinamicamente de `form_fields` segun el `form_type` seleccionado
-
-### 5. Logica de busqueda
-- Cargar todos los estudiantes o representantes del colegio (filtrado por `school_id` via RLS)
-- Hacer join con `families` para obtener apellidos de familia
-- Filtro de texto en el cliente sobre los campos visibles del `form_data` y campos fijos
-- Busqueda case-insensitive
-
-## Sobre la relacion muchos a muchos
-Actualmente `students` y `representatives` ya tienen `school_id` como campo directo. Cambiar esto a una tabla intermedia muchos-a-muchos implicaria una migracion compleja que romperia las politicas RLS existentes y toda la logica de insercion/edicion. Por ahora, la estructura actual ya permite que la busqueda filtre por colegio correctamente. Si en el futuro se necesita multi-colegio, se puede agregar una tabla puente sin eliminar el campo actual.
+### 4. Dependencias nuevas
+- **jspdf** + **jspdf-autotable**: Para generar PDFs con tablas
+- **xlsx**: Para generar archivos Excel
 
 ---
 
 ## Detalles Tecnicos
 
-### Estructura del componente
+### Archivos a modificar
+- `src/pages/school/AdvancedSearch.tsx` - Agregar botones de descarga, popover de columnas de exportacion, y logica de generacion de archivos
 
+### Nuevo estado
+```typescript
+// Columnas seleccionadas para exportar (null = usar las mismas de la tabla)
+const [exportColumns, setExportColumns] = useState<string[] | null>(null);
+// Las columnas efectivas de exportacion
+const effectiveExportColumns = exportColumns ?? activeColumnKeys;
+```
+
+### Estructura de botones
 ```text
-AdvancedSearch.tsx
-+-- Tabs (estudiantes | representantes)
-+-- ColumnSelector (dropdown con checkboxes)
-+-- SearchInput (barra de texto)
-+-- DataTable (tabla dinamica con columnas configurables)
-+-- Pagination
+[Tabs] [Busqueda...] [Columnas] [Exportar ▾ (columnas)] [CSV] [Excel] [PDF]
 ```
 
-### Consulta de datos
-```typescript
-// Estudiantes
-supabase.from("students")
-  .select("*, families(father_last_name, mother_last_name)")
-  .eq("school_id", schoolId)
+El boton "Exportar" abre un popover con checkboxes para elegir las columnas de exportacion. Los botones CSV/Excel/PDF ejecutan la descarga con esas columnas.
 
-// Representantes  
-supabase.from("representatives")
-  .select("*, families(father_last_name, mother_last_name)")
-  .eq("school_id", schoolId)
-```
+### Logica de exportacion
+- Se excluye la columna `photo_url` de las exportaciones (no tiene sentido en archivos)
+- Se usa `filtered` (todos los resultados filtrados, no solo la pagina actual) para exportar
+- Se obtiene el valor de texto de cada celda reutilizando la logica de `getCellValue` pero retornando solo texto plano
 
-### Columnas dinamicas
-Se obtienen de `form_fields` para el school_id y form_type correspondiente, mas los campos fijos (`document_id`, `photo_url`). Cada columna se mapea a una key dentro de `form_data` del registro.
+### Generacion CSV
+Generacion manual sin dependencia externa: construir string con separador `,` y descargar como blob.
 
-### Persistencia en localStorage
-```typescript
-const storageKey = `adv-search-cols-${schoolId}-${formType}`;
-// Guardar: localStorage.setItem(storageKey, JSON.stringify(visibleColumns))
-// Leer: JSON.parse(localStorage.getItem(storageKey) || "null")
-```
+### Generacion Excel
+Usar la libreria `xlsx` (SheetJS) para crear un workbook con los datos y descargarlo.
 
-### Archivos a crear/modificar
-- **Crear**: `src/pages/school/AdvancedSearch.tsx`
-- **Modificar**: `src/components/layout/AppSidebar.tsx` (nuevo item de menu)
-- **Modificar**: `src/App.tsx` (nueva ruta)
-
+### Generacion PDF
+Usar `jspdf` con el plugin `jspdf-autotable` para crear una tabla formateada en PDF.
