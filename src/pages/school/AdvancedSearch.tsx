@@ -11,8 +11,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Pagination } from "@/components/ui/data-pagination";
-import { Search, SlidersHorizontal, Loader2, GripVertical } from "lucide-react";
+import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { downloadCSV, downloadExcel, downloadPDF } from "@/lib/export-utils";
 import {
   DndContext,
   closestCenter,
@@ -83,6 +84,7 @@ export default function AdvancedSearch() {
   const [currentPage, setCurrentPage] = useState(1);
   const [visibleColumns, setVisibleColumns] = useState<string[] | null>(null);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  const [exportColumns, setExportColumns] = useState<string[] | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -106,7 +108,7 @@ export default function AdvancedSearch() {
     enabled: !!schoolId,
   });
 
-  // Build all columns (unordered master list)
+  // Build all columns
   const allColumns = useMemo<ColumnDef[]>(() => {
     const fixed = formType === "student" ? FIXED_COLUMNS_STUDENT : FIXED_COLUMNS_REP;
     const dynamic: ColumnDef[] = (formFields ?? []).map((f) => ({
@@ -116,6 +118,12 @@ export default function AdvancedSearch() {
     }));
     return [...fixed, ...dynamic];
   }, [formType, formFields]);
+
+  // Exportable columns (exclude photo_url)
+  const exportableColumns = useMemo(
+    () => allColumns.filter((c) => c.key !== "photo_url"),
+    [allColumns]
+  );
 
   // localStorage keys
   const visibilityKey = `adv-search-cols-${schoolId}-${formType}`;
@@ -138,9 +146,14 @@ export default function AdvancedSearch() {
     }
   }, [visibilityKey, orderKey, schoolId]);
 
+  // Reset export columns when form type changes
+  useEffect(() => {
+    setExportColumns(null);
+  }, [formType]);
+
   const activeColumnKeys = visibleColumns ?? allColumns.map((c) => c.key);
 
-  // Apply order: use saved order, filtering to only visible keys, then append any new visible keys
+  // Apply order
   const orderedActiveColumns = useMemo(() => {
     const visibleSet = new Set(activeColumnKeys);
     if (columnOrder) {
@@ -151,6 +164,9 @@ export default function AdvancedSearch() {
     }
     return allColumns.filter((c) => visibleSet.has(c.key));
   }, [activeColumnKeys, columnOrder, allColumns]);
+
+  // Effective export column keys
+  const effectiveExportKeys = exportColumns ?? activeColumnKeys.filter((k) => k !== "photo_url");
 
   const saveVisibility = useCallback(
     (cols: string[] | null) => {
@@ -193,7 +209,18 @@ export default function AdvancedSearch() {
     saveVisibility([]);
   };
 
-  // Drag & drop handler for column reorder
+  const toggleExportColumn = (key: string) => {
+    const current = effectiveExportKeys;
+    const next = current.includes(key)
+      ? current.filter((k) => k !== key)
+      : [...current, key];
+    setExportColumns(next);
+  };
+
+  const resetExportColumns = () => setExportColumns(null);
+  const deselectAllExport = () => setExportColumns([]);
+
+  // Drag & drop
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -247,7 +274,7 @@ export default function AdvancedSearch() {
   }, [records, searchTerm, activeColumnKeys, allColumns]);
 
   // Paginate
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
@@ -280,6 +307,48 @@ export default function AdvancedSearch() {
     return record[col.key] ?? "—";
   };
 
+  const getTextValue = (record: any, col: ColumnDef): string => {
+    if (col.key === "family_name") {
+      const f = record.families as any;
+      return [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "";
+    }
+    if (col.isFormData) {
+      const fd = (record.form_data ?? {}) as Record<string, any>;
+      return fd[col.key] != null ? String(fd[col.key]) : "";
+    }
+    return record[col.key] != null ? String(record[col.key]) : "";
+  };
+
+  // Export helpers
+  const getExportData = () => {
+    const cols = exportableColumns.filter((c) => effectiveExportKeys.includes(c.key));
+    const rows = filtered.map((r: any) => {
+      const row: Record<string, any> = {};
+      cols.forEach((c) => {
+        row[c.key] = getTextValue(r, c);
+      });
+      return row;
+    });
+    return { cols, rows };
+  };
+
+  const typeLabel = formType === "student" ? "Estudiantes" : "Representantes";
+
+  const handleExportCSV = () => {
+    const { cols, rows } = getExportData();
+    downloadCSV(cols, rows, typeLabel);
+  };
+
+  const handleExportExcel = () => {
+    const { cols, rows } = getExportData();
+    downloadExcel(cols, rows, typeLabel);
+  };
+
+  const handleExportPDF = () => {
+    const { cols, rows } = getExportData();
+    downloadPDF(cols, rows, typeLabel);
+  };
+
   const isLoading = schoolLoading || recordsLoading;
 
   return (
@@ -288,7 +357,7 @@ export default function AdvancedSearch() {
 
       <div className="space-y-4">
         {/* Tabs + controls */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
           <Tabs
             value={formType}
             onValueChange={(v) => setFormType(v as FormType)}
@@ -299,7 +368,7 @@ export default function AdvancedSearch() {
             </TabsList>
           </Tabs>
 
-          <div className="flex-1 relative w-full sm:w-auto">
+          <div className="flex-1 relative w-full sm:w-auto min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar en todos los campos..."
@@ -309,6 +378,7 @@ export default function AdvancedSearch() {
             />
           </div>
 
+          {/* Column visibility */}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
@@ -330,10 +400,7 @@ export default function AdvancedSearch() {
                   </div>
                 </div>
                 {allColumns.map((col) => (
-                  <label
-                    key={col.key}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
+                  <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
                     <Checkbox
                       checked={activeColumnKeys.includes(col.key)}
                       onCheckedChange={() => toggleColumn(col.key)}
@@ -341,6 +408,51 @@ export default function AdvancedSearch() {
                     {col.label}
                   </label>
                 ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Export column selector */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <FileDown className="h-4 w-4 mr-2" />
+                Exportar
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 max-h-80 overflow-y-auto bg-background z-50" align="end">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between pb-2 border-b gap-1">
+                  <span className="text-sm font-medium">Columnas a exportar</span>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={deselectAllExport} className="text-xs h-7">
+                      Ninguna
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={resetExportColumns} className="text-xs h-7">
+                      Todas
+                    </Button>
+                  </div>
+                </div>
+                {exportableColumns.map((col) => (
+                  <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={effectiveExportKeys.includes(col.key)}
+                      onCheckedChange={() => toggleExportColumn(col.key)}
+                    />
+                    {col.label}
+                  </label>
+                ))}
+                <div className="flex gap-2 pt-2 border-t">
+                  <Button size="sm" variant="outline" onClick={handleExportCSV} className="flex-1 text-xs">
+                    <FileText className="h-3 w-3 mr-1" /> CSV
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleExportExcel} className="flex-1 text-xs">
+                    <FileSpreadsheet className="h-3 w-3 mr-1" /> Excel
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleExportPDF} className="flex-1 text-xs">
+                    <FileText className="h-3 w-3 mr-1" /> PDF
+                  </Button>
+                </div>
               </div>
             </PopoverContent>
           </Popover>
@@ -398,19 +510,13 @@ export default function AdvancedSearch() {
               </DndContext>
             </div>
 
-            {totalPages > 1 && (
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                totalItems={filtered.length}
-                itemsPerPage={PAGE_SIZE}
-              />
-            )}
-
-            <p className="text-xs text-muted-foreground">
-              {filtered.length} registro{filtered.length !== 1 ? "s" : ""} encontrado{filtered.length !== 1 ? "s" : ""}
-            </p>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalItems={filtered.length}
+              itemsPerPage={PAGE_SIZE}
+            />
           </>
         )}
       </div>

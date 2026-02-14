@@ -55,50 +55,54 @@ export function Pagination({
     return pages;
   };
 
-  if (totalPages <= 1) return null;
+  const hideButtons = totalPages <= 1;
 
   return (
     <div className="flex items-center justify-between px-4 py-3 border-t">
       <div className="text-sm text-muted-foreground">
-        Mostrando {startItem} a {endItem} de {totalItems} resultados
+        {totalItems === 0
+          ? "Sin resultados"
+          : `Mostrando ${startItem} a ${endItem} de ${totalItems} resultados`}
       </div>
-      <div className="flex items-center gap-1">
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-
-        {getVisiblePages().map((page, index) => (
+      {!hideButtons && (
+        <div className="flex items-center gap-1">
           <Button
-            key={index}
-            variant={page === currentPage ? "default" : "outline"}
+            variant="outline"
             size="icon"
-            className={cn(
-              "h-8 w-8",
-              page === "..." && "pointer-events-none"
-            )}
-            onClick={() => typeof page === "number" && onPageChange(page)}
-            disabled={page === "..."}
+            className="h-8 w-8"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
           >
-            {page}
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-        ))}
 
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+          {getVisiblePages().map((page, index) => (
+            <Button
+              key={index}
+              variant={page === currentPage ? "default" : "outline"}
+              size="icon"
+              className={cn(
+                "h-8 w-8",
+                page === "..." && "pointer-events-none"
+              )}
+              onClick={() => typeof page === "number" && onPageChange(page)}
+              disabled={page === "..."}
+            >
+              {page}
+            </Button>
+          ))}
+
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
