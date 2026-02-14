@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import logoBlack from "@/assets/logo-black.svg";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -231,6 +232,21 @@ export default function AdvancedSearch() {
     saveOrder(newOrder);
   };
 
+  // Fetch school info for PDF header
+  const { data: schoolInfo } = useQuery({
+    queryKey: ["school-info-export", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("schools")
+        .select("name, dea_code, address, logo_url, institution_type, states(name), municipalities(name), cities(name), parishes(name)")
+        .eq("id", schoolId!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
   // Fetch data
   const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: ["adv-search-records", schoolId, formType],
@@ -346,7 +362,20 @@ export default function AdvancedSearch() {
 
   const handleExportPDF = () => {
     const { cols, rows } = getExportData();
-    downloadPDF(cols, rows, typeLabel);
+    const institutionType = schoolInfo?.institution_type === "public" ? "Unidad Educativa" :
+      schoolInfo?.institution_type === "private" ? "Unidad Educativa Privada" :
+      schoolInfo?.institution_type === "subsidized" ? "Unidad Educativa Subvencionada" : "Unidad Educativa";
+    const pdfSchoolInfo = schoolInfo ? {
+      name: `${institutionType} ${schoolInfo.name}`,
+      deaCode: schoolInfo.dea_code,
+      address: schoolInfo.address,
+      state: (schoolInfo.states as any)?.name || "",
+      municipality: (schoolInfo.municipalities as any)?.name || "",
+      city: (schoolInfo.cities as any)?.name || "",
+      parish: (schoolInfo.parishes as any)?.name || "",
+      logoUrl: schoolInfo.logo_url || undefined,
+    } : undefined;
+    downloadPDF(cols, rows, typeLabel, pdfSchoolInfo);
   };
 
   const isLoading = schoolLoading || recordsLoading;
@@ -420,29 +449,10 @@ export default function AdvancedSearch() {
                 Exportar
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-64 max-h-80 overflow-y-auto bg-background z-50" align="end">
+            <PopoverContent className="w-72 bg-background z-50" align="end">
               <div className="space-y-2">
-                <div className="flex items-center justify-between pb-2 border-b gap-1">
-                  <span className="text-sm font-medium">Columnas a exportar</span>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={deselectAllExport} className="text-xs h-7">
-                      Ninguna
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={resetExportColumns} className="text-xs h-7">
-                      Todas
-                    </Button>
-                  </div>
-                </div>
-                {exportableColumns.map((col) => (
-                  <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox
-                      checked={effectiveExportKeys.includes(col.key)}
-                      onCheckedChange={() => toggleExportColumn(col.key)}
-                    />
-                    {col.label}
-                  </label>
-                ))}
-                <div className="flex gap-2 pt-2 border-t">
+                {/* Export buttons FIRST */}
+                <div className="flex gap-2 pb-2 border-b">
                   <Button size="sm" variant="outline" onClick={handleExportCSV} className="flex-1 text-xs">
                     <FileText className="h-3 w-3 mr-1" /> CSV
                   </Button>
@@ -452,6 +462,28 @@ export default function AdvancedSearch() {
                   <Button size="sm" variant="outline" onClick={handleExportPDF} className="flex-1 text-xs">
                     <FileText className="h-3 w-3 mr-1" /> PDF
                   </Button>
+                </div>
+                <div className="flex items-center justify-between pb-1 gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">Columnas a exportar</span>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={deselectAllExport} className="text-xs h-6 px-2">
+                      Ninguna
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={resetExportColumns} className="text-xs h-6 px-2">
+                      Todas
+                    </Button>
+                  </div>
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-1.5">
+                  {exportableColumns.map((col) => (
+                    <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={effectiveExportKeys.includes(col.key)}
+                        onCheckedChange={() => toggleExportColumn(col.key)}
+                      />
+                      {col.label}
+                    </label>
+                  ))}
                 </div>
               </div>
             </PopoverContent>
