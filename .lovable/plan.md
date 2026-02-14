@@ -1,60 +1,104 @@
 
 
-# Paginacion y Botones de Descarga - Plan
+# Acciones en Busqueda Avanzada + Carnet con QR
 
 ## Resumen
-Agregar paginacion visible siempre (ya existe pero solo aparece con mas de 1 pagina) y tres botones de descarga (PDF, Excel, CSV) con un selector de columnas independiente para exportar.
+Agregar una columna de acciones a las tablas de estudiantes y representantes en la busqueda avanzada con botones de Ver, Editar y Descargar Carnet. Tambien corregir la navegacion en el modal de familia para usar recargas completas y evitar errores de estado.
 
 ## Cambios a realizar
 
-### 1. Paginacion siempre visible
-La paginacion ya funciona correctamente con el componente `data-pagination`. Solo se necesita asegurar que siempre se muestre el conteo de resultados y la paginacion cuando haya datos.
+### 1. Columna de acciones en la tabla de busqueda avanzada
+Agregar una columna fija "Acciones" (no movible, no ocultable) al inicio o final de cada fila con tres botones:
 
-### 2. Botones de descarga (PDF, Excel, CSV)
-Agregar tres botones en la barra de controles:
-- **CSV**: Genera archivo `.csv` con los datos filtrados
-- **Excel**: Genera archivo `.xlsx` usando los datos filtrados
-- **PDF**: Genera archivo `.pdf` con tabla formateada
+- **Ver (Eye)**: Abre un modal con los datos de la familia + datos del estudiante/representante seleccionado. Muestra los datos de familia (apellidos, email, telefono, direccion, status) y debajo los datos del integrante segun las columnas activas (o todos los campos de form_data).
+- **Editar (Edit)**: Navega a la pagina de edicion del estudiante o representante usando `window.location.href` para forzar recarga completa y evitar problemas de estado React.
+- **Carnet (IdCard)**: Genera y descarga un PDF con formato de carnet.
 
-### 3. Selector de columnas independiente para exportacion
-Un segundo popover (junto a los botones de descarga) que permite elegir que columnas incluir en la exportacion, sin afectar las columnas visibles en la tabla de busqueda. Por defecto, hereda las columnas activas de la tabla, pero se pueden modificar de forma independiente. Este estado se mantiene en memoria (no se persiste).
+### 2. Modal "Ver" detalle
+Un nuevo componente `ViewRecordModal` que recibe el registro y muestra:
+- Seccion "Datos de Familia": apellidos, email, telefono, direccion, status
+- Seccion "Datos del Estudiante/Representante": campos del form_data + campos fijos (cedula, foto, etc.)
+- Boton para editar (lleva a la pagina de edicion con recarga)
 
-### 4. Dependencias nuevas
-- **jspdf** + **jspdf-autotable**: Para generar PDFs con tablas
-- **xlsx**: Para generar archivos Excel
+### 3. Corregir navegacion en ViewFamilyModal
+Cambiar los `navigate()` en `ViewFamilyModal.tsx` por `window.location.href` para:
+- `handleEditFamily`
+- `handleEditStudent`
+- `handleEditRepresentative`
+- `handleAddStudent`
+- `handleAddRepresentative`
+
+Esto fuerza una recarga completa de la pagina y evita los errores de estado stale que ocurren con la navegacion SPA.
+
+### 4. Generacion de carnet PDF con QR
+Crear una funcion `downloadCarnet` en `export-utils.ts` que genera un PDF con tamano de carnet estandar (85.6mm x 53.98mm - tamano ISO/IEC 7810 ID-1, como una tarjeta de credito):
+
+**Diseno del carnet (basado en la imagen de referencia):**
+- Fondo blanco con borde redondeado decorativo
+- Franja superior con color institucional (azul)
+- Logo del colegio centrado en la franja
+- Nombre de la institucion
+- Ubicacion (ciudad, estado)
+- Ano escolar activo
+- Numero de cedula
+- Foto del estudiante/representante (circular)
+- Nombre completo en mayusculas
+- Tipo: "ESTUDIANTE" o "REPRESENTANTE"
+- Codigo QR (por ahora un cuadrado placeholder vacio, listo para ser reemplazado)
+
+**Nombre del archivo:** `Carnet_{Nombre_Completo}.pdf`
+
+### 5. Obtener ano escolar activo
+Para el carnet se necesita el ano escolar activo. Se hace un query a `school_years` filtrando por `school_id` y `is_active = true`.
 
 ---
 
 ## Detalles Tecnicos
 
+### Archivos a crear
+- `src/components/search/ViewRecordModal.tsx` - Modal de vista detallada
+
 ### Archivos a modificar
-- `src/pages/school/AdvancedSearch.tsx` - Agregar botones de descarga, popover de columnas de exportacion, y logica de generacion de archivos
+- `src/pages/school/AdvancedSearch.tsx` - Agregar columna acciones, estados para modal y logica de carnet
+- `src/lib/export-utils.ts` - Nueva funcion `downloadCarnet`
+- `src/components/families/ViewFamilyModal.tsx` - Cambiar navigate por window.location.href
 
-### Nuevo estado
-```typescript
-// Columnas seleccionadas para exportar (null = usar las mismas de la tabla)
-const [exportColumns, setExportColumns] = useState<string[] | null>(null);
-// Las columnas efectivas de exportacion
-const effectiveExportColumns = exportColumns ?? activeColumnKeys;
-```
+### Estructura de la columna de acciones
 
-### Estructura de botones
 ```text
-[Tabs] [Busqueda...] [Columnas] [Exportar ▾ (columnas)] [CSV] [Excel] [PDF]
+| ... columnas existentes ... | Acciones          |
+|                             | [Eye] [Edit] [ID] |
 ```
 
-El boton "Exportar" abre un popover con checkboxes para elegir las columnas de exportacion. Los botones CSV/Excel/PDF ejecutan la descarga con esas columnas.
+Los botones de accion seran iconos con tooltips.
 
-### Logica de exportacion
-- Se excluye la columna `photo_url` de las exportaciones (no tiene sentido en archivos)
-- Se usa `filtered` (todos los resultados filtrados, no solo la pagina actual) para exportar
-- Se obtiene el valor de texto de cada celda reutilizando la logica de `getCellValue` pero retornando solo texto plano
+### Funcion downloadCarnet
 
-### Generacion CSV
-Generacion manual sin dependencia externa: construir string con separador `,` y descargar como blob.
+```typescript
+export async function downloadCarnet(params: {
+  personName: string;
+  documentId: string;
+  role: "ESTUDIANTE" | "REPRESENTANTE";
+  photoUrl?: string;
+  schoolName: string;
+  schoolLocation: string;
+  schoolLogoUrl?: string;
+  schoolYear: string;
+}) { ... }
+```
 
-### Generacion Excel
-Usar la libreria `xlsx` (SheetJS) para crear un workbook con los datos y descargarlo.
+El carnet se genera con jsPDF en tamano personalizado (85.6 x 53.98 mm). El codigo QR sera un rectangulo vacio con borde por ahora.
 
-### Generacion PDF
-Usar `jspdf` con el plugin `jspdf-autotable` para crear una tabla formateada en PDF.
+### Navegacion con recarga
+
+```typescript
+// Antes (causa errores de estado)
+navigate(`/registros/familias/${familyId}/editar`);
+
+// Despues (recarga completa)
+window.location.href = `/registros/familias/${familyId}/editar`;
+```
+
+### Datos para el modal "Ver"
+Se reutiliza el registro ya cargado en la tabla + se hace fetch de la familia completa para mostrar datos adicionales (email, telefono, direccion).
+
