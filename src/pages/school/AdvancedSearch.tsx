@@ -12,9 +12,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Pagination } from "@/components/ui/data-pagination";
-import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown, Eye, Edit, IdCard } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { downloadCSV, downloadExcel, downloadPDF } from "@/lib/export-utils";
+import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet } from "@/lib/export-utils";
+import { ViewRecordModal } from "@/components/search/ViewRecordModal";
 import {
   DndContext,
   closestCenter,
@@ -86,6 +88,7 @@ export default function AdvancedSearch() {
   const [visibleColumns, setVisibleColumns] = useState<string[] | null>(null);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [exportColumns, setExportColumns] = useState<string[] | null>(null);
+  const [viewRecord, setViewRecord] = useState<any>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -247,6 +250,22 @@ export default function AdvancedSearch() {
     enabled: !!schoolId,
   });
 
+  // Fetch active school year for carnet
+  const { data: activeSchoolYear } = useQuery({
+    queryKey: ["active-school-year", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("school_years")
+        .select("year_range")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.year_range || "Sin definir";
+    },
+    enabled: !!schoolId,
+  });
+
   // Fetch data
   const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: ["adv-search-records", schoolId, formType],
@@ -254,7 +273,7 @@ export default function AdvancedSearch() {
       const table = formType === "student" ? "students" : "representatives";
       const { data, error } = await supabase
         .from(table)
-        .select("*, families(father_last_name, mother_last_name)")
+        .select("*, families(father_last_name, mother_last_name, is_suspended, contact_phone, address)")
         .eq("school_id", schoolId!);
       if (error) throw error;
       return data;
@@ -376,6 +395,41 @@ export default function AdvancedSearch() {
       logoUrl: schoolInfo.logo_url || undefined,
     } : undefined;
     downloadPDF(cols, rows, typeLabel, pdfSchoolInfo);
+  };
+
+  const handleEditRecord = (record: any) => {
+    const familyId = record.family_id;
+    if (formType === "student") {
+      window.location.href = `/registros/familias/${familyId}/estudiante/${record.id}/editar`;
+    } else {
+      window.location.href = `/registros/familias/${familyId}/representante/${record.id}/editar`;
+    }
+  };
+
+  const handleDownloadCarnet = async (record: any) => {
+    const fd = (record.form_data ?? {}) as Record<string, any>;
+    const name = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido]
+      .filter(Boolean).join(" ") || "Sin nombre";
+    
+    const institutionType = schoolInfo?.institution_type === "public" ? "Unidad Educativa" :
+      schoolInfo?.institution_type === "private" ? "Unidad Educativa Privada" :
+      schoolInfo?.institution_type === "subsidized" ? "Unidad Educativa Subvencionada" : "Unidad Educativa";
+
+    const locationParts = [
+      (schoolInfo?.cities as any)?.name,
+      (schoolInfo?.states as any)?.name,
+    ].filter(Boolean);
+
+    await downloadCarnet({
+      personName: name,
+      documentId: record.document_id || fd.documento || "",
+      role: formType === "student" ? "ESTUDIANTE" : "REPRESENTANTE",
+      photoUrl: record.photo_url || undefined,
+      schoolName: schoolInfo ? `${institutionType} ${schoolInfo.name}` : "Institución",
+      schoolLocation: locationParts.join(", ") || "",
+      schoolLogoUrl: schoolInfo?.logo_url || undefined,
+      schoolYear: activeSchoolYear || "Sin definir",
+    });
   };
 
   const isLoading = schoolLoading || recordsLoading;
@@ -514,13 +568,14 @@ export default function AdvancedSearch() {
                           <SortableHeaderCell key={col.key} col={col} />
                         ))}
                       </SortableContext>
+                      <TableHead className="whitespace-nowrap w-[100px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginated.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={orderedActiveColumns.length || 1}
+                          colSpan={(orderedActiveColumns.length || 1) + 1}
                           className="text-center py-8 text-muted-foreground"
                         >
                           No se encontraron registros
@@ -534,6 +589,36 @@ export default function AdvancedSearch() {
                               {getCellValue(record, col)}
                             </TableCell>
                           ))}
+                          <TableCell>
+                            <TooltipProvider delayDuration={200}>
+                              <div className="flex items-center gap-0.5">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewRecord(record)}>
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Ver</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditRecord(record)}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Editar</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDownloadCarnet(record)}>
+                                      <IdCard className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Descargar Carnet</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            </TooltipProvider>
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
@@ -552,6 +637,15 @@ export default function AdvancedSearch() {
           </>
         )}
       </div>
+
+      <ViewRecordModal
+        open={!!viewRecord}
+        onClose={() => setViewRecord(null)}
+        record={viewRecord}
+        formType={formType}
+        columns={orderedActiveColumns}
+        getTextValue={getTextValue}
+      />
     </DashboardLayout>
   );
 }

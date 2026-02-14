@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import {
   Dialog,
   DialogContent,
@@ -45,7 +44,6 @@ export function ViewFamilyModal({
   schoolId,
   onSuspendToggle,
 }: ViewFamilyModalProps) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [deleteRepId, setDeleteRepId] = useState<string | null>(null);
@@ -173,27 +171,27 @@ export function ViewFamilyModal({
 
   const handleEditFamily = () => {
     onClose();
-    navigate(`/registros/familias/${familyId}/editar`);
+    window.location.href = `/registros/familias/${familyId}/editar`;
   };
 
   const handleAddStudent = () => {
     onClose();
-    navigate(`/registros/familias/${familyId}/estudiante/nuevo`);
+    window.location.href = `/registros/familias/${familyId}/estudiante/nuevo`;
   };
 
   const handleEditStudent = (studentId: string) => {
     onClose();
-    navigate(`/registros/familias/${familyId}/estudiante/${studentId}/editar`);
+    window.location.href = `/registros/familias/${familyId}/estudiante/${studentId}/editar`;
   };
 
   const handleAddRepresentative = () => {
     onClose();
-    navigate(`/registros/familias/${familyId}/representante/nuevo`);
+    window.location.href = `/registros/familias/${familyId}/representante/nuevo`;
   };
 
   const handleEditRepresentative = (repId: string) => {
     onClose();
-    navigate(`/registros/familias/${familyId}/representante/${repId}/editar`);
+    window.location.href = `/registros/familias/${familyId}/representante/${repId}/editar`;
   };
 
   const handleDeleteRepresentative = (repId: string, name: string) => {
