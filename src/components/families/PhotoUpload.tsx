@@ -60,14 +60,8 @@ export function PhotoUpload({ value, onChange, label = "Ingrese la foto de perfi
   };
 
   const handleClick = () => {
-    if (previewUrl) {
-      // If there's already an image, open crop modal to edit
-      setSelectedImage(previewUrl);
-      setCropModalOpen(true);
-    } else {
-      // Otherwise, open file picker
-      fileInputRef.current?.click();
-    }
+    // Always open file picker first
+    fileInputRef.current?.click();
   };
 
   return (
