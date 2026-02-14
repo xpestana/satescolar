@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Cropper, { Area, Point } from "react-easy-crop";
 import {
   Dialog,
@@ -30,11 +30,9 @@ async function getCroppedImg(
     throw new Error("No 2d context");
   }
 
-  // Set canvas size to the cropped area
   canvas.width = pixelCrop.width;
   canvas.height = pixelCrop.height;
 
-  // Draw the cropped image
   ctx.drawImage(
     image,
     pixelCrop.x,
@@ -78,12 +76,23 @@ export function ImageCropModal({
   onSave,
   currentImage,
 }: ImageCropModalProps) {
-  const [imageSrc, setImageSrc] = useState<string | null>(currentImage || null);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync imageSrc when modal opens with a new currentImage
+  useEffect(() => {
+    if (open && currentImage) {
+      setImageSrc(currentImage);
+      setZoom(1);
+      setCrop({ x: 0, y: 0 });
+    } else if (!open) {
+      setImageSrc(null);
+    }
+  }, [open, currentImage]);
 
   const onCropComplete = useCallback(
     (_croppedArea: Area, croppedAreaPixels: Area) => {
@@ -142,7 +151,7 @@ export function ImageCropModal({
   };
 
   const handleClose = () => {
-    setImageSrc(currentImage || null);
+    setImageSrc(null);
     setZoom(1);
     setCrop({ x: 0, y: 0 });
     onClose();
@@ -157,7 +166,7 @@ export function ImageCropModal({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Logo de la institución</DialogTitle>
+          <DialogTitle>Foto de perfil</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
