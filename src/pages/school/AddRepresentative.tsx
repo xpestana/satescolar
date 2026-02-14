@@ -148,10 +148,18 @@ export default function AddRepresentative() {
         photoUrl = urlData.publicUrl;
       }
 
+      // Extract known fields from form_data to sync direct columns
+      const documentType = formData.tipo_documento || "";
+      const documentNum = formData.documento || "";
+      const documentId = documentType && documentNum ? `${documentType}-${documentNum}` : documentNum || null;
+
       const repData = {
         family_id: familyId,
         photo_url: photoUrl,
         form_data: formData,
+        document_id: documentId,
+        phone: formData.numero_contacto || formData.telefono || null,
+        email: formData.email || formData.correo || formData.correo_electronico || null,
       };
 
       if (isEditing) {
