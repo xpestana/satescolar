@@ -150,7 +150,6 @@ export default function AddStudent() {
 
       const studentData = {
         family_id: familyId,
-        school_id: schoolId,
         photo_url: photoUrl,
         form_data: formData,
       };
@@ -162,10 +161,18 @@ export default function AddStudent() {
           .eq("id", studentId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data: newStudent, error } = await supabase
           .from("students")
-          .insert(studentData);
+          .insert(studentData)
+          .select("id")
+          .single();
         if (error) throw error;
+
+        // Create student-school association
+        const { error: assocError } = await supabase
+          .from("student_schools")
+          .insert({ student_id: newStudent.id, school_id: schoolId });
+        if (assocError) throw assocError;
       }
     },
     onSuccess: () => {
@@ -176,7 +183,7 @@ export default function AddStudent() {
           ? "Los datos del estudiante se han actualizado correctamente"
           : "El estudiante ha sido agregado a la familia",
       });
-      navigate(`/registros/familias`);
+      window.history.back();
     },
     onError: (error) => {
       console.error("Error saving student:", error);
@@ -236,7 +243,7 @@ export default function AddStudent() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => navigate("/registros/familias")}
+                onClick={() => window.history.back()}
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Volver
@@ -312,7 +319,7 @@ export default function AddStudent() {
               <Button
                 type="button"
                 variant="destructive"
-                onClick={() => navigate("/registros/familias")}
+                onClick={() => window.history.back()}
               >
                 Cancelar
               </Button>

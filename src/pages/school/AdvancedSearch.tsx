@@ -270,13 +270,21 @@ export default function AdvancedSearch() {
   const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: ["adv-search-records", schoolId, formType],
     queryFn: async () => {
-      const table = formType === "student" ? "students" : "representatives";
-      const { data, error } = await supabase
-        .from(table)
-        .select("*, families(father_last_name, mother_last_name, is_suspended, contact_phone, address)")
-        .eq("school_id", schoolId!);
-      if (error) throw error;
-      return data;
+      if (formType === "student") {
+        const { data, error } = await supabase
+          .from("students")
+          .select("*, families(father_last_name, mother_last_name, is_suspended, contact_phone, address), student_schools!inner(school_id)")
+          .eq("student_schools.school_id", schoolId!);
+        if (error) throw error;
+        return data as any[];
+      } else {
+        const { data, error } = await supabase
+          .from("representatives")
+          .select("*, families!inner(father_last_name, mother_last_name, is_suspended, contact_phone, address, family_schools!inner(school_id))")
+          .eq("families.family_schools.school_id", schoolId!);
+        if (error) throw error;
+        return data as any[];
+      }
     },
     enabled: !!schoolId,
   });

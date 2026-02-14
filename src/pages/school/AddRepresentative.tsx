@@ -150,7 +150,6 @@ export default function AddRepresentative() {
 
       const repData = {
         family_id: familyId,
-        school_id: schoolId,
         photo_url: photoUrl,
         form_data: formData,
       };
@@ -176,7 +175,7 @@ export default function AddRepresentative() {
           ? "Los datos del representante se han actualizado correctamente"
           : "El representante ha sido agregado a la familia",
       });
-      navigate(`/registros/familias`);
+      window.history.back();
     },
     onError: (error) => {
       console.error("Error saving representative:", error);
@@ -236,7 +235,7 @@ export default function AddRepresentative() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => navigate("/registros/familias")}
+                onClick={() => window.history.back()}
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Volver
@@ -311,7 +310,7 @@ export default function AddRepresentative() {
               <Button
                 type="button"
                 variant="destructive"
-                onClick={() => navigate("/registros/familias")}
+                onClick={() => window.history.back()}
               >
                 Cancelar
               </Button>

@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get user's school_id
+    // Get user's school_id from user_roles
     const { data: roleData, error: roleError } = await supabaseClient
       .from("user_roles")
       .select("school_id, role")
@@ -77,18 +77,56 @@ Deno.serve(async (req) => {
     if (existingUser) {
       userId = existingUser.id;
       
-      // Check if already has a family in this school
-      const { data: existingFamily } = await supabaseAdmin
+      // Check if already has a family associated with this school
+      const { data: existingFamilySchool } = await supabaseAdmin
+        .from("family_schools")
+        .select("id, families(id)")
+        .eq("school_id", roleData.school_id)
+        .eq("families.user_id", userId);
+
+      // Check if any of the user's families are already in this school
+      const { data: userFamilies } = await supabaseAdmin
         .from("families")
         .select("id")
-        .eq("user_id", userId)
-        .eq("school_id", roleData.school_id)
-        .single();
+        .eq("user_id", userId);
 
-      if (existingFamily) {
+      if (userFamilies && userFamilies.length > 0) {
+        const familyIds = userFamilies.map(f => f.id);
+        const { data: existingAssoc } = await supabaseAdmin
+          .from("family_schools")
+          .select("id")
+          .eq("school_id", roleData.school_id)
+          .in("family_id", familyIds)
+          .maybeSingle();
+
+        if (existingAssoc) {
+          return new Response(
+            JSON.stringify({ error: "Ya existe una familia con este correo en esta institución" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Family exists but not in this school - associate it
+        const familyId = userFamilies[0].id;
+        const { error: assocError } = await supabaseAdmin
+          .from("family_schools")
+          .insert({ family_id: familyId, school_id: roleData.school_id });
+
+        if (assocError) {
+          console.error("Error associating family to school:", assocError);
+          return new Response(
+            JSON.stringify({ error: "Error al asociar la familia al colegio" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         return new Response(
-          JSON.stringify({ error: "Ya existe una familia con este correo en esta institución" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          JSON.stringify({ 
+            success: true, 
+            family: { id: familyId },
+            message: "Familia existente asociada a esta institución exitosamente"
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
     } else {
@@ -120,7 +158,6 @@ Deno.serve(async (req) => {
 
       if (roleInsertError) {
         console.error("Error creating role:", roleInsertError);
-        // Rollback: delete the user
         await supabaseAdmin.auth.admin.deleteUser(userId);
         return new Response(
           JSON.stringify({ error: "Error al asignar rol al usuario" }),
@@ -129,12 +166,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Create the family
+    // Create the family (without school_id)
     const { data: family, error: familyError } = await supabaseAdmin
       .from("families")
       .insert({
         user_id: userId,
-        school_id: roleData.school_id,
       })
       .select()
       .single();
@@ -143,6 +179,22 @@ Deno.serve(async (req) => {
       console.error("Error creating family:", familyError);
       return new Response(
         JSON.stringify({ error: "Error al crear la familia" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create the family-school association
+    const { error: assocError } = await supabaseAdmin
+      .from("family_schools")
+      .insert({
+        family_id: family.id,
+        school_id: roleData.school_id,
+      });
+
+    if (assocError) {
+      console.error("Error creating family-school association:", assocError);
+      return new Response(
+        JSON.stringify({ error: "Error al asociar la familia al colegio" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
