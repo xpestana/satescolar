@@ -271,7 +271,11 @@ export async function downloadCarnet(params: {
     const photoB64 = await loadImageAsBase64(params.photoUrl);
     if (photoB64) {
       try {
-        doc.addImage(photoB64, "JPEG", w / 2 - photoR, photoY - photoR, photoR * 2, photoR * 2);
+        // Create circular-cropped image via canvas
+        const circularB64 = await createCircularImage(photoB64, 300);
+        if (circularB64) {
+          doc.addImage(circularB64, "PNG", w / 2 - photoR, photoY - photoR, photoR * 2, photoR * 2);
+        }
       } catch { /* ignore */ }
     }
   }
@@ -317,13 +321,35 @@ export async function downloadCarnet(params: {
   doc.setFillColor(50, 150, 230);
   doc.triangle(0, h, 12, h, 0, h - 4, "F");
 
-  // ── BACK SIDE (blank white) ──
-  doc.addPage([w, h], "portrait");
-  doc.setFillColor(255, 255, 255);
-  doc.rect(0, 0, w, h, "F");
-
   const safeName = params.personName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_");
   doc.save(`Carnet_${safeName}.pdf`);
+}
+
+// ── Circular image helper ────────────────────────────
+function createCircularImage(base64: string, size: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(null); return; }
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      // Draw image centered/covering the circle
+      const minDim = Math.min(img.width, img.height);
+      const sx = (img.width - minDim) / 2;
+      const sy = (img.height - minDim) / 2;
+      ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = () => resolve(null);
+    img.src = base64;
+  });
 }
 
 // ── Helper ───────────────────────────────────────────
