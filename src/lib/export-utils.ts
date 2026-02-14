@@ -190,6 +190,116 @@ export async function downloadPDF(
   doc.save(`${filename}.pdf`);
 }
 
+// ── Carnet ───────────────────────────────────────────
+export async function downloadCarnet(params: {
+  personName: string;
+  documentId: string;
+  role: "ESTUDIANTE" | "REPRESENTANTE";
+  photoUrl?: string;
+  schoolName: string;
+  schoolLocation: string;
+  schoolLogoUrl?: string;
+  schoolYear: string;
+}) {
+  const w = 85.6;
+  const h = 53.98;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: [h, w] });
+
+  // Background
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(0, 0, w, h, 2, 2, "F");
+
+  // Top bar
+  doc.setFillColor(30, 64, 120);
+  doc.rect(0, 0, w, 14, "F");
+
+  // Logo in top bar
+  if (params.schoolLogoUrl) {
+    const logoB64 = await loadImageAsBase64(params.schoolLogoUrl);
+    if (logoB64) {
+      try {
+        doc.addImage(logoB64, "PNG", 2, 1.5, 11, 11);
+      } catch { /* ignore */ }
+    }
+  }
+
+  // School name in top bar
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(5.5);
+  doc.setFont("helvetica", "bold");
+  const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), 58);
+  doc.text(nameLines, params.schoolLogoUrl ? 15 : 4, 5);
+
+  // School location
+  doc.setFontSize(4);
+  doc.setFont("helvetica", "normal");
+  doc.text(params.schoolLocation, params.schoolLogoUrl ? 15 : 4, nameLines.length > 1 ? 10 : 9);
+
+  // School year
+  doc.setFontSize(4);
+  doc.text(`Año Escolar: ${params.schoolYear}`, params.schoolLogoUrl ? 15 : 4, nameLines.length > 1 ? 13 : 12);
+
+  // Photo circle area
+  const photoX = w / 2;
+  const photoY = 25;
+  const photoR = 7;
+
+  if (params.photoUrl) {
+    const photoB64 = await loadImageAsBase64(params.photoUrl);
+    if (photoB64) {
+      try {
+        doc.addImage(photoB64, "JPEG", photoX - photoR, photoY - photoR, photoR * 2, photoR * 2);
+      } catch { /* ignore */ }
+    }
+  }
+  // Circle border
+  doc.setDrawColor(30, 64, 120);
+  doc.setLineWidth(0.4);
+  doc.circle(photoX, photoY, photoR);
+
+  // Name
+  doc.setTextColor(30, 30, 30);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "bold");
+  doc.text(params.personName.toUpperCase(), w / 2, 35, { align: "center" });
+
+  // Document
+  doc.setFontSize(5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text(`C.I.: ${params.documentId || "Sin documento"}`, w / 2, 39, { align: "center" });
+
+  // Role badge
+  doc.setFillColor(30, 64, 120);
+  const badgeW = 22;
+  const badgeH = 4;
+  const badgeX = (w - badgeW) / 2;
+  doc.roundedRect(badgeX, 41, badgeW, badgeH, 1, 1, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(4.5);
+  doc.setFont("helvetica", "bold");
+  doc.text(params.role, w / 2, 43.8, { align: "center" });
+
+  // QR placeholder
+  const qrSize = 8;
+  const qrX = w - qrSize - 3;
+  const qrY = h - qrSize - 3;
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.2);
+  doc.rect(qrX, qrY, qrSize, qrSize);
+  doc.setFontSize(3);
+  doc.setTextColor(180, 180, 180);
+  doc.text("QR", qrX + qrSize / 2, qrY + qrSize / 2 + 1, { align: "center" });
+
+  // Bottom decorative line
+  doc.setDrawColor(30, 64, 120);
+  doc.setLineWidth(0.6);
+  doc.line(3, h - 2, w - 3, h - 2);
+
+  const safeName = params.personName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_");
+  doc.save(`Carnet_${safeName}.pdf`);
+}
+
 // ── Helper ───────────────────────────────────────────
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
