@@ -148,10 +148,16 @@ export default function AddStudent() {
         photoUrl = urlData.publicUrl;
       }
 
+      // Extract known fields from form_data to sync direct columns
+      const documentType = formData.tipo_documento || "";
+      const documentNum = formData.documento || formData.cedula || "";
+      const documentId = documentType && documentNum ? `${documentType}-${documentNum}` : documentNum || null;
+
       const studentData = {
         family_id: familyId,
         photo_url: photoUrl,
         form_data: formData,
+        document_id: documentId,
       };
 
       if (isEditing) {
