@@ -167,17 +167,17 @@ export default function AddStudent() {
           .eq("id", studentId);
         if (error) throw error;
       } else {
-        const { data: newStudent, error } = await supabase
+        // Generate ID client-side so we can create student + association without needing SELECT back
+        const newStudentId = crypto.randomUUID();
+        const { error } = await supabase
           .from("students")
-          .insert(studentData)
-          .select("id")
-          .single();
+          .insert({ id: newStudentId, ...studentData });
         if (error) throw error;
 
         // Create student-school association
         const { error: assocError } = await supabase
           .from("student_schools")
-          .insert({ student_id: newStudent.id, school_id: schoolId });
+          .insert({ student_id: newStudentId, school_id: schoolId });
         if (assocError) throw assocError;
       }
     },
