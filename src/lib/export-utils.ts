@@ -190,7 +190,7 @@ export async function downloadPDF(
   doc.save(`${filename}.pdf`);
 }
 
-// ── Carnet ───────────────────────────────────────────
+// ── Carnet (vertical) ────────────────────────────────
 export async function downloadCarnet(params: {
   personName: string;
   documentId: string;
@@ -201,100 +201,126 @@ export async function downloadCarnet(params: {
   schoolLogoUrl?: string;
   schoolYear: string;
 }) {
-  const w = 85.6;
-  const h = 53.98;
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: [h, w] });
+  // Standard CR80 card: 85.6 x 53.98 mm — vertical orientation
+  const w = 53.98;
+  const h = 85.6;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [w, h] });
 
-  // Background
+  // ── FRONT SIDE ──
+
+  // White background
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(0, 0, w, h, 2, 2, "F");
+  doc.rect(0, 0, w, h, "F");
 
-  // Top bar
-  doc.setFillColor(30, 64, 120);
-  doc.rect(0, 0, w, 14, "F");
+  // Top blue header area with diagonal geometric shapes
+  doc.setFillColor(1, 5, 30); // dark blue (#01051e)
+  doc.rect(0, 0, w, 28, "F");
 
-  // Logo in top bar
+  // Decorative diagonal accent (lighter blue triangle)
+  doc.setFillColor(30, 120, 200);
+  doc.triangle(0, 0, 18, 0, 0, 28, "F");
+
+  // Another accent triangle on the right
+  doc.setFillColor(50, 150, 230);
+  doc.triangle(w, 0, w - 14, 0, w, 22, "F");
+
+  // Small decorative stripe
+  doc.setFillColor(30, 120, 200);
+  doc.rect(0, 28, w, 1.5, "F");
+
+  // School logo in header
   if (params.schoolLogoUrl) {
     const logoB64 = await loadImageAsBase64(params.schoolLogoUrl);
     if (logoB64) {
       try {
-        doc.addImage(logoB64, "PNG", 2, 1.5, 11, 11);
+        doc.addImage(logoB64, "PNG", w / 2 - 5, 2, 10, 10);
       } catch { /* ignore */ }
     }
   }
 
-  // School name in top bar
+  // School name in header
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(5.5);
+  doc.setFontSize(5);
   doc.setFont("helvetica", "bold");
-  const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), 58);
-  doc.text(nameLines, params.schoolLogoUrl ? 15 : 4, 5);
+  const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), w - 8);
+  doc.text(nameLines, w / 2, params.schoolLogoUrl ? 15 : 8, { align: "center" });
 
   // School location
-  doc.setFontSize(4);
+  doc.setFontSize(3.5);
   doc.setFont("helvetica", "normal");
-  doc.text(params.schoolLocation, params.schoolLogoUrl ? 15 : 4, nameLines.length > 1 ? 10 : 9);
+  doc.text(params.schoolLocation, w / 2, params.schoolLogoUrl ? 19 : 13, { align: "center" });
 
   // School year
-  doc.setFontSize(4);
-  doc.text(`Año Escolar: ${params.schoolYear}`, params.schoolLogoUrl ? 15 : 4, nameLines.length > 1 ? 13 : 12);
+  doc.setFontSize(3.5);
+  doc.text(`Año Escolar: ${params.schoolYear}`, w / 2, params.schoolLogoUrl ? 22 : 16, { align: "center" });
 
-  // Photo circle area
-  const photoX = w / 2;
-  const photoY = 25;
-  const photoR = 7;
+  // ── Photo circle ──
+  const photoY = 40;
+  const photoR = 9;
+
+  // White circle background behind photo
+  doc.setFillColor(255, 255, 255);
+  doc.circle(w / 2, photoY, photoR + 1, "F");
+
+  // Blue border ring
+  doc.setDrawColor(30, 120, 200);
+  doc.setLineWidth(0.8);
+  doc.circle(w / 2, photoY, photoR + 0.5);
 
   if (params.photoUrl) {
     const photoB64 = await loadImageAsBase64(params.photoUrl);
     if (photoB64) {
       try {
-        doc.addImage(photoB64, "JPEG", photoX - photoR, photoY - photoR, photoR * 2, photoR * 2);
+        doc.addImage(photoB64, "JPEG", w / 2 - photoR, photoY - photoR, photoR * 2, photoR * 2);
       } catch { /* ignore */ }
     }
   }
-  // Circle border
-  doc.setDrawColor(30, 64, 120);
-  doc.setLineWidth(0.4);
-  doc.circle(photoX, photoY, photoR);
 
-  // Name
-  doc.setTextColor(30, 30, 30);
+  // ── Name ──
+  doc.setTextColor(1, 5, 30);
   doc.setFontSize(7);
   doc.setFont("helvetica", "bold");
-  doc.text(params.personName.toUpperCase(), w / 2, 35, { align: "center" });
+  const personLines = doc.splitTextToSize(params.personName.toUpperCase(), w - 8);
+  doc.text(personLines, w / 2, 54, { align: "center" });
 
-  // Document
-  doc.setFontSize(5);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(80, 80, 80);
-  doc.text(`C.I.: ${params.documentId || "Sin documento"}`, w / 2, 39, { align: "center" });
-
-  // Role badge
-  doc.setFillColor(30, 64, 120);
-  const badgeW = 22;
-  const badgeH = 4;
+  // ── Role badge ──
+  doc.setFillColor(30, 120, 200);
+  const badgeW = 24;
+  const badgeH = 5;
   const badgeX = (w - badgeW) / 2;
-  doc.roundedRect(badgeX, 41, badgeW, badgeH, 1, 1, "F");
+  const badgeY = personLines.length > 1 ? 58 : 57;
+  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, "F");
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(4.5);
+  doc.setFontSize(5);
   doc.setFont("helvetica", "bold");
-  doc.text(params.role, w / 2, 43.8, { align: "center" });
+  doc.text(params.role, w / 2, badgeY + 3.5, { align: "center" });
 
-  // QR placeholder
-  const qrSize = 8;
-  const qrX = w - qrSize - 3;
-  const qrY = h - qrSize - 3;
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.2);
-  doc.rect(qrX, qrY, qrSize, qrSize);
-  doc.setFontSize(3);
-  doc.setTextColor(180, 180, 180);
-  doc.text("QR", qrX + qrSize / 2, qrY + qrSize / 2 + 1, { align: "center" });
+  // ── Document ID ──
+  const idY = badgeY + badgeH + 5;
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(4);
+  doc.setFont("helvetica", "normal");
+  doc.text("DOCUMENTO DE IDENTIDAD", w / 2, idY, { align: "center" });
+  doc.setTextColor(1, 5, 30);
+  doc.setFontSize(6);
+  doc.setFont("helvetica", "bold");
+  doc.text(params.documentId || "Sin documento", w / 2, idY + 4, { align: "center" });
 
-  // Bottom decorative line
-  doc.setDrawColor(30, 64, 120);
-  doc.setLineWidth(0.6);
-  doc.line(3, h - 2, w - 3, h - 2);
+  // ── Bottom decorative bar ──
+  doc.setFillColor(1, 5, 30);
+  doc.rect(0, h - 4, w, 4, "F");
+
+  // Diagonal accent on bottom
+  doc.setFillColor(30, 120, 200);
+  doc.triangle(w, h, w - 16, h, w, h - 4, "F");
+
+  doc.setFillColor(50, 150, 230);
+  doc.triangle(0, h, 12, h, 0, h - 4, "F");
+
+  // ── BACK SIDE (blank white) ──
+  doc.addPage([w, h], "portrait");
+  doc.setFillColor(255, 255, 255);
+  doc.rect(0, 0, w, h, "F");
 
   const safeName = params.personName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_");
   doc.save(`Carnet_${safeName}.pdf`);
