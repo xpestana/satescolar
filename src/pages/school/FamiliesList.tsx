@@ -55,8 +55,8 @@ export default function FamiliesList() {
 
       const { data, error, count } = await supabase
         .from("families")
-        .select("*", { count: "exact" })
-        .eq("school_id", schoolId)
+        .select("*, family_schools!inner(school_id)", { count: "exact" })
+        .eq("family_schools.school_id", schoolId)
         .range(from, to)
         .order("created_at", { ascending: false });
 

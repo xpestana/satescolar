@@ -273,7 +273,7 @@ export default function EditFamily() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => navigate("/registros/familias")}
+              onClick={() => window.history.back()}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Volver
@@ -716,7 +716,7 @@ export default function EditFamily() {
             <Button
               type="button"
               variant="destructive"
-              onClick={() => navigate("/registros/familias")}
+              onClick={() => window.history.back()}
             >
               Cancelar
             </Button>
