@@ -560,6 +560,7 @@ export default function AdvancedSearch() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="whitespace-nowrap w-[100px] sticky left-0 bg-background z-10">Acciones</TableHead>
                       <SortableContext
                         items={orderedActiveColumns.map((c) => c.key)}
                         strategy={horizontalListSortingStrategy}
@@ -568,7 +569,6 @@ export default function AdvancedSearch() {
                           <SortableHeaderCell key={col.key} col={col} />
                         ))}
                       </SortableContext>
-                      <TableHead className="whitespace-nowrap w-[100px]">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -584,12 +584,7 @@ export default function AdvancedSearch() {
                     ) : (
                       paginated.map((record: any) => (
                         <TableRow key={record.id}>
-                          {orderedActiveColumns.map((col) => (
-                            <TableCell key={col.key}>
-                              {getCellValue(record, col)}
-                            </TableCell>
-                          ))}
-                          <TableCell>
+                          <TableCell className="sticky left-0 bg-background z-10">
                             <TooltipProvider delayDuration={200}>
                               <div className="flex items-center gap-0.5">
                                 <Tooltip>
@@ -619,6 +614,11 @@ export default function AdvancedSearch() {
                               </div>
                             </TooltipProvider>
                           </TableCell>
+                          {orderedActiveColumns.map((col) => (
+                            <TableCell key={col.key}>
+                              {getCellValue(record, col)}
+                            </TableCell>
+                          ))}
                         </TableRow>
                       ))
                     )}
