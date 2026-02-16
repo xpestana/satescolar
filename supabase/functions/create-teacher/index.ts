@@ -55,14 +55,16 @@ Deno.serve(async (req) => {
 
     const { email, password, form_data, photo_url, document_id, phone } = await req.json();
 
-    if (!email) {
+    if (!email || !document_id) {
       return new Response(
-        JSON.stringify({ error: "El correo electrónico es requerido" }),
+        JSON.stringify({ error: "El correo electrónico y el documento son requeridos" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const teacherPassword = password || "Docente2024!";
+    // Password is the document number (without type prefix)
+    const rawDocument = document_id.includes("-") ? document_id.split("-").slice(1).join("-") : document_id;
+    const teacherPassword = rawDocument;
 
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
