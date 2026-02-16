@@ -13,10 +13,12 @@ import {
   FileText,
   Search,
   BookOpen,
+  Home as HomeIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSchoolData } from "@/hooks/useSchoolData";
+import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -104,12 +106,29 @@ const navSections: NavSection[] = [
       },
     ],
   },
+  // Representative sections
+  {
+    requiredRole: "representative",
+    items: [
+      { label: "Inicio", href: "/representative/dashboard", icon: LayoutDashboard, requiredRole: "representative" },
+    ],
+  },
+  {
+    title: "MI FAMILIA",
+    requiredRole: "representative",
+    items: [
+      { label: "Mis Representantes", href: "/representative/representantes", icon: Users, requiredRole: "representative" },
+      { label: "Mis Estudiantes", href: "/representative/estudiantes", icon: GraduationCap, requiredRole: "representative" },
+      { label: "Datos de Familia", href: "/representative/datos-familia", icon: HomeIcon, requiredRole: "representative" },
+    ],
+  },
 ];
 
 export function AppSidebar() {
   const location = useLocation();
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
+  const { familyName } = useRepresentativeFamily();
   const [openDropdowns, setOpenDropdowns] = useState<string[]>([]);
 
   const toggleDropdown = (label: string) => {
@@ -274,7 +293,7 @@ export function AppSidebar() {
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">
-              {userRole === "school" && school?.name ? school.name : "Colegio"}
+              {userRole === "school" && school?.name ? school.name : userRole === "representative" ? `Familia ${familyName}` : "Colegio"}
             </p>
             <p className="text-xs text-white/70">
               {getRoleLabel(userRole)}
