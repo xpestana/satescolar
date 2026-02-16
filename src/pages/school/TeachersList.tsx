@@ -364,15 +364,32 @@ export default function TeachersList() {
     setPasswordModal({ open: true, teacherId: record.id, teacherName: name });
   };
 
+  const passwordMutation = useMutation({
+    mutationFn: async ({ teacherId, password }: { teacherId: string; password: string }) => {
+      const response = await supabase.functions.invoke("update-teacher-password", {
+        body: { teacher_id: teacherId, new_password: password },
+      });
+      if (response.error) throw new Error(response.error.message);
+      const result = response.data;
+      if (result?.error) throw new Error(result.error);
+      return result;
+    },
+    onSuccess: () => {
+      toast.success(`Contraseña actualizada para ${passwordModal.teacherName}`);
+      setPasswordModal({ open: false, teacherId: "", teacherName: "" });
+      setNewPassword("");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Error al actualizar la contraseña");
+    },
+  });
+
   const handleSavePassword = () => {
     if (!newPassword.trim()) {
       toast.error("Ingrese una contraseña");
       return;
     }
-    // For now just show the password - actual auth user creation will come with teacher role dashboard
-    toast.success(`Contraseña establecida para ${passwordModal.teacherName}: ${newPassword}`);
-    setPasswordModal({ open: false, teacherId: "", teacherName: "" });
-    setNewPassword("");
+    passwordMutation.mutate({ teacherId: passwordModal.teacherId, password: newPassword });
   };
 
   const isLoading = schoolLoading || teachersLoading;
@@ -607,7 +624,9 @@ export default function TeachersList() {
             <Button variant="outline" onClick={() => setPasswordModal({ open: false, teacherId: "", teacherName: "" })}>
               Cancelar
             </Button>
-            <Button onClick={handleSavePassword}>Guardar</Button>
+            <Button onClick={handleSavePassword} disabled={passwordMutation.isPending}>
+              {passwordMutation.isPending ? "Guardando..." : "Guardar"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
