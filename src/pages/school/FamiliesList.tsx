@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Eye, Users, UserPlus, Info, Trash2 } from "lucide-react";
+import { Eye, Users, UserPlus, Info, Trash2, GraduationCap, UserCheck } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +43,8 @@ interface FamilyWithEmail {
   is_suspended: boolean;
   email?: string;
   hasMembers?: boolean;
+  representativeNames?: string[];
+  studentNames?: string[];
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -49,6 +53,7 @@ export default function FamiliesList() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   
   const [currentPage, setCurrentPage] = useState(1);
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -94,16 +99,24 @@ export default function FamiliesList() {
           body: { userIds: [family.user_id] },
         });
 
-        // Check if family has representatives or students
-        const [{ count: repsCount }, { count: studentsCount }] = await Promise.all([
-          supabase.from("representatives").select("id", { count: "exact", head: true }).eq("family_id", family.id),
-          supabase.from("students").select("id", { count: "exact", head: true }).eq("family_id", family.id),
+        // Check if family has representatives or students, and get their names
+        const [{ count: repsCount, data: repsData }, { count: studentsCount, data: studentsData }] = await Promise.all([
+          supabase.from("representatives").select("id, form_data", { count: "exact" }).eq("family_id", family.id),
+          supabase.from("students").select("id, form_data", { count: "exact" }).eq("family_id", family.id),
         ]);
+
+        const getNameFromFormData = (fd: any) => {
+          if (!fd) return "Sin nombre";
+          const parts = [fd.primer_nombre, fd.primer_apellido].filter(Boolean);
+          return parts.length > 0 ? parts.join(" ") : "Sin nombre";
+        };
 
         familiesWithEmails.push({
           ...family,
           email: emailData?.emails?.[family.user_id] || "Sin correo",
           hasMembers: (repsCount || 0) > 0 || (studentsCount || 0) > 0,
+          representativeNames: (repsData || []).map((r: any) => getNameFromFormData(r.form_data)),
+          studentNames: (studentsData || []).map((s: any) => getNameFromFormData(s.form_data)),
         });
       }
 
@@ -226,6 +239,8 @@ export default function FamiliesList() {
                   <TableHead>Acciones</TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Representantes</TableHead>
+                  <TableHead>Estudiantes</TableHead>
                   <TableHead>Activo</TableHead>
                 </TableRow>
               </TableHeader>
@@ -233,35 +248,79 @@ export default function FamiliesList() {
                 {familiesData?.families.map((family) => (
                   <TableRow key={family.id}>
                     <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleViewFamily(family.id)}
-                          title="Ver familia"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {!family.hasMembers && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => {
-                              setFamilyToDelete(family);
-                              setDeleteDialogOpen(true);
-                            }}
-                            title="Eliminar familia"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
+                      <TooltipProvider delayDuration={200}>
+                        <div className="flex items-center gap-0.5">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewFamily(family.id)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver familia</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/registros/familias/${family.id}/representante/nuevo`)}>
+                                <UserCheck className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Agregar Representante</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/registros/familias/${family.id}/estudiante/nuevo`)}>
+                                <GraduationCap className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Agregar Estudiante</TooltipContent>
+                          </Tooltip>
+                          {!family.hasMembers && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => {
+                                    setFamilyToDelete(family);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Eliminar familia</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </TooltipProvider>
                     </TableCell>
-                    <TableCell className="max-w-[300px] truncate">
+                    <TableCell className="max-w-[200px] truncate">
                       {getFamilyName(family)}
                     </TableCell>
                     <TableCell>{family.email}</TableCell>
+                    <TableCell>
+                      {family.representativeNames && family.representativeNames.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {family.representativeNames.map((name, i) => (
+                            <p key={i} className="text-sm">{name}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {family.studentNames && family.studentNames.length > 0 ? (
+                        <div className="space-y-0.5">
+                          {family.studentNames.map((name, i) => (
+                            <p key={i} className="text-sm">{name}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge
                         variant={family.is_suspended ? "destructive" : "default"}
