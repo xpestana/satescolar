@@ -712,6 +712,53 @@ export type Database = {
           },
         ]
       }
+      teachers: {
+        Row: {
+          created_at: string
+          document_id: string | null
+          email: string | null
+          form_data: Json | null
+          id: string
+          is_suspended: boolean
+          phone: string | null
+          photo_url: string | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_id?: string | null
+          email?: string | null
+          form_data?: Json | null
+          id?: string
+          is_suspended?: boolean
+          phone?: string | null
+          photo_url?: string | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string | null
+          email?: string | null
+          form_data?: Json | null
+          id?: string
+          is_suspended?: boolean
+          phone?: string | null
+          photo_url?: string | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teachers_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -778,7 +825,7 @@ export type Database = {
         | "textarea"
         | "checkbox"
         | "file"
-      form_type: "representative" | "student"
+      form_type: "representative" | "student" | "teacher"
       grade_level:
         | "pre_maternal"
         | "maternal"
@@ -927,7 +974,7 @@ export const Constants = {
         "checkbox",
         "file",
       ],
-      form_type: ["representative", "student"],
+      form_type: ["representative", "student", "teacher"],
       grade_level: [
         "pre_maternal",
         "maternal",

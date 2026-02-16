@@ -67,7 +67,7 @@ import {
 } from "lucide-react";
 import { FormGroupsManager } from "@/components/forms/FormGroupsManager";
 
-type FormType = "representative" | "student";
+type FormType = "representative" | "student" | "teacher";
 type FieldType = "text" | "email" | "phone" | "number" | "date" | "select" | "textarea" | "checkbox" | "file";
 
 interface FormField {
@@ -131,6 +131,16 @@ const PREDEFINED_FIELDS: { [key in FormType]: { name: string; label: string; typ
     { name: "condiciones_medicas", label: "Condiciones Médicas", type: "textarea" },
     { name: "grupo_sanguineo", label: "Grupo Sanguíneo", type: "select" },
   ],
+  teacher: [
+    { name: "nombres", label: "Nombres", type: "text" },
+    { name: "apellidos", label: "Apellidos", type: "text" },
+    { name: "cedula", label: "Cédula de Identidad", type: "text" },
+    { name: "telefono", label: "Teléfono", type: "phone" },
+    { name: "email", label: "Correo Electrónico", type: "email" },
+    { name: "cargo", label: "Cargo", type: "text" },
+    { name: "fecha_ingreso", label: "Fecha de Ingreso", type: "date" },
+    { name: "titulo", label: "Título Obtenido", type: "text" },
+  ],
 };
 
 export default function FormFieldsEditor() {
@@ -146,10 +156,12 @@ export default function FormFieldsEditor() {
     "representative": "representative",
     "estudiantes": "student",
     "student": "student",
+    "docentes": "teacher",
+    "teacher": "teacher",
   };
   
   const formType = typeMapping[type || ""] || null;
-  const isValidType = formType === "representative" || formType === "student";
+  const isValidType = formType === "representative" || formType === "student" || formType === "teacher";
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGroupsModalOpen, setIsGroupsModalOpen] = useState(false);
@@ -377,6 +389,8 @@ export default function FormFieldsEditor() {
 
   const title = formType === "representative" 
     ? "Formulario de Representantes" 
+    : formType === "teacher"
+    ? "Formulario de Docentes"
     : "Formulario de Estudiantes";
 
   const breadcrumbs = [
@@ -529,7 +543,7 @@ export default function FormFieldsEditor() {
           <form onSubmit={handleSubmit}>
             <div className="space-y-6 py-4">
               <h3 className="text-center font-semibold text-lg">
-                {editingField ? "Editar Campo" : `Nuevo Formulario para ${formType === "representative" ? "Representantes" : "Estudiantes"}`}
+                {editingField ? "Editar Campo" : `Nuevo Formulario para ${formType === "representative" ? "Representantes" : formType === "teacher" ? "Docentes" : "Estudiantes"}`}
               </h3>
 
               {!editingField && (

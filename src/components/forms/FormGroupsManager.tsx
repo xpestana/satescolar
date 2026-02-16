@@ -52,7 +52,7 @@ import { Plus, Edit, Trash2, FolderOpen, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-type FormType = "representative" | "student";
+type FormType = "representative" | "student" | "teacher";
 
 interface FormFieldGroup {
   id: string;
@@ -161,7 +161,7 @@ export function FormGroupsManager({
   const [groupDescription, setGroupDescription] = useState("");
 
   const formTypeLabel =
-    formType === "representative" ? "Representantes" : "Estudiantes";
+    formType === "representative" ? "Representantes" : formType === "teacher" ? "Docentes" : "Estudiantes";
 
   // DnD sensors
   const sensors = useSensors(
