@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useSchoolData } from "@/hooks/useSchoolData";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -108,6 +109,7 @@ const navSections: NavSection[] = [
 export function AppSidebar() {
   const location = useLocation();
   const { user, signOut, userRole } = useAuth();
+  const { school } = useSchoolData();
   const [openDropdowns, setOpenDropdowns] = useState<string[]>([]);
 
   const toggleDropdown = (label: string) => {
@@ -258,15 +260,21 @@ export function AppSidebar() {
       {/* User Card - Dark Blue */}
       <div className="bg-[#01051e] p-4 border-l border-border">
         <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 border-2 border-primary">
-            <AvatarImage src="" />
-            <AvatarFallback className="bg-primary/20 text-primary-foreground text-sm font-medium">
-              {getInitials(user?.email)}
-            </AvatarFallback>
-          </Avatar>
+          {userRole === "school" && school?.logo_url ? (
+            <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-primary bg-white flex-shrink-0">
+              <img src={school.logo_url} alt={school.name || "Colegio"} className="h-full w-full object-cover" />
+            </div>
+          ) : (
+            <Avatar className="h-10 w-10 border-2 border-primary">
+              <AvatarImage src="" />
+              <AvatarFallback className="bg-primary/20 text-primary-foreground text-sm font-medium">
+                {getInitials(user?.email)}
+              </AvatarFallback>
+            </Avatar>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-white truncate">
-              Colegio
+              {userRole === "school" && school?.name ? school.name : "Colegio"}
             </p>
             <p className="text-xs text-white/70">
               {getRoleLabel(userRole)}
