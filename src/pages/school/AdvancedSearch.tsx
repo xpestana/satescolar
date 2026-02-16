@@ -17,6 +17,7 @@ import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreads
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
+import { ViewTeacherModal } from "@/components/search/ViewTeacherModal";
 import {
   DndContext,
   closestCenter,
@@ -34,7 +35,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-type FormType = "student" | "representative";
+type FormType = "student" | "representative" | "teacher";
 
 interface ColumnDef {
   key: string;
@@ -54,6 +55,13 @@ const FIXED_COLUMNS_REP: ColumnDef[] = [
   { key: "email", label: "Email", isFormData: false },
   { key: "phone", label: "Teléfono", isFormData: false },
   { key: "family_name", label: "Familia", isFormData: false },
+];
+
+const FIXED_COLUMNS_TEACHER: ColumnDef[] = [
+  { key: "photo_url", label: "Foto", isFormData: false },
+  { key: "document_id", label: "Cédula", isFormData: false },
+  { key: "email", label: "Email", isFormData: false },
+  { key: "phone", label: "Teléfono", isFormData: false },
 ];
 
 const PAGE_SIZE = 10;
@@ -114,7 +122,7 @@ export default function AdvancedSearch() {
 
   // Build all columns
   const allColumns = useMemo<ColumnDef[]>(() => {
-    const fixed = formType === "student" ? FIXED_COLUMNS_STUDENT : FIXED_COLUMNS_REP;
+    const fixed = formType === "student" ? FIXED_COLUMNS_STUDENT : formType === "representative" ? FIXED_COLUMNS_REP : FIXED_COLUMNS_TEACHER;
     const dynamic: ColumnDef[] = (formFields ?? []).map((f) => ({
       key: f.field_name,
       label: f.field_label,
@@ -277,11 +285,18 @@ export default function AdvancedSearch() {
           .eq("student_schools.school_id", schoolId!);
         if (error) throw error;
         return data as any[];
-      } else {
+      } else if (formType === "representative") {
         const { data, error } = await supabase
           .from("representatives")
           .select("*, families!inner(father_last_name, mother_last_name, is_suspended, contact_phone, address, family_schools!inner(school_id))")
           .eq("families.family_schools.school_id", schoolId!);
+        if (error) throw error;
+        return data as any[];
+      } else {
+        const { data, error } = await supabase
+          .from("teachers")
+          .select("*")
+          .eq("school_id", schoolId!);
         if (error) throw error;
         return data as any[];
       }
@@ -296,13 +311,15 @@ export default function AdvancedSearch() {
     const term = searchTerm.toLowerCase();
     return records.filter((r: any) => {
       const fixedVals = [r.document_id, r.email, r.phone].filter(Boolean);
-      const familyName = [
-        (r.families as any)?.father_last_name,
-        (r.families as any)?.mother_last_name,
-      ]
-        .filter(Boolean)
-        .join(" ");
-      fixedVals.push(familyName);
+      if (formType !== "teacher") {
+        const familyName = [
+          (r.families as any)?.father_last_name,
+          (r.families as any)?.mother_last_name,
+        ]
+          .filter(Boolean)
+          .join(" ");
+        fixedVals.push(familyName);
+      }
 
       const formData = (r.form_data ?? {}) as Record<string, any>;
       const formVals = activeColumnKeys
@@ -375,7 +392,7 @@ export default function AdvancedSearch() {
     return { cols, rows };
   };
 
-  const typeLabel = formType === "student" ? "Estudiantes" : "Representantes";
+  const typeLabel = formType === "student" ? "Estudiantes" : formType === "representative" ? "Representantes" : "Docentes";
 
   const handleExportCSV = () => {
     const { cols, rows } = getExportData();
@@ -406,11 +423,15 @@ export default function AdvancedSearch() {
   };
 
   const handleEditRecord = (record: any) => {
-    const familyId = record.family_id;
-    if (formType === "student") {
-      window.location.href = `/registros/familias/${familyId}/estudiante/${record.id}/editar`;
+    if (formType === "teacher") {
+      window.location.href = `/registros/docentes/${record.id}/editar`;
     } else {
-      window.location.href = `/registros/familias/${familyId}/representante/${record.id}/editar`;
+      const familyId = record.family_id;
+      if (formType === "student") {
+        window.location.href = `/registros/familias/${familyId}/estudiante/${record.id}/editar`;
+      } else {
+        window.location.href = `/registros/familias/${familyId}/representante/${record.id}/editar`;
+      }
     }
   };
 
@@ -431,7 +452,7 @@ export default function AdvancedSearch() {
     await downloadCarnet({
       personName: name,
       documentId: record.document_id || fd.documento || "",
-      role: formType === "student" ? "ESTUDIANTE" : "REPRESENTANTE",
+      role: formType === "student" ? "ESTUDIANTE" : formType === "representative" ? "REPRESENTANTE" : "DOCENTE",
       photoUrl: record.photo_url || undefined,
       schoolName: schoolInfo ? `${institutionType} ${schoolInfo.name}` : "Institución",
       schoolLocation: locationParts.join(", ") || "",
@@ -456,6 +477,7 @@ export default function AdvancedSearch() {
             <TabsList>
               <TabsTrigger value="student">Estudiantes</TabsTrigger>
               <TabsTrigger value="representative">Representantes</TabsTrigger>
+              <TabsTrigger value="teacher">Docentes</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -646,14 +668,24 @@ export default function AdvancedSearch() {
         )}
       </div>
 
-      <ViewRecordModal
-        open={!!viewRecord}
-        onClose={() => setViewRecord(null)}
-        record={viewRecord}
-        formType={formType}
-        columns={orderedActiveColumns}
-        getTextValue={getTextValue}
-      />
+      {formType !== "teacher" ? (
+        <ViewRecordModal
+          open={!!viewRecord}
+          onClose={() => setViewRecord(null)}
+          record={viewRecord}
+          formType={formType as "student" | "representative"}
+          columns={orderedActiveColumns}
+          getTextValue={getTextValue}
+        />
+      ) : (
+        <ViewTeacherModal
+          open={!!viewRecord}
+          onClose={() => setViewRecord(null)}
+          record={viewRecord}
+          columns={orderedActiveColumns}
+          getTextValue={getTextValue}
+        />
+      )}
     </DashboardLayout>
   );
 }
