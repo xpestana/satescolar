@@ -65,8 +65,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate a generic password
-    const genericPassword = "Familia2024!";
+    // Generate a random password for each new family account
+    function generateRandomPassword(length = 16): string {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+      const array = new Uint8Array(length);
+      crypto.getRandomValues(array);
+      return Array.from(array, (byte) => chars[byte % chars.length]).join('');
+    }
+    const genericPassword = generateRandomPassword();
 
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
