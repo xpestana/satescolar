@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/useAuth";
+import { useSchoolData } from "@/hooks/useSchoolData";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -13,6 +14,10 @@ import logo from "@/assets/logo.svg";
 
 export function TopBar() {
   const { user, signOut, userRole } = useAuth();
+  const { school } = useSchoolData();
+
+  const displayLogo = userRole === "school" && school?.logo_url ? school.logo_url : logo;
+  const isSchoolLogo = userRole === "school" && !!school?.logo_url;
 
   const getInitials = (email?: string) => {
     if (!email) return "U";
@@ -39,7 +44,7 @@ export function TopBar() {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-3 rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#01051e]">
               <div className="h-10 w-10 rounded-full bg-white p-1 flex items-center justify-center overflow-hidden">
-                <img src={logo} alt="SAT Escolar" className="h-8 w-8 object-contain" />
+                <img src={displayLogo} alt={isSchoolLogo ? school?.name || "Colegio" : "SAT Escolar"} className={`${isSchoolLogo ? "h-full w-full object-cover rounded-full" : "h-8 w-8 object-contain"}`} />
               </div>
             </button>
           </DropdownMenuTrigger>
