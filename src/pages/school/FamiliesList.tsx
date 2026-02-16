@@ -107,7 +107,7 @@ export default function FamiliesList() {
         });
       }
 
-      return { families: familiesWithEmails, count: count || 0 };
+      return { families: familiesWithEmails, count: familiesWithEmails.length };
     },
     enabled: !!schoolId,
   });
