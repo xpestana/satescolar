@@ -48,6 +48,13 @@ export default function FormBuilder() {
               <Edit className="h-4 w-4" />
               Editar Formulario De Estudiantes
             </Button>
+            <Button
+              onClick={() => navigate("/school/configuraciones/formularios/docentes")}
+              className="gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              Editar Formulario De Docentes
+            </Button>
           </div>
         </CardContent>
       </Card>

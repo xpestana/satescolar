@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   FileText,
   Search,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -76,6 +77,7 @@ const navSections: NavSection[] = [
     requiredRole: "school",
     items: [
       { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school" },
+      { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school" },
       { label: "Búsqueda Avanzada", href: "/registros/busqueda-avanzada", icon: Search, requiredRole: "school" },
     ],
   },

@@ -194,7 +194,7 @@ export async function downloadPDF(
 export async function downloadCarnet(params: {
   personName: string;
   documentId: string;
-  role: "ESTUDIANTE" | "REPRESENTANTE";
+  role: "ESTUDIANTE" | "REPRESENTANTE" | "DOCENTE";
   photoUrl?: string;
   schoolName: string;
   schoolLocation: string;
