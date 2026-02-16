@@ -23,6 +23,8 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
         navigate("/dashboard");
       } else if (userRole === "school") {
         navigate("/school/dashboard");
+      } else if (userRole === "representative") {
+        navigate("/representative/dashboard");
       } else {
         navigate("/login");
       }

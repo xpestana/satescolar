@@ -35,6 +35,8 @@ export default function Login() {
         navigate("/dashboard");
       } else if (userRole === "school") {
         navigate("/school/dashboard");
+      } else if (userRole === "representative") {
+        navigate("/representative/dashboard");
       } else {
         navigate("/dashboard");
       }

@@ -22,6 +22,12 @@ import AddTeacher from "./pages/school/AddTeacher";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import UsersList from "./pages/admin/UsersList";
+import RepresentativeDashboard from "./pages/representative/RepresentativeDashboard";
+import RepresentativesList from "./pages/representative/RepresentativesList";
+import RepStudentsList from "./pages/representative/StudentsList";
+import EditFamilyData from "./pages/representative/EditFamilyData";
+import RepAddRepresentative from "./pages/representative/RepAddRepresentative";
+import RepAddStudent from "./pages/representative/RepAddStudent";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -189,6 +195,15 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            {/* Representative routes */}
+            <Route path="/representative/dashboard" element={<ProtectedRoute requiredRole="representative"><RepresentativeDashboard /></ProtectedRoute>} />
+            <Route path="/representative/representantes" element={<ProtectedRoute requiredRole="representative"><RepresentativesList /></ProtectedRoute>} />
+            <Route path="/representative/estudiantes" element={<ProtectedRoute requiredRole="representative"><RepStudentsList /></ProtectedRoute>} />
+            <Route path="/representative/datos-familia" element={<ProtectedRoute requiredRole="representative"><EditFamilyData /></ProtectedRoute>} />
+            <Route path="/representative/representante/nuevo" element={<ProtectedRoute requiredRole="representative"><RepAddRepresentative /></ProtectedRoute>} />
+            <Route path="/representative/representante/:representativeId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddRepresentative /></ProtectedRoute>} />
+            <Route path="/representative/estudiante/nuevo" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
+            <Route path="/representative/estudiante/:studentId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
