@@ -75,8 +75,20 @@ export default function FamiliesList() {
 
       if (error) throw error;
 
+      // Filter families to only show those with representative role
+      const userIds = (data || []).map((f) => f.user_id);
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .in("user_id", userIds);
+
+      const repUserIds = new Set(
+        (rolesData || []).filter((r) => r.role === "representative").map((r) => r.user_id)
+      );
+      const repFamilies = (data || []).filter((f) => repUserIds.has(f.user_id));
+
       const familiesWithEmails: FamilyWithEmail[] = [];
-      for (const family of data || []) {
+      for (const family of repFamilies) {
         // Fetch email
         const { data: emailData } = await supabase.functions.invoke("get-user-emails", {
           body: { userIds: [family.user_id] },
