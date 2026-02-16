@@ -13,7 +13,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/data-pagination";
-import { Eye, Users, UserPlus, Info } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Eye, Users, UserPlus, Info, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +40,7 @@ interface FamilyWithEmail {
   address: string | null;
   is_suspended: boolean;
   email?: string;
+  hasMembers?: boolean;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -43,6 +54,8 @@ export default function FamiliesList() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [familyToDelete, setFamilyToDelete] = useState<FamilyWithEmail | null>(null);
 
   // Fetch families
   const { data: familiesData, isLoading } = useQuery({
@@ -62,16 +75,23 @@ export default function FamiliesList() {
 
       if (error) throw error;
 
-      // Fetch emails for each family
       const familiesWithEmails: FamilyWithEmail[] = [];
       for (const family of data || []) {
+        // Fetch email
         const { data: emailData } = await supabase.functions.invoke("get-user-emails", {
           body: { userIds: [family.user_id] },
         });
-        
+
+        // Check if family has representatives or students
+        const [{ count: repsCount }, { count: studentsCount }] = await Promise.all([
+          supabase.from("representatives").select("id", { count: "exact", head: true }).eq("family_id", family.id),
+          supabase.from("students").select("id", { count: "exact", head: true }).eq("family_id", family.id),
+        ]);
+
         familiesWithEmails.push({
           ...family,
           email: emailData?.emails?.[family.user_id] || "Sin correo",
+          hasMembers: (repsCount || 0) > 0 || (studentsCount || 0) > 0,
         });
       }
 
@@ -87,7 +107,6 @@ export default function FamiliesList() {
         .from("families")
         .update({ is_suspended: suspend })
         .eq("id", familyId);
-
       if (error) throw error;
     },
     onSuccess: (_, { suspend }) => {
@@ -100,11 +119,27 @@ export default function FamiliesList() {
       });
     },
     onError: () => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo actualizar el estado de la familia",
-      });
+      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el estado de la familia" });
+    },
+  });
+
+  // Delete family mutation
+  const deleteFamilyMutation = useMutation({
+    mutationFn: async (familyId: string) => {
+      // Delete family_schools link first
+      await supabase.from("family_schools").delete().eq("family_id", familyId);
+      // Delete the family
+      const { error } = await supabase.from("families").delete().eq("id", familyId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["families"] });
+      toast({ title: "Familia eliminada", description: "La familia ha sido eliminada exitosamente" });
+      setDeleteDialogOpen(false);
+      setFamilyToDelete(null);
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar la familia" });
     },
   });
 
@@ -186,14 +221,30 @@ export default function FamiliesList() {
                 {familiesData?.families.map((family) => (
                   <TableRow key={family.id}>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleViewFamily(family.id)}
-                        title="Ver familia"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleViewFamily(family.id)}
+                          title="Ver familia"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {!family.hasMembers && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              setFamilyToDelete(family);
+                              setDeleteDialogOpen(true);
+                            }}
+                            title="Eliminar familia"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="max-w-[300px] truncate">
                       {getFamilyName(family)}
@@ -256,6 +307,26 @@ export default function FamiliesList() {
           }
         />
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar familia?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar la familia <strong>{familyToDelete ? getFamilyName(familyToDelete) : ""}</strong>. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => familyToDelete && deleteFamilyMutation.mutate(familyToDelete.id)}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
