@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -6,23 +6,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { UserPlus, Edit, Trash2, Download, GraduationCap } from "lucide-react";
+import { UserPlus, Edit, Download, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
-import { useToast } from "@/hooks/use-toast";
 import { downloadCarnet } from "@/lib/export-utils";
-import { useState } from "react";
 
 export default function StudentsList() {
   const navigate = useNavigate();
   const { familyId, school } = useRepresentativeFamily();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { data: students = [] } = useQuery({
     queryKey: ["students", familyId],
@@ -43,18 +34,6 @@ export default function StudentsList() {
     enabled: !!school?.id,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("students").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["students", familyId] });
-      toast({ title: "Eliminado", description: "Estudiante eliminado exitosamente" });
-      setDeleteTarget(null);
-    },
-    onError: () => { toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar" }); },
-  });
 
   const getName = (s: any) => {
     const fd = s.form_data as Record<string, any> || {};
@@ -113,9 +92,6 @@ export default function StudentsList() {
                     <Button size="sm" variant="outline" onClick={() => navigate(`/representative/estudiante/${student.id}/editar`)}>
                       <Edit className="h-3 w-3 mr-1" /> Editar
                     </Button>
-                    <Button size="sm" variant="outline" className="text-destructive" onClick={() => setDeleteTarget({ id: student.id, name: getName(student) })}>
-                      <Trash2 className="h-3 w-3 mr-1" /> Eliminar
-                    </Button>
                     <Button size="sm" variant="outline" onClick={() => handleCarnet(student)}>
                       <Download className="h-3 w-3 mr-1" /> Carnet
                     </Button>
@@ -127,18 +103,6 @@ export default function StudentsList() {
         )}
       </div>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar estudiante?</AlertDialogTitle>
-            <AlertDialogDescription>Estás a punto de eliminar a <strong>{deleteTarget?.name}</strong>. Esta acción no se puede deshacer.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}>Eliminar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </DashboardLayout>
   );
 }
