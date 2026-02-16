@@ -147,8 +147,7 @@ export default function AddTeacher() {
         // Use edge function to create user + role + teacher record
         const email = formData.correo_electronico;
         if (!email) throw new Error("El correo electrónico es obligatorio para crear el docente");
-
-        const { data: sessionData } = await supabase.auth.getSession();
+        if (!documentId) throw new Error("El número de documento es obligatorio para crear el docente");
         const response = await supabase.functions.invoke("create-teacher", {
           body: {
             email,
