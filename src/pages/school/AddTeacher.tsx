@@ -129,26 +129,49 @@ export default function AddTeacher() {
       const documentNum = formData.documento || "";
       const documentId = documentType && documentNum ? `${documentType}-${documentNum}` : documentNum || null;
 
-      const teacherData = {
-        school_id: schoolId,
-        photo_url: photoUrl,
-        form_data: formData,
-        document_id: documentId,
-        phone: formData.numero_contacto || null,
-        email: formData.correo_electronico || null,
-      };
-
       if (isEditing) {
+        const teacherData = {
+          school_id: schoolId,
+          photo_url: photoUrl,
+          form_data: formData,
+          document_id: documentId,
+          phone: formData.numero_contacto || null,
+          email: formData.correo_electronico || null,
+        };
         const { error } = await supabase
           .from("teachers")
           .update(teacherData)
           .eq("id", teacherId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("teachers")
-          .insert(teacherData);
-        if (error) throw error;
+        // Use edge function to create user + role + teacher record
+        const email = formData.correo_electronico;
+        if (!email) throw new Error("El correo electrónico es obligatorio para crear el docente");
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        const response = await supabase.functions.invoke("create-teacher", {
+          body: {
+            email,
+            form_data: formData,
+            photo_url: photoUrl,
+            document_id: documentId,
+            phone: formData.numero_contacto || null,
+          },
+        });
+
+        if (response.error) throw new Error(response.error.message || "Error al crear el docente");
+        const result = response.data;
+        if (result?.error) throw new Error(result.error);
+
+        // Show the temporary password message
+        if (result?.message) {
+          toast({
+            title: "Docente creado",
+            description: result.message,
+            duration: 10000,
+          });
+          return; // Skip the onSuccess toast since we already showed one
+        }
       }
     },
     onSuccess: () => {
