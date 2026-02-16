@@ -30,7 +30,9 @@ import RepAddRepresentative from "./pages/representative/RepAddRepresentative";
 import RepAddStudent from "./pages/representative/RepAddStudent";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1 } },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
