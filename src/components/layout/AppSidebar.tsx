@@ -14,6 +14,7 @@ import {
   Search,
   BookOpen,
   Home as HomeIcon,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -85,6 +86,13 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "ÁREA DE INSCRIPCIONES",
+    requiredRole: "school",
+    items: [
+      { label: "Inscripciones", href: "/inscripciones", icon: ClipboardCheck, requiredRole: "school" },
+    ],
+  },
+  {
     title: "ÁREA ADMINISTRATIVA",
     requiredRole: "school",
     items: [
@@ -102,6 +110,7 @@ const navSections: NavSection[] = [
         subItems: [
           { label: "Año escolar y secciones", href: "/school/configuraciones/anos-secciones", icon: SlidersHorizontal, requiredRole: "school" },
           { label: "Formularios", href: "/school/configuraciones/formularios", icon: FileText, requiredRole: "school" },
+          { label: "Campos de Inscripción", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school" },
         ],
       },
     ],

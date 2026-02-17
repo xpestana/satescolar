@@ -19,6 +19,8 @@ import AddRepresentative from "./pages/school/AddRepresentative";
 import AdvancedSearch from "./pages/school/AdvancedSearch";
 import TeachersList from "./pages/school/TeachersList";
 import AddTeacher from "./pages/school/AddTeacher";
+import EnrollmentsList from "./pages/school/EnrollmentsList";
+import EnrollmentDisplayConfig from "./pages/school/EnrollmentDisplayConfig";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import UsersList from "./pages/admin/UsersList";
@@ -86,10 +88,26 @@ const App = () => (
               } 
             />
             <Route 
+              path="/school/configuraciones/inscripcion-campos" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <EnrollmentDisplayConfig />
+                </ProtectedRoute>
+              } 
+            />
+            <Route
               path="/registros/familias" 
               element={
                 <ProtectedRoute requiredRole="school">
                   <FamiliesList />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/inscripciones" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <EnrollmentsList />
                 </ProtectedRoute>
               } 
             />
