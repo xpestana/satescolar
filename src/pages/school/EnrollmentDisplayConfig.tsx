@@ -8,10 +8,11 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Save, Info, Plus, Trash2, GripVertical } from "lucide-react";
+import { Save, Info, Plus, Trash2, ChevronDown } from "lucide-react";
 
 interface FieldConfig {
   field_name: string;
@@ -291,11 +292,10 @@ export default function EnrollmentDisplayConfig() {
 
               <div className="space-y-6">
                 {planillaSections.map((section, sectionIdx) => (
-                  <div key={sectionIdx} className="border rounded-lg overflow-hidden">
+                  <Collapsible key={sectionIdx} defaultOpen={false} className="border rounded-lg overflow-hidden">
                     {/* Section Header */}
-                    <div className="flex items-center gap-3 p-4 bg-muted/30 border-b">
-                      <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                      <span className="text-sm font-semibold text-muted-foreground w-8">
+                    <div className="flex items-center gap-3 p-4 bg-muted/30">
+                      <span className="text-sm font-semibold text-muted-foreground w-6">
                         {sectionIdx + 1}.
                       </span>
                       <Input
@@ -303,7 +303,16 @@ export default function EnrollmentDisplayConfig() {
                         onChange={(e) => updateSectionTitle(sectionIdx, e.target.value)}
                         placeholder="Título de la sección (ej: Datos Básicos)"
                         className="flex-1 font-medium"
+                        onClick={(e) => e.stopPropagation()}
                       />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {section.field_names.length} campos
+                      </span>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="flex-shrink-0">
+                          <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                        </Button>
+                      </CollapsibleTrigger>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -314,30 +323,28 @@ export default function EnrollmentDisplayConfig() {
                       </Button>
                     </div>
 
-                    {/* Section Fields */}
-                    <div className="p-4">
-                      <p className="text-xs text-muted-foreground mb-3">
-                        Selecciona los campos a incluir en esta sección ({section.field_names.length} seleccionados)
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {formFields.map(ff => {
-                          const isSelected = section.field_names.includes(ff.field_name);
-                          return (
-                            <label
-                              key={ff.field_name}
-                              className="flex items-center justify-between p-2.5 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
-                            >
-                              <span className="text-sm">{ff.field_label}</span>
-                              <Switch
-                                checked={isSelected}
-                                onCheckedChange={() => toggleSectionField(sectionIdx, ff.field_name)}
-                              />
-                            </label>
-                          );
-                        })}
+                    <CollapsibleContent>
+                      <div className="p-4 border-t">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {formFields.map(ff => {
+                            const isSelected = section.field_names.includes(ff.field_name);
+                            return (
+                              <label
+                                key={ff.field_name}
+                                className="flex items-center justify-between p-2.5 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
+                              >
+                                <span className="text-sm">{ff.field_label}</span>
+                                <Switch
+                                  checked={isSelected}
+                                  onCheckedChange={() => toggleSectionField(sectionIdx, ff.field_name)}
+                                />
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 ))}
               </div>
             </CardContent>
