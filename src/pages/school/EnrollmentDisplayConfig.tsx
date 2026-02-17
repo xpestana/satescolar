@@ -323,17 +323,16 @@ export default function EnrollmentDisplayConfig() {
                         {formFields.map(ff => {
                           const isSelected = section.field_names.includes(ff.field_name);
                           return (
-                            <div
+                            <label
                               key={ff.field_name}
                               className="flex items-center justify-between p-2.5 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
-                              onClick={() => toggleSectionField(sectionIdx, ff.field_name)}
                             >
-                              <Label className="text-sm cursor-pointer">{ff.field_label}</Label>
+                              <span className="text-sm">{ff.field_label}</span>
                               <Switch
                                 checked={isSelected}
                                 onCheckedChange={() => toggleSectionField(sectionIdx, ff.field_name)}
                               />
-                            </div>
+                            </label>
                           );
                         })}
                       </div>
