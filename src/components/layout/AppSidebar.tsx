@@ -110,7 +110,7 @@ const navSections: NavSection[] = [
         subItems: [
           { label: "Año escolar y secciones", href: "/school/configuraciones/anos-secciones", icon: SlidersHorizontal, requiredRole: "school" },
           { label: "Formularios", href: "/school/configuraciones/formularios", icon: FileText, requiredRole: "school" },
-          { label: "Campos de Inscripción", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school" },
+          { label: "Datos para Inscripciones", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school" },
         ],
       },
     ],
