@@ -12,7 +12,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Save, Info, Plus, Trash2, ChevronDown } from "lucide-react";
+import { Save, Info, Plus, Trash2, ChevronDown, Eye } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 interface FieldConfig {
   field_name: string;
@@ -415,6 +416,61 @@ export default function EnrollmentDisplayConfig() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Preview */}
+          {planillaSections.some(s => s.field_names.length > 0) && (
+            <Card className="mt-6">
+              <CardHeader className="flex flex-row items-center gap-2">
+                <Eye className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-lg">Previsualización de la Planilla</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg overflow-hidden">
+                  {planillaSections.filter(s => s.field_names.length > 0).map((section, idx) => {
+                    const resolveLabel = (prefixed: string) => {
+                      const [type, name] = prefixed.split(":");
+                      if (type === "student") return studentFields.find(f => f.field_name === name)?.field_label || name;
+                      if (type === "representative") return repFields.find(f => f.field_name === name)?.field_label || name;
+                      if (type === "family") return familyFields.find(f => f.field_name === name)?.field_label || name;
+                      return name;
+                    };
+                    const labels = section.field_names.map(resolveLabel);
+                    // Build rows of 4 columns
+                    const rows: string[][] = [];
+                    for (let i = 0; i < labels.length; i += 4) {
+                      rows.push(labels.slice(i, i + 4));
+                    }
+                    return (
+                      <div key={idx}>
+                        {idx > 0 && <Separator />}
+                        <div className="bg-muted/50 px-4 py-2 border-b">
+                          <h4 className="text-sm font-bold text-center uppercase tracking-wide">
+                            {section.title || "Sin título"}
+                          </h4>
+                        </div>
+                        <div className="divide-y">
+                          {rows.map((row, rIdx) => (
+                            <div key={rIdx} className="grid grid-cols-4 divide-x">
+                              {row.map((label, cIdx) => (
+                                <div key={cIdx} className="px-3 py-2">
+                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase">{label}</p>
+                                  <p className="text-xs text-muted-foreground/50 mt-0.5 italic">—</p>
+                                </div>
+                              ))}
+                              {/* Fill empty cols */}
+                              {Array.from({ length: 4 - row.length }).map((_, i) => (
+                                <div key={`empty-${i}`} className="px-3 py-2" />
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </DashboardLayout>
