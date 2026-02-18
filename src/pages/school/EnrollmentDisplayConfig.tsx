@@ -71,6 +71,7 @@ export default function EnrollmentDisplayConfig() {
 
   // Static family fields
   const familyFields = [
+    { field_name: "email", field_label: "Correo Electrónico" },
     { field_name: "father_last_name", field_label: "Apellido del Padre" },
     { field_name: "mother_last_name", field_label: "Apellido de la Madre" },
     { field_name: "contact_phone", field_label: "Teléfono de Contacto" },
