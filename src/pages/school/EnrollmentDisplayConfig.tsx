@@ -36,7 +36,7 @@ export default function EnrollmentDisplayConfig() {
   const [planillaSections, setPlanillaSections] = useState<PlanillaSection[]>([]);
 
   // Fetch student form fields
-  const { data: formFields = [] } = useQuery({
+  const { data: studentFields = [] } = useQuery({
     queryKey: ["student-form-fields-all", schoolId],
     queryFn: async () => {
       if (!schoolId) return [];
@@ -51,6 +51,49 @@ export default function EnrollmentDisplayConfig() {
     },
     enabled: !!schoolId,
   });
+
+  // Fetch representative form fields
+  const { data: repFields = [] } = useQuery({
+    queryKey: ["representative-form-fields-all", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase
+        .from("form_fields")
+        .select("field_name, field_label, field_order")
+        .eq("school_id", schoolId)
+        .eq("form_type", "representative")
+        .order("field_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Static family fields
+  const familyFields = [
+    { field_name: "father_last_name", field_label: "Apellido del Padre" },
+    { field_name: "mother_last_name", field_label: "Apellido de la Madre" },
+    { field_name: "contact_phone", field_label: "Teléfono de Contacto" },
+    { field_name: "additional_phone", field_label: "Teléfono Adicional" },
+    { field_name: "emergency_contact", field_label: "Contacto de Emergencia" },
+    { field_name: "address", field_label: "Dirección" },
+    { field_name: "housing_type", field_label: "Tipo de Vivienda" },
+    { field_name: "housing_sector", field_label: "Sector" },
+    { field_name: "housing_details", field_label: "Detalles de Vivienda" },
+    { field_name: "property_ownership", field_label: "Tenencia de Vivienda" },
+    { field_name: "monthly_housing_payment", field_label: "Pago Mensual Vivienda" },
+    { field_name: "rooms_count", field_label: "Cantidad de Habitaciones" },
+    { field_name: "monthly_income", field_label: "Ingreso Mensual" },
+    { field_name: "income_contributor", field_label: "Contribuyente de Ingresos" },
+    { field_name: "dependents_count", field_label: "Cantidad de Dependientes" },
+    { field_name: "parents_marital_status", field_label: "Estado Civil de los Padres" },
+    { field_name: "religion", field_label: "Religión" },
+    { field_name: "transport_method", field_label: "Medio de Transporte" },
+    { field_name: "transport_companion", field_label: "Acompañante de Transporte" },
+  ];
+
+  // Combined form fields for modal tab (student only)
+  const formFields = studentFields;
 
   // Fetch existing modal config
   const { data: existingConfig = [] } = useQuery({
@@ -324,24 +367,46 @@ export default function EnrollmentDisplayConfig() {
                     </div>
 
                     <CollapsibleContent>
-                      <div className="p-4 border-t">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {formFields.map(ff => {
-                            const isSelected = section.field_names.includes(ff.field_name);
-                            return (
-                              <label
-                                key={ff.field_name}
-                                className="flex items-center justify-between p-2.5 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
-                              >
-                                <span className="text-sm">{ff.field_label}</span>
-                                <Switch
-                                  checked={isSelected}
-                                  onCheckedChange={() => toggleSectionField(sectionIdx, ff.field_name)}
-                                />
-                              </label>
-                            );
-                          })}
-                        </div>
+                      <div className="p-4 border-t space-y-4">
+                        {[
+                          { key: "student", label: "Estudiante", fields: studentFields },
+                          { key: "representative", label: "Representante", fields: repFields },
+                          { key: "family", label: "Familia", fields: familyFields },
+                        ].map(group => (
+                          <Collapsible key={group.key} defaultOpen={false} className="border rounded-md">
+                            <CollapsibleTrigger asChild>
+                              <button className="flex items-center justify-between w-full p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+                                <span>{group.label}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">
+                                    {group.fields.filter(f => section.field_names.includes(`${group.key}:${f.field_name}`)).length} sel.
+                                  </span>
+                                  <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                                </div>
+                              </button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 pt-0">
+                                {group.fields.map(ff => {
+                                  const prefixed = `${group.key}:${ff.field_name}`;
+                                  const isSelected = section.field_names.includes(prefixed);
+                                  return (
+                                    <label
+                                      key={prefixed}
+                                      className="flex items-center justify-between p-2.5 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
+                                    >
+                                      <span className="text-sm">{ff.field_label}</span>
+                                      <Switch
+                                        checked={isSelected}
+                                        onCheckedChange={() => toggleSectionField(sectionIdx, prefixed)}
+                                      />
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ))}
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
