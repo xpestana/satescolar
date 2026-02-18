@@ -35,6 +35,7 @@ export default function EnrollmentDisplayConfig() {
   const { schoolId } = useSchoolId();
   const [fields, setFields] = useState<FieldConfig[]>([]);
   const [planillaSections, setPlanillaSections] = useState<PlanillaSection[]>([]);
+  const [customFieldInput, setCustomFieldInput] = useState<Record<number, string>>({});
 
   // Fetch student form fields
   const { data: studentFields = [] } = useQuery({
@@ -421,6 +422,82 @@ export default function EnrollmentDisplayConfig() {
                             </CollapsibleContent>
                           </Collapsible>
                         ))}
+
+                        {/* Custom fields accordion */}
+                        <Collapsible defaultOpen={false} className="border rounded-md">
+                          <CollapsibleTrigger asChild>
+                            <button className="flex items-center justify-between w-full p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+                              <span>Campos personalizados</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">
+                                  {section.field_names.filter(f => f.startsWith("custom:")).length} campos
+                                </span>
+                                <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                              </div>
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="p-3 pt-0 space-y-3">
+                              <div className="flex gap-2">
+                                <Input
+                                  value={customFieldInput[sectionIdx] || ""}
+                                  onChange={(e) => setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: e.target.value }))}
+                                  placeholder="Nombre del campo (ej: Año a cursar)"
+                                  className="flex-1"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      const val = (customFieldInput[sectionIdx] || "").trim();
+                                      if (!val) return;
+                                      const key = `custom:${val.toLowerCase().replace(/\s+/g, "_")}`;
+                                      if (!planillaSections[sectionIdx].field_names.includes(key)) {
+                                        toggleSectionField(sectionIdx, key);
+                                      }
+                                      setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: "" }));
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const val = (customFieldInput[sectionIdx] || "").trim();
+                                    if (!val) return;
+                                    const key = `custom:${val.toLowerCase().replace(/\s+/g, "_")}`;
+                                    if (!planillaSections[sectionIdx].field_names.includes(key)) {
+                                      toggleSectionField(sectionIdx, key);
+                                    }
+                                    setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: "" }));
+                                  }}
+                                  className="gap-1"
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                  Agregar
+                                </Button>
+                              </div>
+                              {section.field_names.filter(f => f.startsWith("custom:")).length > 0 && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {section.field_names.filter(f => f.startsWith("custom:")).map(f => {
+                                    const label = f.replace("custom:", "").replace(/_/g, " ");
+                                    return (
+                                      <div key={f} className="flex items-center justify-between p-2.5 rounded-md border">
+                                        <span className="text-sm capitalize">{label}</span>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-destructive hover:text-destructive"
+                                          onClick={() => toggleSectionField(sectionIdx, f)}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
@@ -440,8 +517,10 @@ export default function EnrollmentDisplayConfig() {
                 <div className="border rounded-lg overflow-hidden">
                   {planillaSections.filter(s => s.field_names.length > 0).map((section, idx) => {
                     const resolveLabel = (prefixed: string) => {
-                      const [type, name] = prefixed.split(":");
+                      const [type, ...rest] = prefixed.split(":");
+                      const name = rest.join(":");
                       if (name === "_edad") return "Edad";
+                      if (type === "custom") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
                       if (type === "student") return studentFields.find(f => f.field_name === name)?.field_label || name;
                       if (type === "representative") return repFields.find(f => f.field_name === name)?.field_label || name;
                       if (type === "family") return familyFields.find(f => f.field_name === name)?.field_label || name;
