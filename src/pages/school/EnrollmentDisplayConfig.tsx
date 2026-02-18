@@ -209,12 +209,24 @@ export default function EnrollmentDisplayConfig() {
     setPlanillaSections(prev => prev.map((s, i) => {
       if (i !== sectionIndex) return s;
       const has = s.field_names.includes(fieldName);
-      return {
-        ...s,
-        field_names: has
-          ? s.field_names.filter(f => f !== fieldName)
-          : [...s.field_names, fieldName],
-      };
+      
+      // Auto-add/remove "Edad" when toggling fecha_nacimiento
+      const isFechaNac = fieldName.endsWith(":fecha_nacimiento");
+      const ageKey = fieldName.replace(":fecha_nacimiento", ":_edad");
+      
+      if (has) {
+        // Removing
+        let filtered = s.field_names.filter(f => f !== fieldName);
+        if (isFechaNac) filtered = filtered.filter(f => f !== ageKey);
+        return { ...s, field_names: filtered };
+      } else {
+        // Adding
+        const newFields = [...s.field_names, fieldName];
+        if (isFechaNac && !newFields.includes(ageKey)) {
+          newFields.push(ageKey);
+        }
+        return { ...s, field_names: newFields };
+      }
     }));
   };
 
@@ -429,6 +441,7 @@ export default function EnrollmentDisplayConfig() {
                   {planillaSections.filter(s => s.field_names.length > 0).map((section, idx) => {
                     const resolveLabel = (prefixed: string) => {
                       const [type, name] = prefixed.split(":");
+                      if (name === "_edad") return "Edad";
                       if (type === "student") return studentFields.find(f => f.field_name === name)?.field_label || name;
                       if (type === "representative") return repFields.find(f => f.field_name === name)?.field_label || name;
                       if (type === "family") return familyFields.find(f => f.field_name === name)?.field_label || name;
