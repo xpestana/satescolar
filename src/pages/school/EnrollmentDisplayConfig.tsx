@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { Save, Info, Plus, Trash2, ChevronDown, Eye } from "lucide-react";
+import GeneralConfigTab from "@/components/planilla/GeneralConfigTab";
 import { Separator } from "@/components/ui/separator";
 
 interface FieldConfig {
@@ -288,18 +289,24 @@ export default function EnrollmentDisplayConfig() {
   const breadcrumbs = [
     { label: "Dashboard", href: "/school/dashboard" },
     { label: "Ajustes" },
-    { label: "Datos para Inscripciones" },
+    { label: "Configuración de Planillas" },
   ];
 
   return (
     <DashboardLayout>
-      <PageHeader title="Datos para Inscripciones" breadcrumbs={breadcrumbs} />
+      <PageHeader title="Configuración de Planillas" breadcrumbs={breadcrumbs} />
 
-      <Tabs defaultValue="modal" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
+      <Tabs defaultValue="general" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+          <TabsTrigger value="general">Modificaciones Generales</TabsTrigger>
           <TabsTrigger value="modal">Modal de Inscripción</TabsTrigger>
           <TabsTrigger value="planilla">Planilla de Inscripción</TabsTrigger>
         </TabsList>
+
+        {/* TAB 0: General Config */}
+        <TabsContent value="general">
+          <GeneralConfigTab schoolId={schoolId} />
+        </TabsContent>
 
         {/* TAB 1: Modal Config */}
         <TabsContent value="modal">

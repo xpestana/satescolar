@@ -522,6 +522,44 @@ export type Database = {
           },
         ]
       }
+      planilla_general_config: {
+        Row: {
+          created_at: string
+          footer_config: Json
+          header_config: Json
+          id: string
+          school_id: string
+          signature_lines: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          footer_config?: Json
+          header_config?: Json
+          id?: string
+          school_id: string
+          signature_lines?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          footer_config?: Json
+          header_config?: Json
+          id?: string
+          school_id?: string
+          signature_lines?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planilla_general_config_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
