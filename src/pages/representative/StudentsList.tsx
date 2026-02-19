@@ -10,6 +10,7 @@ import { UserPlus, Edit, Download, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { downloadCarnet } from "@/lib/export-utils";
+import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 
 export default function StudentsList() {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ export default function StudentsList() {
     enabled: !!school?.id,
   });
 
-
+  const { data: carnetConfig } = useCarnetConfig(school?.id);
   const getName = (s: any) => {
     const fd = s.form_data as Record<string, any> || {};
     return `${fd.primer_nombre || ""} ${fd.segundo_nombre || ""} ${fd.primer_apellido || ""} ${fd.segundo_apellido || ""}`.replace(/\s+/g, " ").trim() || "Sin nombre";
@@ -54,6 +55,11 @@ export default function StudentsList() {
       schoolLocation: school?.address || "",
       schoolLogoUrl: school?.logo_url || undefined,
       schoolYear: schoolYear || "2024-2025",
+      primaryColor: carnetConfig?.primary_color || undefined,
+      secondaryColor: carnetConfig?.secondary_color || undefined,
+      watermarkUrl: carnetConfig?.watermark_url || undefined,
+      watermarkOpacity: carnetConfig?.watermark_opacity ? Number(carnetConfig.watermark_opacity) : undefined,
+      watermarkSize: carnetConfig?.watermark_size ? Number(carnetConfig.watermark_size) : undefined,
     });
   };
 
