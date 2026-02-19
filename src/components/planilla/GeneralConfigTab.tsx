@@ -63,7 +63,7 @@ const defaultFooter: FooterConfig = {
   show_rif: true,
 };
 
-const defaultSignatures = ["Firma del Representante", "Firma del Director(a)", "Firma del Coordinador(a)"];
+const defaultSignatures = ["Firma del Representante", "Firma del Director(a)"];
 
 interface Props {
   schoolId: string | null;
