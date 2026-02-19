@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import QRCode from "qrcode";
 
 interface ExportColumn {
   key: string;
@@ -372,15 +373,28 @@ export async function downloadCarnet(params: {
   doc.text(params.role, w / 2, badgeY + 3.5, { align: "center" });
 
   // ── Document ID ──
-  const idY = badgeY + badgeH + 5;
+  const idY = badgeY + badgeH + 4;
   doc.setTextColor(80, 80, 80);
-  doc.setFontSize(4);
+  doc.setFontSize(3.5);
   doc.setFont("helvetica", "normal");
   doc.text("DOCUMENTO DE IDENTIDAD", w / 2, idY, { align: "center" });
   doc.setTextColor(1, 5, 30);
-  doc.setFontSize(6);
+  doc.setFontSize(5.5);
   doc.setFont("helvetica", "bold");
-  doc.text(params.documentId || "Sin documento", w / 2, idY + 4, { align: "center" });
+  doc.text(params.documentId || "Sin documento", w / 2, idY + 3.5, { align: "center" });
+
+  // ── QR Code ──
+  const qrContent = params.documentId || params.personName;
+  try {
+    const qrDataUrl = await QRCode.toDataURL(qrContent, {
+      width: 200,
+      margin: 0,
+      color: { dark: "#01051e", light: "#ffffff" },
+    });
+    const qrSize = 10;
+    const qrY = idY + 6;
+    doc.addImage(qrDataUrl, "PNG", w / 2 - qrSize / 2, qrY, qrSize, qrSize);
+  } catch { /* ignore QR errors */ }
 
   // ── Bottom decorative bar ──
   doc.setFillColor(1, 5, 30);
