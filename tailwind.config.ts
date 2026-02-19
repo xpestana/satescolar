@@ -12,7 +12,10 @@ export default {
         "2xl": "1400px",
       },
     },
-    extend: {
+    fontSize: {
+        sm: ["0.9375rem", { lineHeight: "1.25rem" }],
+      },
+      extend: {
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
