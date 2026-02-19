@@ -328,8 +328,8 @@ export async function downloadCarnet(params: {
   doc.text(`Año Escolar: ${params.schoolYear}`, w / 2, params.schoolLogoUrl ? 22 : 16, { align: "center" });
 
   // ── Photo circle ──
-  const photoY = 40;
-  const photoR = 9;
+  const photoY = 37;
+  const photoR = 7;
 
   // White circle background behind photo
   doc.setFillColor(255, 255, 255);
@@ -344,7 +344,6 @@ export async function downloadCarnet(params: {
     const photoB64 = await loadImageAsBase64(params.photoUrl);
     if (photoB64) {
       try {
-        // Create circular-cropped image via canvas
         const circularB64 = await createCircularImage(photoB64, 300);
         if (circularB64) {
           doc.addImage(circularB64, "PNG", w / 2 - photoR, photoY - photoR, photoR * 2, photoR * 2);
@@ -355,44 +354,40 @@ export async function downloadCarnet(params: {
 
   // ── Name ──
   doc.setTextColor(1, 5, 30);
-  doc.setFontSize(7);
+  doc.setFontSize(6);
   doc.setFont("helvetica", "bold");
   const personLines = doc.splitTextToSize(params.personName.toUpperCase(), w - 8);
-  doc.text(personLines, w / 2, 54, { align: "center" });
+  doc.text(personLines, w / 2, 48, { align: "center" });
 
   // ── Role badge ──
   doc.setFillColor(30, 120, 200);
-  const badgeW = 24;
-  const badgeH = 5;
+  const badgeW = 22;
+  const badgeH = 4.5;
   const badgeX = (w - badgeW) / 2;
-  const badgeY = personLines.length > 1 ? 58 : 57;
+  const badgeY = personLines.length > 1 ? 52 : 51;
   doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, "F");
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(5);
+  doc.setFontSize(4.5);
   doc.setFont("helvetica", "bold");
-  doc.text(params.role, w / 2, badgeY + 3.5, { align: "center" });
+  doc.text(params.role, w / 2, badgeY + 3.2, { align: "center" });
 
-  // ── Document ID ──
-  const idY = badgeY + badgeH + 4;
-  doc.setTextColor(80, 80, 80);
-  doc.setFontSize(3.5);
-  doc.setFont("helvetica", "normal");
-  doc.text("DOCUMENTO DE IDENTIDAD", w / 2, idY, { align: "center" });
+  // ── Document ID (solo el dato) ──
+  const idY = badgeY + badgeH + 3;
   doc.setTextColor(1, 5, 30);
   doc.setFontSize(5.5);
   doc.setFont("helvetica", "bold");
-  doc.text(params.documentId || "Sin documento", w / 2, idY + 3.5, { align: "center" });
+  doc.text(params.documentId || "Sin documento", w / 2, idY, { align: "center" });
 
   // ── QR Code ──
   const qrContent = params.documentId || params.personName;
   try {
     const qrDataUrl = await QRCode.toDataURL(qrContent, {
-      width: 200,
+      width: 300,
       margin: 0,
       color: { dark: "#01051e", light: "#ffffff" },
     });
-    const qrSize = 10;
-    const qrY = idY + 6;
+    const qrSize = 14;
+    const qrY = idY + 2;
     doc.addImage(qrDataUrl, "PNG", w / 2 - qrSize / 2, qrY, qrSize, qrSize);
   } catch { /* ignore QR errors */ }
 
