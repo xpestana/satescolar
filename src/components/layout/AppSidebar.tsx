@@ -173,7 +173,7 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed right-0 top-0 z-40 flex h-screen w-64 flex-col">
+    <aside className="fixed right-0 top-0 z-40 flex h-screen w-72 flex-col">
       {/* Logo Section - Dark Blue */}
       <div className="flex items-center justify-center py-6 bg-[#01051e]">
         <img src={logo} alt="SAT Escolar" className="h-28" />
