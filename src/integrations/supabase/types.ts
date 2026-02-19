@@ -94,6 +94,8 @@ export type Database = {
           field_names: Json
           id: string
           school_id: string
+          section_text: string | null
+          section_type: string
           title: string
           updated_at: string
         }
@@ -103,6 +105,8 @@ export type Database = {
           field_names?: Json
           id?: string
           school_id: string
+          section_text?: string | null
+          section_type?: string
           title: string
           updated_at?: string
         }
@@ -112,6 +116,8 @@ export type Database = {
           field_names?: Json
           id?: string
           school_id?: string
+          section_text?: string | null
+          section_type?: string
           title?: string
           updated_at?: string
         }
