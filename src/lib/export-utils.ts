@@ -311,11 +311,11 @@ export async function downloadCarnet(params: {
     }
   }
 
-  // School name in header
+  // School name in header (more padding - narrower text area)
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(4);
   doc.setFont("helvetica", "bold");
-  const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), w - 8);
+  const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), w - 16);
   doc.text(nameLines, w / 2, params.schoolLogoUrl ? 11.5 : 6, { align: "center" });
 
   // School location
@@ -326,6 +326,21 @@ export async function downloadCarnet(params: {
   // School year
   doc.setFontSize(3);
   doc.text(`Año Escolar: ${params.schoolYear}`, w / 2, params.schoolLogoUrl ? 17.5 : 12.5, { align: "center" });
+
+  // ── Watermark logo on white area ──
+  if (params.schoolLogoUrl) {
+    const wmB64 = await loadImageAsBase64(params.schoolLogoUrl);
+    if (wmB64) {
+      try {
+        const savedState = (doc as any).internal.getGState?.();
+        doc.saveGraphicsState();
+        doc.setGState(new (doc as any).GState({ opacity: 0.06 }));
+        const wmSize = 30;
+        doc.addImage(wmB64, "PNG", w / 2 - wmSize / 2, 35, wmSize, wmSize);
+        doc.restoreGraphicsState();
+      } catch { /* ignore watermark errors */ }
+    }
+  }
 
   // ── Photo circle ──
   const photoY = 33;
