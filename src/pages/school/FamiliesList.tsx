@@ -24,13 +24,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Eye, Users, UserPlus, Info, Trash2, GraduationCap, UserCheck } from "lucide-react";
+import { Eye, Users, UserPlus, Info, Trash2, GraduationCap, UserCheck, KeyRound } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
 import { AddFamilyModal } from "@/components/families/AddFamilyModal";
 import { ViewFamilyModal } from "@/components/families/ViewFamilyModal";
+import { ChangePasswordModal } from "@/components/families/ChangePasswordModal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface FamilyWithEmail {
@@ -61,6 +62,8 @@ export default function FamiliesList() {
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [familyToDelete, setFamilyToDelete] = useState<FamilyWithEmail | null>(null);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [passwordFamily, setPasswordFamily] = useState<FamilyWithEmail | null>(null);
 
   // Fetch families
   const { data: familiesData, isLoading } = useQuery({
@@ -274,6 +277,14 @@ export default function FamiliesList() {
                             </TooltipTrigger>
                             <TooltipContent>Agregar Estudiante</TooltipContent>
                           </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setPasswordFamily(family); setPasswordModalOpen(true); }}>
+                                <KeyRound className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Cambiar contraseña</TooltipContent>
+                          </Tooltip>
                           {!family.hasMembers && (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -398,6 +409,15 @@ export default function FamiliesList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {passwordFamily && (
+        <ChangePasswordModal
+          open={passwordModalOpen}
+          onClose={() => { setPasswordModalOpen(false); setPasswordFamily(null); }}
+          familyId={passwordFamily.id}
+          familyName={getFamilyName(passwordFamily)}
+        />
+      )}
     </DashboardLayout>
   );
 }
