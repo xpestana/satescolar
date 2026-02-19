@@ -74,56 +74,67 @@ export default function FamiliesList() {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
+      // 1. Fetch families with count
       const { data, error, count } = await supabase
         .from("families")
-        .select("*, family_schools!inner(school_id)", { count: "exact" })
+        .select("id, user_id, father_last_name, mother_last_name, contact_phone, address, is_suspended, family_schools!inner(school_id)", { count: "exact" })
         .eq("family_schools.school_id", schoolId)
         .range(from, to)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      if (!data || data.length === 0) return { families: [], count: 0 };
 
-      // Filter families to only show those with representative role
-      const userIds = (data || []).map((f) => f.user_id);
-      const { data: rolesData } = await supabase
-        .from("user_roles")
-        .select("user_id, role")
-        .in("user_id", userIds);
+      const userIds = data.map((f) => f.user_id);
+      const familyIds = data.map((f) => f.id);
 
-      const repUserIds = new Set(
-        (rolesData || []).filter((r) => r.role === "representative").map((r) => r.user_id)
-      );
-      const repFamilies = (data || []).filter((f) => repUserIds.has(f.user_id));
+      // 2. Batch all secondary queries in parallel
+      const [rolesRes, emailsRes, repsRes, studentsRes] = await Promise.all([
+        supabase.from("user_roles").select("user_id").eq("role", "representative").in("user_id", userIds),
+        supabase.functions.invoke("get-user-emails", { body: { userIds } }),
+        supabase.from("representatives").select("family_id, form_data").in("family_id", familyIds),
+        supabase.from("students").select("family_id, form_data").in("family_id", familyIds),
+      ]);
 
-      const familiesWithEmails: FamilyWithEmail[] = [];
-      for (const family of repFamilies) {
-        // Fetch email
-        const { data: emailData } = await supabase.functions.invoke("get-user-emails", {
-          body: { userIds: [family.user_id] },
-        });
+      const repUserIds = new Set((rolesRes.data || []).map((r) => r.user_id));
+      const emails = emailsRes.data?.emails || {};
 
-        // Check if family has representatives or students, and get their names
-        const [{ count: repsCount, data: repsData }, { count: studentsCount, data: studentsData }] = await Promise.all([
-          supabase.from("representatives").select("id, form_data", { count: "exact" }).eq("family_id", family.id),
-          supabase.from("students").select("id, form_data", { count: "exact" }).eq("family_id", family.id),
-        ]);
-
-        const getNameFromFormData = (fd: any) => {
-          if (!fd) return "Sin nombre";
-          const parts = [fd.primer_nombre, fd.primer_apellido].filter(Boolean);
-          return parts.length > 0 ? parts.join(" ") : "Sin nombre";
-        };
-
-        familiesWithEmails.push({
-          ...family,
-          email: emailData?.emails?.[family.user_id] || "Sin correo",
-          hasMembers: (repsCount || 0) > 0 || (studentsCount || 0) > 0,
-          representativeNames: (repsData || []).map((r: any) => getNameFromFormData(r.form_data)),
-          studentNames: (studentsData || []).map((s: any) => getNameFromFormData(s.form_data)),
-        });
+      // Group reps and students by family_id
+      const repsByFamily = new Map<string, any[]>();
+      for (const r of repsRes.data || []) {
+        const list = repsByFamily.get(r.family_id) || [];
+        list.push(r);
+        repsByFamily.set(r.family_id, list);
+      }
+      const studentsByFamily = new Map<string, any[]>();
+      for (const s of studentsRes.data || []) {
+        const list = studentsByFamily.get(s.family_id) || [];
+        list.push(s);
+        studentsByFamily.set(s.family_id, list);
       }
 
-      return { families: familiesWithEmails, count: familiesWithEmails.length };
+      const getNameFromFormData = (fd: any) => {
+        if (!fd) return "Sin nombre";
+        const parts = [fd.primer_nombre, fd.primer_apellido].filter(Boolean);
+        return parts.length > 0 ? parts.join(" ") : "Sin nombre";
+      };
+
+      // 3. Build result filtering by representative role
+      const families: FamilyWithEmail[] = data
+        .filter((f) => repUserIds.has(f.user_id))
+        .map((family) => {
+          const reps = repsByFamily.get(family.id) || [];
+          const students = studentsByFamily.get(family.id) || [];
+          return {
+            ...family,
+            email: emails[family.user_id] || "Sin correo",
+            hasMembers: reps.length > 0 || students.length > 0,
+            representativeNames: reps.map((r: any) => getNameFromFormData(r.form_data)),
+            studentNames: students.map((s: any) => getNameFromFormData(s.form_data)),
+          };
+        });
+
+      return { families, count: count || 0 };
     },
     enabled: !!schoolId,
   });
