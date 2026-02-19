@@ -391,8 +391,9 @@ export default function FamiliesList() {
                   <TableHead>Acciones</TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Representantes</TableHead>
+                   <TableHead>Representantes</TableHead>
                   <TableHead>Estudiantes</TableHead>
+                  <TableHead>Miembros</TableHead>
                   <TableHead>Activo</TableHead>
                 </TableRow>
               </TableHeader>
@@ -461,7 +462,6 @@ export default function FamiliesList() {
                     <TableCell>{family.email}</TableCell>
                     <TableCell>
                       <div className="space-y-0.5">
-                        <Badge variant="secondary" className="text-xs mb-1">{family.repsCount} {family.repsCount === 1 ? "representante" : "representantes"}</Badge>
                         {family.representativeNames && family.representativeNames.length > 0 ? (
                           family.representativeNames.map((name, i) => (
                             <p key={i} className="text-sm">{name}</p>
@@ -473,7 +473,6 @@ export default function FamiliesList() {
                     </TableCell>
                     <TableCell>
                       <div className="space-y-0.5">
-                        <Badge variant="secondary" className="text-xs mb-1">{family.studentsCount} {family.studentsCount === 1 ? "estudiante" : "estudiantes"}</Badge>
                         {family.studentNames && family.studentNames.length > 0 ? (
                           family.studentNames.map((name, i) => (
                             <p key={i} className="text-sm">{name}</p>
@@ -481,6 +480,11 @@ export default function FamiliesList() {
                         ) : (
                           <span className="text-sm text-muted-foreground">—</span>
                         )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm text-muted-foreground whitespace-nowrap">
+                        <span className="font-medium text-foreground">{family.repsCount}</span> {family.repsCount === 1 ? "rep." : "reps."} / <span className="font-medium text-foreground">{family.studentsCount}</span> {family.studentsCount === 1 ? "est." : "ests."}
                       </div>
                     </TableCell>
                     <TableCell>
