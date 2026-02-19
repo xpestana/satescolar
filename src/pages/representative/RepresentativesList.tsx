@@ -15,11 +15,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useToast } from "@/hooks/use-toast";
 import { downloadCarnet } from "@/lib/export-utils";
+import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 import { useState } from "react";
 
 export default function RepresentativesList() {
   const navigate = useNavigate();
   const { familyId, school } = useRepresentativeFamily();
+  const { data: carnetConfig } = useCarnetConfig(school?.id);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -73,6 +75,11 @@ export default function RepresentativesList() {
       schoolLocation: school?.address || "",
       schoolLogoUrl: school?.logo_url || undefined,
       schoolYear: schoolYear || "2024-2025",
+      primaryColor: carnetConfig?.primary_color || undefined,
+      secondaryColor: carnetConfig?.secondary_color || undefined,
+      watermarkUrl: carnetConfig?.watermark_url || undefined,
+      watermarkOpacity: carnetConfig?.watermark_opacity ? Number(carnetConfig.watermark_opacity) : undefined,
+      watermarkSize: carnetConfig?.watermark_size ? Number(carnetConfig.watermark_size) : undefined,
     });
   };
 

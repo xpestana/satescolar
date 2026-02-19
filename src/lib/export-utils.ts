@@ -273,85 +273,81 @@ export async function downloadCarnet(params: {
   schoolLocation: string;
   schoolLogoUrl?: string;
   schoolYear: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  watermarkUrl?: string;
+  watermarkOpacity?: number;
+  watermarkSize?: number;
 }) {
-  // Standard CR80 card: 85.6 x 53.98 mm — vertical orientation
   const w = 53.98;
   const h = 85.6;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [w, h] });
 
-  // ── FRONT SIDE ──
+  // Parse colors
+  const pc = hexToRgb(params.primaryColor || "#01051e");
+  const sc = hexToRgb(params.secondaryColor || "#1e78c8");
+  const sc2 = { r: Math.min(sc.r + 20, 255), g: Math.min(sc.g + 30, 255), b: Math.min(sc.b + 30, 255) };
 
-  // White background
+  // ── FRONT SIDE ──
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, w, h, "F");
 
-  // Top blue header area with diagonal geometric shapes
-  doc.setFillColor(1, 5, 30); // dark blue (#01051e)
+  // Top header
+  doc.setFillColor(pc.r, pc.g, pc.b);
   doc.rect(0, 0, w, 22, "F");
 
-  // Decorative diagonal accent (lighter blue triangle)
-  doc.setFillColor(30, 120, 200);
-  doc.triangle(0, 0, 14, 0, 0, 22, "F");
-
-  // Another accent triangle on the right
-  doc.setFillColor(50, 150, 230);
+  // Symmetric triangles
+  doc.setFillColor(sc.r, sc.g, sc.b);
+  doc.triangle(0, 0, 10, 0, 0, 17, "F");
+  doc.setFillColor(sc2.r, sc2.g, sc2.b);
   doc.triangle(w, 0, w - 10, 0, w, 17, "F");
 
-  // Small decorative stripe
-  doc.setFillColor(30, 120, 200);
+  // Stripe
+  doc.setFillColor(sc.r, sc.g, sc.b);
   doc.rect(0, 22, w, 1, "F");
 
   // School logo in header
   if (params.schoolLogoUrl) {
     const logoB64 = await loadImageAsBase64(params.schoolLogoUrl);
     if (logoB64) {
-      try {
-        doc.addImage(logoB64, "PNG", w / 2 - 4, 1.5, 8, 8);
-      } catch { /* ignore */ }
+      try { doc.addImage(logoB64, "PNG", w / 2 - 4, 1.5, 8, 8); } catch { /* ignore */ }
     }
   }
 
-  // School name in header (more padding - narrower text area)
+  // School name
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(4);
   doc.setFont("helvetica", "bold");
   const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), w - 16);
   doc.text(nameLines, w / 2, params.schoolLogoUrl ? 11.5 : 6, { align: "center" });
 
-  // School location
   doc.setFontSize(3);
   doc.setFont("helvetica", "normal");
   doc.text(params.schoolLocation, w / 2, params.schoolLogoUrl ? 15 : 10, { align: "center" });
-
-  // School year
-  doc.setFontSize(3);
   doc.text(`Año Escolar: ${params.schoolYear}`, w / 2, params.schoolLogoUrl ? 17.5 : 12.5, { align: "center" });
 
-  // ── Watermark logo on white area ──
-  if (params.schoolLogoUrl) {
-    const wmB64 = await loadImageAsBase64(params.schoolLogoUrl);
+  // ── Watermark ──
+  const wmUrl = params.watermarkUrl || params.schoolLogoUrl;
+  const wmOpacity = params.watermarkOpacity ?? 0.06;
+  const wmSize = params.watermarkSize ?? 30;
+  if (wmUrl) {
+    const wmB64 = await loadImageAsBase64(wmUrl);
     if (wmB64) {
       try {
-        const savedState = (doc as any).internal.getGState?.();
         doc.saveGraphicsState();
-        doc.setGState(new (doc as any).GState({ opacity: 0.06 }));
-        const wmSize = 30;
+        doc.setGState(new (doc as any).GState({ opacity: wmOpacity }));
         doc.addImage(wmB64, "PNG", w / 2 - wmSize / 2, 35, wmSize, wmSize);
         doc.restoreGraphicsState();
-      } catch { /* ignore watermark errors */ }
+      } catch { /* ignore */ }
     }
   }
 
   // ── Photo circle ──
   const photoY = 33;
   const photoR = 7;
-
-  // White circle background behind photo
   doc.setFillColor(255, 255, 255);
   doc.circle(w / 2, photoY, photoR + 1, "F");
-
-  // Blue border ring
-  doc.setDrawColor(30, 120, 200);
+  doc.setDrawColor(sc.r, sc.g, sc.b);
   doc.setLineWidth(0.8);
   doc.circle(w / 2, photoY, photoR + 0.5);
 
@@ -368,14 +364,14 @@ export async function downloadCarnet(params: {
   }
 
   // ── Name ──
-  doc.setTextColor(1, 5, 30);
+  doc.setTextColor(pc.r, pc.g, pc.b);
   doc.setFontSize(6);
   doc.setFont("helvetica", "bold");
   const personLines = doc.splitTextToSize(params.personName.toUpperCase(), w - 8);
   doc.text(personLines, w / 2, 48, { align: "center" });
 
   // ── Role badge ──
-  doc.setFillColor(30, 120, 200);
+  doc.setFillColor(sc.r, sc.g, sc.b);
   const badgeW = 22;
   const badgeH = 4.5;
   const badgeX = (w - badgeW) / 2;
@@ -386,9 +382,9 @@ export async function downloadCarnet(params: {
   doc.setFont("helvetica", "bold");
   doc.text(params.role, w / 2, badgeY + 3.2, { align: "center" });
 
-  // ── Document ID (solo el dato) ──
+  // ── Document ID ──
   const idY = badgeY + badgeH + 3;
-  doc.setTextColor(1, 5, 30);
+  doc.setTextColor(pc.r, pc.g, pc.b);
   doc.setFontSize(5.5);
   doc.setFont("helvetica", "bold");
   doc.text(params.documentId || "Sin documento", w / 2, idY, { align: "center" });
@@ -397,24 +393,20 @@ export async function downloadCarnet(params: {
   const qrContent = params.documentId || params.personName;
   try {
     const qrDataUrl = await QRCode.toDataURL(qrContent, {
-      width: 300,
-      margin: 0,
-      color: { dark: "#01051e", light: "#ffffff" },
+      width: 300, margin: 0,
+      color: { dark: params.primaryColor || "#01051e", light: "#ffffff" },
     });
     const qrSize = 14;
     const qrY = idY + 2;
     doc.addImage(qrDataUrl, "PNG", w / 2 - qrSize / 2, qrY, qrSize, qrSize);
-  } catch { /* ignore QR errors */ }
+  } catch { /* ignore */ }
 
-  // ── Bottom decorative bar ──
-  doc.setFillColor(1, 5, 30);
+  // ── Bottom bar ──
+  doc.setFillColor(pc.r, pc.g, pc.b);
   doc.rect(0, h - 4, w, 4, "F");
-
-  // Diagonal accent on bottom
-  doc.setFillColor(30, 120, 200);
+  doc.setFillColor(sc.r, sc.g, sc.b);
   doc.triangle(w, h, w - 16, h, w, h - 4, "F");
-
-  doc.setFillColor(50, 150, 230);
+  doc.setFillColor(sc2.r, sc2.g, sc2.b);
   doc.triangle(0, h, 12, h, 0, h - 4, "F");
 
   const safeName = params.personName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_");
@@ -448,7 +440,16 @@ function createCircularImage(base64: string, size: number): Promise<string | nul
   });
 }
 
-// ── Helper ───────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace("#", "");
+  return {
+    r: parseInt(h.substring(0, 2), 16) || 0,
+    g: parseInt(h.substring(2, 4), 16) || 0,
+    b: parseInt(h.substring(4, 6), 16) || 0,
+  };
+}
+
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

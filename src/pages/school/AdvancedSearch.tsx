@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
 import { ViewTeacherModal } from "@/components/search/ViewTeacherModal";
+import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 import {
   DndContext,
   closestCenter,
@@ -90,6 +91,7 @@ function SortableHeaderCell({ col }: { col: ColumnDef }) {
 
 export default function AdvancedSearch() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
+  const { data: carnetConfig } = useCarnetConfig(schoolId);
   const [formType, setFormType] = useState<FormType>("student");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -476,6 +478,11 @@ export default function AdvancedSearch() {
       schoolLocation: locationParts.join(", ") || "",
       schoolLogoUrl: schoolInfo?.logo_url || undefined,
       schoolYear: activeSchoolYear || "Sin definir",
+      primaryColor: carnetConfig?.primary_color || undefined,
+      secondaryColor: carnetConfig?.secondary_color || undefined,
+      watermarkUrl: carnetConfig?.watermark_url || undefined,
+      watermarkOpacity: carnetConfig?.watermark_opacity ? Number(carnetConfig.watermark_opacity) : undefined,
+      watermarkSize: carnetConfig?.watermark_size ? Number(carnetConfig.watermark_size) : undefined,
     });
   };
 

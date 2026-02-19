@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      carnet_config: {
+        Row: {
+          created_at: string
+          id: string
+          primary_color: string
+          school_id: string
+          secondary_color: string
+          updated_at: string
+          watermark_opacity: number
+          watermark_size: number
+          watermark_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          primary_color?: string
+          school_id: string
+          secondary_color?: string
+          updated_at?: string
+          watermark_opacity?: number
+          watermark_size?: number
+          watermark_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          primary_color?: string
+          school_id?: string
+          secondary_color?: string
+          updated_at?: string
+          watermark_opacity?: number
+          watermark_size?: number
+          watermark_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carnet_config_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cities: {
         Row: {
           created_at: string

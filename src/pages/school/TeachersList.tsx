@@ -24,6 +24,7 @@ import {
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
 import { useNavigate } from "react-router-dom";
+import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 import { toast } from "sonner";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent,
@@ -79,6 +80,7 @@ function generatePassword(length = 8): string {
 
 export default function TeachersList() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
+  const { data: carnetConfig } = useCarnetConfig(schoolId);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
@@ -372,6 +374,11 @@ export default function TeachersList() {
       schoolLocation: locationParts.join(", ") || "",
       schoolLogoUrl: schoolInfo?.logo_url || undefined,
       schoolYear: activeSchoolYear || "Sin definir",
+      primaryColor: carnetConfig?.primary_color || undefined,
+      secondaryColor: carnetConfig?.secondary_color || undefined,
+      watermarkUrl: carnetConfig?.watermark_url || undefined,
+      watermarkOpacity: carnetConfig?.watermark_opacity ? Number(carnetConfig.watermark_opacity) : undefined,
+      watermarkSize: carnetConfig?.watermark_size ? Number(carnetConfig.watermark_size) : undefined,
     });
   };
 
