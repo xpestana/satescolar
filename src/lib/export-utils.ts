@@ -287,48 +287,48 @@ export async function downloadCarnet(params: {
 
   // Top blue header area with diagonal geometric shapes
   doc.setFillColor(1, 5, 30); // dark blue (#01051e)
-  doc.rect(0, 0, w, 28, "F");
+  doc.rect(0, 0, w, 22, "F");
 
   // Decorative diagonal accent (lighter blue triangle)
   doc.setFillColor(30, 120, 200);
-  doc.triangle(0, 0, 18, 0, 0, 28, "F");
+  doc.triangle(0, 0, 14, 0, 0, 22, "F");
 
   // Another accent triangle on the right
   doc.setFillColor(50, 150, 230);
-  doc.triangle(w, 0, w - 14, 0, w, 22, "F");
+  doc.triangle(w, 0, w - 10, 0, w, 17, "F");
 
   // Small decorative stripe
   doc.setFillColor(30, 120, 200);
-  doc.rect(0, 28, w, 1.5, "F");
+  doc.rect(0, 22, w, 1, "F");
 
   // School logo in header
   if (params.schoolLogoUrl) {
     const logoB64 = await loadImageAsBase64(params.schoolLogoUrl);
     if (logoB64) {
       try {
-        doc.addImage(logoB64, "PNG", w / 2 - 5, 2, 10, 10);
+        doc.addImage(logoB64, "PNG", w / 2 - 4, 1.5, 8, 8);
       } catch { /* ignore */ }
     }
   }
 
   // School name in header
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(5);
+  doc.setFontSize(4);
   doc.setFont("helvetica", "bold");
   const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), w - 8);
-  doc.text(nameLines, w / 2, params.schoolLogoUrl ? 15 : 8, { align: "center" });
+  doc.text(nameLines, w / 2, params.schoolLogoUrl ? 11.5 : 6, { align: "center" });
 
   // School location
-  doc.setFontSize(3.5);
+  doc.setFontSize(3);
   doc.setFont("helvetica", "normal");
-  doc.text(params.schoolLocation, w / 2, params.schoolLogoUrl ? 19 : 13, { align: "center" });
+  doc.text(params.schoolLocation, w / 2, params.schoolLogoUrl ? 15 : 10, { align: "center" });
 
   // School year
-  doc.setFontSize(3.5);
-  doc.text(`Año Escolar: ${params.schoolYear}`, w / 2, params.schoolLogoUrl ? 22 : 16, { align: "center" });
+  doc.setFontSize(3);
+  doc.text(`Año Escolar: ${params.schoolYear}`, w / 2, params.schoolLogoUrl ? 17.5 : 12.5, { align: "center" });
 
   // ── Photo circle ──
-  const photoY = 37;
+  const photoY = 33;
   const photoR = 7;
 
   // White circle background behind photo
