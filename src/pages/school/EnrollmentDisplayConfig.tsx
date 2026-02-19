@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -27,6 +29,8 @@ interface PlanillaSection {
   title: string;
   field_names: string[];
   display_order: number;
+  section_type: 'fields' | 'text';
+  section_text: string;
 }
 
 export default function EnrollmentDisplayConfig() {
@@ -36,6 +40,7 @@ export default function EnrollmentDisplayConfig() {
   const [fields, setFields] = useState<FieldConfig[]>([]);
   const [planillaSections, setPlanillaSections] = useState<PlanillaSection[]>([]);
   const [customFieldInput, setCustomFieldInput] = useState<Record<number, string>>({});
+  const [newSectionType, setNewSectionType] = useState<'fields' | 'text'>('fields');
 
   // Fetch student form fields
   const { data: studentFields = [] } = useQuery({
@@ -80,6 +85,7 @@ export default function EnrollmentDisplayConfig() {
     { field_name: "additional_phone", field_label: "Teléfono Adicional" },
     { field_name: "emergency_contact", field_label: "Contacto de Emergencia" },
     { field_name: "address", field_label: "Dirección" },
+    { field_name: "location_full", field_label: "Ubicación (Estado/Municipio/Ciudad/Parroquia)" },
     { field_name: "housing_type", field_label: "Tipo de Vivienda" },
     { field_name: "housing_sector", field_label: "Sector" },
     { field_name: "housing_details", field_label: "Detalles de Vivienda" },
@@ -155,6 +161,8 @@ export default function EnrollmentDisplayConfig() {
           title: s.title,
           field_names: Array.isArray(s.field_names) ? (s.field_names as string[]) : [],
           display_order: s.display_order,
+          section_type: ((s as any).section_type || 'fields') as 'fields' | 'text',
+          section_text: (s as any).section_text || '',
         }))
       );
     }
@@ -194,7 +202,7 @@ export default function EnrollmentDisplayConfig() {
   const addSection = () => {
     setPlanillaSections(prev => [
       ...prev,
-      { title: "", field_names: [], display_order: prev.length },
+      { title: "", field_names: [], display_order: prev.length, section_type: newSectionType, section_text: "" },
     ]);
   };
 
@@ -204,6 +212,10 @@ export default function EnrollmentDisplayConfig() {
 
   const updateSectionTitle = (index: number, title: string) => {
     setPlanillaSections(prev => prev.map((s, i) => i === index ? { ...s, title } : s));
+  };
+
+  const updateSectionText = (index: number, section_text: string) => {
+    setPlanillaSections(prev => prev.map((s, i) => i === index ? { ...s, section_text } : s));
   };
 
   const toggleSectionField = (sectionIndex: number, fieldName: string) => {
@@ -216,12 +228,10 @@ export default function EnrollmentDisplayConfig() {
       const ageKey = fieldName.replace(":fecha_nacimiento", ":_edad");
       
       if (has) {
-        // Removing
         let filtered = s.field_names.filter(f => f !== fieldName);
         if (isFechaNac) filtered = filtered.filter(f => f !== ageKey);
         return { ...s, field_names: filtered };
       } else {
-        // Adding
         const newFields = [...s.field_names, fieldName];
         if (isFechaNac && !newFields.includes(ageKey)) {
           newFields.push(ageKey);
@@ -236,11 +246,9 @@ export default function EnrollmentDisplayConfig() {
     mutationFn: async () => {
       if (!schoolId) throw new Error("No school");
 
-      // Validate
       const emptyTitle = planillaSections.some(s => !s.title.trim());
       if (emptyTitle) throw new Error("Todas las secciones deben tener un título.");
 
-      // Delete existing and re-insert
       await supabase.from("enrollment_planilla_sections").delete().eq("school_id", schoolId);
 
       if (planillaSections.length === 0) return;
@@ -250,9 +258,11 @@ export default function EnrollmentDisplayConfig() {
         title: s.title.trim(),
         field_names: s.field_names,
         display_order: idx,
+        section_type: s.section_type,
+        section_text: s.section_text,
       }));
 
-      const { error } = await supabase.from("enrollment_planilla_sections").insert(rows);
+      const { error } = await supabase.from("enrollment_planilla_sections").insert(rows as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -263,6 +273,17 @@ export default function EnrollmentDisplayConfig() {
       toast({ variant: "destructive", title: "Error", description: err.message || "No se pudo guardar." });
     },
   });
+
+  const resolveLabel = (prefixed: string) => {
+    const [type, ...rest] = prefixed.split(":");
+    const name = rest.join(":");
+    if (name === "_edad") return "Edad";
+    if (type === "custom") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    if (type === "student") return studentFields.find(f => f.field_name === name)?.field_label || name;
+    if (type === "representative") return repFields.find(f => f.field_name === name)?.field_label || name;
+    if (type === "family") return familyFields.find(f => f.field_name === name)?.field_label || name;
+    return name;
+  };
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/school/dashboard" },
@@ -319,10 +340,19 @@ export default function EnrollmentDisplayConfig() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Secciones de la Planilla</CardTitle>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                <Select value={newSectionType} onValueChange={(v) => setNewSectionType(v as 'fields' | 'text')}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fields">Campos de datos</SelectItem>
+                    <SelectItem value="text">Bloque de texto</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button variant="outline" onClick={addSection} className="gap-2">
                   <Plus className="h-4 w-4" />
-                  Agregar Sección
+                  Agregar
                 </Button>
                 <Button onClick={() => savePlanillaMutation.mutate()} disabled={savePlanillaMutation.isPending} className="gap-2">
                   <Save className="h-4 w-4" />
@@ -334,7 +364,7 @@ export default function EnrollmentDisplayConfig() {
               <div className="flex items-start gap-3 mb-6 p-4 bg-muted/50 rounded-lg">
                 <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
-                  Crea secciones con un título y selecciona los campos de estudiante que incluirá cada una. Estas secciones se usarán para generar la planilla de inscripción.
+                  Crea secciones de tipo "Campos de datos" para seleccionar campos, o "Bloque de texto" para contenido libre como observaciones o compromisos.
                 </p>
               </div>
 
@@ -359,12 +389,12 @@ export default function EnrollmentDisplayConfig() {
                       <Input
                         value={section.title}
                         onChange={(e) => updateSectionTitle(sectionIdx, e.target.value)}
-                        placeholder="Título de la sección (ej: Datos Básicos)"
+                        placeholder="Título de la sección"
                         className="flex-1 font-medium"
                         onClick={(e) => e.stopPropagation()}
                       />
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {section.field_names.length} campos
+                      <span className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-muted rounded">
+                        {section.section_type === 'text' ? 'Texto' : `${section.field_names.length} campos`}
                       </span>
                       <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="icon" className="flex-shrink-0">
@@ -383,121 +413,140 @@ export default function EnrollmentDisplayConfig() {
 
                     <CollapsibleContent>
                       <div className="p-4 border-t space-y-4">
-                        {[
-                          { key: "student", label: "Estudiante", fields: studentFields },
-                          { key: "representative", label: "Representante", fields: repFields },
-                          { key: "family", label: "Familia", fields: familyFields },
-                        ].map(group => (
-                          <Collapsible key={group.key} defaultOpen={false} className="border rounded-md">
-                            <CollapsibleTrigger asChild>
-                              <button className="flex items-center justify-between w-full p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
-                                <span>{group.label}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-muted-foreground">
-                                    {group.fields.filter(f => section.field_names.includes(`${group.key}:${f.field_name}`)).length} sel.
-                                  </span>
-                                  <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
-                                </div>
-                              </button>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 pt-0">
-                                {group.fields.map(ff => {
-                                  const prefixed = `${group.key}:${ff.field_name}`;
-                                  const isSelected = section.field_names.includes(prefixed);
-                                  return (
-                                    <label
-                                      key={prefixed}
-                                      className="flex items-center justify-between p-2.5 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
-                                    >
-                                      <span className="text-sm">{ff.field_label}</span>
-                                      <Switch
-                                        checked={isSelected}
-                                        onCheckedChange={() => toggleSectionField(sectionIdx, prefixed)}
-                                      />
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        ))}
-
-                        {/* Custom fields accordion */}
-                        <Collapsible defaultOpen={false} className="border rounded-md">
-                          <CollapsibleTrigger asChild>
-                            <button className="flex items-center justify-between w-full p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
-                              <span>Campos personalizados</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">
-                                  {section.field_names.filter(f => f.startsWith("custom:")).length} campos
-                                </span>
-                                <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
-                              </div>
-                            </button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent>
-                            <div className="p-3 pt-0 space-y-3">
-                              <div className="flex gap-2">
-                                <Input
-                                  value={customFieldInput[sectionIdx] || ""}
-                                  onChange={(e) => setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: e.target.value }))}
-                                  placeholder="Nombre del campo (ej: Año a cursar)"
-                                  className="flex-1"
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      const val = (customFieldInput[sectionIdx] || "").trim();
-                                      if (!val) return;
-                                      const key = `custom:${val.toLowerCase().replace(/\s+/g, "_")}`;
-                                      if (!planillaSections[sectionIdx].field_names.includes(key)) {
-                                        toggleSectionField(sectionIdx, key);
-                                      }
-                                      setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: "" }));
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    const val = (customFieldInput[sectionIdx] || "").trim();
-                                    if (!val) return;
-                                    const key = `custom:${val.toLowerCase().replace(/\s+/g, "_")}`;
-                                    if (!planillaSections[sectionIdx].field_names.includes(key)) {
-                                      toggleSectionField(sectionIdx, key);
-                                    }
-                                    setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: "" }));
-                                  }}
-                                  className="gap-1"
-                                >
-                                  <Plus className="h-3.5 w-3.5" />
-                                  Agregar
-                                </Button>
-                              </div>
-                              {section.field_names.filter(f => f.startsWith("custom:")).length > 0 && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  {section.field_names.filter(f => f.startsWith("custom:")).map(f => {
-                                    const label = f.replace("custom:", "").replace(/_/g, " ");
-                                    return (
-                                      <div key={f} className="flex items-center justify-between p-2.5 rounded-md border">
-                                        <span className="text-sm capitalize">{label}</span>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7 text-destructive hover:text-destructive"
-                                          onClick={() => toggleSectionField(sectionIdx, f)}
+                        {section.section_type === 'text' ? (
+                          /* Text section editor */
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Contenido del bloque de texto</Label>
+                            <Textarea
+                              value={section.section_text}
+                              onChange={(e) => updateSectionText(sectionIdx, e.target.value)}
+                              placeholder="Escribe el texto que aparecerá en esta sección de la planilla... (Dejar vacío para un área en blanco)"
+                              className="min-h-[120px]"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Si se deja vacío, se mostrará un área en blanco para rellenar manualmente.
+                            </p>
+                          </div>
+                        ) : (
+                          /* Fields section editor */
+                          <>
+                            {[
+                              { key: "student", label: "Estudiante", fields: studentFields },
+                              { key: "representative", label: "Representante", fields: repFields },
+                              { key: "family", label: "Familia", fields: familyFields },
+                            ].map(group => (
+                              <Collapsible key={group.key} defaultOpen={false} className="border rounded-md">
+                                <CollapsibleTrigger asChild>
+                                  <button className="flex items-center justify-between w-full p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+                                    <span>{group.label}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs text-muted-foreground">
+                                        {group.fields.filter(f => section.field_names.includes(`${group.key}:${f.field_name}`)).length} sel.
+                                      </span>
+                                      <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                                    </div>
+                                  </button>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 pt-0">
+                                    {group.fields.map(ff => {
+                                      const prefixed = `${group.key}:${ff.field_name}`;
+                                      const isSelected = section.field_names.includes(prefixed);
+                                      return (
+                                        <label
+                                          key={prefixed}
+                                          className="flex items-center justify-between p-2.5 rounded-md border cursor-pointer hover:bg-muted/50 transition-colors"
                                         >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                      </div>
-                                    );
-                                  })}
+                                          <span className="text-sm">{ff.field_label}</span>
+                                          <Switch
+                                            checked={isSelected}
+                                            onCheckedChange={() => toggleSectionField(sectionIdx, prefixed)}
+                                          />
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            ))}
+
+                            {/* Custom fields accordion */}
+                            <Collapsible defaultOpen={false} className="border rounded-md">
+                              <CollapsibleTrigger asChild>
+                                <button className="flex items-center justify-between w-full p-3 text-sm font-medium hover:bg-muted/50 transition-colors">
+                                  <span>Campos personalizados</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">
+                                      {section.field_names.filter(f => f.startsWith("custom:")).length} campos
+                                    </span>
+                                    <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                                  </div>
+                                </button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <div className="p-3 pt-0 space-y-3">
+                                  <div className="flex gap-2">
+                                    <Input
+                                      value={customFieldInput[sectionIdx] || ""}
+                                      onChange={(e) => setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: e.target.value }))}
+                                      placeholder="Nombre del campo (ej: Año a cursar)"
+                                      className="flex-1"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          const val = (customFieldInput[sectionIdx] || "").trim();
+                                          if (!val) return;
+                                          const key = `custom:${val.toLowerCase().replace(/\s+/g, "_")}`;
+                                          if (!planillaSections[sectionIdx].field_names.includes(key)) {
+                                            toggleSectionField(sectionIdx, key);
+                                          }
+                                          setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: "" }));
+                                        }
+                                      }}
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        const val = (customFieldInput[sectionIdx] || "").trim();
+                                        if (!val) return;
+                                        const key = `custom:${val.toLowerCase().replace(/\s+/g, "_")}`;
+                                        if (!planillaSections[sectionIdx].field_names.includes(key)) {
+                                          toggleSectionField(sectionIdx, key);
+                                        }
+                                        setCustomFieldInput(prev => ({ ...prev, [sectionIdx]: "" }));
+                                      }}
+                                      className="gap-1"
+                                    >
+                                      <Plus className="h-3.5 w-3.5" />
+                                      Agregar
+                                    </Button>
+                                  </div>
+                                  {section.field_names.filter(f => f.startsWith("custom:")).length > 0 && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {section.field_names.filter(f => f.startsWith("custom:")).map(f => {
+                                        const label = f.replace("custom:", "").replace(/_/g, " ");
+                                        return (
+                                          <div key={f} className="flex items-center justify-between p-2.5 rounded-md border">
+                                            <span className="text-sm capitalize">{label}</span>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-7 w-7 text-destructive hover:text-destructive"
+                                              onClick={() => toggleSectionField(sectionIdx, f)}
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          </>
+                        )}
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
@@ -507,7 +556,7 @@ export default function EnrollmentDisplayConfig() {
           </Card>
 
           {/* Preview */}
-          {planillaSections.some(s => s.field_names.length > 0) && (
+          {planillaSections.some(s => s.field_names.length > 0 || s.section_type === 'text') && (
             <Card className="mt-6">
               <CardHeader className="flex flex-row items-center gap-2">
                 <Eye className="h-5 w-5 text-muted-foreground" />
@@ -515,19 +564,30 @@ export default function EnrollmentDisplayConfig() {
               </CardHeader>
               <CardContent>
                 <div className="border rounded-lg overflow-hidden">
-                  {planillaSections.filter(s => s.field_names.length > 0).map((section, idx) => {
-                    const resolveLabel = (prefixed: string) => {
-                      const [type, ...rest] = prefixed.split(":");
-                      const name = rest.join(":");
-                      if (name === "_edad") return "Edad";
-                      if (type === "custom") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-                      if (type === "student") return studentFields.find(f => f.field_name === name)?.field_label || name;
-                      if (type === "representative") return repFields.find(f => f.field_name === name)?.field_label || name;
-                      if (type === "family") return familyFields.find(f => f.field_name === name)?.field_label || name;
-                      return name;
-                    };
+                  {planillaSections.filter(s => s.field_names.length > 0 || s.section_type === 'text').map((section, idx) => {
+                    if (section.section_type === 'text') {
+                      return (
+                        <div key={idx}>
+                          {idx > 0 && <Separator />}
+                          <div className="bg-muted/50 px-4 py-2 border-b">
+                            <h4 className="text-sm font-bold text-center uppercase tracking-wide">
+                              {section.title || "Sin título"}
+                            </h4>
+                          </div>
+                          <div className="px-4 py-3">
+                            {section.section_text ? (
+                              <p className="text-xs leading-relaxed whitespace-pre-line">{section.section_text}</p>
+                            ) : (
+                              <div className="border-b border-dashed border-muted-foreground/30 py-4">
+                                <p className="text-xs text-muted-foreground/50 italic text-center">Área para rellenar</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const labels = section.field_names.map(resolveLabel);
-                    // Build rows of 4 columns
                     const rows: string[][] = [];
                     for (let i = 0; i < labels.length; i += 4) {
                       rows.push(labels.slice(i, i + 4));
@@ -549,7 +609,6 @@ export default function EnrollmentDisplayConfig() {
                                   <p className="text-xs text-muted-foreground/50 mt-0.5 italic">—</p>
                                 </div>
                               ))}
-                              {/* Fill empty cols */}
                               {Array.from({ length: 4 - row.length }).map((_, i) => (
                                 <div key={`empty-${i}`} className="px-3 py-2" />
                               ))}
