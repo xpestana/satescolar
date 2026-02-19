@@ -460,14 +460,28 @@ export default function FamiliesList() {
                     </TableCell>
                     <TableCell>{family.email}</TableCell>
                     <TableCell>
-                      <span className="text-sm font-medium">
-                        {family.repsCount} {family.repsCount === 1 ? "representante" : "representantes"}
-                      </span>
+                      <div className="space-y-0.5">
+                        <Badge variant="secondary" className="text-xs mb-1">{family.repsCount} {family.repsCount === 1 ? "representante" : "representantes"}</Badge>
+                        {family.representativeNames && family.representativeNames.length > 0 ? (
+                          family.representativeNames.map((name, i) => (
+                            <p key={i} className="text-sm">{name}</p>
+                          ))
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm font-medium">
-                        {family.studentsCount} {family.studentsCount === 1 ? "estudiante" : "estudiantes"}
-                      </span>
+                      <div className="space-y-0.5">
+                        <Badge variant="secondary" className="text-xs mb-1">{family.studentsCount} {family.studentsCount === 1 ? "estudiante" : "estudiantes"}</Badge>
+                        {family.studentNames && family.studentNames.length > 0 ? (
+                          family.studentNames.map((name, i) => (
+                            <p key={i} className="text-sm">{name}</p>
+                          ))
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Badge
