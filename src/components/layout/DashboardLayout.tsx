@@ -37,7 +37,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="min-h-screen bg-background">
       <TopBar />
       <AppSidebar />
-      <main className="mr-64 min-h-screen pt-16 p-6">
+      <main className="mr-72 min-h-screen pt-16 p-6">
         {children}
       </main>
     </div>
