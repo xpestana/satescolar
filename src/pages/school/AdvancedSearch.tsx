@@ -15,7 +15,7 @@ import { Pagination } from "@/components/ui/data-pagination";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown, Eye, Edit, IdCard } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet } from "@/lib/export-utils";
+import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
 import { ViewTeacherModal } from "@/components/search/ViewTeacherModal";
 import {
@@ -249,11 +249,26 @@ export default function AdvancedSearch() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("schools")
-        .select("name, dea_code, address, logo_url, institution_type, states(name), municipalities(name), cities(name), parishes(name)")
+        .select("name, dea_code, statistical_code, address, logo_url, institution_type, phone, rif, states(name), municipalities(name), cities(name), parishes(name)")
         .eq("id", schoolId!)
         .single();
       if (error) throw error;
       return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch planilla general config for PDF header/footer
+  const { data: planillaConfig } = useQuery({
+    queryKey: ["planilla-general-config", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("planilla_general_config" as any)
+        .select("header_config, footer_config")
+        .eq("school_id", schoolId!)
+        .single();
+      if (error && error.code !== "PGRST116") throw error;
+      return data as unknown as { header_config: PdfHeaderConfig; footer_config: PdfFooterConfig } | null;
     },
     enabled: !!schoolId,
   });
@@ -412,14 +427,17 @@ export default function AdvancedSearch() {
     const pdfSchoolInfo = schoolInfo ? {
       name: `${institutionType} ${schoolInfo.name}`,
       deaCode: schoolInfo.dea_code,
+      statisticalCode: schoolInfo.statistical_code,
       address: schoolInfo.address,
+      phone: schoolInfo.phone,
+      rif: schoolInfo.rif,
       state: (schoolInfo.states as any)?.name || "",
       municipality: (schoolInfo.municipalities as any)?.name || "",
       city: (schoolInfo.cities as any)?.name || "",
       parish: (schoolInfo.parishes as any)?.name || "",
       logoUrl: schoolInfo.logo_url || undefined,
     } : undefined;
-    downloadPDF(cols, rows, typeLabel, pdfSchoolInfo);
+    downloadPDF(cols, rows, typeLabel, pdfSchoolInfo, planillaConfig?.header_config, planillaConfig?.footer_config);
   };
 
   const handleEditRecord = (record: any) => {

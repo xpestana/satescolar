@@ -285,7 +285,7 @@ export default function GeneralConfigTab({ schoolId }: Props) {
 
           {/* SIGNATURES CONFIG */}
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Firmas</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Firmas para Planillas de Inscripción</h3>
             <div className="space-y-2 mb-3">
               {signatureLines.map((sig, idx) => (
                 <div key={idx} className="flex items-center gap-2">

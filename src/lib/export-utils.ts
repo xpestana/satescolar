@@ -12,12 +12,31 @@ type RecordRow = Record<string, any>;
 export interface PdfSchoolInfo {
   name: string;
   deaCode: string;
+  statisticalCode?: string;
   address: string;
   state: string;
   municipality: string;
   city: string;
   parish: string;
   logoUrl?: string;
+  phone?: string;
+  rif?: string;
+}
+
+export interface PdfHeaderConfig {
+  show_logo?: boolean;
+  show_name?: boolean;
+  show_dea_code?: boolean;
+  show_statistical_code?: boolean;
+  show_address?: boolean;
+  show_phone?: boolean;
+  show_rif?: boolean;
+}
+
+export interface PdfFooterConfig {
+  show_address?: boolean;
+  show_phone?: boolean;
+  show_rif?: boolean;
 }
 
 function sanitize(val: any): string {
@@ -87,8 +106,18 @@ export async function downloadPDF(
   columns: ExportColumn[],
   rows: RecordRow[],
   filename: string,
-  schoolInfo?: PdfSchoolInfo
+  schoolInfo?: PdfSchoolInfo,
+  headerConfig?: PdfHeaderConfig,
+  footerConfig?: PdfFooterConfig
 ) {
+  // Default: show everything if no config provided
+  const hc: PdfHeaderConfig = headerConfig ?? {
+    show_logo: true, show_name: true, show_dea_code: true,
+    show_statistical_code: true, show_address: true, show_phone: true, show_rif: true,
+  };
+  const fc: PdfFooterConfig = footerConfig ?? {
+    show_address: true, show_phone: true, show_rif: true,
+  };
   const isLandscape = columns.length > 6;
   const doc = new jsPDF({ orientation: isLandscape ? "landscape" : "portrait" });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -107,9 +136,8 @@ export async function downloadPDF(
     doc.text(dateStr, pageWidth - margin, startY, { align: "right" });
 
     // Logo
-    let logoX = margin;
     let textX = margin;
-    if (schoolInfo.logoUrl) {
+    if (hc.show_logo !== false && schoolInfo.logoUrl) {
       const logoBase64 = await loadImageAsBase64(schoolInfo.logoUrl);
       if (logoBase64) {
         doc.addImage(logoBase64, "PNG", margin, startY + 2, 22, 22);
@@ -126,29 +154,51 @@ export async function downloadPDF(
     doc.text("República Bolivariana de Venezuela", infoX, infoY);
     infoY += 5;
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text(schoolInfo.name.toUpperCase(), infoX, infoY);
-    infoY += 5;
+    if (hc.show_name !== false) {
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(schoolInfo.name.toUpperCase(), infoX, infoY);
+      infoY += 5;
+    }
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(60);
-    doc.text(`Código del Plantel: ${schoolInfo.deaCode}`, infoX, infoY);
-    infoY += 4;
+
+    // Codes line
+    const codeParts: string[] = [];
+    if (hc.show_dea_code !== false) codeParts.push(`Código DEA: ${schoolInfo.deaCode}`);
+    if (hc.show_statistical_code !== false && schoolInfo.statisticalCode) codeParts.push(`Código Estadístico: ${schoolInfo.statisticalCode}`);
+    if (codeParts.length > 0) {
+      doc.text(codeParts.join("  -  "), infoX, infoY);
+      infoY += 4;
+    }
+
+    // RIF in header
+    if (hc.show_rif !== false && schoolInfo.rif) {
+      doc.text(`RIF: ${schoolInfo.rif}`, infoX, infoY);
+      infoY += 4;
+    }
 
     // Address line
-    const addressParts = [schoolInfo.address];
-    if (schoolInfo.parish) addressParts.push(`Parroquia: ${schoolInfo.parish}`);
-    if (schoolInfo.municipality) addressParts.push(`Municipio: ${schoolInfo.municipality}`);
-    if (schoolInfo.city) addressParts.push(`Ciudad: ${schoolInfo.city}`);
-    if (schoolInfo.state) addressParts.push(`Estado: ${schoolInfo.state}`);
-    const addressLine = addressParts.filter(Boolean).join("   ");
+    if (hc.show_address !== false) {
+      const addressParts = [schoolInfo.address];
+      if (schoolInfo.parish) addressParts.push(`Parroquia: ${schoolInfo.parish}`);
+      if (schoolInfo.municipality) addressParts.push(`Municipio: ${schoolInfo.municipality}`);
+      if (schoolInfo.city) addressParts.push(`Ciudad: ${schoolInfo.city}`);
+      if (schoolInfo.state) addressParts.push(`Estado: ${schoolInfo.state}`);
+      const addressLine = addressParts.filter(Boolean).join("   ");
+      const maxWidth = pageWidth - infoX - margin;
+      const addressLines = doc.splitTextToSize(addressLine, maxWidth);
+      doc.text(addressLines, infoX, infoY);
+      infoY += addressLines.length * 4;
+    }
 
-    const maxWidth = pageWidth - infoX - margin;
-    const addressLines = doc.splitTextToSize(addressLine, maxWidth);
-    doc.text(addressLines, infoX, infoY);
-    infoY += addressLines.length * 4;
+    // Phone in header
+    if (hc.show_phone !== false && schoolInfo.phone) {
+      doc.text(`Tel: ${schoolInfo.phone}`, infoX, infoY);
+      infoY += 4;
+    }
 
     // Separator line
     infoY += 2;
@@ -174,14 +224,36 @@ export async function downloadPDF(
     headStyles: { fillColor: [41, 128, 185], fontSize: 7 },
     margin: { top: startY, left: margin, right: margin },
     didDrawPage: (data) => {
-      // Footer with page number
+      const pageHeight = doc.internal.pageSize.getHeight();
       const pageCount = (doc as any).internal.getNumberOfPages();
+
+      // School footer info
+      if (schoolInfo) {
+        const footerParts: string[] = [];
+        if (fc.show_address !== false) {
+          const addrParts = [schoolInfo.address];
+          if (schoolInfo.parish) addrParts.push(`Parroquia: ${schoolInfo.parish}`);
+          if (schoolInfo.municipality) addrParts.push(`Municipio: ${schoolInfo.municipality}`);
+          if (schoolInfo.state) addrParts.push(schoolInfo.state);
+          footerParts.push(addrParts.filter(Boolean).join(", "));
+        }
+        if (fc.show_phone !== false && schoolInfo.phone) footerParts.push(`Tel: ${schoolInfo.phone}`);
+        if (fc.show_rif !== false && schoolInfo.rif) footerParts.push(`RIF: ${schoolInfo.rif}`);
+
+        if (footerParts.length > 0) {
+          doc.setFontSize(6);
+          doc.setTextColor(130);
+          doc.text(footerParts.join("  |  "), pageWidth / 2, pageHeight - 12, { align: "center" });
+        }
+      }
+
+      // Page number
       doc.setFontSize(7);
       doc.setTextColor(150);
       doc.text(
         `Página ${data.pageNumber} de ${pageCount}`,
         pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 8,
+        pageHeight - 8,
         { align: "center" }
       );
     },
