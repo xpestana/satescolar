@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import logoBlack from "@/assets/logo-black.svg";
@@ -13,8 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Pagination } from "@/components/ui/data-pagination";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown, Eye, Edit, IdCard } from "lucide-react";
+import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown, Eye, Edit, IdCard, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
 import { ViewTeacherModal } from "@/components/search/ViewTeacherModal";
@@ -91,6 +92,7 @@ function SortableHeaderCell({ col }: { col: ColumnDef }) {
 
 export default function AdvancedSearch() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
+  const queryClient = useQueryClient();
   const { data: carnetConfig } = useCarnetConfig(schoolId);
   const [formType, setFormType] = useState<FormType>("student");
   const [searchTerm, setSearchTerm] = useState("");
@@ -486,6 +488,20 @@ export default function AdvancedSearch() {
     });
   };
 
+  const setPrimaryMutation = useMutation({
+    mutationFn: async (record: any) => {
+      const familyId = record.family_id;
+      // Unset all in family, then set this one
+      const { error: unsetErr } = await supabase.from("representatives").update({ is_primary: false } as any).eq("family_id", familyId);
+      if (unsetErr) throw unsetErr;
+      const { error: setErr } = await supabase.from("representatives").update({ is_primary: true } as any).eq("id", record.id);
+      if (setErr) throw setErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["adv-search-records", schoolId, "representative"] });
+    },
+  });
+
   const isLoading = schoolLoading || recordsLoading;
 
   return (
@@ -666,6 +682,23 @@ export default function AdvancedSearch() {
                                   </TooltipTrigger>
                                   <TooltipContent>Descargar Carnet</TooltipContent>
                                 </Tooltip>
+                                {formType === "representative" && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className={`h-8 w-8 ${(record as any).is_primary ? "text-amber-500" : ""}`}
+                                        onClick={() => setPrimaryMutation.mutate(record)}
+                                        disabled={setPrimaryMutation.isPending || (record as any).is_primary}
+                                        title={(record as any).is_primary ? "Representante principal" : "Marcar como principal"}
+                                      >
+                                        <Star className={`h-4 w-4 ${(record as any).is_primary ? "fill-amber-500" : ""}`} />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{(record as any).is_primary ? "Representante Principal" : "Marcar como Principal"}</TooltipContent>
+                                  </Tooltip>
+                                )}
                               </div>
                             </TooltipProvider>
                           </TableCell>

@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Edit, Plus, Trash2 } from "lucide-react";
+import { Edit, Plus, Trash2, Star } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { DeleteRepresentativeDialog } from "./DeleteRepresentativeDialog";
@@ -199,6 +199,22 @@ export function ViewFamilyModal({
     setDeleteRepName(name);
   };
 
+  const setPrimaryMutation = useMutation({
+    mutationFn: async (repId: string) => {
+      const { error: unsetErr } = await supabase.from("representatives").update({ is_primary: false } as any).eq("family_id", familyId);
+      if (unsetErr) throw unsetErr;
+      const { error: setErr } = await supabase.from("representatives").update({ is_primary: true } as any).eq("id", repId);
+      if (setErr) throw setErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["representatives", familyId] });
+      toast({ title: "Actualizado", description: "Representante principal actualizado" });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar" });
+    },
+  });
+
   if (familyLoading) {
     return (
       <Dialog open={open} onOpenChange={() => onClose()}>
@@ -342,9 +358,11 @@ export function ViewFamilyModal({
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nombre</TableHead>
+                      <TableHead>Principal</TableHead>
                       <TableHead>Documento</TableHead>
                       <TableHead>Teléfono</TableHead>
                       <TableHead>Correo</TableHead>
+                      <TableHead>Acciones</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -352,6 +370,23 @@ export function ViewFamilyModal({
                     {representatives.map((rep) => (
                       <TableRow key={rep.id}>
                         <TableCell>{getRepresentativeName(rep)}</TableCell>
+                        <TableCell>
+                          {(rep as any).is_primary ? (
+                            <Badge variant="default" className="gap-1">
+                              <Star className="h-3 w-3 fill-current" /> Principal
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={() => setPrimaryMutation.mutate(rep.id)}
+                              disabled={setPrimaryMutation.isPending}
+                            >
+                              <Star className="h-3 w-3 mr-1" /> Marcar
+                            </Button>
+                          )}
+                        </TableCell>
                         <TableCell>{rep.document_id || "Sin documento"}</TableCell>
                         <TableCell>{rep.phone || "Sin teléfono"}</TableCell>
                         <TableCell>{rep.email || "Sin correo"}</TableCell>
