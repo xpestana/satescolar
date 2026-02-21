@@ -791,7 +791,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     y = ensureSpace(y, estimatedHeight);
 
     // Section title
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0);
 
@@ -820,7 +820,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
 
       if (isFamilyTextSection) {
         // Render as text lines instead of table
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(0);
         for (const fn of fieldNames) {
@@ -862,8 +862,8 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
             startY: y,
             head: [headChunk],
             body: [bodyChunk],
-            styles: { fontSize: 10, cellPadding: 3, halign: "center", font: "helvetica" },
-            headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
+            styles: { fontSize: 9, cellPadding: 3, halign: "center", font: "helvetica" },
+            headStyles: { fillColor: [41, 128, 185], fontSize: 8 },
             margin: { left: margin, right: margin },
             theme: "grid",
           });
@@ -875,7 +875,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       // Text block
       const text = section.section_text || "";
       if (text) {
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(0);
         const lines = doc.splitTextToSize(text, contentWidth);
