@@ -363,7 +363,6 @@ export function ViewFamilyModal({
                       <TableHead>Teléfono</TableHead>
                       <TableHead>Correo</TableHead>
                       <TableHead>Acciones</TableHead>
-                      <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
