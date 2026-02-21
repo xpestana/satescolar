@@ -1,100 +1,83 @@
 
 
-## Plan: Constructor de Planilla de Inscripcion con Secciones por Defecto
+## Plan: Desplegable de descargas y Planilla de Inscripcion en PDF
 
 ### Resumen
-Reestructurar el constructor de planilla para que al crear un colegio se generen automaticamente 5 secciones predefinidas con los campos correctos. Ademas, agregar campos faltantes de familia (ubicacion geografica) y una seccion especial de "Compromiso del Representante" con texto editable.
+
+Reemplazar el boton simple de "Carnet" en la lista de estudiantes del representante por un desplegable (dropdown) con dos opciones: **Carnet** y **Planilla de Inscripcion**. La planilla se generara como PDF siguiendo el formato proporcionado, usando los datos del estudiante, la familia, el representante principal, las secciones configuradas en `enrollment_planilla_sections`, y la configuracion general de `planilla_general_config`.
+
+Ademas, se agregara un campo `is_primary` a la tabla `representatives` para marcar al representante principal de cada familia.
 
 ---
 
-### Cambios planificados
+### Cambios necesarios
 
-#### 1. Agregar campos de ubicacion a la lista de familia
-En `EnrollmentDisplayConfig.tsx`, agregar los campos de ubicacion geografica que faltan en `familyFields`:
-- Estado, Municipio, Ciudad, Parroquia (como campos `state`, `municipality`, `city`, `parish`)
+#### 1. Migracion de base de datos
+- Agregar columna `is_primary` (boolean, default false) a la tabla `representatives`.
+- Ejecutar un UPDATE para marcar como `is_primary = true` al representante mas antiguo (`created_at` menor) de cada familia que aun no tenga ninguno marcado. Esto cubre los colegios ya creados.
 
-Tambien agregar un campo especial `family:location_full` que en la planilla impresa combinara Estado + Municipio + Ciudad + Parroquia en una sola linea.
+#### 2. Nueva funcion: `downloadPlanillaInscripcion` en `src/lib/export-utils.ts`
+Funcion que genera el PDF multi-pagina con:
 
-#### 2. Agregar soporte para secciones de tipo "texto libre"
-Actualmente las secciones solo soportan campos con datos. Se necesita un nuevo tipo de seccion que contenga un bloque de texto largo (para Observaciones y Compromiso del Representante).
+**Encabezado (cada pagina):**
+- Logo del colegio (izquierda), datos institucionales (centro), fotos del representante y estudiante (derecha)
+- Titulo "PLANILLA" y "ANO ESCOLAR: XXXX-XXXX"
+- Nota de advertencia sobre datos exactos
 
-Se agregara una columna `section_type` y `section_text` a la tabla `enrollment_planilla_sections`:
-- `section_type`: `'fields'` (por defecto) o `'text'`
-- `section_text`: texto libre para secciones de tipo texto
+**Pagina 1 - Datos identificativos:**
+- Mini-tabla con primer apellido, segundo apellido, primer nombre, segundo nombre del estudiante
+- Luego se renderizan las secciones configuradas en `enrollment_planilla_sections`:
+  - Tipo `fields`: tabla con los campos seleccionados, resolviendo los valores desde `student.form_data`, `representative.form_data`, o los campos de `families`
+  - Tipo `text`: bloque de texto libre (ej: compromiso del representante)
+- Si una seccion tiene datos de la familia, representante o inscripcion, se colocan en formato tabla
 
-#### 3. Migracion de base de datos
-Nueva migracion SQL que:
-1. Agrega `section_type text NOT NULL DEFAULT 'fields'` y `section_text text DEFAULT ''` a `enrollment_planilla_sections`
-2. Actualiza la funcion `create_default_form_fields()` para insertar 5 secciones por defecto al crear un colegio
-3. Inserta las secciones por defecto para colegios existentes (que no tengan secciones aun)
+**Pie de pagina (cada pagina):**
+- Lineas de firma configuradas en `planilla_general_config.signature_lines`
+- Direccion, telefono, RIF segun configuracion de footer
+- Texto "Documento generado de forma automatica por SAT Escolar"
 
-Las 5 secciones por defecto seran:
+**Datos que se consultan:**
+- Estudiante: `students` (form_data, photo_url, document_id)
+- Representante principal: `representatives` donde `is_primary = true` y `family_id` del estudiante
+- Familia: `families` (apellidos, direccion, telefono, etc.)
+- Colegio: `schools` + ubicacion geografica (states, municipalities, cities, parishes)
+- Secciones de planilla: `enrollment_planilla_sections`
+- Config general: `planilla_general_config` (header, footer, firmas)
+- Ano escolar activo: `school_years`
+- Inscripcion del estudiante (si existe): `enrollments` + `sections` para grado/seccion
 
-**Seccion 1 - "Datos Personales del Estudiante"** (type: fields)
-- `student:primer_apellido`, `student:segundo_apellido`, `student:primer_nombre`, `student:segundo_nombre`
-- `student:documento`, `student:email`, `student:numero_contacto`, `student:_edad`
-- `student:fecha_nacimiento`, `student:ciudad_nacimiento`
+#### 3. Modificar `src/pages/representative/StudentsList.tsx`
+- Reemplazar el boton "Carnet" por un `DropdownMenu` con dos items:
+  - "Descargar Carnet" (logica actual)
+  - "Descargar Planilla de Inscripcion" (nueva funcion)
+- Importar `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuTrigger` de los componentes UI
+- El boton trigger dira "Descargas" con icono `ChevronDown`
 
-**Seccion 2 - "Datos de Familia"** (type: fields)
-- `family:email`, `family:contact_phone`, `family:address`, `family:location_full`
-
-**Seccion 3 - "Datos del Representante"** (type: fields)
-- `representative:documento`, `representative:primer_apellido`, `representative:segundo_apellido`, `representative:_edad`
-- `representative:pais_nacimiento` (campo custom si no existe en el form), `representative:fecha_nacimiento`, `representative:numero_contacto`
-
-**Seccion 4 - "Informacion para la Inscripcion"** (type: fields)
-- `student:grado`, `custom:grupo_asignado`, `custom:tipo_de_estudiante`, `custom:fecha_de_inscripcion`
-
-**Seccion 5 - "Observaciones"** (type: text)
-- Texto vacio por defecto, area para rellenar
-
-**Seccion 6 - "Compromiso del Representante"** (type: text)
-- Texto por defecto: "Hago constar por medio de la presente, que he leido, acepto y me comprometo a cumplir las condiciones establecidas en el contrato de Prestacion de Servicio educativo para el ano escolar que se indica en esta planilla, asi como los deberes y obligaciones conforme a las leyes y reglamentos vigentes del Estado Venezolano. Del mismo modo, mi representado y yo, nos comprometemos a respetar los acuerdos de Convivencia de la Institucion.\n\nImportante: El Proceso de Inscripcion se concretara una vez efectuado el pago por concepto de inscripcion y primer mes, la consignacion fisica de la Planilla de Registro y firma del Contrato de Prestacion de Servicios Educativos."
-
-#### 4. Actualizar la UI del constructor
-En `EnrollmentDisplayConfig.tsx`:
-
-- Al agregar seccion, permitir elegir tipo: "Campos de datos" o "Bloque de texto"
-- Para secciones tipo `text`: mostrar un `Textarea` para editar el contenido del texto
-- Para secciones tipo `fields`: mantener la UI actual con los accordions de Estudiante/Representante/Familia/Custom
-- Actualizar la previsualizacion para mostrar secciones de texto como bloques con borde y el texto contenido
-- Agregar `location_full` a familyFields como campo especial
-
-#### 5. Actualizar save/load
-- Incluir `section_type` y `section_text` en las operaciones de guardado e insercion
-- Cargar estos campos al recuperar las secciones existentes
+#### 4. Marcar representante principal al crear
+- En `src/pages/representative/RepAddRepresentative.tsx` (o donde se cree el representante), al insertar el primer representante de una familia, marcarlo como `is_primary = true`
 
 ---
 
 ### Detalles tecnicos
 
-**Migracion SQL:**
-```text
-ALTER TABLE enrollment_planilla_sections 
-  ADD COLUMN section_type text NOT NULL DEFAULT 'fields',
-  ADD COLUMN section_text text DEFAULT '';
+**Estructura del PDF (jsPDF):**
+- Orientacion: portrait, tamano carta
+- Cada pagina repite: header con logo + info colegio + fotos, y footer con firmas + info institucional
+- Las secciones se renderizan secuencialmente; si no caben en una pagina, se hace salto automatico con `autoTable` y se repite el mini-header (apellidos/nombres del estudiante)
+- Campos sin datos se muestran como "No registrado"
+- Los campos tipo `_edad` se calculan automaticamente desde `fecha_nacimiento`
+- Los campos tipo `location_full` se resuelven consultando las tablas geograficas
 
--- Actualizar create_default_form_fields() para incluir inserts de secciones
--- Insertar secciones por defecto para colegios existentes
-```
+**Resolucion de campos prefijados:**
+Los `field_names` en `enrollment_planilla_sections` usan el formato `tipo:nombre_campo`:
+- `student:campo` -> buscar en `student.form_data`
+- `representative:campo` -> buscar en `representative.form_data`  
+- `family:campo` -> buscar en la tabla `families`
+- `custom:campo` -> campo personalizado
+- `student:_edad` -> calculado desde `student:fecha_nacimiento`
 
-**Archivos a modificar:**
-- `src/pages/school/EnrollmentDisplayConfig.tsx` - UI del constructor, nuevos campos familia, soporte texto
-- Nueva migracion SQL via herramienta de migracion
-
-**Interfaz PlanillaSection actualizada:**
-```text
-interface PlanillaSection {
-  id?: string;
-  title: string;
-  field_names: string[];
-  display_order: number;
-  section_type: 'fields' | 'text';
-  section_text: string;
-}
-```
-
-**Previsualizacion de seccion tipo texto:**
-- Se renderiza con borde punteado, el titulo como encabezado y el texto debajo en italica
-- Para "Observaciones" se muestra una linea vacia para rellenar
-
+**Archivos a crear/modificar:**
+1. Migracion SQL (nueva columna `is_primary`)
+2. `src/lib/export-utils.ts` - nueva funcion `downloadPlanillaInscripcion`
+3. `src/pages/representative/StudentsList.tsx` - dropdown de descargas
+4. `src/pages/representative/RepAddRepresentative.tsx` - marcar `is_primary` en primer representante
