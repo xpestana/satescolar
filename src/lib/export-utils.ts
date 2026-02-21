@@ -793,7 +793,26 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
 
   // Render each section
   for (const section of planillaData.sections) {
-    y = ensureSpace(y, 22);
+    // Estimate full section height to avoid splitting across pages
+    let estimatedHeight = 10; // title + spacing
+    if (section.section_type === "fields") {
+      const fieldNames: string[] = Array.isArray(section.field_names) ? section.field_names : [];
+      const familyTextFields = ["family:email", "family:contact_phone", "family:address", "family:location_full"];
+      const isFamilyTextSection = fieldNames.every(f => familyTextFields.includes(f));
+      if (isFamilyTextSection) {
+        estimatedHeight += fieldNames.length * 6 + 4;
+      } else {
+        const chunks = Math.ceil(fieldNames.length / 4);
+        estimatedHeight += chunks * 20 + 4; // ~20mm per table chunk
+      }
+    } else if (section.section_type === "text") {
+      const text = section.section_text || "";
+      const lines = doc.splitTextToSize(text, contentWidth);
+      estimatedHeight += lines.length * 4.5 + 8;
+    }
+
+    // If section won't fit, jump to next page
+    y = ensureSpace(y, estimatedHeight);
 
     // Section title
     doc.setFontSize(10);
