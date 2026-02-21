@@ -767,31 +767,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
   // ── PAGE 1 ──
   let y = drawHeader(doc);
 
-  // Student name mini-table
-  y = ensureSpace(y, 22);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(0);
-  doc.text("DATOS PERSONALES DEL ESTUDIANTE", pageWidth / 2, y, { align: "center" });
-  y += 5;
-
-  autoTable(doc, {
-    startY: y,
-    head: [["Primer Apellido", "Segundo Apellido", "Primer Nombre", "Segundo Nombre"]],
-    body: [[
-      studentFd.primer_apellido || "No registrado",
-      studentFd.segundo_apellido || "No registrado",
-      studentFd.primer_nombre || "No registrado",
-      studentFd.segundo_nombre || "No registrado",
-    ]],
-    styles: { fontSize: 10, cellPadding: 3, halign: "center", font: "helvetica" },
-    headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
-    margin: { left: margin, right: margin },
-    theme: "grid",
-  });
-  y = (doc as any).lastAutoTable.finalY + 6;
-
-  // Render each section
+  // Render each section (no hardcoded mini-table — the first dynamic section handles student data)
   for (const section of planillaData.sections) {
     // Estimate full section height to avoid splitting across pages
     let estimatedHeight = 10; // title + spacing
@@ -862,7 +838,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
             y += 5;
           }
         }
-        y += 4;
+        y += 10;
       } else {
         // Build rows of 4 columns max (label-value pairs)
         const tableHead: string[] = [];
@@ -893,7 +869,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
           });
           y = (doc as any).lastAutoTable.finalY + 3;
         }
-        y += 4;
+        y += 10;
       }
     } else if (section.section_type === "text") {
       // Text block
@@ -915,7 +891,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
         doc.line(margin, y, pageWidth - margin, y);
         y += 5;
       }
-      y += 4;
+      y += 10;
     }
   }
 
