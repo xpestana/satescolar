@@ -678,7 +678,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       textY += 4;
     }
 
-    y = Math.max(y + 22, textY + 4);
+    y = Math.max(y + 28, textY + 8);
 
     // PLANILLA title
     pageDoc.setFontSize(16);
@@ -699,7 +699,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       "Lea detenidamente esta planilla, los datos suministrados deben ser exactos y ajustados a la realidad, de lo contrario será invalidada",
       centerX, y, { align: "center" }
     );
-    y += 7;
+    y += 12;
 
     return y;
   }
