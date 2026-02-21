@@ -98,7 +98,10 @@ export default function RepAddRepresentative() {
         const { error } = await supabase.from("representatives").update(repData).eq("id", representativeId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("representatives").insert(repData);
+        // Check if this is the first representative for the family
+        const { count } = await supabase.from("representatives").select("id", { count: "exact", head: true }).eq("family_id", familyId!);
+        const isFirst = (count || 0) === 0;
+        const { error } = await supabase.from("representatives").insert({ ...repData, is_primary: isFirst });
         if (error) throw error;
       }
     },

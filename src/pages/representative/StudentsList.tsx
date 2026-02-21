@@ -6,11 +6,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, Edit, Download, GraduationCap } from "lucide-react";
+import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
-import { downloadCarnet } from "@/lib/export-utils";
+import { downloadCarnet, downloadPlanillaInscripcion } from "@/lib/export-utils";
 import { useCarnetConfig } from "@/hooks/useCarnetConfig";
+import { toast } from "sonner";
 
 export default function StudentsList() {
   const navigate = useNavigate();
@@ -63,6 +65,70 @@ export default function StudentsList() {
     });
   };
 
+  const handlePlanilla = async (student: any) => {
+    if (!school?.id || !familyId) return;
+    try {
+      toast.info("Generando planilla...");
+
+      // Fetch all data in parallel
+      const [familyRes, repRes, sectionsRes, configRes, enrollmentRes, geoRes, formFieldsRes] = await Promise.all([
+        supabase.from("families").select("*").eq("id", familyId).single(),
+        supabase.from("representatives").select("*").eq("family_id", familyId).eq("is_primary", true).limit(1).maybeSingle(),
+        supabase.from("enrollment_planilla_sections").select("*").eq("school_id", school.id).order("display_order"),
+        supabase.from("planilla_general_config").select("*").eq("school_id", school.id).maybeSingle(),
+        supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", school.id).limit(1).maybeSingle(),
+        // Geo data for school
+        Promise.all([
+          school.state_id ? supabase.from("states").select("name").eq("id", school.state_id).single() : null,
+          school.municipality_id ? supabase.from("municipalities").select("name").eq("id", school.municipality_id).single() : null,
+          school.city_id ? supabase.from("cities").select("name").eq("id", school.city_id).single() : null,
+          school.parish_id ? supabase.from("parishes").select("name").eq("id", school.parish_id).single() : null,
+        ]),
+        supabase.from("form_fields").select("field_name, field_label, form_type").eq("school_id", school.id).in("form_type", ["student", "representative"]),
+      ]);
+
+      // If no primary rep found, fallback to first rep
+      let representative = repRes.data;
+      if (!representative) {
+        const { data: fallbackRep } = await supabase.from("representatives").select("*").eq("family_id", familyId).order("created_at").limit(1).maybeSingle();
+        representative = fallbackRep;
+      }
+
+      // Resolve family geo (for location_full in family context)
+      const familyGeoPromises = await Promise.all([
+        familyRes.data?.state_id ? supabase.from("states").select("name").eq("id", familyRes.data.state_id).single() : null,
+        familyRes.data?.municipality_id ? supabase.from("municipalities").select("name").eq("id", familyRes.data.municipality_id).single() : null,
+        familyRes.data?.city_id ? supabase.from("cities").select("name").eq("id", familyRes.data.city_id).single() : null,
+        familyRes.data?.parish_id ? supabase.from("parishes").select("name").eq("id", familyRes.data.parish_id).single() : null,
+      ]);
+
+      const [stateRes, muniRes, cityRes, parishRes] = geoRes;
+      const familyGeo = {
+        state: familyGeoPromises[0]?.data?.name || stateRes?.data?.name,
+        municipality: familyGeoPromises[1]?.data?.name || muniRes?.data?.name,
+        city: familyGeoPromises[2]?.data?.name || cityRes?.data?.name,
+        parish: familyGeoPromises[3]?.data?.name || parishRes?.data?.name,
+      };
+
+      await downloadPlanillaInscripcion({
+        student,
+        representative,
+        family: familyRes.data,
+        school,
+        schoolGeo: familyGeo,
+        sections: sectionsRes.data || [],
+        generalConfig: configRes.data,
+        schoolYear: schoolYear || "2024-2025",
+        enrollment: enrollmentRes.data,
+        enrollmentSection: enrollmentRes.data?.sections,
+        formFields: formFieldsRes.data || [],
+      });
+    } catch (err) {
+      console.error("Error generating planilla:", err);
+      toast.error("Error al generar la planilla");
+    }
+  };
+
   return (
     <DashboardLayout>
       <PageHeader title="Mis Estudiantes" breadcrumbs={[{ label: "Dashboard", href: "/representative/dashboard" }, { label: "Estudiantes" }]} />
@@ -98,9 +164,21 @@ export default function StudentsList() {
                     <Button size="sm" variant="outline" onClick={() => navigate(`/representative/estudiante/${student.id}/editar`)}>
                       <Edit className="h-3 w-3 mr-1" /> Editar
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleCarnet(student)}>
-                      <Download className="h-3 w-3 mr-1" /> Carnet
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="sm" variant="outline">
+                          <Download className="h-3 w-3 mr-1" /> Descargas <ChevronDown className="h-3 w-3 ml-1" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleCarnet(student)}>
+                          <Download className="h-3 w-3 mr-2" /> Carnet
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handlePlanilla(student)}>
+                          <FileText className="h-3 w-3 mr-2" /> Planilla de Inscripción
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardContent>
               </Card>

@@ -642,6 +642,7 @@ export type Database = {
           family_id: string
           form_data: Json | null
           id: string
+          is_primary: boolean
           phone: string | null
           photo_url: string | null
           updated_at: string
@@ -653,6 +654,7 @@ export type Database = {
           family_id: string
           form_data?: Json | null
           id?: string
+          is_primary?: boolean
           phone?: string | null
           photo_url?: string | null
           updated_at?: string
@@ -664,6 +666,7 @@ export type Database = {
           family_id?: string
           form_data?: Json | null
           id?: string
+          is_primary?: boolean
           phone?: string | null
           photo_url?: string | null
           updated_at?: string
