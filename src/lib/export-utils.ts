@@ -460,3 +460,449 @@ function triggerDownload(blob: Blob, filename: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// ── Planilla de Inscripción ──────────────────────────
+export interface PlanillaData {
+  student: any;
+  representative: any;
+  family: any;
+  school: any;
+  schoolGeo: { state?: string; municipality?: string; city?: string; parish?: string };
+  sections: any[];
+  generalConfig: any;
+  schoolYear: string;
+  enrollment?: any;
+  enrollmentSection?: any;
+  formFields?: any[];
+}
+
+function resolveFieldValue(
+  fieldKey: string,
+  data: PlanillaData
+): string {
+  const [prefix, ...rest] = fieldKey.split(":");
+  const fieldName = rest.join(":");
+  if (!fieldName) return "No registrado";
+
+  const studentFd = (data.student?.form_data || {}) as Record<string, any>;
+  const repFd = (data.representative?.form_data || {}) as Record<string, any>;
+
+  // Calculate age helper
+  const calcAge = (dateStr: string | undefined): string => {
+    if (!dateStr) return "No registrado";
+    const birth = new Date(dateStr);
+    if (isNaN(birth.getTime())) return "No registrado";
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+    return `${age} años`;
+  };
+
+  const formatDate = (dateStr: string | undefined): string => {
+    if (!dateStr) return "No registrado";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("es-VE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  };
+
+  switch (prefix) {
+    case "student": {
+      if (fieldName === "_edad") return calcAge(studentFd.fecha_nacimiento);
+      if (fieldName === "fecha_nacimiento") return formatDate(studentFd.fecha_nacimiento);
+      if (fieldName === "documento") return data.student?.document_id || studentFd.documento || "No registrado";
+      if (fieldName === "grado") {
+        if (data.enrollmentSection) {
+          const gradeName = data.enrollmentSection.name || "";
+          const gradeLevel = data.enrollmentSection.grade_level || "";
+          return gradeName || gradeLevel || studentFd.grado || "No registrado";
+        }
+        return studentFd.grado || "No registrado";
+      }
+      return studentFd[fieldName] || "No registrado";
+    }
+    case "representative": {
+      if (fieldName === "_edad") return calcAge(repFd.fecha_nacimiento);
+      if (fieldName === "fecha_nacimiento") return formatDate(repFd.fecha_nacimiento);
+      if (fieldName === "documento") return data.representative?.document_id || repFd.documento || "No registrado";
+      if (fieldName === "numero_contacto") return data.representative?.phone || repFd.numero_contacto || "No registrado";
+      return repFd[fieldName] || "No registrado";
+    }
+    case "family": {
+      const f = data.family;
+      if (!f) return "No registrado";
+      if (fieldName === "email") return f.email || "No registrado";
+      if (fieldName === "contact_phone") return f.contact_phone || "No registrado";
+      if (fieldName === "address") return f.address || "No registrado";
+      if (fieldName === "location_full") {
+        const parts = [
+          data.schoolGeo.parish ? `Parroquia ${data.schoolGeo.parish}` : null,
+          data.schoolGeo.municipality ? `Municipio ${data.schoolGeo.municipality}` : null,
+          data.schoolGeo.city ? `Ciudad ${data.schoolGeo.city}` : null,
+          data.schoolGeo.state ? `Estado ${data.schoolGeo.state}` : null,
+        ].filter(Boolean);
+        return parts.length > 0 ? parts.join(", ") : "No registrado";
+      }
+      return (f as any)[fieldName] || "No registrado";
+    }
+    case "custom": {
+      // Custom fields check enrollment or student form_data
+      return studentFd[fieldName] || "No registrado";
+    }
+    default:
+      return "No registrado";
+  }
+}
+
+function getFieldLabel(fieldKey: string, data: PlanillaData): string {
+  const [prefix, ...rest] = fieldKey.split(":");
+  const fieldName = rest.join(":");
+  
+  // Check form_fields for label
+  if (data.formFields) {
+    const ff = data.formFields.find(f => f.field_name === fieldName);
+    if (ff) return ff.field_label;
+  }
+
+  // Fallback labels
+  const labels: Record<string, string> = {
+    "primer_nombre": "Primer Nombre", "segundo_nombre": "Segundo Nombre",
+    "primer_apellido": "Primer Apellido", "segundo_apellido": "Segundo Apellido",
+    "documento": "Documento", "email": "Correo Electrónico", "correo_electronico": "Correo Electrónico",
+    "numero_contacto": "Teléfono", "telefono": "Teléfono", "_edad": "Edad",
+    "fecha_nacimiento": "Fecha de Nacimiento", "ciudad_nacimiento": "Lugar de Nacimiento",
+    "pais_nacimiento": "País de Nacimiento", "grado": "Grado o Año a Cursar",
+    "contact_phone": "Teléfono", "address": "Dirección", "location_full": "Ubicación",
+    "grupo_asignado": "Grupo asignado", "tipo_de_estudiante": "Tipo de Estudiante",
+    "fecha_de_inscripcion": "Fecha de inscripción",
+  };
+  return labels[fieldName] || fieldName.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+}
+
+export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  const contentWidth = pageWidth - margin * 2;
+
+  const hc = planillaData.generalConfig?.header_config || {};
+  const fc = planillaData.generalConfig?.footer_config || {};
+  const signatureLines: string[] = planillaData.generalConfig?.signature_lines || ["Firma del Representante", "Firma del Director(a)"];
+
+  // Preload images
+  let logoB64: string | null = null;
+  let studentPhotoB64: string | null = null;
+  let repPhotoB64: string | null = null;
+
+  if (planillaData.school?.logo_url && hc.show_logo !== false) {
+    logoB64 = await loadImageAsBase64(planillaData.school.logo_url);
+  }
+  if (planillaData.student?.photo_url && hc.show_student_photo !== false) {
+    studentPhotoB64 = await loadImageAsBase64(planillaData.student.photo_url);
+  }
+  if (planillaData.representative?.photo_url && hc.show_representative_photo !== false) {
+    repPhotoB64 = await loadImageAsBase64(planillaData.representative.photo_url);
+  }
+
+  const studentFd = (planillaData.student?.form_data || {}) as Record<string, any>;
+  const repFd = (planillaData.representative?.form_data || {}) as Record<string, any>;
+  const studentName = `${studentFd.primer_nombre || ""} ${studentFd.segundo_nombre || ""} ${studentFd.primer_apellido || ""} ${studentFd.segundo_apellido || ""}`.replace(/\s+/g, " ").trim();
+
+  // Footer height reservation
+  const footerHeight = 30;
+
+  function drawHeader(pageDoc: jsPDF): number {
+    let y = 10;
+    const school = planillaData.school;
+
+    // Logo left
+    if (logoB64) {
+      try { pageDoc.addImage(logoB64, "PNG", margin, y, 18, 18); } catch {}
+    }
+
+    // Photos right
+    const photoSize = 18;
+    let photosX = pageWidth - margin - photoSize;
+    if (studentPhotoB64) {
+      try { pageDoc.addImage(studentPhotoB64, "JPEG", photosX, y, photoSize, photoSize); } catch {}
+      photosX -= photoSize + 2;
+    }
+    if (repPhotoB64) {
+      try { pageDoc.addImage(repPhotoB64, "JPEG", photosX, y, photoSize, photoSize); } catch {}
+    }
+
+    // Center text
+    const centerX = pageWidth / 2;
+    let textY = y + 4;
+    pageDoc.setFontSize(10);
+    pageDoc.setFont("helvetica", "bold");
+    pageDoc.setTextColor(0);
+    if (hc.show_name !== false && school?.name) {
+      pageDoc.text(school.name.toUpperCase(), centerX, textY, { align: "center" });
+      textY += 4;
+    }
+
+    pageDoc.setFont("helvetica", "normal");
+    pageDoc.setFontSize(7);
+    pageDoc.setTextColor(60);
+
+    // Address line
+    if (hc.show_address !== false && school?.address) {
+      const addrParts = [school.address];
+      if (planillaData.schoolGeo.parish) addrParts.push(`Parroquia ${planillaData.schoolGeo.parish}`);
+      if (planillaData.schoolGeo.municipality) addrParts.push(`Municipio ${planillaData.schoolGeo.municipality}`);
+      if (planillaData.schoolGeo.city) addrParts.push(planillaData.schoolGeo.city);
+      if (planillaData.schoolGeo.state) addrParts.push(planillaData.schoolGeo.state);
+      const addrLine = addrParts.filter(Boolean).join(", ");
+      const addrLines = pageDoc.splitTextToSize(addrLine, contentWidth - 80);
+      pageDoc.text(addrLines, centerX, textY, { align: "center" });
+      textY += addrLines.length * 3.5;
+    }
+
+    // Codes
+    const codeParts: string[] = [];
+    if (hc.show_dea_code !== false && school?.dea_code) codeParts.push(`Código DEA: ${school.dea_code}`);
+    if (hc.show_statistical_code !== false && school?.statistical_code) codeParts.push(`Código Estadístico: ${school.statistical_code}`);
+    if (codeParts.length > 0) {
+      pageDoc.text(codeParts.join(" - "), centerX, textY, { align: "center" });
+      textY += 3.5;
+    }
+
+    // Phone & RIF
+    const infoParts: string[] = [];
+    if (hc.show_phone !== false && school?.phone) infoParts.push(`Tel: ${school.phone}`);
+    if (hc.show_rif !== false && school?.rif) infoParts.push(`Rif: ${school.rif}`);
+    if (infoParts.length > 0) {
+      pageDoc.text(infoParts.join(" - "), centerX, textY, { align: "center" });
+      textY += 3.5;
+    }
+
+    y = Math.max(y + 20, textY + 2);
+
+    // PLANILLA title
+    pageDoc.setFontSize(14);
+    pageDoc.setFont("helvetica", "bold");
+    pageDoc.setTextColor(0);
+    pageDoc.text("PLANILLA", centerX, y, { align: "center" });
+    y += 6;
+
+    pageDoc.setFontSize(11);
+    pageDoc.text(`AÑO ESCOLAR: ${planillaData.schoolYear}`, centerX, y, { align: "center" });
+    y += 5;
+
+    // Warning text
+    pageDoc.setFontSize(6.5);
+    pageDoc.setFont("helvetica", "italic");
+    pageDoc.setTextColor(100);
+    pageDoc.text(
+      "Lea detenidamente esta planilla, los datos suministrados deben ser exactos y ajustados a la realidad, de lo contrario será invalidada",
+      centerX, y, { align: "center" }
+    );
+    y += 5;
+
+    return y;
+  }
+
+  function drawFooter(pageDoc: jsPDF) {
+    let y = pageHeight - footerHeight;
+
+    // Signature lines
+    if (signatureLines.length > 0) {
+      const lineWidth = 60;
+      const gap = 20;
+      const totalW = signatureLines.length * lineWidth + (signatureLines.length - 1) * gap;
+      let startX = (pageWidth - totalW) / 2;
+
+      pageDoc.setDrawColor(0);
+      pageDoc.setLineWidth(0.3);
+      pageDoc.setFontSize(7);
+      pageDoc.setFont("helvetica", "normal");
+      pageDoc.setTextColor(0);
+
+      signatureLines.forEach((label, i) => {
+        const x = startX + i * (lineWidth + gap);
+        pageDoc.line(x, y, x + lineWidth, y);
+        pageDoc.text(label, x + lineWidth / 2, y + 4, { align: "center" });
+      });
+      y += 10;
+    }
+
+    // Footer info
+    const footerParts: string[] = [];
+    if (fc.show_address !== false && planillaData.school?.address) {
+      const addrParts = [planillaData.school.address];
+      if (planillaData.schoolGeo.parish) addrParts.push(`Parroquia ${planillaData.schoolGeo.parish}`);
+      if (planillaData.schoolGeo.municipality) addrParts.push(`Municipio ${planillaData.schoolGeo.municipality}`);
+      if (planillaData.schoolGeo.city) addrParts.push(planillaData.schoolGeo.city);
+      if (planillaData.schoolGeo.state) addrParts.push(planillaData.schoolGeo.state);
+      footerParts.push(addrParts.filter(Boolean).join(", "));
+    }
+    if (fc.show_phone !== false && planillaData.school?.phone) footerParts.push(`Tel: ${planillaData.school.phone}`);
+    if (fc.show_rif !== false && planillaData.school?.rif) footerParts.push(`Rif: ${planillaData.school.rif}`);
+
+    if (footerParts.length > 0) {
+      pageDoc.setFontSize(6);
+      pageDoc.setTextColor(100);
+      const footerLine = footerParts.join("  ");
+      const footerLines = pageDoc.splitTextToSize(footerLine, contentWidth);
+      pageDoc.text(footerLines, pageWidth / 2, y, { align: "center" });
+      y += footerLines.length * 3;
+    }
+
+    pageDoc.setFontSize(5.5);
+    pageDoc.setTextColor(130);
+    pageDoc.text("Documento generado de forma automática por SAT Escolar", pageWidth / 2, pageHeight - 5, { align: "center" });
+  }
+
+  function ensureSpace(currentY: number, needed: number): number {
+    if (currentY + needed > pageHeight - footerHeight) {
+      drawFooter(doc);
+      doc.addPage();
+      return drawHeader(doc);
+    }
+    return currentY;
+  }
+
+  // ── PAGE 1 ──
+  let y = drawHeader(doc);
+
+  // Student name mini-table
+  y = ensureSpace(y, 20);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(0);
+  doc.text("DATOS PERSONALES DEL ESTUDIANTE", pageWidth / 2, y, { align: "center" });
+  y += 4;
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Primer Apellido", "Segundo Apellido", "Primer Nombre", "Segundo Nombre"]],
+    body: [[
+      studentFd.primer_apellido || "No registrado",
+      studentFd.segundo_apellido || "No registrado",
+      studentFd.primer_nombre || "No registrado",
+      studentFd.segundo_nombre || "No registrado",
+    ]],
+    styles: { fontSize: 7, cellPadding: 2, halign: "center" },
+    headStyles: { fillColor: [41, 128, 185], fontSize: 7 },
+    margin: { left: margin, right: margin },
+    theme: "grid",
+  });
+  y = (doc as any).lastAutoTable.finalY + 4;
+
+  // Render each section
+  for (const section of planillaData.sections) {
+    y = ensureSpace(y, 20);
+
+    // Section title
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0);
+
+    // For family section, show family name
+    let titleText = section.title;
+    if (section.title.toLowerCase().includes("familia") && planillaData.family) {
+      const famName = `${planillaData.family.father_last_name || ""} ${planillaData.family.mother_last_name || ""}`.trim();
+      if (famName) titleText = `${section.title} ${famName}`;
+    }
+
+    // For representative section, show parentesco
+    if (section.title.toLowerCase().includes("representante") && repFd.parentesco) {
+      titleText = `${section.title} (${repFd.parentesco})`;
+    }
+
+    doc.text(titleText, pageWidth / 2, y, { align: "center" });
+    y += 4;
+
+    if (section.section_type === "fields") {
+      const fieldNames: string[] = Array.isArray(section.field_names) ? section.field_names : [];
+      if (fieldNames.length === 0) continue;
+
+      // Check if this is a "family info" section with text format (email, phone, address)
+      const familyTextFields = ["family:email", "family:contact_phone", "family:address", "family:location_full"];
+      const isFamilyTextSection = fieldNames.every(f => familyTextFields.includes(f));
+
+      if (isFamilyTextSection) {
+        // Render as text lines instead of table
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0);
+        for (const fn of fieldNames) {
+          const label = getFieldLabel(fn, planillaData);
+          const value = resolveFieldValue(fn, planillaData);
+          if (fn === "family:address" || fn === "family:location_full") {
+            const text = `${label}: ${value}`;
+            const lines = doc.splitTextToSize(text, contentWidth);
+            y = ensureSpace(y, lines.length * 3.5);
+            doc.text(lines, margin, y);
+            y += lines.length * 3.5 + 1;
+          } else {
+            y = ensureSpace(y, 5);
+            doc.text(`${label}: ${value}`, margin, y);
+            y += 4;
+          }
+        }
+        y += 2;
+      } else {
+        // Build rows of 4 columns max (label-value pairs)
+        const tableHead: string[] = [];
+        const tableBody: string[] = [];
+
+        for (const fn of fieldNames) {
+          tableHead.push(getFieldLabel(fn, planillaData));
+          tableBody.push(resolveFieldValue(fn, planillaData));
+        }
+
+        // Split into rows of 4
+        const chunkSize = 4;
+        for (let i = 0; i < tableHead.length; i += chunkSize) {
+          const headChunk = tableHead.slice(i, i + chunkSize);
+          const bodyChunk = tableBody.slice(i, i + chunkSize);
+          // Pad to chunkSize
+          while (headChunk.length < chunkSize) { headChunk.push(""); bodyChunk.push(""); }
+
+          y = ensureSpace(y, 15);
+          autoTable(doc, {
+            startY: y,
+            head: [headChunk],
+            body: [bodyChunk],
+            styles: { fontSize: 7, cellPadding: 2, halign: "center" },
+            headStyles: { fillColor: [41, 128, 185], fontSize: 6.5 },
+            margin: { left: margin, right: margin },
+            theme: "grid",
+          });
+          y = (doc as any).lastAutoTable.finalY + 2;
+        }
+        y += 2;
+      }
+    } else if (section.section_type === "text") {
+      // Text block
+      const text = section.section_text || "";
+      if (text) {
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(0);
+        const lines = doc.splitTextToSize(text, contentWidth);
+        y = ensureSpace(y, lines.length * 3.5);
+        doc.text(lines, margin, y);
+        y += lines.length * 3.5 + 2;
+      }
+      // If title contains "observaciones" add a line
+      if (section.title.toLowerCase().includes("observacion")) {
+        y = ensureSpace(y, 6);
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.2);
+        doc.line(margin, y, pageWidth - margin, y);
+        y += 4;
+      }
+      y += 2;
+    }
+  }
+
+  // Draw footer on last page
+  drawFooter(doc);
+
+  const safeName = studentName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_") || "planilla";
+  doc.save(`Planilla_${safeName}.pdf`);
+}
