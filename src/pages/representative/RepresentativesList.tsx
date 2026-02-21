@@ -10,7 +10,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { UserPlus, Edit, Trash2, Download, Users } from "lucide-react";
+import { UserPlus, Edit, Trash2, Download, Users, Star, StarOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useToast } from "@/hooks/use-toast";
@@ -56,6 +56,21 @@ export default function RepresentativesList() {
       setDeleteTarget(null);
     },
     onError: () => { toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar" }); },
+  });
+
+  const setPrimaryMutation = useMutation({
+    mutationFn: async (repId: string) => {
+      // Unset all, then set the selected one
+      const { error: unsetErr } = await supabase.from("representatives").update({ is_primary: false } as any).eq("family_id", familyId!);
+      if (unsetErr) throw unsetErr;
+      const { error: setErr } = await supabase.from("representatives").update({ is_primary: true } as any).eq("id", repId);
+      if (setErr) throw setErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["representatives", familyId] });
+      toast({ title: "Actualizado", description: "Representante principal actualizado" });
+    },
+    onError: () => { toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar" }); },
   });
 
   const getName = (rep: any) => {
@@ -109,7 +124,12 @@ export default function RepresentativesList() {
                       <AvatarFallback className="bg-primary/10 text-primary text-lg">{getName(rep).charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold truncate">{getName(rep)}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold truncate">{getName(rep)}</p>
+                        {(rep as any).is_primary && (
+                          <Badge variant="default" className="text-xs shrink-0">Principal</Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">{getType(rep)}</p>
                       <Badge variant="secondary" className="mt-1">{rep.document_id || "Sin doc."}</Badge>
                     </div>
@@ -126,6 +146,11 @@ export default function RepresentativesList() {
                     <Button size="sm" variant="outline" onClick={() => handleCarnet(rep)}>
                       <Download className="h-3 w-3 mr-1" /> Carnet
                     </Button>
+                    {!(rep as any).is_primary && (
+                      <Button size="sm" variant="outline" onClick={() => setPrimaryMutation.mutate(rep.id)} disabled={setPrimaryMutation.isPending} title="Marcar como representante principal">
+                        <Star className="h-3 w-3 mr-1" /> Principal
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

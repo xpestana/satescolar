@@ -635,16 +635,16 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     // Center text
     const centerX = pageWidth / 2;
     let textY = y + 4;
-    pageDoc.setFontSize(10);
+    pageDoc.setFontSize(11);
     pageDoc.setFont("helvetica", "bold");
     pageDoc.setTextColor(0);
     if (hc.show_name !== false && school?.name) {
       pageDoc.text(school.name.toUpperCase(), centerX, textY, { align: "center" });
-      textY += 4;
+      textY += 5;
     }
 
     pageDoc.setFont("helvetica", "normal");
-    pageDoc.setFontSize(7);
+    pageDoc.setFontSize(8);
     pageDoc.setTextColor(60);
 
     // Address line
@@ -657,7 +657,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       const addrLine = addrParts.filter(Boolean).join(", ");
       const addrLines = pageDoc.splitTextToSize(addrLine, contentWidth - 80);
       pageDoc.text(addrLines, centerX, textY, { align: "center" });
-      textY += addrLines.length * 3.5;
+      textY += addrLines.length * 4;
     }
 
     // Codes
@@ -666,7 +666,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     if (hc.show_statistical_code !== false && school?.statistical_code) codeParts.push(`Código Estadístico: ${school.statistical_code}`);
     if (codeParts.length > 0) {
       pageDoc.text(codeParts.join(" - "), centerX, textY, { align: "center" });
-      textY += 3.5;
+      textY += 4;
     }
 
     // Phone & RIF
@@ -675,31 +675,31 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     if (hc.show_rif !== false && school?.rif) infoParts.push(`Rif: ${school.rif}`);
     if (infoParts.length > 0) {
       pageDoc.text(infoParts.join(" - "), centerX, textY, { align: "center" });
-      textY += 3.5;
+      textY += 4;
     }
 
-    y = Math.max(y + 20, textY + 2);
+    y = Math.max(y + 22, textY + 4);
 
     // PLANILLA title
-    pageDoc.setFontSize(14);
+    pageDoc.setFontSize(16);
     pageDoc.setFont("helvetica", "bold");
     pageDoc.setTextColor(0);
     pageDoc.text("PLANILLA", centerX, y, { align: "center" });
+    y += 7;
+
+    pageDoc.setFontSize(13);
+    pageDoc.text(`AÑO ESCOLAR: ${planillaData.schoolYear}`, centerX, y, { align: "center" });
     y += 6;
 
-    pageDoc.setFontSize(11);
-    pageDoc.text(`AÑO ESCOLAR: ${planillaData.schoolYear}`, centerX, y, { align: "center" });
-    y += 5;
-
     // Warning text
-    pageDoc.setFontSize(6.5);
+    pageDoc.setFontSize(7);
     pageDoc.setFont("helvetica", "italic");
     pageDoc.setTextColor(100);
     pageDoc.text(
       "Lea detenidamente esta planilla, los datos suministrados deben ser exactos y ajustados a la realidad, de lo contrario será invalidada",
       centerX, y, { align: "center" }
     );
-    y += 5;
+    y += 7;
 
     return y;
   }
@@ -716,16 +716,16 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
 
       pageDoc.setDrawColor(0);
       pageDoc.setLineWidth(0.3);
-      pageDoc.setFontSize(7);
+      pageDoc.setFontSize(9);
       pageDoc.setFont("helvetica", "normal");
       pageDoc.setTextColor(0);
 
       signatureLines.forEach((label, i) => {
         const x = startX + i * (lineWidth + gap);
         pageDoc.line(x, y, x + lineWidth, y);
-        pageDoc.text(label, x + lineWidth / 2, y + 4, { align: "center" });
+        pageDoc.text(label, x + lineWidth / 2, y + 5, { align: "center" });
       });
-      y += 10;
+      y += 12;
     }
 
     // Footer info
@@ -742,15 +742,15 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     if (fc.show_rif !== false && planillaData.school?.rif) footerParts.push(`Rif: ${planillaData.school.rif}`);
 
     if (footerParts.length > 0) {
-      pageDoc.setFontSize(6);
+      pageDoc.setFontSize(7);
       pageDoc.setTextColor(100);
       const footerLine = footerParts.join("  ");
       const footerLines = pageDoc.splitTextToSize(footerLine, contentWidth);
       pageDoc.text(footerLines, pageWidth / 2, y, { align: "center" });
-      y += footerLines.length * 3;
+      y += footerLines.length * 3.5;
     }
 
-    pageDoc.setFontSize(5.5);
+    pageDoc.setFontSize(6);
     pageDoc.setTextColor(130);
     pageDoc.text("Documento generado de forma automática por SAT Escolar", pageWidth / 2, pageHeight - 5, { align: "center" });
   }
@@ -768,12 +768,12 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
   let y = drawHeader(doc);
 
   // Student name mini-table
-  y = ensureSpace(y, 20);
-  doc.setFontSize(9);
+  y = ensureSpace(y, 22);
+  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0);
   doc.text("DATOS PERSONALES DEL ESTUDIANTE", pageWidth / 2, y, { align: "center" });
-  y += 4;
+  y += 5;
 
   autoTable(doc, {
     startY: y,
@@ -784,19 +784,19 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       studentFd.primer_nombre || "No registrado",
       studentFd.segundo_nombre || "No registrado",
     ]],
-    styles: { fontSize: 7, cellPadding: 2, halign: "center" },
-    headStyles: { fillColor: [41, 128, 185], fontSize: 7 },
+    styles: { fontSize: 10, cellPadding: 3, halign: "center", font: "helvetica" },
+    headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
     margin: { left: margin, right: margin },
     theme: "grid",
   });
-  y = (doc as any).lastAutoTable.finalY + 4;
+  y = (doc as any).lastAutoTable.finalY + 6;
 
   // Render each section
   for (const section of planillaData.sections) {
-    y = ensureSpace(y, 20);
+    y = ensureSpace(y, 22);
 
     // Section title
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0);
 
@@ -813,7 +813,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     }
 
     doc.text(titleText, pageWidth / 2, y, { align: "center" });
-    y += 4;
+    y += 5;
 
     if (section.section_type === "fields") {
       const fieldNames: string[] = Array.isArray(section.field_names) ? section.field_names : [];
@@ -825,7 +825,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
 
       if (isFamilyTextSection) {
         // Render as text lines instead of table
-        doc.setFontSize(7);
+        doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(0);
         for (const fn of fieldNames) {
@@ -834,16 +834,16 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
           if (fn === "family:address" || fn === "family:location_full") {
             const text = `${label}: ${value}`;
             const lines = doc.splitTextToSize(text, contentWidth);
-            y = ensureSpace(y, lines.length * 3.5);
+            y = ensureSpace(y, lines.length * 4.5);
             doc.text(lines, margin, y);
-            y += lines.length * 3.5 + 1;
+            y += lines.length * 4.5 + 2;
           } else {
-            y = ensureSpace(y, 5);
+            y = ensureSpace(y, 6);
             doc.text(`${label}: ${value}`, margin, y);
-            y += 4;
+            y += 5;
           }
         }
-        y += 2;
+        y += 4;
       } else {
         // Build rows of 4 columns max (label-value pairs)
         const tableHead: string[] = [];
@@ -862,41 +862,41 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
           // Pad to chunkSize
           while (headChunk.length < chunkSize) { headChunk.push(""); bodyChunk.push(""); }
 
-          y = ensureSpace(y, 15);
+          y = ensureSpace(y, 18);
           autoTable(doc, {
             startY: y,
             head: [headChunk],
             body: [bodyChunk],
-            styles: { fontSize: 7, cellPadding: 2, halign: "center" },
-            headStyles: { fillColor: [41, 128, 185], fontSize: 6.5 },
+            styles: { fontSize: 10, cellPadding: 3, halign: "center", font: "helvetica" },
+            headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
             margin: { left: margin, right: margin },
             theme: "grid",
           });
-          y = (doc as any).lastAutoTable.finalY + 2;
+          y = (doc as any).lastAutoTable.finalY + 3;
         }
-        y += 2;
+        y += 4;
       }
     } else if (section.section_type === "text") {
       // Text block
       const text = section.section_text || "";
       if (text) {
-        doc.setFontSize(7);
+        doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(0);
         const lines = doc.splitTextToSize(text, contentWidth);
-        y = ensureSpace(y, lines.length * 3.5);
+        y = ensureSpace(y, lines.length * 4.5);
         doc.text(lines, margin, y);
-        y += lines.length * 3.5 + 2;
+        y += lines.length * 4.5 + 3;
       }
       // If title contains "observaciones" add a line
       if (section.title.toLowerCase().includes("observacion")) {
-        y = ensureSpace(y, 6);
+        y = ensureSpace(y, 8);
         doc.setDrawColor(0);
         doc.setLineWidth(0.2);
         doc.line(margin, y, pageWidth - margin, y);
-        y += 4;
+        y += 5;
       }
-      y += 2;
+      y += 4;
     }
   }
 
