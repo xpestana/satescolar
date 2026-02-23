@@ -114,7 +114,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     queryFn: async () => {
       const { data, error } = await supabase
         .from("representatives")
-        .select("form_data")
+        .select("id, form_data")
         .eq("family_id", student.family_id)
         .eq("is_primary", true)
         .maybeSingle();
@@ -344,19 +344,19 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
           {completeness && !isDataComplete ? (
             <div className="flex gap-2">
               {hasStudentMissing && (
-                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); navigate(`/estudiantes/editar/${student.id}`); }}>
+                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/estudiante/${student.id}/editar`; }}>
                   <GraduationCap className="h-4 w-4" />
                   Modificar Estudiante
                 </Button>
               )}
               {hasRepMissing && (
-                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); navigate(`/representantes/editar/${student.family_id}`); }}>
+                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/representante/${primaryRep?.id}/editar`; }}>
                   <UserPen className="h-4 w-4" />
                   Modificar Representante
                 </Button>
               )}
               {hasFamilyMissing && (
-                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); navigate(`/familias/editar/${student.family_id}`); }}>
+                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/editar`; }}>
                   <Users className="h-4 w-4" />
                   Modificar Familia
                 </Button>
