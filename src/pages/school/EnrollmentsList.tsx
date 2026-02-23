@@ -678,7 +678,25 @@ export default function EnrollmentsList() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-72 max-h-80 overflow-y-auto" align="end">
-                  <p className="text-sm font-medium mb-3">Columnas visibles</p>
+                  <p className="text-sm font-medium mb-2">Columnas visibles</p>
+                  <div className="flex gap-2 mb-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 flex-1"
+                      onClick={() => setHiddenColumns(new Set())}
+                    >
+                      Seleccionar todo
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 flex-1"
+                      onClick={() => setHiddenColumns(new Set(dynamicColumns.map(c => c.key)))}
+                    >
+                      Deseleccionar todo
+                    </Button>
+                  </div>
                   <div className="space-y-2">
                     {dynamicColumns.map(col => (
                       <label key={col.key} className="flex items-center gap-2 cursor-pointer text-sm">
