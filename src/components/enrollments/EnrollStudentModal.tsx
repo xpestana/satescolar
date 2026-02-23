@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -11,8 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { checkStudentCompleteness, ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
+import { AlertTriangle, GraduationCap, Users, UserPen } from "lucide-react";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal",
@@ -40,6 +44,7 @@ interface Props {
     document_id: string | null;
     photo_url: string | null;
     form_data: Record<string, string> | null;
+    family_id: string;
     familyName: string;
     isEnrolled: boolean;
   };
@@ -51,9 +56,11 @@ interface Props {
 
 export function EnrollStudentModal({ open, onOpenChange, student, activeYear, sections, schoolId, onSuccess }: Props) {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [enrollmentType, setEnrollmentType] = useState("");
   const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split("T")[0]);
+
   // Fetch display config for this school
   const { data: displayConfig = [] } = useQuery({
     queryKey: ["enrollment-display-config", schoolId],
@@ -86,12 +93,72 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!schoolId,
   });
 
+  // Fetch planilla sections for completeness validation
+  const { data: planillaSections = [] } = useQuery({
+    queryKey: ["enrollment-planilla-sections", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("enrollment_planilla_sections")
+        .select("*")
+        .eq("school_id", schoolId)
+        .order("display_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch primary representative data
+  const { data: primaryRep } = useQuery({
+    queryKey: ["primary-rep-modal", student.family_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("representatives")
+        .select("form_data")
+        .eq("family_id", student.family_id)
+        .eq("is_primary", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!student.family_id,
+  });
+
+  // Fetch family data
+  const { data: familyData } = useQuery({
+    queryKey: ["family-data-modal", student.family_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("families")
+        .select("*")
+        .eq("id", student.family_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!student.family_id,
+  });
+
+  // Completeness check
+  const completeness = planillaSections.length > 0
+    ? checkStudentCompleteness(
+        planillaSections.map(s => ({ field_names: Array.isArray(s.field_names) ? s.field_names as string[] : [], section_type: s.section_type })),
+        student.form_data,
+        primaryRep?.form_data as Record<string, string> | null,
+        familyData as Record<string, any> | null,
+      )
+    : null;
+
+  const hasStudentMissing = completeness ? completeness.missingStudentFields.length > 0 : false;
+  const hasRepMissing = completeness ? completeness.missingRepresentativeFields.length > 0 : false;
+  const hasFamilyMissing = completeness ? completeness.missingFamilyFields.length > 0 : false;
+  const isDataComplete = completeness ? completeness.isComplete : true;
+
   const enrollMutation = useMutation({
     mutationFn: async () => {
       if (!selectedSectionId) throw new Error("Selecciona una sección");
       if (!enrollmentType) throw new Error("Selecciona el tipo de inscripción");
 
-      // Upsert: if already enrolled, update; otherwise insert
       const { error } = await supabase
         .from("enrollments")
         .upsert({
@@ -120,14 +187,9 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     return [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido].filter(Boolean).join(" ") || "Sin nombre";
   };
 
-  // Determine which fields to show
   const fieldsToShow = displayConfig.length > 0
-    ? displayConfig.map(dc => ({
-        name: dc.field_name,
-        label: dc.field_label,
-      }))
-    : // Default: show basic fields
-      [
+    ? displayConfig.map(dc => ({ name: dc.field_name, label: dc.field_label }))
+    : [
         { name: "primer_nombre", label: "Primer Nombre" },
         { name: "segundo_nombre", label: "Segundo Nombre" },
         { name: "primer_apellido", label: "Primer Apellido" },
@@ -137,13 +199,23 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         { name: "grado", label: "Grado" },
       ];
 
-  // Group sections by grade level
   const sectionsByGrade = sections.reduce((acc, s) => {
     const label = GRADE_LABELS[s.grade_level] || s.grade_level;
     if (!acc[label]) acc[label] = [];
     acc[label].push(s);
     return acc;
   }, {} as Record<string, typeof sections>);
+
+  // Resolve field label for missing fields display
+  const resolveLabel = (prefixed: string) => {
+    const [type, ...rest] = prefixed.split(":");
+    const name = rest.join(":");
+    if (type === "student") return formFields.find(f => f.field_name === name)?.field_label || name;
+    if (type === "custom") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    if (type === "representative") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    if (type === "family") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    return name;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -181,6 +253,40 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         </div>
 
         <Separator />
+
+        {/* Completeness warning */}
+        {completeness && !isDataComplete && (
+          <Alert className="my-4 border-orange-300 bg-orange-50 text-orange-800">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <AlertDescription>
+              <p className="font-medium mb-2">Faltan datos por completar antes de inscribir:</p>
+              {hasStudentMissing && (
+                <div className="mb-1">
+                  <span className="font-medium text-xs">Estudiante:</span>
+                  <span className="text-xs ml-1">
+                    {completeness.missingStudentFields.map(resolveLabel).join(", ")}
+                  </span>
+                </div>
+              )}
+              {hasRepMissing && (
+                <div className="mb-1">
+                  <span className="font-medium text-xs">Representante:</span>
+                  <span className="text-xs ml-1">
+                    {completeness.missingRepresentativeFields.map(resolveLabel).join(", ")}
+                  </span>
+                </div>
+              )}
+              {hasFamilyMissing && (
+                <div className="mb-1">
+                  <span className="font-medium text-xs">Familia:</span>
+                  <span className="text-xs ml-1">
+                    {completeness.missingFamilyFields.map(resolveLabel).join(", ")}
+                  </span>
+                </div>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Enrollment form */}
         <div className="grid grid-cols-2 gap-4 my-4">
@@ -239,12 +345,35 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button
-            onClick={() => enrollMutation.mutate()}
-            disabled={!selectedSectionId || !enrollmentType || enrollMutation.isPending}
-          >
-            {enrollMutation.isPending ? "Inscribiendo..." : student.isEnrolled ? "Actualizar Inscripción" : "Inscribir"}
-          </Button>
+          {completeness && !isDataComplete ? (
+            <div className="flex gap-2">
+              {hasStudentMissing && (
+                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); navigate(`/estudiantes/editar/${student.id}`); }}>
+                  <GraduationCap className="h-4 w-4" />
+                  Modificar Estudiante
+                </Button>
+              )}
+              {hasRepMissing && (
+                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); navigate(`/representantes/editar/${student.family_id}`); }}>
+                  <UserPen className="h-4 w-4" />
+                  Modificar Representante
+                </Button>
+              )}
+              {hasFamilyMissing && (
+                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); navigate(`/familias/editar/${student.family_id}`); }}>
+                  <Users className="h-4 w-4" />
+                  Modificar Familia
+                </Button>
+              )}
+            </div>
+          ) : (
+            <Button
+              onClick={() => enrollMutation.mutate()}
+              disabled={!selectedSectionId || !enrollmentType || enrollMutation.isPending}
+            >
+              {enrollMutation.isPending ? "Inscribiendo..." : student.isEnrolled ? "Actualizar Inscripción" : "Inscribir"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
