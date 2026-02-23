@@ -150,7 +150,11 @@ export default function AddRepresentative() {
 
       // Extract known fields from form_data to sync direct columns
       const documentType = formData.tipo_documento || "";
-      const documentNum = formData.documento || "";
+      let documentNum = formData.documento || "";
+      // Strip any existing type prefix to avoid duplication (e.g., "V-12345" with tipo "E" → "E-12345")
+      if (documentType && documentNum) {
+        documentNum = documentNum.replace(/^(V-|E-|CE-|P-)/i, "");
+      }
       const documentId = documentType && documentNum ? `${documentType}-${documentNum}` : documentNum || null;
 
       const repData = {
