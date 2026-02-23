@@ -147,7 +147,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Inscribir Estudiante</DialogTitle>
         </DialogHeader>
@@ -171,7 +171,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         <Separator />
 
         {/* Student data fields */}
-        <div className="grid grid-cols-2 gap-3 my-4">
+        <div className="grid grid-cols-3 gap-3 my-4">
           {fieldsToShow.map(field => (
             <div key={field.name}>
               <p className="text-xs text-muted-foreground">{field.label}</p>
@@ -183,12 +183,22 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         <Separator />
 
         {/* Enrollment form */}
-        <div className="space-y-4 my-4">
+        <div className="grid grid-cols-2 gap-4 my-4">
           <div>
             <Label className="text-sm font-medium">Año Escolar</Label>
             <div className="mt-1">
               <Badge variant="default" className="text-sm px-3 py-1">{activeYear.year_range}</Badge>
             </div>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium">Fecha de Inscripción</Label>
+            <Input
+              type="date"
+              value={enrollmentDate}
+              onChange={(e) => setEnrollmentDate(e.target.value)}
+              className="mt-1"
+            />
           </div>
 
           <div>
@@ -224,16 +234,6 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div>
-            <Label className="text-sm font-medium">Fecha de Inscripción</Label>
-            <Input
-              type="date"
-              value={enrollmentDate}
-              onChange={(e) => setEnrollmentDate(e.target.value)}
-              className="mt-1"
-            />
           </div>
         </div>
 
