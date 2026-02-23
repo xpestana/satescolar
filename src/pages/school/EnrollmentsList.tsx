@@ -75,7 +75,7 @@ export default function EnrollmentsList() {
   const [selectedStudent, setSelectedStudent] = useState<StudentWithEnrollment | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 15;
+  const pageSize = 20;
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<"all" | "enrolled" | "pending">("all");
@@ -416,8 +416,8 @@ export default function EnrollmentsList() {
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const enrolledCount = students.filter(s => s.isEnrolled).length;
-  const pendingCount = students.filter(s => !s.isEnrolled).length;
+  const enrolledCount = filtered.filter(s => s.isEnrolled).length;
+  const pendingCount = filtered.filter(s => !s.isEnrolled).length;
 
   // School geo data for exports
   const { data: schoolGeo } = useQuery({
@@ -582,7 +582,7 @@ export default function EnrollmentsList() {
             <div className="flex items-center gap-3">
               <ClipboardCheck className="h-8 w-8 text-primary" />
               <div>
-                <p className="text-2xl font-bold">{students.length}</p>
+                <p className="text-2xl font-bold">{filtered.length}</p>
                 <p className="text-sm text-muted-foreground">Total Estudiantes Activos</p>
               </div>
             </div>
