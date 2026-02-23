@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -12,7 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Search, ClipboardCheck, CheckCircle } from "lucide-react";
+import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EnrollStudentModal } from "@/components/enrollments/EnrollStudentModal";
 import { Pagination } from "@/components/ui/data-pagination";
 
@@ -31,6 +35,7 @@ export default function EnrollmentsList() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { schoolId } = useSchoolId();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<StudentWithEnrollment | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -238,13 +243,13 @@ export default function EnrollmentsList() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Acciones</TableHead>
                 <TableHead>Foto</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Cédula</TableHead>
                 <TableHead>Familia</TableHead>
                 <TableHead>Grado</TableHead>
                 <TableHead className="text-center">Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -258,6 +263,40 @@ export default function EnrollmentsList() {
                 </TableRow>
               ) : paginated.map(student => (
                 <TableRow key={student.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant={student.isEnrolled ? "outline" : "default"}
+                        onClick={() => handleEnroll(student)}
+                        className="gap-1"
+                      >
+                        <ClipboardCheck className="h-4 w-4" />
+                        {student.isEnrolled ? "Cambiar" : "Inscribir"}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem onClick={() => navigate(`/estudiantes/editar/${student.id}`)}>
+                            <GraduationCap className="h-4 w-4 mr-2" />
+                            Editar Estudiante
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/familias/editar/${student.family_id}`)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Editar Familia
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/representantes/editar/${student.family_id}`)}>
+                            <UserPen className="h-4 w-4 mr-2" />
+                            Editar Representante Principal
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {student.photo_url ? (
                       <img src={student.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
@@ -277,17 +316,6 @@ export default function EnrollmentsList() {
                     ) : (
                       <Badge variant="outline" className="text-orange-600 border-orange-300">Pendiente</Badge>
                     )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant={student.isEnrolled ? "outline" : "default"}
-                      onClick={() => handleEnroll(student)}
-                      className="gap-1"
-                    >
-                      <ClipboardCheck className="h-4 w-4" />
-                      {student.isEnrolled ? "Cambiar" : "Inscribir"}
-                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
