@@ -179,6 +179,8 @@ export type Database = {
         Row: {
           created_at: string
           enrolled_at: string
+          enrollment_date: string | null
+          enrollment_type: string | null
           id: string
           school_id: string
           school_year_id: string
@@ -189,6 +191,8 @@ export type Database = {
         Insert: {
           created_at?: string
           enrolled_at?: string
+          enrollment_date?: string | null
+          enrollment_type?: string | null
           id?: string
           school_id: string
           school_year_id: string
@@ -199,6 +203,8 @@ export type Database = {
         Update: {
           created_at?: string
           enrolled_at?: string
+          enrollment_date?: string | null
+          enrollment_type?: string | null
           id?: string
           school_id?: string
           school_year_id?: string
