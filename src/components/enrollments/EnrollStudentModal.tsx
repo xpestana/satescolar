@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +22,15 @@ const GRADE_LABELS: Record<string, string> = {
   media_general: "Media General",
   media_tecnica: "Media Técnica",
 };
+
+const ENROLLMENT_TYPES = [
+  "Regular",
+  "Becado",
+  "Regular con materia pendiente",
+  "Nuevo Ingreso",
+  "Propedéutico",
+  "Repitiente",
+];
 
 interface Props {
   open: boolean;
@@ -42,7 +52,8 @@ interface Props {
 export function EnrollStudentModal({ open, onOpenChange, student, activeYear, sections, schoolId, onSuccess }: Props) {
   const { toast } = useToast();
   const [selectedSectionId, setSelectedSectionId] = useState("");
-
+  const [enrollmentType, setEnrollmentType] = useState("");
+  const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split("T")[0]);
   // Fetch display config for this school
   const { data: displayConfig = [] } = useQuery({
     queryKey: ["enrollment-display-config", schoolId],
@@ -78,6 +89,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
   const enrollMutation = useMutation({
     mutationFn: async () => {
       if (!selectedSectionId) throw new Error("Selecciona una sección");
+      if (!enrollmentType) throw new Error("Selecciona el tipo de inscripción");
 
       // Upsert: if already enrolled, update; otherwise insert
       const { error } = await supabase
@@ -87,7 +99,9 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
           section_id: selectedSectionId,
           school_year_id: activeYear.id,
           school_id: schoolId,
-        }, { onConflict: "student_id,school_year_id,school_id" });
+          enrollment_type: enrollmentType,
+          enrollment_date: enrollmentDate || null,
+        } as any, { onConflict: "student_id,school_year_id,school_id" });
 
       if (error) throw error;
     },
@@ -197,13 +211,37 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
               </SelectContent>
             </Select>
           </div>
+
+          <div>
+            <Label className="text-sm font-medium">Tipo de Inscripción *</Label>
+            <Select value={enrollmentType} onValueChange={setEnrollmentType}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Seleccione una opción..." />
+              </SelectTrigger>
+              <SelectContent>
+                {ENROLLMENT_TYPES.map(type => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium">Fecha de Inscripción</Label>
+            <Input
+              type="date"
+              value={enrollmentDate}
+              onChange={(e) => setEnrollmentDate(e.target.value)}
+              className="mt-1"
+            />
+          </div>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button
             onClick={() => enrollMutation.mutate()}
-            disabled={!selectedSectionId || enrollMutation.isPending}
+            disabled={!selectedSectionId || !enrollmentType || enrollMutation.isPending}
           >
             {enrollMutation.isPending ? "Inscribiendo..." : student.isEnrolled ? "Actualizar Inscripción" : "Inscribir"}
           </Button>

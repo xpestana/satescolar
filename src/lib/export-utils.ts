@@ -546,7 +546,18 @@ function resolveFieldValue(
       return (f as any)[fieldName] || "No registrado";
     }
     case "custom": {
-      // Custom fields check enrollment or student form_data
+      // Custom fields - check enrollment data first, then student form_data
+      if (fieldName === "tipo_de_estudiante" && data.enrollment?.enrollment_type) {
+        return data.enrollment.enrollment_type;
+      }
+      if (fieldName === "fecha_de_inscripcion" && data.enrollment?.enrollment_date) {
+        return formatDate(data.enrollment.enrollment_date);
+      }
+      if (fieldName === "grupo_asignado" && data.enrollmentSection) {
+        const gradeLabel = data.enrollmentSection.grade_level || "";
+        const sectionName = data.enrollmentSection.name || "";
+        return `${gradeLabel} - ${sectionName}`.trim() || "No registrado";
+      }
       return studentFd[fieldName] || "No registrado";
     }
     default:
