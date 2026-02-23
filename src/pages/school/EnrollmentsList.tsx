@@ -345,13 +345,13 @@ export default function EnrollmentsList() {
   // Fetch primary representatives for completeness check
   const familyIds = useMemo(() => [...new Set(students.map(s => s.family_id))], [students]);
 
-  const { data: representatives = [] } = useQuery({
+    const { data: representatives = [] } = useQuery({
     queryKey: ["primary-representatives", familyIds],
     queryFn: async () => {
       if (familyIds.length === 0) return [];
       const { data, error } = await supabase
         .from("representatives")
-        .select("family_id, form_data")
+        .select("id, family_id, form_data")
         .in("family_id", familyIds)
         .eq("is_primary", true);
       if (error) throw error;
@@ -375,6 +375,7 @@ export default function EnrollmentsList() {
   });
 
   const repMap = useMemo(() => new Map(representatives.map(r => [r.family_id, r.form_data as Record<string, string> | null])), [representatives]);
+  const repIdMap = useMemo(() => new Map(representatives.map(r => [r.family_id, r.id])), [representatives]);
   const familyDataMap = useMemo(() => new Map(familiesData.map(f => [f.id, f as Record<string, any>])), [familiesData]);
 
   const getCompleteness = (student: StudentWithEnrollment) => {
@@ -798,18 +799,20 @@ export default function EnrollmentsList() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="start">
-                              <DropdownMenuItem onClick={() => navigate(`/estudiantes/editar/${student.id}`)}>
+                              <DropdownMenuItem onClick={() => { window.location.href = `/registros/familias/${student.family_id}/estudiante/${student.id}/editar`; }}>
                                 <GraduationCap className="h-4 w-4 mr-2" />
                                 Editar Estudiante
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/familias/editar/${student.family_id}`)}>
+                              <DropdownMenuItem onClick={() => { window.location.href = `/registros/familias/${student.family_id}/editar`; }}>
                                 <Users className="h-4 w-4 mr-2" />
                                 Editar Familia
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => navigate(`/representantes/editar/${student.family_id}`)}>
-                                <UserPen className="h-4 w-4 mr-2" />
-                                Editar Representante Principal
-                              </DropdownMenuItem>
+                              {repIdMap.get(student.family_id) && (
+                                <DropdownMenuItem onClick={() => { window.location.href = `/registros/familias/${student.family_id}/representante/${repIdMap.get(student.family_id)}/editar`; }}>
+                                  <UserPen className="h-4 w-4 mr-2" />
+                                  Editar Representante Principal
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleDownloadPlanilla(student)}>
                                 <FileDown className="h-4 w-4 mr-2" />
                                 Descargar Planilla
@@ -842,7 +845,7 @@ export default function EnrollmentsList() {
                       {visibleDynamicColumns.map(col => (
                         <TableCell key={col.key} className="text-sm">{getDynamicValue(student, col.key)}</TableCell>
                       ))}
-                      {isColVisible("_grado") && <TableCell>{student.form_data?.grado || "—"}</TableCell>}
+                      {isColVisible("_grado") && <TableCell>{student.form_data?.nivel_grado || student.form_data?.grado || "—"}</TableCell>}
                     </TableRow>
                   );
                 })}

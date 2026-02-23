@@ -150,7 +150,11 @@ export default function AddStudent() {
 
       // Extract known fields from form_data to sync direct columns
       const documentType = formData.tipo_documento || "";
-      const documentNum = formData.documento || formData.cedula || "";
+      let documentNum = formData.documento || formData.cedula || "";
+      // Strip any existing type prefix (V-, E-, CE-, etc.) from the number to avoid duplication
+      if (documentType && documentNum) {
+        documentNum = documentNum.replace(/^(V-|E-|CE-|P-)/i, "");
+      }
       const documentId = documentType && documentNum ? `${documentType}-${documentNum}` : documentNum || null;
 
       const studentData = {
