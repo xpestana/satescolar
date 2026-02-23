@@ -15,13 +15,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap, Columns } from "lucide-react";
+import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap, Columns, FileDown } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EnrollStudentModal } from "@/components/enrollments/EnrollStudentModal";
 import { Pagination } from "@/components/ui/data-pagination";
 import { checkStudentCompleteness, ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
+import { downloadPlanillaInscripcion } from "@/lib/export-utils";
+import { toast } from "sonner";
 
 interface StudentWithEnrollment {
   id: string;
@@ -35,7 +37,7 @@ interface StudentWithEnrollment {
 }
 
 export default function EnrollmentsList() {
-  const { toast } = useToast();
+  const { toast: uiToast } = useToast();
   const queryClient = useQueryClient();
   const { schoolId } = useSchoolId();
   const navigate = useNavigate();
@@ -44,6 +46,18 @@ export default function EnrollmentsList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 15;
+
+  // Fetch school data for planilla download
+  const { data: school } = useQuery({
+    queryKey: ["school-data", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return null;
+      const { data, error } = await supabase.from("schools").select("*").eq("id", schoolId).single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
 
   // Fetch active school year
   const { data: activeYear } = useQuery({
@@ -311,9 +325,74 @@ export default function EnrollmentsList() {
   const enrolledCount = students.filter(s => s.isEnrolled).length;
   const pendingCount = students.filter(s => !s.isEnrolled).length;
 
+  const handleDownloadPlanilla = async (student: StudentWithEnrollment) => {
+    if (!school || !schoolId) return;
+    try {
+      toast.info("Generando planilla...");
+
+      const [familyRes, repRes, sectionsRes, configRes, enrollmentRes, geoRes, formFieldsRes] = await Promise.all([
+        supabase.from("families").select("*").eq("id", student.family_id).single(),
+        supabase.from("representatives").select("*").eq("family_id", student.family_id).eq("is_primary", true).limit(1).maybeSingle(),
+        supabase.from("enrollment_planilla_sections").select("*").eq("school_id", schoolId).order("display_order"),
+        supabase.from("planilla_general_config").select("*").eq("school_id", schoolId).maybeSingle(),
+        supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", schoolId).limit(1).maybeSingle(),
+        Promise.all([
+          school.state_id ? supabase.from("states").select("name").eq("id", school.state_id).single() : null,
+          school.municipality_id ? supabase.from("municipalities").select("name").eq("id", school.municipality_id).single() : null,
+          school.city_id ? supabase.from("cities").select("name").eq("id", school.city_id).single() : null,
+          school.parish_id ? supabase.from("parishes").select("name").eq("id", school.parish_id).single() : null,
+        ]),
+        supabase.from("form_fields").select("field_name, field_label, form_type").eq("school_id", schoolId).in("form_type", ["student", "representative"]),
+      ]);
+
+      let representative = repRes.data;
+      if (!representative) {
+        const { data: fallbackRep } = await supabase.from("representatives").select("*").eq("family_id", student.family_id).order("created_at").limit(1).maybeSingle();
+        representative = fallbackRep;
+      }
+
+      const familyGeoPromises = await Promise.all([
+        familyRes.data?.state_id ? supabase.from("states").select("name").eq("id", familyRes.data.state_id).single() : null,
+        familyRes.data?.municipality_id ? supabase.from("municipalities").select("name").eq("id", familyRes.data.municipality_id).single() : null,
+        familyRes.data?.city_id ? supabase.from("cities").select("name").eq("id", familyRes.data.city_id).single() : null,
+        familyRes.data?.parish_id ? supabase.from("parishes").select("name").eq("id", familyRes.data.parish_id).single() : null,
+      ]);
+
+      const [stateRes, muniRes, cityRes, parishRes] = geoRes;
+      const schoolGeo = {
+        state: familyGeoPromises[0]?.data?.name || stateRes?.data?.name,
+        municipality: familyGeoPromises[1]?.data?.name || muniRes?.data?.name,
+        city: familyGeoPromises[2]?.data?.name || cityRes?.data?.name,
+        parish: familyGeoPromises[3]?.data?.name || parishRes?.data?.name,
+      };
+
+      const studentFullData = {
+        ...student,
+        form_data: student.form_data || {},
+      };
+
+      await downloadPlanillaInscripcion({
+        student: studentFullData,
+        representative,
+        family: familyRes.data,
+        school,
+        schoolGeo,
+        sections: sectionsRes.data || [],
+        generalConfig: configRes.data,
+        schoolYear: activeYear?.year_range || "2024-2025",
+        enrollment: enrollmentRes.data,
+        enrollmentSection: enrollmentRes.data?.sections,
+        formFields: formFieldsRes.data || [],
+      });
+    } catch (err) {
+      console.error("Error generating planilla:", err);
+      toast.error("Error al generar la planilla");
+    }
+  };
+
   const handleEnroll = (student: StudentWithEnrollment) => {
     if (!activeYear) {
-      toast({ variant: "destructive", title: "Error", description: "No hay un año escolar activo configurado." });
+      uiToast({ variant: "destructive", title: "Error", description: "No hay un año escolar activo configurado." });
       return;
     }
     setSelectedStudent(student);
@@ -483,6 +562,10 @@ export default function EnrollmentsList() {
                             <DropdownMenuItem onClick={() => navigate(`/representantes/editar/${student.family_id}`)}>
                               <UserPen className="h-4 w-4 mr-2" />
                               Editar Representante Principal
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadPlanilla(student)}>
+                              <FileDown className="h-4 w-4 mr-2" />
+                              Descargar Planilla
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
