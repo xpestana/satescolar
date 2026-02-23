@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,18 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap } from "lucide-react";
+import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap, Columns } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EnrollStudentModal } from "@/components/enrollments/EnrollStudentModal";
 import { Pagination } from "@/components/ui/data-pagination";
+import { checkStudentCompleteness, ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
 
 interface StudentWithEnrollment {
   id: string;
@@ -76,13 +79,104 @@ export default function EnrollmentsList() {
     enabled: !!schoolId,
   });
 
+  // Fetch planilla sections for dynamic columns + completeness
+  const { data: planillaSections = [] } = useQuery({
+    queryKey: ["enrollment-planilla-sections", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase
+        .from("enrollment_planilla_sections")
+        .select("*")
+        .eq("school_id", schoolId)
+        .order("display_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch student form fields for labels
+  const { data: studentFormFields = [] } = useQuery({
+    queryKey: ["student-form-fields-all", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase
+        .from("form_fields")
+        .select("field_name, field_label")
+        .eq("school_id", schoolId)
+        .eq("form_type", "student")
+        .order("field_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch representative form fields for labels
+  const { data: repFormFields = [] } = useQuery({
+    queryKey: ["representative-form-fields-all", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase
+        .from("form_fields")
+        .select("field_name, field_label")
+        .eq("school_id", schoolId)
+        .eq("form_type", "representative")
+        .order("field_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Build dynamic column definitions from planilla sections
+  const dynamicColumns = useMemo(() => {
+    const cols: { key: string; label: string }[] = [];
+    const seen = new Set<string>();
+    planillaSections.forEach(s => {
+      if (s.section_type !== "fields") return;
+      const fieldNames = Array.isArray(s.field_names) ? (s.field_names as string[]) : [];
+      fieldNames.forEach(f => {
+        if (ENROLLMENT_CUSTOM_FIELDS.includes(f) || f.endsWith(":_edad") || seen.has(f)) return;
+        seen.add(f);
+        const [type, ...rest] = f.split(":");
+        const name = rest.join(":");
+        let label = name;
+        if (type === "student") {
+          label = studentFormFields.find(ff => ff.field_name === name)?.field_label || name;
+        } else if (type === "representative") {
+          label = repFormFields.find(ff => ff.field_name === name)?.field_label || name;
+        } else if (type === "family") {
+          label = name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        } else if (type === "custom") {
+          label = name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        }
+        cols.push({ key: f, label });
+      });
+    });
+    return cols;
+  }, [planillaSections, studentFormFields, repFormFields]);
+
+  // Column visibility state — all visible by default
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
+
+  const visibleDynamicColumns = dynamicColumns.filter(c => !hiddenColumns.has(c.key));
+
+  const toggleColumn = (key: string) => {
+    setHiddenColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   // Fetch active students with enrollment status
   const { data: students = [], isLoading } = useQuery({
     queryKey: ["enrollment-students", schoolId, activeYear?.id],
     queryFn: async () => {
       if (!schoolId) return [];
 
-      // Get students linked to this school
       const { data: studentSchools, error: ssError } = await supabase
         .from("student_schools")
         .select("student_id")
@@ -99,7 +193,6 @@ export default function EnrollmentsList() {
         .eq("status", "active");
       if (stError) throw stError;
 
-      // Get family names
       const familyIds = [...new Set(studentsData.map(s => s.family_id))];
       const { data: families } = await supabase
         .from("families")
@@ -108,7 +201,6 @@ export default function EnrollmentsList() {
 
       const familyMap = new Map(families?.map(f => [f.id, `${f.father_last_name || ""} ${f.mother_last_name || ""}`.trim() || "Sin apellido"]) || []);
 
-      // Get enrollments for active year
       let enrollmentMap = new Map<string, string>();
       if (activeYear?.id) {
         const { data: enrollments } = await supabase
@@ -137,10 +229,72 @@ export default function EnrollmentsList() {
     enabled: !!schoolId && sections.length >= 0,
   });
 
+  // Fetch primary representatives for completeness check
+  const familyIds = useMemo(() => [...new Set(students.map(s => s.family_id))], [students]);
+
+  const { data: representatives = [] } = useQuery({
+    queryKey: ["primary-representatives", familyIds],
+    queryFn: async () => {
+      if (familyIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("representatives")
+        .select("family_id, form_data")
+        .in("family_id", familyIds)
+        .eq("is_primary", true);
+      if (error) throw error;
+      return data;
+    },
+    enabled: familyIds.length > 0,
+  });
+
+  const { data: familiesData = [] } = useQuery({
+    queryKey: ["families-data", familyIds],
+    queryFn: async () => {
+      if (familyIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("families")
+        .select("*")
+        .in("id", familyIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: familyIds.length > 0,
+  });
+
+  const repMap = useMemo(() => new Map(representatives.map(r => [r.family_id, r.form_data as Record<string, string> | null])), [representatives]);
+  const familyDataMap = useMemo(() => new Map(familiesData.map(f => [f.id, f as Record<string, any>])), [familiesData]);
+
+  const getCompleteness = (student: StudentWithEnrollment) => {
+    return checkStudentCompleteness(
+      planillaSections.map(s => ({ field_names: Array.isArray(s.field_names) ? s.field_names as string[] : [], section_type: s.section_type })),
+      student.form_data,
+      repMap.get(student.family_id) || null,
+      familyDataMap.get(student.family_id) || null,
+    );
+  };
+
   const getStudentName = (formData: Record<string, string> | null) => {
     if (!formData) return "Sin nombre";
     const parts = [formData.primer_nombre, formData.segundo_nombre, formData.primer_apellido, formData.segundo_apellido].filter(Boolean);
     return parts.length > 0 ? parts.join(" ") : "Sin nombre";
+  };
+
+  // Resolve dynamic column value for a student
+  const getDynamicValue = (student: StudentWithEnrollment, fieldKey: string): string => {
+    const [type, ...rest] = fieldKey.split(":");
+    const name = rest.join(":");
+    if (type === "student") return student.form_data?.[name] || "—";
+    if (type === "representative") {
+      const repData = repMap.get(student.family_id);
+      return (repData as any)?.[name] || "—";
+    }
+    if (type === "family") {
+      const fam = familyDataMap.get(student.family_id);
+      const val = fam?.[name];
+      return val !== null && val !== undefined && val !== "" ? String(val) : "—";
+    }
+    if (type === "custom") return student.form_data?.[name] || "—";
+    return "—";
   };
 
   const filtered = students.filter(s => {
@@ -165,6 +319,8 @@ export default function EnrollmentsList() {
     setSelectedStudent(student);
     setIsModalOpen(true);
   };
+
+  const totalColSpan = 7 + visibleDynamicColumns.length;
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/school/dashboard" },
@@ -227,7 +383,7 @@ export default function EnrollmentsList() {
 
       <Card>
         <CardContent className="pt-6">
-          {/* Search */}
+          {/* Search + Column toggle */}
           <div className="flex items-center gap-2 mb-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -238,6 +394,30 @@ export default function EnrollmentsList() {
                 className="pl-9"
               />
             </div>
+            {dynamicColumns.length > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Columns className="h-4 w-4" />
+                    Columnas
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 max-h-80 overflow-y-auto" align="end">
+                  <p className="text-sm font-medium mb-3">Columnas visibles</p>
+                  <div className="space-y-2">
+                    {dynamicColumns.map(col => (
+                      <label key={col.key} className="flex items-center gap-2 cursor-pointer text-sm">
+                        <Checkbox
+                          checked={!hiddenColumns.has(col.key)}
+                          onCheckedChange={() => toggleColumn(col.key)}
+                        />
+                        {col.label}
+                      </label>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
 
           <Table>
@@ -248,6 +428,9 @@ export default function EnrollmentsList() {
                 <TableHead>Nombre</TableHead>
                 <TableHead>Cédula</TableHead>
                 <TableHead>Familia</TableHead>
+                {visibleDynamicColumns.map(col => (
+                  <TableHead key={col.key}>{col.label}</TableHead>
+                ))}
                 <TableHead>Grado</TableHead>
                 <TableHead className="text-center">Estado</TableHead>
               </TableRow>
@@ -255,70 +438,82 @@ export default function EnrollmentsList() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
+                  <TableCell colSpan={totalColSpan} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
                 </TableRow>
               ) : paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No hay estudiantes activos.</TableCell>
+                  <TableCell colSpan={totalColSpan} className="text-center py-8 text-muted-foreground">No hay estudiantes activos.</TableCell>
                 </TableRow>
-              ) : paginated.map(student => (
-                <TableRow key={student.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant={student.isEnrolled ? "outline" : "default"}
-                        onClick={() => handleEnroll(student)}
-                        className="gap-1"
-                      >
-                        <ClipboardCheck className="h-4 w-4" />
-                        {student.isEnrolled ? "Cambiar" : "Inscribir"}
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuItem onClick={() => navigate(`/estudiantes/editar/${student.id}`)}>
-                            <GraduationCap className="h-4 w-4 mr-2" />
-                            Editar Estudiante
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/familias/editar/${student.family_id}`)}>
-                            <Users className="h-4 w-4 mr-2" />
-                            Editar Familia
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/representantes/editar/${student.family_id}`)}>
-                            <UserPen className="h-4 w-4 mr-2" />
-                            Editar Representante Principal
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {student.photo_url ? (
-                      <img src={student.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
-                        {getStudentName(student.form_data).charAt(0)}
+              ) : paginated.map(student => {
+                const completeness = planillaSections.length > 0 ? getCompleteness(student) : null;
+                const rowBg = completeness
+                  ? completeness.isComplete
+                    ? "bg-green-50/60 hover:bg-green-100/60"
+                    : "bg-red-50/60 hover:bg-red-100/60"
+                  : "";
+
+                return (
+                  <TableRow key={student.id} className={rowBg}>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant={student.isEnrolled ? "outline" : "default"}
+                          onClick={() => handleEnroll(student)}
+                          className="gap-1"
+                        >
+                          <ClipboardCheck className="h-4 w-4" />
+                          {student.isEnrolled ? "Cambiar" : "Inscribir"}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => navigate(`/estudiantes/editar/${student.id}`)}>
+                              <GraduationCap className="h-4 w-4 mr-2" />
+                              Editar Estudiante
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/familias/editar/${student.family_id}`)}>
+                              <Users className="h-4 w-4 mr-2" />
+                              Editar Familia
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(`/representantes/editar/${student.family_id}`)}>
+                              <UserPen className="h-4 w-4 mr-2" />
+                              Editar Representante Principal
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">{getStudentName(student.form_data)}</TableCell>
-                  <TableCell>{student.document_id || "—"}</TableCell>
-                  <TableCell>{student.familyName}</TableCell>
-                  <TableCell>{student.form_data?.grado || "—"}</TableCell>
-                  <TableCell className="text-center">
-                    {student.isEnrolled ? (
-                      <Badge className="bg-green-100 text-green-800">Inscrito - Sección {student.enrollmentSection}</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-orange-600 border-orange-300">Pendiente</Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell>
+                      {student.photo_url ? (
+                        <img src={student.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground">
+                          {getStudentName(student.form_data).charAt(0)}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{getStudentName(student.form_data)}</TableCell>
+                    <TableCell>{student.document_id || "—"}</TableCell>
+                    <TableCell>{student.familyName}</TableCell>
+                    {visibleDynamicColumns.map(col => (
+                      <TableCell key={col.key} className="text-sm">{getDynamicValue(student, col.key)}</TableCell>
+                    ))}
+                    <TableCell>{student.form_data?.grado || "—"}</TableCell>
+                    <TableCell className="text-center">
+                      {student.isEnrolled ? (
+                        <Badge className="bg-green-100 text-green-800">Inscrito - Sección {student.enrollmentSection}</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-orange-600 border-orange-300">Pendiente</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 

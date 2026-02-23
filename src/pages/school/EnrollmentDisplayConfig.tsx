@@ -14,7 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Save, Info, Plus, Trash2, ChevronDown, Eye } from "lucide-react";
+import { Save, Info, Plus, Trash2, ChevronDown, Eye, Star } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
 import GeneralConfigTab from "@/components/planilla/GeneralConfigTab";
 import { Separator } from "@/components/ui/separator";
 
@@ -492,6 +494,25 @@ export default function EnrollmentDisplayConfig() {
                               </CollapsibleTrigger>
                               <CollapsibleContent>
                                 <div className="p-3 pt-0 space-y-3">
+                                  {/* Quick-add enrollment fields */}
+                                  <div className="flex flex-wrap gap-2 mb-2">
+                                    {[
+                                      { key: "custom:tipo_de_estudiante", label: "Tipo de Estudiante" },
+                                      { key: "custom:grupo_asignado", label: "Grupo Asignado" },
+                                      { key: "custom:fecha_de_inscripcion", label: "Fecha de Inscripción" },
+                                    ].filter(ef => !section.field_names.includes(ef.key)).map(ef => (
+                                      <Button
+                                        key={ef.key}
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+                                        onClick={() => toggleSectionField(sectionIdx, ef.key)}
+                                      >
+                                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                        {ef.label}
+                                      </Button>
+                                    ))}
+                                  </div>
                                   <div className="flex gap-2">
                                     <Input
                                       value={customFieldInput[sectionIdx] || ""}
@@ -533,9 +554,24 @@ export default function EnrollmentDisplayConfig() {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                       {section.field_names.filter(f => f.startsWith("custom:")).map(f => {
                                         const label = f.replace("custom:", "").replace(/_/g, " ");
+                                        const isEnrollmentField = ENROLLMENT_CUSTOM_FIELDS.includes(f);
                                         return (
-                                          <div key={f} className="flex items-center justify-between p-2.5 rounded-md border">
-                                            <span className="text-sm capitalize">{label}</span>
+                                          <div key={f} className={`flex items-center justify-between p-2.5 rounded-md border ${isEnrollmentField ? "border-amber-300 bg-amber-50/50" : ""}`}>
+                                            <div className="flex items-center gap-1.5">
+                                              {isEnrollmentField && (
+                                                <TooltipProvider>
+                                                  <Tooltip>
+                                                    <TooltipTrigger>
+                                                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                      <p>Este campo se llena automáticamente al inscribir</p>
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                                </TooltipProvider>
+                                              )}
+                                              <span className="text-sm capitalize">{label}</span>
+                                            </div>
                                             <Button
                                               variant="ghost"
                                               size="icon"
