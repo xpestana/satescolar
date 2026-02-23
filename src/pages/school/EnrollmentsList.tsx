@@ -503,6 +503,7 @@ export default function EnrollmentsList() {
             <TableHeader>
               <TableRow>
                 <TableHead>Acciones</TableHead>
+                <TableHead className="text-center">Estado</TableHead>
                 <TableHead>Foto</TableHead>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Cédula</TableHead>
@@ -511,7 +512,6 @@ export default function EnrollmentsList() {
                   <TableHead key={col.key}>{col.label}</TableHead>
                 ))}
                 <TableHead>Grado</TableHead>
-                <TableHead className="text-center">Estado</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -571,6 +571,13 @@ export default function EnrollmentsList() {
                         </DropdownMenu>
                       </div>
                     </TableCell>
+                    <TableCell className="text-center">
+                      {student.isEnrolled ? (
+                        <Badge className="bg-green-100 text-green-800">Inscrito - Sección {student.enrollmentSection}</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-orange-600 border-orange-300">Pendiente</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {student.photo_url ? (
                         <img src={student.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
@@ -587,13 +594,6 @@ export default function EnrollmentsList() {
                       <TableCell key={col.key} className="text-sm">{getDynamicValue(student, col.key)}</TableCell>
                     ))}
                     <TableCell>{student.form_data?.grado || "—"}</TableCell>
-                    <TableCell className="text-center">
-                      {student.isEnrolled ? (
-                        <Badge className="bg-green-100 text-green-800">Inscrito - Sección {student.enrollmentSection}</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-orange-600 border-orange-300">Pendiente</Badge>
-                      )}
-                    </TableCell>
                   </TableRow>
                 );
               })}
