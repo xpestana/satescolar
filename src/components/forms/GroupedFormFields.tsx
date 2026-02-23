@@ -179,10 +179,26 @@ export function GroupedFormFields({
     }
   };
 
+  // Auto-persist "pais" fields that are hardcoded to "Venezuela"
+  const paisFields = useMemo(() => 
+    fields.filter(f => getGeoBase(f.field_name) === "pais"), 
+    [fields]
+  );
+  
+  // On mount / when formData changes, ensure pais fields have "Venezuela" persisted
+  useMemo(() => {
+    paisFields.forEach(f => {
+      if (!formData[f.field_name]) {
+        // Use setTimeout to avoid updating state during render
+        setTimeout(() => onFieldChange(f.field_name, "Venezuela"), 0);
+      }
+    });
+  }, [paisFields, formData, onFieldChange]);
+
   const renderGeographicField = (field: FormField, base: GeoBase) => {
     if (base === "pais") {
       return (
-        <Select value="Venezuela" disabled>
+        <Select value={formData[field.field_name] || "Venezuela"} disabled>
           <SelectTrigger>
             <SelectValue placeholder="Venezuela" />
           </SelectTrigger>
