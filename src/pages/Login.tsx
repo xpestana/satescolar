@@ -28,20 +28,20 @@ export default function Login() {
   const navigate = useNavigate();
   const { signIn, userRole, user } = useAuth();
 
-  // Redirect after login when role is available
+  // Redirect if already logged in
   useEffect(() => {
-    if (loginSuccess && user && userRole) {
+    if (user && userRole) {
       if (userRole === "admin") {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       } else if (userRole === "school") {
-        navigate("/school/dashboard");
+        navigate("/school/dashboard", { replace: true });
       } else if (userRole === "representative") {
-        navigate("/representative/dashboard");
+        navigate("/representative/dashboard", { replace: true });
       } else {
-        navigate("/dashboard");
+        navigate("/dashboard", { replace: true });
       }
     }
-  }, [loginSuccess, user, userRole, navigate]);
+  }, [user, userRole, navigate]);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
