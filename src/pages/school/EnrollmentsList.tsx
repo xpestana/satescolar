@@ -199,6 +199,15 @@ export default function EnrollmentsList() {
     enabled: !!schoolId,
   });
 
+  // Fixed columns that can be toggled (except Acciones and Foto which always show)
+  const FIXED_COLUMNS: { key: string; label: string }[] = [
+    { key: "_estado", label: "Estado" },
+    { key: "_nombre", label: "Nombre" },
+    { key: "_cedula", label: "Cédula" },
+    { key: "_familia", label: "Familia" },
+    { key: "_grado", label: "Grado" },
+  ];
+
   // Build dynamic column definitions from planilla sections
   const baseDynamicColumns = useMemo(() => {
     const cols: { key: string; label: string }[] = [];
@@ -227,6 +236,9 @@ export default function EnrollmentsList() {
     return cols;
   }, [planillaSections, studentFormFields, repFormFields]);
 
+  // All toggleable columns = fixed + dynamic
+  const allToggleableColumns = useMemo(() => [...FIXED_COLUMNS, ...baseDynamicColumns], [baseDynamicColumns]);
+
   // Column order state for drag and drop
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
 
@@ -245,6 +257,7 @@ export default function EnrollmentsList() {
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
 
   const visibleDynamicColumns = dynamicColumns.filter(c => !hiddenColumns.has(c.key));
+  const isColVisible = (key: string) => !hiddenColumns.has(key);
 
   const toggleColumn = (key: string) => {
     setHiddenColumns(prev => {
@@ -441,14 +454,13 @@ export default function EnrollmentsList() {
 
   // Build export data from filtered results and visible columns
   const buildExportData = useCallback(() => {
-    const columns = [
-      { key: "estado", label: "Estado" },
-      { key: "nombre", label: "Nombre" },
-      { key: "cedula", label: "Cédula" },
-      { key: "familia", label: "Familia" },
-      ...visibleDynamicColumns.map(c => ({ key: c.key, label: c.label })),
-      { key: "grado", label: "Grado" },
-    ];
+    const columns: { key: string; label: string }[] = [];
+    if (isColVisible("_estado")) columns.push({ key: "estado", label: "Estado" });
+    if (isColVisible("_nombre")) columns.push({ key: "nombre", label: "Nombre" });
+    if (isColVisible("_cedula")) columns.push({ key: "cedula", label: "Cédula" });
+    if (isColVisible("_familia")) columns.push({ key: "familia", label: "Familia" });
+    visibleDynamicColumns.forEach(c => columns.push({ key: c.key, label: c.label }));
+    if (isColVisible("_grado")) columns.push({ key: "grado", label: "Grado" });
 
     const rows = filtered.map(s => {
       const row: Record<string, string> = {
@@ -465,7 +477,7 @@ export default function EnrollmentsList() {
     });
 
     return { columns, rows };
-  }, [filtered, visibleDynamicColumns]);
+  }, [filtered, visibleDynamicColumns, hiddenColumns]);
 
   const handleExportPDF = async () => {
     const { columns, rows } = buildExportData();
@@ -564,7 +576,7 @@ export default function EnrollmentsList() {
     setIsModalOpen(true);
   };
 
-  const totalColSpan = 7 + visibleDynamicColumns.length;
+  const totalColSpan = 2 + visibleDynamicColumns.length + (isColVisible("_estado") ? 1 : 0) + (isColVisible("_nombre") ? 1 : 0) + (isColVisible("_cedula") ? 1 : 0) + (isColVisible("_familia") ? 1 : 0) + (isColVisible("_grado") ? 1 : 0);
 
   const breadcrumbs = [
     { label: "Dashboard", href: "/school/dashboard" },
@@ -669,48 +681,46 @@ export default function EnrollmentsList() {
             )}
 
             {/* Column toggle */}
-            {dynamicColumns.length > 0 && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Columns className="h-4 w-4" />
-                    Columnas
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Columns className="h-4 w-4" />
+                  Columnas
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 max-h-80 overflow-y-auto" align="end">
+                <p className="text-sm font-medium mb-2">Columnas visibles</p>
+                <div className="flex gap-2 mb-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7 flex-1"
+                    onClick={() => setHiddenColumns(new Set())}
+                  >
+                    Seleccionar todo
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 max-h-80 overflow-y-auto" align="end">
-                  <p className="text-sm font-medium mb-2">Columnas visibles</p>
-                  <div className="flex gap-2 mb-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-7 flex-1"
-                      onClick={() => setHiddenColumns(new Set())}
-                    >
-                      Seleccionar todo
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-7 flex-1"
-                      onClick={() => setHiddenColumns(new Set(dynamicColumns.map(c => c.key)))}
-                    >
-                      Deseleccionar todo
-                    </Button>
-                  </div>
-                  <div className="space-y-2">
-                    {dynamicColumns.map(col => (
-                      <label key={col.key} className="flex items-center gap-2 cursor-pointer text-sm">
-                        <Checkbox
-                          checked={!hiddenColumns.has(col.key)}
-                          onCheckedChange={() => toggleColumn(col.key)}
-                        />
-                        {col.label}
-                      </label>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7 flex-1"
+                    onClick={() => setHiddenColumns(new Set(allToggleableColumns.map(c => c.key)))}
+                  >
+                    Deseleccionar todo
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {allToggleableColumns.map(col => (
+                    <label key={col.key} className="flex items-center gap-2 cursor-pointer text-sm">
+                      <Checkbox
+                        checked={!hiddenColumns.has(col.key)}
+                        onCheckedChange={() => toggleColumn(col.key)}
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
 
             {/* Export buttons */}
             <DropdownMenu>
@@ -738,17 +748,17 @@ export default function EnrollmentsList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Acciones</TableHead>
-                  <TableHead className="text-center">Estado</TableHead>
+                  {isColVisible("_estado") && <TableHead className="text-center">Estado</TableHead>}
                   <TableHead>Foto</TableHead>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Cédula</TableHead>
-                  <TableHead>Familia</TableHead>
+                  {isColVisible("_nombre") && <TableHead>Nombre</TableHead>}
+                  {isColVisible("_cedula") && <TableHead>Cédula</TableHead>}
+                  {isColVisible("_familia") && <TableHead>Familia</TableHead>}
                   <SortableContext items={visibleDynamicColumns.map(c => c.key)} strategy={horizontalListSortingStrategy}>
                     {visibleDynamicColumns.map(col => (
                       <SortableColumnHeader key={col.key} id={col.key} label={col.label} />
                     ))}
                   </SortableContext>
-                  <TableHead>Grado</TableHead>
+                  {isColVisible("_grado") && <TableHead>Grado</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -808,6 +818,7 @@ export default function EnrollmentsList() {
                           </DropdownMenu>
                         </div>
                       </TableCell>
+                    {isColVisible("_estado") && (
                       <TableCell className="text-center">
                         {student.isEnrolled ? (
                           <Badge className="bg-green-100 text-green-800">Inscrito - Sección {student.enrollmentSection}</Badge>
@@ -815,6 +826,7 @@ export default function EnrollmentsList() {
                           <Badge variant="outline" className="text-orange-600 border-orange-300">Pendiente</Badge>
                         )}
                       </TableCell>
+                    )}
                       <TableCell>
                         {student.photo_url ? (
                           <img src={student.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
@@ -824,13 +836,13 @@ export default function EnrollmentsList() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium">{getStudentName(student.form_data)}</TableCell>
-                      <TableCell>{student.document_id || "—"}</TableCell>
-                      <TableCell>{student.familyName}</TableCell>
+                      {isColVisible("_nombre") && <TableCell className="font-medium">{getStudentName(student.form_data)}</TableCell>}
+                      {isColVisible("_cedula") && <TableCell>{student.document_id || "—"}</TableCell>}
+                      {isColVisible("_familia") && <TableCell>{student.familyName}</TableCell>}
                       {visibleDynamicColumns.map(col => (
                         <TableCell key={col.key} className="text-sm">{getDynamicValue(student, col.key)}</TableCell>
                       ))}
-                      <TableCell>{student.form_data?.grado || "—"}</TableCell>
+                      {isColVisible("_grado") && <TableCell>{student.form_data?.grado || "—"}</TableCell>}
                     </TableRow>
                   );
                 })}
