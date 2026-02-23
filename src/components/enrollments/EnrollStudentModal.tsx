@@ -219,35 +219,31 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Inscribir Estudiante</DialogTitle>
         </DialogHeader>
 
-        {/* Student info */}
-        <div className="flex items-center gap-4 mb-4">
+        {/* Student info + data fields combined */}
+        <div className="flex items-start gap-4 mb-2">
           {student.photo_url ? (
-            <img src={student.photo_url} alt="" className="h-16 w-16 rounded-full object-cover border-2 border-primary" />
+            <img src={student.photo_url} alt="" className="h-14 w-14 rounded-full object-cover border-2 border-primary flex-shrink-0" />
           ) : (
-            <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center text-lg font-bold text-muted-foreground">
+            <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center text-lg font-bold text-muted-foreground flex-shrink-0">
               {getStudentName().charAt(0)}
             </div>
           )}
-          <div>
-            <p className="font-semibold text-lg">{getStudentName()}</p>
-            <p className="text-sm text-muted-foreground">Cédula: {student.document_id || "—"}</p>
-            <p className="text-sm text-muted-foreground">Familia: {student.familyName}</p>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold">{getStudentName()}</p>
+            <p className="text-xs text-muted-foreground">Cédula: {student.document_id || "—"} · Familia: {student.familyName}</p>
           </div>
         </div>
 
-        <Separator />
-
-        {/* Student data fields */}
-        <div className="grid grid-cols-3 gap-3 my-4">
+        <div className="grid grid-cols-4 gap-x-4 gap-y-1 mb-2">
           {fieldsToShow.map(field => (
             <div key={field.name}>
-              <p className="text-xs text-muted-foreground">{field.label}</p>
-              <p className="text-sm font-medium">{student.form_data?.[field.name] || "—"}</p>
+              <p className="text-[11px] text-muted-foreground leading-tight">{field.label}</p>
+              <p className="text-xs font-medium">{student.form_data?.[field.name] || "—"}</p>
             </div>
           ))}
         </div>
@@ -289,7 +285,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         )}
 
         {/* Enrollment form */}
-        <div className="grid grid-cols-2 gap-4 my-4">
+        <div className="grid grid-cols-4 gap-3 my-2">
           <div>
             <Label className="text-sm font-medium">Año Escolar</Label>
             <div className="mt-1">
