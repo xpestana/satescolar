@@ -1,83 +1,94 @@
 
 
-## Plan: Desplegable de descargas y Planilla de Inscripcion en PDF
+# Plan: Mejoras en la Lista de Inscripciones
 
-### Resumen
+## Resumen
 
-Reemplazar el boton simple de "Carnet" en la lista de estudiantes del representante por un desplegable (dropdown) con dos opciones: **Carnet** y **Planilla de Inscripcion**. La planilla se generara como PDF siguiendo el formato proporcionado, usando los datos del estudiante, la familia, el representante principal, las secciones configuradas en `enrollment_planilla_sections`, y la configuracion general de `planilla_general_config`.
-
-Ademas, se agregara un campo `is_primary` a la tabla `representatives` para marcar al representante principal de cada familia.
-
----
-
-### Cambios necesarios
-
-#### 1. Migracion de base de datos
-- Agregar columna `is_primary` (boolean, default false) a la tabla `representatives`.
-- Ejecutar un UPDATE para marcar como `is_primary = true` al representante mas antiguo (`created_at` menor) de cada familia que aun no tenga ninguno marcado. Esto cubre los colegios ya creados.
-
-#### 2. Nueva funcion: `downloadPlanillaInscripcion` en `src/lib/export-utils.ts`
-Funcion que genera el PDF multi-pagina con:
-
-**Encabezado (cada pagina):**
-- Logo del colegio (izquierda), datos institucionales (centro), fotos del representante y estudiante (derecha)
-- Titulo "PLANILLA" y "ANO ESCOLAR: XXXX-XXXX"
-- Nota de advertencia sobre datos exactos
-
-**Pagina 1 - Datos identificativos:**
-- Mini-tabla con primer apellido, segundo apellido, primer nombre, segundo nombre del estudiante
-- Luego se renderizan las secciones configuradas en `enrollment_planilla_sections`:
-  - Tipo `fields`: tabla con los campos seleccionados, resolviendo los valores desde `student.form_data`, `representative.form_data`, o los campos de `families`
-  - Tipo `text`: bloque de texto libre (ej: compromiso del representante)
-- Si una seccion tiene datos de la familia, representante o inscripcion, se colocan en formato tabla
-
-**Pie de pagina (cada pagina):**
-- Lineas de firma configuradas en `planilla_general_config.signature_lines`
-- Direccion, telefono, RIF segun configuracion de footer
-- Texto "Documento generado de forma automatica por SAT Escolar"
-
-**Datos que se consultan:**
-- Estudiante: `students` (form_data, photo_url, document_id)
-- Representante principal: `representatives` donde `is_primary = true` y `family_id` del estudiante
-- Familia: `families` (apellidos, direccion, telefono, etc.)
-- Colegio: `schools` + ubicacion geografica (states, municipalities, cities, parishes)
-- Secciones de planilla: `enrollment_planilla_sections`
-- Config general: `planilla_general_config` (header, footer, firmas)
-- Ano escolar activo: `school_years`
-- Inscripcion del estudiante (si existe): `enrollments` + `sections` para grado/seccion
-
-#### 3. Modificar `src/pages/representative/StudentsList.tsx`
-- Reemplazar el boton "Carnet" por un `DropdownMenu` con dos items:
-  - "Descargar Carnet" (logica actual)
-  - "Descargar Planilla de Inscripcion" (nueva funcion)
-- Importar `DropdownMenu`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuTrigger` de los componentes UI
-- El boton trigger dira "Descargas" con icono `ChevronDown`
-
-#### 4. Marcar representante principal al crear
-- En `src/pages/representative/RepAddRepresentative.tsx` (o donde se cree el representante), al insertar el primer representante de una familia, marcarlo como `is_primary = true`
+Se implementaran 4 mejoras principales en el modulo de inscripciones:
+1. Selector de columnas visibles en la tabla
+2. Indicador de campos de inscripcion en el constructor de planillas
+3. Fondo rojo/verde segun completitud de datos del estudiante
+4. Validacion en el modal de inscripcion
 
 ---
 
-### Detalles tecnicos
+## 1. Selector de columnas visibles en la tabla de inscripciones
 
-**Estructura del PDF (jsPDF):**
-- Orientacion: portrait, tamano carta
-- Cada pagina repite: header con logo + info colegio + fotos, y footer con firmas + info institucional
-- Las secciones se renderizan secuencialmente; si no caben en una pagina, se hace salto automatico con `autoTable` y se repite el mini-header (apellidos/nombres del estudiante)
-- Campos sin datos se muestran como "No registrado"
-- Los campos tipo `_edad` se calculan automaticamente desde `fecha_nacimiento`
-- Los campos tipo `location_full` se resuelven consultando las tablas geograficas
+**Que se hace:** Se agrega un boton junto a la barra de busqueda que abre un popover/dropdown con checkboxes para mostrar/ocultar columnas de la tabla.
 
-**Resolucion de campos prefijados:**
-Los `field_names` en `enrollment_planilla_sections` usan el formato `tipo:nombre_campo`:
-- `student:campo` -> buscar en `student.form_data`
-- `representative:campo` -> buscar en `representative.form_data`  
-- `family:campo` -> buscar en la tabla `families`
-- `custom:campo` -> campo personalizado
-- `student:_edad` -> calculado desde `student:fecha_nacimiento`
+**Columnas disponibles:**
+- Foto, Nombre, Cedula, Familia, Grado, Estado (las actuales fijas)
+- Columnas adicionales basadas en los campos configurados en las secciones de la planilla de inscripcion (`enrollment_planilla_sections`), excluyendo los campos de tipo `custom:` que son de inscripcion (seccion, tipo, fecha)
 
-**Archivos a crear/modificar:**
-1. Migracion SQL (nueva columna `is_primary`)
-2. `src/lib/export-utils.ts` - nueva funcion `downloadPlanillaInscripcion`
-3. `src/pages/representative/StudentsList.tsx` - dropdown de descargas
-4. `src/pages/representative/RepAddRepresentative.tsx` - marcar `is_primary` en primer representante
+**Por defecto:** Todas las columnas de la planilla visibles. Se usa `enrollment_planilla_sections` para obtener los `field_names` activos y mapearlos a columnas de la tabla.
+
+**Archivo:** `src/pages/school/EnrollmentsList.tsx`
+- Se agrega query para `enrollment_planilla_sections`
+- Estado local `visibleColumns` con Set de nombres de columnas
+- Boton con icono `Columns` de lucide + Popover con checkboxes
+- La tabla renderiza dinamicamente las columnas seleccionadas
+
+---
+
+## 2. Indicador de campos de inscripcion en el constructor de planillas
+
+**Que se hace:** En la seccion "Informacion para la Inscripcion" del constructor de planillas, los campos `custom:` que corresponden a datos de inscripcion (`tipo_de_estudiante`, `grupo_asignado`, `fecha_de_inscripcion`) se marcan con una estrella o icono especial para diferenciarlos.
+
+**Archivo:** `src/pages/school/EnrollmentDisplayConfig.tsx`
+- En la lista de campos custom de cada seccion, si el campo es uno de los 3 campos de inscripcion conocidos (`custom:tipo_de_estudiante`, `custom:grupo_asignado`, `custom:fecha_de_inscripcion`), se muestra un icono de estrella y un tooltip indicando que "Este campo se llena automaticamente al inscribir".
+- Se agrega una lista predefinida de campos custom de inscripcion como select rapido (para que no necesiten escribirlos manualmente).
+
+**Migracion:** Actualizar el trigger `create_default_form_fields` para incluir los campos de inscripcion correctamente marcados en la seccion por defecto.
+
+---
+
+## 3. Fondo rojo/verde segun completitud de datos
+
+**Que se hace:** Cada fila de la tabla de inscripciones se colorea segun si el estudiante tiene todos sus datos completos o no.
+
+**Logica de validacion:**
+- Se obtienen los `field_names` de todas las `enrollment_planilla_sections` del colegio
+- Se excluyen los campos que pertenecen al area de inscripcion: `custom:tipo_de_estudiante`, `custom:grupo_asignado`, `custom:fecha_de_inscripcion`
+- Para cada estudiante, se verifica si los campos de tipo `student:*` estan llenos en su `form_data`
+- Los campos `representative:*` y `family:*` requieren datos adicionales (se cargan representante principal y familia)
+
+**Colores:**
+- Fondo verde claro (`bg-green-50`) si todos los campos no-inscripcion estan completos
+- Fondo rojo claro (`bg-red-50`) si falta algun campo
+
+**Archivo:** `src/pages/school/EnrollmentsList.tsx`
+- Se agregan queries para cargar representantes principales y datos de familia
+- Funcion `checkStudentCompleteness()` que evalua cada campo contra los datos disponibles
+- Se aplica clase CSS condicional en el `TableRow`
+
+---
+
+## 4. Validacion en el modal de inscripcion
+
+**Que se hace:** En el modal `EnrollStudentModal`, si faltan campos por rellenar (no de inscripcion), en lugar de mostrar el boton "Inscribir", se muestran botones para ir a editar los datos faltantes.
+
+**Logica:**
+- Se reutiliza la misma logica de completitud del punto 3
+- Se cargan las secciones de la planilla y se verifican los campos del estudiante, representante y familia
+- Si hay campos faltantes:
+  - Se muestra un aviso visual (alerta amarilla/naranja) listando los campos incompletos
+  - El footer muestra botones: "Modificar Estudiante", "Modificar Representante", "Modificar Familia" segun donde esten los campos faltantes
+  - El boton "Inscribir" se oculta o se deshabilita
+- Si todos los campos estan completos, se muestra el boton "Inscribir" normalmente
+
+**Archivo:** `src/components/enrollments/EnrollStudentModal.tsx`
+- Se agrega query para `enrollment_planilla_sections`
+- Se agrega query para representante principal y datos de familia completos
+- Funcion de validacion de completitud
+- Renderizado condicional del footer
+
+---
+
+## Secuencia tecnica de archivos a modificar
+
+1. `src/pages/school/EnrollmentsList.tsx` - Columnas dinamicas + fondo rojo/verde + queries adicionales
+2. `src/components/enrollments/EnrollStudentModal.tsx` - Validacion de completitud + botones condicionales
+3. `src/pages/school/EnrollmentDisplayConfig.tsx` - Indicador de campos de inscripcion con estrella + select rapido
+
+No se requieren migraciones de base de datos ya que los campos de inscripcion conocidos se identifican por convencion (`custom:tipo_de_estudiante`, `custom:grupo_asignado`, `custom:fecha_de_inscripcion`).
+
