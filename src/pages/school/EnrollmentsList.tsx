@@ -860,7 +860,7 @@ export default function EnrollmentsList() {
             </Table>
           </DndContext>
 
-          {totalPages > 1 && (
+          {filtered.length > 0 && (
             <div className="mt-4">
               <Pagination
                 currentPage={currentPage}
