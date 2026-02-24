@@ -474,6 +474,7 @@ export interface PlanillaData {
   enrollment?: any;
   enrollmentSection?: any;
   formFields?: any[];
+  geoCache?: Record<string, string>; // UUID -> name mapping for geographic fields
 }
 
 function resolveFieldValue(
@@ -519,14 +520,23 @@ function resolveFieldValue(
         }
         return studentFd.grado || "No registrado";
       }
-      return studentFd[fieldName] || "No registrado";
+      const val = studentFd[fieldName] || "No registrado";
+      // Resolve UUID geographic fields
+      if (data.geoCache && val && val.match(/^[0-9a-f]{8}-[0-9a-f]{4}-/i)) {
+        return data.geoCache[val] || val;
+      }
+      return val;
     }
     case "representative": {
       if (fieldName === "_edad") return calcAge(repFd.fecha_nacimiento);
       if (fieldName === "fecha_nacimiento") return formatDate(repFd.fecha_nacimiento);
       if (fieldName === "documento") return data.representative?.document_id || repFd.documento || "No registrado";
       if (fieldName === "numero_contacto") return data.representative?.phone || repFd.numero_contacto || "No registrado";
-      return repFd[fieldName] || "No registrado";
+      const val = repFd[fieldName] || "No registrado";
+      if (data.geoCache && val && val.match(/^[0-9a-f]{8}-[0-9a-f]{4}-/i)) {
+        return data.geoCache[val] || val;
+      }
+      return val;
     }
     case "family": {
       const f = data.family;
@@ -543,7 +553,11 @@ function resolveFieldValue(
         ].filter(Boolean);
         return parts.length > 0 ? parts.join(", ") : "No registrado";
       }
-      return (f as any)[fieldName] || "No registrado";
+      const fVal = (f as any)[fieldName] || "No registrado";
+      if (data.geoCache && fVal && typeof fVal === "string" && fVal.match(/^[0-9a-f]{8}-[0-9a-f]{4}-/i)) {
+        return data.geoCache[fVal] || fVal;
+      }
+      return fVal;
     }
     case "custom": {
       // Custom fields - check enrollment data first, then student form_data

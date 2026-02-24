@@ -110,6 +110,31 @@ export default function StudentsList() {
         parish: familyGeoPromises[3]?.data?.name || parishRes?.data?.name,
       };
 
+      // Build geoCache for UUID geographic fields in form_data
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
+      const uuidsToResolve = new Set<string>();
+      const studentFd = (student.form_data || {}) as Record<string, string>;
+      const repFd = (representative?.form_data || {}) as Record<string, string>;
+      for (const fd of [studentFd, repFd]) {
+        for (const val of Object.values(fd)) {
+          if (typeof val === "string" && uuidPattern.test(val)) uuidsToResolve.add(val);
+        }
+      }
+      const geoCache: Record<string, string> = {};
+      if (uuidsToResolve.size > 0) {
+        const ids = Array.from(uuidsToResolve);
+        const [stR, muR, ciR, paR] = await Promise.all([
+          supabase.from("states").select("id, name").in("id", ids),
+          supabase.from("municipalities").select("id, name").in("id", ids),
+          supabase.from("cities").select("id, name").in("id", ids),
+          supabase.from("parishes").select("id, name").in("id", ids),
+        ]);
+        for (const r of (stR.data || [])) geoCache[r.id] = r.name;
+        for (const r of (muR.data || [])) geoCache[r.id] = r.name;
+        for (const r of (ciR.data || [])) geoCache[r.id] = r.name;
+        for (const r of (paR.data || [])) geoCache[r.id] = r.name;
+      }
+
       await downloadPlanillaInscripcion({
         student,
         representative,
@@ -122,6 +147,7 @@ export default function StudentsList() {
         enrollment: enrollmentRes.data,
         enrollmentSection: enrollmentRes.data?.sections,
         formFields: formFieldsRes.data || [],
+        geoCache,
       });
     } catch (err) {
       console.error("Error generating planilla:", err);
