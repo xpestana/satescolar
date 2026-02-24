@@ -551,6 +551,39 @@ export default function EnrollmentsList() {
         form_data: student.form_data || {},
       };
 
+      // Build geoCache: collect all UUID values from student/rep form_data geographic fields
+      const geoFieldNames = ["estado_nacimiento", "municipio_nacimiento", "ciudad_nacimiento", "parroquia_nacimiento", "estado", "municipio", "ciudad", "parroquia"];
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
+      const uuidsToResolve = new Set<string>();
+      const studentFd = (student.form_data || {}) as Record<string, string>;
+      const repFd = (representative?.form_data || {}) as Record<string, string>;
+      
+      for (const fd of [studentFd, repFd]) {
+        for (const key of geoFieldNames) {
+          const val = fd[key];
+          if (val && uuidPattern.test(val)) uuidsToResolve.add(val);
+        }
+        // Also check all form_data values for UUIDs
+        for (const val of Object.values(fd)) {
+          if (typeof val === "string" && uuidPattern.test(val)) uuidsToResolve.add(val);
+        }
+      }
+
+      const geoCache: Record<string, string> = {};
+      if (uuidsToResolve.size > 0) {
+        const ids = Array.from(uuidsToResolve);
+        const [statesR, munisR, citiesR, parishesR] = await Promise.all([
+          supabase.from("states").select("id, name").in("id", ids),
+          supabase.from("municipalities").select("id, name").in("id", ids),
+          supabase.from("cities").select("id, name").in("id", ids),
+          supabase.from("parishes").select("id, name").in("id", ids),
+        ]);
+        for (const row of (statesR.data || [])) geoCache[row.id] = row.name;
+        for (const row of (munisR.data || [])) geoCache[row.id] = row.name;
+        for (const row of (citiesR.data || [])) geoCache[row.id] = row.name;
+        for (const row of (parishesR.data || [])) geoCache[row.id] = row.name;
+      }
+
       await downloadPlanillaInscripcion({
         student: studentFullData,
         representative,
@@ -563,6 +596,7 @@ export default function EnrollmentsList() {
         enrollment: enrollmentRes.data,
         enrollmentSection: enrollmentRes.data?.sections,
         formFields: formFieldsRes.data || [],
+        geoCache,
       });
     } catch (err) {
       console.error("Error generating planilla:", err);
