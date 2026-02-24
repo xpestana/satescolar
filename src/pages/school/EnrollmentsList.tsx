@@ -45,6 +45,7 @@ interface StudentWithEnrollment {
   familyName: string;
   isEnrolled: boolean;
   enrollmentSection?: string;
+  enrollmentType?: string;
 }
 
 // Sortable column header component
@@ -314,17 +315,17 @@ export default function EnrollmentsList() {
 
       const familyMap = new Map(families?.map(f => [f.id, `${f.father_last_name || ""} ${f.mother_last_name || ""}`.trim() || "Sin apellido"]) || []);
 
-      let enrollmentMap = new Map<string, string>();
+      let enrollmentMap = new Map<string, { section: string; type: string }>();
       if (resolvedYear?.id) {
         const { data: enrollments } = await supabase
           .from("enrollments")
-          .select("student_id, section_id")
+          .select("student_id, section_id, enrollment_type")
           .eq("school_year_id", resolvedYear.id)
           .eq("school_id", schoolId);
 
         enrollments?.forEach(e => {
           const section = sections.find(s => s.id === e.section_id);
-          enrollmentMap.set(e.student_id, section?.name || "");
+          enrollmentMap.set(e.student_id, { section: section?.name || "", type: e.enrollment_type || "" });
         });
       }
 
@@ -336,7 +337,8 @@ export default function EnrollmentsList() {
         family_id: s.family_id,
         familyName: familyMap.get(s.family_id) || "",
         isEnrolled: enrollmentMap.has(s.id),
-        enrollmentSection: enrollmentMap.get(s.id),
+        enrollmentSection: enrollmentMap.get(s.id)?.section,
+        enrollmentType: enrollmentMap.get(s.id)?.type,
       })) as StudentWithEnrollment[];
     },
     enabled: !!schoolId && sections.length >= 0,
@@ -824,7 +826,12 @@ export default function EnrollmentsList() {
                     {isColVisible("_estado") && (
                       <TableCell className="text-center">
                         {student.isEnrolled ? (
-                          <Badge className="bg-green-100 text-green-800">Inscrito - Sección {student.enrollmentSection}</Badge>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Badge className="bg-green-100 text-green-800">Inscrito - Sección {student.enrollmentSection}</Badge>
+                            {student.enrollmentType && (
+                              <span className="text-[10px] text-muted-foreground">{student.enrollmentType}</span>
+                            )}
+                          </div>
                         ) : (
                           <Badge variant="outline" className="text-orange-600 border-orange-300">Pendiente</Badge>
                         )}
