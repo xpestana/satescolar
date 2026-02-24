@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
@@ -60,6 +60,43 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [enrollmentType, setEnrollmentType] = useState("");
   const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split("T")[0]);
+
+  // Fetch existing enrollment data for pre-population
+  const { data: existingEnrollment } = useQuery({
+    queryKey: ["existing-enrollment", student.id, activeYear.id, schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("enrollments")
+        .select("section_id, enrollment_type, enrollment_date")
+        .eq("student_id", student.id)
+        .eq("school_year_id", activeYear.id)
+        .eq("school_id", schoolId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!student.id && !!activeYear.id && !!schoolId && student.isEnrolled,
+  });
+
+  // Pre-populate form when existing enrollment loads
+  useEffect(() => {
+    if (existingEnrollment && open) {
+      setSelectedSectionId(existingEnrollment.section_id || "");
+      setEnrollmentType(existingEnrollment.enrollment_type || "");
+      setEnrollmentDate(existingEnrollment.enrollment_date || new Date().toISOString().split("T")[0]);
+    }
+  }, [existingEnrollment, open]);
+
+  // Reset when modal closes
+  useEffect(() => {
+    if (!open) {
+      if (!student.isEnrolled) {
+        setSelectedSectionId("");
+        setEnrollmentType("");
+        setEnrollmentDate(new Date().toISOString().split("T")[0]);
+      }
+    }
+  }, [open, student.isEnrolled]);
 
   // Fetch display config for this school
   const { data: displayConfig = [] } = useQuery({
@@ -196,7 +233,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         { name: "segundo_apellido", label: "Segundo Apellido" },
         { name: "fecha_nacimiento", label: "Fecha de Nacimiento" },
         { name: "genero", label: "Género" },
-        { name: "grado", label: "Grado" },
+        { name: "nivel_grado", label: "Grado" },
       ];
 
   const sectionsByGrade = sections.reduce((acc, s) => {
