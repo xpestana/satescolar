@@ -16,6 +16,7 @@ import {
   BookOpen,
   Home as HomeIcon,
   ClipboardCheck,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -68,6 +69,7 @@ const navSections: NavSection[] = [
     items: [
       { label: "Usuarios", href: "/admin/usuarios", icon: Users, requiredRole: "admin" },
       { label: "Colegios", href: "/admin/colegios", icon: GraduationCap, requiredRole: "admin" },
+      { label: "Enviar Email", href: "/admin/enviar-email", icon: Mail, requiredRole: "admin" },
     ],
   },
   {

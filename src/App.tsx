@@ -24,6 +24,7 @@ import EnrollmentDisplayConfig from "./pages/school/EnrollmentDisplayConfig";
 import UtilitiesSettings from "./pages/school/UtilitiesSettings";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
+import SendEmail from "./pages/admin/SendEmail";
 import UsersList from "./pages/admin/UsersList";
 import RepresentativeDashboard from "./pages/representative/RepresentativeDashboard";
 import RepresentativesList from "./pages/representative/RepresentativesList";
@@ -221,6 +222,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="admin">
                   <UsersList />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/enviar-email" 
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <SendEmail />
                 </ProtectedRoute>
               } 
             />
