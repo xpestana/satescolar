@@ -515,7 +515,9 @@ export default function EnrollmentsList() {
         supabase.from("representatives").select("*").eq("family_id", student.family_id).eq("is_primary", true).limit(1).maybeSingle(),
         supabase.from("enrollment_planilla_sections").select("*").eq("school_id", schoolId).order("display_order"),
         supabase.from("planilla_general_config").select("*").eq("school_id", schoolId).maybeSingle(),
-        supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", schoolId).limit(1).maybeSingle(),
+        resolvedYear?.id 
+          ? supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", schoolId).eq("school_year_id", resolvedYear.id).maybeSingle()
+          : supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", schoolId).limit(1).maybeSingle(),
         Promise.all([
           school.state_id ? supabase.from("states").select("name").eq("id", school.state_id).single() : null,
           school.municipality_id ? supabase.from("municipalities").select("name").eq("id", school.municipality_id).single() : null,
