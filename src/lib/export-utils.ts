@@ -512,13 +512,18 @@ function resolveFieldValue(
       if (fieldName === "_edad") return calcAge(studentFd.fecha_nacimiento);
       if (fieldName === "fecha_nacimiento") return formatDate(studentFd.fecha_nacimiento);
       if (fieldName === "documento") return data.student?.document_id || studentFd.documento || "No registrado";
-      if (fieldName === "grado") {
+      if (fieldName === "grado" || fieldName === "nivel_grado") {
         if (data.enrollmentSection) {
-          const gradeName = data.enrollmentSection.name || "";
           const gradeLevel = data.enrollmentSection.grade_level || "";
-          return gradeName || gradeLevel || studentFd.grado || "No registrado";
+          const sectionName = data.enrollmentSection.name || "";
+          const GRADE_LABELS: Record<string, string> = {
+            pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
+            primaria: "Primaria", media_general: "Media General", media_tecnica: "Media Técnica",
+          };
+          const gradeLabel = GRADE_LABELS[gradeLevel] || gradeLevel;
+          return `${gradeLabel}${sectionName ? ` - Sección ${sectionName}` : ""}` || studentFd.nivel_grado || studentFd.grado || "No registrado";
         }
-        return studentFd.grado || "No registrado";
+        return studentFd.nivel_grado || studentFd.grado || "No registrado";
       }
       const val = studentFd[fieldName] || "No registrado";
       // Resolve UUID geographic fields
