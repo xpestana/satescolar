@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { toast } from "sonner";
+import { CarnetEditor, CarnetLayoutConfig, DEFAULT_LAYOUT } from "@/components/utilities/CarnetEditor";
 
 const DEFAULT_PRIMARY = "#01051e";
 const DEFAULT_SECONDARY = "#1e78c8";
@@ -29,6 +30,7 @@ export default function UtilitiesSettings() {
   const [watermarkFile, setWatermarkFile] = useState<File | null>(null);
   const [watermarkPreview, setWatermarkPreview] = useState<string | null>(null);
   const [useCustomWatermark, setUseCustomWatermark] = useState(false);
+  const [layout, setLayout] = useState<CarnetLayoutConfig>(DEFAULT_LAYOUT);
 
   const { data: config, isLoading } = useQuery({
     queryKey: ["carnet-config", schoolId],
@@ -44,20 +46,6 @@ export default function UtilitiesSettings() {
     enabled: !!schoolId,
   });
 
-  // Sync state when config loads
-  useState(() => {
-    if (config) {
-      setPrimaryColor(config.primary_color || DEFAULT_PRIMARY);
-      setSecondaryColor(config.secondary_color || DEFAULT_SECONDARY);
-      setWatermarkOpacity(Number(config.watermark_opacity) || 0.06);
-      setWatermarkSize(Number(config.watermark_size) || 30);
-      if (config.watermark_url) {
-        setWatermarkPreview(config.watermark_url);
-        setUseCustomWatermark(true);
-      }
-    }
-  });
-
   // Re-sync when config changes
   const [prevConfigId, setPrevConfigId] = useState<string | null>(null);
   if (config && config.id !== prevConfigId) {
@@ -70,13 +58,28 @@ export default function UtilitiesSettings() {
       setWatermarkPreview(config.watermark_url);
       setUseCustomWatermark(true);
     }
+    // Load layout config
+    const lc = config.layout_config as any;
+    if (lc && typeof lc === "object" && lc.headerHeight) {
+      setLayout({
+        headerHeight: lc.headerHeight ?? DEFAULT_LAYOUT.headerHeight,
+        photoSize: lc.photoSize ?? DEFAULT_LAYOUT.photoSize,
+        photoPos: lc.photoPos ?? DEFAULT_LAYOUT.photoPos,
+        namePos: lc.namePos ?? DEFAULT_LAYOUT.namePos,
+        badgePos: lc.badgePos ?? DEFAULT_LAYOUT.badgePos,
+        fontSizes: {
+          schoolName: lc.fontSizes?.schoolName ?? DEFAULT_LAYOUT.fontSizes.schoolName,
+          studentName: lc.fontSizes?.studentName ?? DEFAULT_LAYOUT.fontSizes.studentName,
+          document: lc.fontSizes?.document ?? DEFAULT_LAYOUT.fontSizes.document,
+        },
+      });
+    }
   }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       let watermarkUrl = config?.watermark_url || null;
 
-      // Upload custom watermark if provided
       if (watermarkFile && schoolId) {
         const ext = watermarkFile.name.split(".").pop();
         const path = `${schoolId}/carnet-watermark.${ext}`;
@@ -87,7 +90,7 @@ export default function UtilitiesSettings() {
         const { data: urlData } = supabase.storage.from("school-assets").getPublicUrl(path);
         watermarkUrl = urlData.publicUrl;
       } else if (!useCustomWatermark) {
-        watermarkUrl = null; // Will use school logo as default
+        watermarkUrl = null;
       }
 
       const payload = {
@@ -97,6 +100,7 @@ export default function UtilitiesSettings() {
         watermark_url: watermarkUrl,
         watermark_opacity: watermarkOpacity,
         watermark_size: watermarkSize,
+        layout_config: layout as any,
       };
 
       if (config) {
@@ -133,9 +137,9 @@ export default function UtilitiesSettings() {
     setWatermarkFile(null);
     setWatermarkPreview(null);
     setUseCustomWatermark(false);
+    setLayout(DEFAULT_LAYOUT);
   };
 
-  // Preview card colors
   const previewLogoUrl = school?.logo_url || null;
 
   return (
@@ -158,10 +162,9 @@ export default function UtilitiesSettings() {
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Settings */}
+              {/* Colors & Watermark controls */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div className="space-y-6">
-                  {/* Colors */}
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-medium">Colores del Carnet</CardTitle>
@@ -204,7 +207,6 @@ export default function UtilitiesSettings() {
                     </CardContent>
                   </Card>
 
-                  {/* Watermark */}
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-medium">Marca de Agua</CardTitle>
@@ -259,107 +261,34 @@ export default function UtilitiesSettings() {
                       </div>
                     </CardContent>
                   </Card>
-
-                  <div className="flex gap-2">
-                    <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                      <Save className="h-4 w-4 mr-2" />
-                      {saveMutation.isPending ? "Guardando..." : "Guardar"}
-                    </Button>
-                    <Button variant="outline" onClick={resetDefaults}>
-                      <RotateCcw className="h-4 w-4 mr-2" /> Restablecer
-                    </Button>
-                  </div>
                 </div>
 
-                {/* Live Preview */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Vista Previa</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div
-                      className="mx-auto border rounded-lg overflow-hidden shadow-lg"
-                      style={{ width: 216, height: 342 }}
-                    >
-                      {/* Header */}
-                      <div className="relative" style={{ height: 88, backgroundColor: primaryColor }}>
-                        {/* Left triangle */}
-                        <svg className="absolute top-0 left-0" width="40" height="68" viewBox="0 0 40 68">
-                          <polygon points="0,0 40,0 0,68" fill={secondaryColor} />
-                        </svg>
-                        {/* Right triangle */}
-                        <svg className="absolute top-0 right-0" width="40" height="68" viewBox="0 0 40 68">
-                          <polygon points="40,0 0,0 40,68" fill={secondaryColor} style={{ opacity: 0.7 }} />
-                        </svg>
-                        {/* Stripe */}
-                        <div className="absolute bottom-0 left-0 right-0 h-1" style={{ backgroundColor: secondaryColor }} />
-                        {/* Logo */}
-                        {previewLogoUrl && (
-                          <img src={previewLogoUrl} alt="" className="absolute left-1/2 -translate-x-1/2 top-2 h-8 w-8 object-contain" />
-                        )}
-                        <div className="absolute bottom-3 left-0 right-0 text-center">
-                          <p className="text-white text-[8px] font-bold px-4 leading-tight">{school?.name?.toUpperCase() || "NOMBRE DEL COLEGIO"}</p>
-                          <p className="text-white/80 text-[6px] mt-0.5">Ciudad, Estado</p>
-                          <p className="text-white/70 text-[6px]">Año Escolar: 2024-2025</p>
-                        </div>
-                      </div>
+                {/* Empty right column placeholder - the CarnetEditor below handles preview */}
+                <div />
+              </div>
 
-                      {/* Body */}
-                      <div className="relative bg-white flex-1" style={{ height: 254 - 16 }}>
-                        {/* Watermark */}
-                        {(watermarkPreview || previewLogoUrl) && (
-                          <img
-                            src={useCustomWatermark && watermarkPreview ? watermarkPreview : previewLogoUrl || ""}
-                            alt=""
-                            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 object-contain pointer-events-none"
-                            style={{
-                              width: `${(watermarkSize / 54) * 100}%`,
-                              height: `${(watermarkSize / 54) * 100}%`,
-                              opacity: watermarkOpacity,
-                            }}
-                          />
-                        )}
+              {/* Interactive Carnet Editor */}
+              <CarnetEditor
+                primaryColor={primaryColor}
+                secondaryColor={secondaryColor}
+                schoolName={school?.name || ""}
+                logoUrl={previewLogoUrl}
+                watermarkUrl={useCustomWatermark && watermarkPreview ? watermarkPreview : null}
+                watermarkOpacity={watermarkOpacity}
+                watermarkSize={watermarkSize}
+                useCustomWatermark={useCustomWatermark}
+                layout={layout}
+                onLayoutChange={setLayout}
+              />
 
-                        {/* Photo placeholder */}
-                        <div className="flex justify-center pt-3">
-                          <div
-                            className="rounded-full border-2 bg-muted flex items-center justify-center"
-                            style={{ width: 56, height: 56, borderColor: secondaryColor }}
-                          >
-                            <span className="text-muted-foreground text-[10px]">Foto</span>
-                          </div>
-                        </div>
-
-                        <div className="text-center mt-2 px-2">
-                          <p className="font-bold text-[9px]" style={{ color: primaryColor }}>NOMBRE DEL ESTUDIANTE</p>
-                          <div
-                            className="mx-auto mt-1 rounded-full px-3 py-0.5"
-                            style={{ backgroundColor: secondaryColor, width: "fit-content" }}
-                          >
-                            <span className="text-white text-[7px] font-bold">ESTUDIANTE</span>
-                          </div>
-                          <p className="mt-1.5 font-bold text-[8px]" style={{ color: primaryColor }}>V-12345678</p>
-
-                          {/* QR placeholder */}
-                          <div className="mt-1.5 mx-auto bg-muted border rounded flex items-center justify-center" style={{ width: 44, height: 44 }}>
-                            <span className="text-muted-foreground text-[7px]">QR</span>
-                          </div>
-                        </div>
-
-                        {/* Bottom bar */}
-                        <div className="absolute bottom-0 left-0 right-0 h-4 flex">
-                          <div className="flex-1" style={{ backgroundColor: primaryColor }} />
-                          <svg width="32" height="16" viewBox="0 0 32 16" className="absolute right-0 bottom-0">
-                            <polygon points="32,16 0,16 32,0" fill={secondaryColor} />
-                          </svg>
-                          <svg width="24" height="16" viewBox="0 0 24 16" className="absolute left-0 bottom-0">
-                            <polygon points="0,16 24,16 0,0" fill={secondaryColor} style={{ opacity: 0.7 }} />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="flex gap-2 mt-6">
+                <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+                  <Save className="h-4 w-4 mr-2" />
+                  {saveMutation.isPending ? "Guardando..." : "Guardar"}
+                </Button>
+                <Button variant="outline" onClick={resetDefaults}>
+                  <RotateCcw className="h-4 w-4 mr-2" /> Restablecer
+                </Button>
               </div>
             </AccordionContent>
           </AccordionItem>
