@@ -95,7 +95,26 @@ export default function FamiliesList() {
         .select("family_id")
         .eq("school_id", schoolId);
 
-      const familyIds = (familySchools || []).map((fs) => fs.family_id);
+      const allFamilyIds = (familySchools || []).map((fs) => fs.family_id);
+      if (allFamilyIds.length === 0) return { families: 0, representatives: 0, students: 0 };
+
+      // Get families and filter to only those with representative role
+      const { data: familiesData } = await supabase
+        .from("families")
+        .select("id, user_id")
+        .in("id", allFamilyIds);
+
+      if (!familiesData || familiesData.length === 0) return { families: 0, representatives: 0, students: 0 };
+
+      const famUserIds = familiesData.map((f) => f.user_id);
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "representative")
+        .in("user_id", famUserIds);
+
+      const repUserIds = new Set((rolesData || []).map((r) => r.user_id));
+      const familyIds = familiesData.filter((f) => repUserIds.has(f.user_id)).map((f) => f.id);
       if (familyIds.length === 0) return { families: 0, representatives: 0, students: 0 };
 
       // Count reps and students in parallel (students via student_schools for school isolation)
@@ -135,12 +154,14 @@ export default function FamiliesList() {
       const userIds = data.map((f) => f.user_id);
       const familyIds = data.map((f) => f.id);
 
-      const [emailsRes, repsRes, studentsRes] = await Promise.all([
+      const [rolesRes, emailsRes, repsRes, studentsRes] = await Promise.all([
+        supabase.from("user_roles").select("user_id").eq("role", "representative").in("user_id", userIds),
         supabase.functions.invoke("get-user-emails", { body: { userIds } }),
         supabase.from("representatives").select("family_id, form_data").in("family_id", familyIds),
         supabase.from("students").select("family_id, form_data").in("family_id", familyIds),
       ]);
 
+      const repUserIds = new Set((rolesRes.data || []).map((r) => r.user_id));
       const emails = emailsRes.data?.emails || {};
 
       const repsByFamily = new Map<string, any[]>();
@@ -163,6 +184,7 @@ export default function FamiliesList() {
       };
 
       const families: FamilyWithEmail[] = data
+        .filter((f) => repUserIds.has(f.user_id))
         .map((family) => {
           const reps = repsByFamily.get(family.id) || [];
           const students = studentsByFamily.get(family.id) || [];
