@@ -503,7 +503,7 @@ export async function downloadCarnet(params: {
       color: { dark: params.primaryColor || "#01051e", light: "#ffffff" },
     });
     doc.addImage(qrDataUrl, "PNG",
-      qp.x - qrSizeMm / 2, qp.y - qrSizeMm / 2,
+      qp.x - qrSizeMm / 2, qp.y,
       qrSizeMm, qrSizeMm);
   } catch { /* ignore */ }
 
