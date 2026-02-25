@@ -134,50 +134,82 @@ export function EmailComposer() {
     const logoUrl = school?.logo_url || "";
     const schoolName = school?.name || "Colegio";
     const bodyHtml = message.replace(/\n/g, "<br/>");
+    const subjectText = subject || "Asunto del correo";
+    const bodyContent = bodyHtml || '<span style="color:#9ca3af;font-style:italic;">El contenido de tu mensaje aparecerá aquí...</span>';
 
     return `<!DOCTYPE html>
-<html>
+<html lang="es">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#f4f4f7;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;">
-<tr><td align="center" style="padding:32px 16px;">
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
 
-<!-- Header -->
-<tr><td style="background-color:${primaryColor};padding:32px 40px;text-align:center;">
-${logoUrl ? `<img src="${logoUrl}" alt="${schoolName}" style="height:60px;margin-bottom:12px;border-radius:8px;" />` : ""}
-<h2 style="color:#ffffff;margin:0;font-size:20px;font-weight:700;letter-spacing:0.5px;">${schoolName}</h2>
+<!-- Outer wrapper -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f2f5;">
+<tr><td align="center" style="padding:40px 20px;">
+
+<!-- Main card -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+<!-- Top accent line -->
+<tr><td style="background:linear-gradient(90deg,${primaryColor},${secondaryColor});height:4px;font-size:0;line-height:0;">&nbsp;</td></tr>
+
+<!-- Header with logo -->
+<tr><td style="background-color:${primaryColor};padding:28px 40px;text-align:center;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr><td align="center">
+      ${logoUrl ? `<img src="${logoUrl}" alt="${schoolName}" style="height:52px;margin-bottom:14px;border-radius:6px;display:block;margin-left:auto;margin-right:auto;" />` : ""}
+      <p style="color:#ffffff;margin:0;font-size:18px;font-weight:600;letter-spacing:0.3px;line-height:1.4;">${schoolName}</p>
+    </td></tr>
+  </table>
 </td></tr>
 
-<!-- Accent bar -->
-<tr><td style="background-color:${secondaryColor};height:4px;"></td></tr>
+<!-- Secondary accent bar -->
+<tr><td style="background-color:${secondaryColor};height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>
 
-<!-- Subject -->
-<tr><td style="padding:32px 40px 0;">
-<h1 style="color:${primaryColor};margin:0;font-size:24px;font-weight:700;line-height:1.3;">${subject || "Asunto del correo"}</h1>
+<!-- Content area -->
+<tr><td style="padding:36px 40px 16px;">
+  <h1 style="color:#1a1a2e;margin:0 0 8px;font-size:22px;font-weight:700;line-height:1.35;">${subjectText}</h1>
+  <div style="width:48px;height:3px;background-color:${secondaryColor};border-radius:2px;margin-bottom:24px;"></div>
 </td></tr>
 
-<!-- Body -->
-<tr><td style="padding:20px 40px 32px;">
-<div style="color:#374151;font-size:15px;line-height:1.7;">
-${bodyHtml || '<span style="color:#9ca3af;">El contenido de tu mensaje aparecerá aquí...</span>'}
-</div>
+<tr><td style="padding:0 40px 36px;">
+  <div style="color:#4a4a68;font-size:15px;line-height:1.75;">${bodyContent}</div>
 </td></tr>
 
 <!-- Divider -->
 <tr><td style="padding:0 40px;">
-<hr style="border:none;border-top:2px solid ${secondaryColor};opacity:0.3;margin:0;" />
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr><td style="border-top:1px solid #e8e8ef;font-size:0;line-height:0;">&nbsp;</td></tr>
+  </table>
 </td></tr>
 
-<!-- Footer -->
-<tr><td style="background-color:${primaryColor};padding:24px 40px;text-align:center;border-radius:0 0 12px 12px;">
-<p style="color:rgba(255,255,255,0.7);margin:0;font-size:12px;">Desarrollado por <a href="https://satescolar.com" style="color:${secondaryColor};text-decoration:none;font-weight:600;">SATEscolar</a></p>
-<p style="color:rgba(255,255,255,0.5);margin:4px 0 0;font-size:11px;">satescolar.com</p>
+<!-- School info footer -->
+<tr><td style="padding:24px 40px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td style="vertical-align:middle;">
+        ${logoUrl ? `<img src="${logoUrl}" alt="" style="height:28px;border-radius:4px;display:inline-block;vertical-align:middle;margin-right:10px;" />` : ""}
+        <span style="color:#6b7280;font-size:13px;vertical-align:middle;">${schoolName}</span>
+      </td>
+    </tr>
+  </table>
+</td></tr>
+
+<!-- Bottom footer -->
+<tr><td style="background-color:${primaryColor};padding:20px 40px;text-align:center;">
+  <p style="color:rgba(255,255,255,0.6);margin:0;font-size:12px;line-height:1.5;">
+    Desarrollado por <a href="https://satescolar.com" style="color:${secondaryColor};text-decoration:none;font-weight:600;">SATEscolar</a>
+  </p>
+  <p style="color:rgba(255,255,255,0.4);margin:6px 0 0;font-size:11px;">
+    <a href="https://satescolar.com" style="color:rgba(255,255,255,0.4);text-decoration:none;">satescolar.com</a>
+  </p>
 </td></tr>
 
 </table>
+<!-- End main card -->
+
 </td></tr>
 </table>
+
 </body>
 </html>`;
   };
@@ -399,16 +431,15 @@ ${bodyHtml || '<span style="color:#9ca3af;">El contenido de tu mensaje aparecer�
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Eye className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">Vista Previa</span>
+              <span className="text-sm font-medium text-muted-foreground">Vista Previa del Correo</span>
             </div>
-            <div
-              className="border rounded-lg overflow-hidden bg-[#f4f4f7]"
-              style={{ maxHeight: "calc(100vh - 220px)", overflowY: "auto" }}
-            >
-              <div
-                className="transform origin-top scale-[0.55] xl:scale-[0.65]"
-                style={{ width: "600px", margin: "0 auto" }}
-                dangerouslySetInnerHTML={{ __html: previewHtml }}
+            <div className="border rounded-lg overflow-hidden">
+              <iframe
+                srcDoc={previewHtml}
+                title="Email preview"
+                className="w-full border-0"
+                style={{ height: "520px", background: "#f0f2f5" }}
+                sandbox=""
               />
             </div>
           </CardContent>
