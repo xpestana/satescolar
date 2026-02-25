@@ -264,6 +264,27 @@ export async function downloadPDF(
 }
 
 // ── Carnet (vertical) ────────────────────────────────
+export interface CarnetLayoutParams {
+  headerHeight?: number;
+  photoSize?: number;
+  photoPos?: { x: number; y: number };
+  namePos?: { x: number; y: number };
+  badgePos?: { x: number; y: number };
+  docPos?: { x: number; y: number };
+  qrPos?: { x: number; y: number };
+  qrSize?: number;
+  schoolNamePos?: { x: number; y: number };
+  cityPos?: { x: number; y: number };
+  yearPos?: { x: number; y: number };
+  logoPos?: { x: number; y: number };
+  logoSize?: number;
+  fontSizes?: {
+    schoolName?: number;
+    studentName?: number;
+    document?: number;
+  };
+}
+
 export async function downloadCarnet(params: {
   personName: string;
   documentId: string;
@@ -278,10 +299,50 @@ export async function downloadCarnet(params: {
   watermarkUrl?: string;
   watermarkOpacity?: number;
   watermarkSize?: number;
+  layoutConfig?: CarnetLayoutParams;
 }) {
   const w = 53.98;
   const h = 85.6;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [w, h] });
+
+  // Layout defaults
+  const lc = params.layoutConfig || {};
+  const headerH = ((lc.headerHeight ?? 88) / 342) * h; // convert from px proportion to mm
+  const logoPos = lc.logoPos ?? { x: 50, y: 20 };
+  const logoSizePx = lc.logoSize ?? 32;
+  const logoSizeMm = (logoSizePx / 342) * h;
+  const schoolNamePos = lc.schoolNamePos ?? { x: 50, y: 55 };
+  const cityPos = lc.cityPos ?? { x: 50, y: 72 };
+  const yearPos = lc.yearPos ?? { x: 50, y: 85 };
+  const photoPos = lc.photoPos ?? { x: 50, y: 15 };
+  const photoSizePx = lc.photoSize ?? 56;
+  const photoR = ((photoSizePx / 342) * h) / 2;
+  const namePos = lc.namePos ?? { x: 50, y: 52 };
+  const badgePos = lc.badgePos ?? { x: 50, y: 62 };
+  const docPos = lc.docPos ?? { x: 50, y: 74 };
+  const qrPos = lc.qrPos ?? { x: 50, y: 85 };
+  const qrSizePx = lc.qrSize ?? 44;
+  const qrSizeMm = ((qrSizePx / 342) * h);
+  const fontSizes = {
+    schoolName: lc.fontSizes?.schoolName ?? 8,
+    studentName: lc.fontSizes?.studentName ?? 9,
+    document: lc.fontSizes?.document ?? 8,
+  };
+
+  // Scale font from preview px to PDF points (preview is 342px tall = 85.6mm)
+  const fontScale = 0.55; // approximate px-to-pt ratio for this card size
+
+  // Helper: convert percentage position to mm coordinates
+  const headerMm = (pos: { x: number; y: number }) => ({
+    x: (pos.x / 100) * w,
+    y: (pos.y / 100) * headerH,
+  });
+  const bodyTop = headerH + (1 / 342) * h; // after stripe
+  const bodyH = h - bodyTop - 4; // minus bottom bar
+  const bodyMm = (pos: { x: number; y: number }) => ({
+    x: (pos.x / 100) * w,
+    y: bodyTop + (pos.y / 100) * bodyH,
+  });
 
   // Parse colors
   const pc = hexToRgb(params.primaryColor || "#01051e");
@@ -294,37 +355,45 @@ export async function downloadCarnet(params: {
 
   // Top header
   doc.setFillColor(pc.r, pc.g, pc.b);
-  doc.rect(0, 0, w, 22, "F");
+  doc.rect(0, 0, w, headerH, "F");
 
   // Symmetric triangles
+  const triH = headerH * 0.77;
   doc.setFillColor(sc.r, sc.g, sc.b);
-  doc.triangle(0, 0, 10, 0, 0, 17, "F");
+  doc.triangle(0, 0, 10, 0, 0, triH, "F");
   doc.setFillColor(sc2.r, sc2.g, sc2.b);
-  doc.triangle(w, 0, w - 10, 0, w, 17, "F");
+  doc.triangle(w, 0, w - 10, 0, w, triH, "F");
 
   // Stripe
   doc.setFillColor(sc.r, sc.g, sc.b);
-  doc.rect(0, 22, w, 1, "F");
+  doc.rect(0, headerH, w, 1, "F");
 
   // School logo in header
   if (params.schoolLogoUrl) {
     const logoB64 = await loadImageAsBase64(params.schoolLogoUrl);
     if (logoB64) {
-      try { doc.addImage(logoB64, "PNG", w / 2 - 4, 1.5, 8, 8); } catch { /* ignore */ }
+      const lp = headerMm(logoPos);
+      try { doc.addImage(logoB64, "PNG", lp.x - logoSizeMm / 2, lp.y - logoSizeMm / 2, logoSizeMm, logoSizeMm); } catch { /* ignore */ }
     }
   }
 
   // School name
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(4);
+  doc.setFontSize(fontSizes.schoolName * fontScale);
   doc.setFont("helvetica", "bold");
+  const snp = headerMm(schoolNamePos);
   const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), w - 16);
-  doc.text(nameLines, w / 2, params.schoolLogoUrl ? 11.5 : 6, { align: "center" });
+  doc.text(nameLines, snp.x, snp.y, { align: "center" });
 
+  // City/Location
   doc.setFontSize(3);
   doc.setFont("helvetica", "normal");
-  doc.text(params.schoolLocation, w / 2, params.schoolLogoUrl ? 15 : 10, { align: "center" });
-  doc.text(`Año Escolar: ${params.schoolYear}`, w / 2, params.schoolLogoUrl ? 17.5 : 12.5, { align: "center" });
+  const cp = headerMm(cityPos);
+  doc.text(params.schoolLocation, cp.x, cp.y, { align: "center" });
+
+  // Year
+  const yp = headerMm(yearPos);
+  doc.text(`Año Escolar: ${params.schoolYear}`, yp.x, yp.y, { align: "center" });
 
   // ── Watermark ──
   const wmUrl = params.watermarkUrl || params.schoolLogoUrl;
@@ -336,20 +405,20 @@ export async function downloadCarnet(params: {
       try {
         doc.saveGraphicsState();
         doc.setGState(new (doc as any).GState({ opacity: wmOpacity }));
-        doc.addImage(wmB64, "PNG", w / 2 - wmSize / 2, 35, wmSize, wmSize);
+        const wmY = bodyTop + bodyH / 2 - wmSize / 2;
+        doc.addImage(wmB64, "PNG", w / 2 - wmSize / 2, wmY, wmSize, wmSize);
         doc.restoreGraphicsState();
       } catch { /* ignore */ }
     }
   }
 
   // ── Photo circle ──
-  const photoY = 33;
-  const photoR = 7;
+  const pp = bodyMm(photoPos);
   doc.setFillColor(255, 255, 255);
-  doc.circle(w / 2, photoY, photoR + 1, "F");
+  doc.circle(pp.x, pp.y, photoR + 0.5, "F");
   doc.setDrawColor(sc.r, sc.g, sc.b);
   doc.setLineWidth(0.8);
-  doc.circle(w / 2, photoY, photoR + 0.5);
+  doc.circle(pp.x, pp.y, photoR + 0.3);
 
   if (params.photoUrl) {
     const photoB64 = await loadImageAsBase64(params.photoUrl);
@@ -357,48 +426,47 @@ export async function downloadCarnet(params: {
       try {
         const circularB64 = await createCircularImage(photoB64, 300);
         if (circularB64) {
-          doc.addImage(circularB64, "PNG", w / 2 - photoR, photoY - photoR, photoR * 2, photoR * 2);
+          doc.addImage(circularB64, "PNG", pp.x - photoR, pp.y - photoR, photoR * 2, photoR * 2);
         }
       } catch { /* ignore */ }
     }
   }
 
   // ── Name ──
+  const np = bodyMm(namePos);
   doc.setTextColor(pc.r, pc.g, pc.b);
-  doc.setFontSize(6);
+  doc.setFontSize(fontSizes.studentName * fontScale);
   doc.setFont("helvetica", "bold");
   const personLines = doc.splitTextToSize(params.personName.toUpperCase(), w - 8);
-  doc.text(personLines, w / 2, 48, { align: "center" });
+  doc.text(personLines, np.x, np.y, { align: "center" });
 
   // ── Role badge ──
+  const bp = bodyMm(badgePos);
   doc.setFillColor(sc.r, sc.g, sc.b);
   const badgeW = 22;
-  const badgeH = 4.5;
-  const badgeX = (w - badgeW) / 2;
-  const badgeY = personLines.length > 1 ? 52 : 51;
-  doc.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.5, 1.5, "F");
+  const badgeH2 = 4.5;
+  doc.roundedRect(bp.x - badgeW / 2, bp.y - badgeH2 / 2, badgeW, badgeH2, 1.5, 1.5, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(4.5);
   doc.setFont("helvetica", "bold");
-  doc.text(params.role, w / 2, badgeY + 3.2, { align: "center" });
+  doc.text(params.role, bp.x, bp.y + 1.5, { align: "center" });
 
   // ── Document ID ──
-  const idY = badgeY + badgeH + 3;
+  const dp = bodyMm(docPos);
   doc.setTextColor(pc.r, pc.g, pc.b);
-  doc.setFontSize(5.5);
+  doc.setFontSize(fontSizes.document * fontScale);
   doc.setFont("helvetica", "bold");
-  doc.text(params.documentId || "Sin documento", w / 2, idY, { align: "center" });
+  doc.text(params.documentId || "Sin documento", dp.x, dp.y, { align: "center" });
 
   // ── QR Code ──
+  const qp = bodyMm(qrPos);
   const qrContent = params.documentId || params.personName;
   try {
     const qrDataUrl = await QRCode.toDataURL(qrContent, {
       width: 300, margin: 0,
       color: { dark: params.primaryColor || "#01051e", light: "#ffffff" },
     });
-    const qrSize = 14;
-    const qrY = idY + 2;
-    doc.addImage(qrDataUrl, "PNG", w / 2 - qrSize / 2, qrY, qrSize, qrSize);
+    doc.addImage(qrDataUrl, "PNG", qp.x - qrSizeMm / 2, qp.y - qrSizeMm / 2, qrSizeMm, qrSizeMm);
   } catch { /* ignore */ }
 
   // ── Bottom bar ──

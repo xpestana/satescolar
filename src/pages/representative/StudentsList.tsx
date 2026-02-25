@@ -62,6 +62,7 @@ export default function StudentsList() {
       watermarkUrl: carnetConfig?.watermark_url || undefined,
       watermarkOpacity: carnetConfig?.watermark_opacity ? Number(carnetConfig.watermark_opacity) : undefined,
       watermarkSize: carnetConfig?.watermark_size ? Number(carnetConfig.watermark_size) : undefined,
+      layoutConfig: (carnetConfig?.layout_config as any) || undefined,
     });
   };
 
