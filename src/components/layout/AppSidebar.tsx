@@ -91,7 +91,9 @@ const navSections: NavSection[] = [
   {
     title: "ÁREA DE UTILIDADES",
     requiredRole: "school",
-    items: [],
+    items: [
+      { label: "Correo", href: "/utilidades/correo", icon: Mail, requiredRole: "school" },
+    ],
   },
   {
     title: "ÁREA DE INSCRIPCIONES",

@@ -22,6 +22,7 @@ import AddTeacher from "./pages/school/AddTeacher";
 import EnrollmentsList from "./pages/school/EnrollmentsList";
 import EnrollmentDisplayConfig from "./pages/school/EnrollmentDisplayConfig";
 import UtilitiesSettings from "./pages/school/UtilitiesSettings";
+import EmailSender from "./pages/school/EmailSender";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import SendEmail from "./pages/admin/SendEmail";
@@ -102,6 +103,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="school">
                   <UtilitiesSettings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/utilidades/correo" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <EmailSender />
                 </ProtectedRoute>
               } 
             />
