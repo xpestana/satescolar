@@ -370,7 +370,7 @@ export default function TeachersList() {
       documentId: record.document_id || fd.documento || "",
       role: "DOCENTE" as any,
       photoUrl: record.photo_url || undefined,
-      schoolName: schoolInfo ? `${institutionType} ${schoolInfo.name}` : "Institución",
+      schoolName: schoolInfo?.name || "Institución",
       schoolLocation: locationParts.join(", ") || "",
       schoolLogoUrl: schoolInfo?.logo_url || undefined,
       schoolYear: activeSchoolYear || "Sin definir",
