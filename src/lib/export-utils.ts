@@ -518,6 +518,11 @@ export async function downloadCarnet(params: {
   const btTriWL = pxW(30);
   doc.setFillColor(sc2.r, sc2.g, sc2.b);
   doc.triangle(0, H, btTriWL, H, 0, H - bottomBarMm, "F");
+  // URL text
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(fontPt(5 * SCALE));
+  doc.setFont("helvetica", "normal");
+  doc.text("https://satescolar.com", W / 2, H - bottomBarMm / 2, { align: "center", baseline: "middle" as any });
 
   const safeName = params.personName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_");
   doc.save(`Carnet_${safeName}.pdf`);

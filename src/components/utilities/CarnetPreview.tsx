@@ -246,8 +246,8 @@ export function CarnetPreview({
         </div>
 
         {/* BOTTOM BAR */}
-        <div className="absolute bottom-0 left-0 right-0 flex" style={{ height: 20 }}>
-          <div className="flex-1" style={{ backgroundColor: primaryColor }} />
+        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center" style={{ height: 20, backgroundColor: primaryColor }}>
+          <span className="text-white/80 z-10" style={{ fontSize: 5 * scale }}>https://satescolar.com</span>
           <svg width={40} height={20} viewBox="0 0 32 16" className="absolute right-0 bottom-0">
             <polygon points="32,16 0,16 32,0" fill={secondaryColor} />
           </svg>
