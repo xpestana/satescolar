@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
@@ -34,6 +34,7 @@ export function EmailComposer() {
   const { schoolId } = useSchoolId();
   const { school } = useSchoolData();
   const { data: carnetConfig } = useCarnetConfig(schoolId);
+  const queryClient = useQueryClient();
 
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [subject, setSubject] = useState("");
@@ -220,10 +221,12 @@ export function EmailComposer() {
     if (!message.trim()) return toast.error("Escribe un mensaje");
 
     setSending(true);
-    try {
-      const emails = recipients.map((r) => r.email);
-      const html = buildEmailHtml();
+    const emails = recipients.map((r) => r.email);
+    const html = buildEmailHtml();
+    let status = "success";
+    let errorMessage: string | null = null;
 
+    try {
       const { data, error } = await supabase.functions.invoke("send-email", {
         body: { to: emails, subject, body: html, isHtml: true },
       });
@@ -232,14 +235,37 @@ export function EmailComposer() {
       if (data?.error) throw new Error(data.error);
 
       toast.success(`Correo enviado a ${emails.length} destinatario(s)`);
+    } catch (e: any) {
+      status = "error";
+      errorMessage = e.message || "Error al enviar";
+      toast.error(errorMessage);
+    }
+
+    // Save to history regardless of success/failure
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("email_history").insert({
+        school_id: schoolId!,
+        sent_by: user!.id,
+        recipients: recipients as any,
+        subject,
+        body_html: html,
+        status,
+        error_message: errorMessage,
+        recipient_count: emails.length,
+      });
+      queryClient.invalidateQueries({ queryKey: ["email-history"] });
+    } catch {
+      // Silent fail for history save
+    }
+
+    if (status === "success") {
       setRecipients([]);
       setSubject("");
       setMessage("");
-    } catch (e: any) {
-      toast.error(e.message || "Error al enviar");
-    } finally {
-      setSending(false);
     }
+
+    setSending(false);
   };
 
   const previewHtml = useMemo(() => buildEmailHtml(), [subject, message, school, primaryColor, secondaryColor]);
