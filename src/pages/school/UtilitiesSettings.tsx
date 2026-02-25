@@ -74,6 +74,7 @@ export default function UtilitiesSettings() {
         yearPos: lc.yearPos ?? DEFAULT_LAYOUT.yearPos,
         logoPos: lc.logoPos ?? DEFAULT_LAYOUT.logoPos,
         logoSize: lc.logoSize ?? DEFAULT_LAYOUT.logoSize,
+        qrSize: lc.qrSize ?? DEFAULT_LAYOUT.qrSize,
         fontSizes: {
           schoolName: lc.fontSizes?.schoolName ?? DEFAULT_LAYOUT.fontSizes.schoolName,
           studentName: lc.fontSizes?.studentName ?? DEFAULT_LAYOUT.fontSizes.studentName,

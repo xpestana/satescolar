@@ -7,6 +7,7 @@ export interface CarnetLayoutConfig {
   badgePos: { x: number; y: number };
   docPos: { x: number; y: number };
   qrPos: { x: number; y: number };
+  qrSize: number;
   schoolNamePos: { x: number; y: number };
   cityPos: { x: number; y: number };
   yearPos: { x: number; y: number };
@@ -27,6 +28,7 @@ export const DEFAULT_LAYOUT: CarnetLayoutConfig = {
   badgePos: { x: 50, y: 62 },
   docPos: { x: 50, y: 74 },
   qrPos: { x: 50, y: 85 },
+  qrSize: 44,
   schoolNamePos: { x: 50, y: 55 },
   cityPos: { x: 50, y: 72 },
   yearPos: { x: 50, y: 85 },
