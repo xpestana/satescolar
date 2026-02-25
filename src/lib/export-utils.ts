@@ -264,6 +264,11 @@ export async function downloadPDF(
 }
 
 // ── Carnet (vertical) ────────────────────────────────
+// Uses the EXACT same coordinate system as CarnetPreview.tsx
+// Preview: CARD_W=280px, CARD_H=443px, scale=280/216
+// PDF: CR80 card = 53.98mm × 85.6mm
+// Conversion: 1 preview-px = (85.6/443) mm ≈ 0.1932 mm
+
 export interface CarnetLayoutParams {
   headerHeight?: number;
   photoSize?: number;
@@ -301,114 +306,126 @@ export async function downloadCarnet(params: {
   watermarkSize?: number;
   layoutConfig?: CarnetLayoutParams;
 }) {
-  const w = 53.98;
-  const h = 85.6;
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [w, h] });
-
-  // Layout defaults — use same proportions as CarnetPreview.tsx
-  // Preview: CARD_W=280, CARD_H=443, scale=280/216≈1.296
-  const lc = params.layoutConfig || {};
-  const PREVIEW_CARD_W = 280;
-  const PREVIEW_CARD_H = 443;
-  const PREVIEW_SCALE = PREVIEW_CARD_W / 216;
+  // ─── Constants matching CarnetPreview.tsx exactly ───
+  const CARD_W_PX = 280;
+  const CARD_H_PX = 443;
+  const SCALE = CARD_W_PX / 216; // ≈ 1.296
   const BOTTOM_BAR_PX = 20;
 
-  // Header: in preview headerRenderedH = headerHeight * scale
-  const headerHeightRaw = lc.headerHeight ?? 88;
-  const headerRenderedPx = headerHeightRaw * PREVIEW_SCALE;
-  const headerH = (headerRenderedPx / PREVIEW_CARD_H) * h;
+  // PDF dimensions (CR80 card)
+  const W = 53.98; // mm
+  const H = 85.6;  // mm
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [W, H] });
 
-  // Sizes: convert from preview px (raw * scale) to mm
-  const pxToMm = (px: number) => (px / PREVIEW_CARD_H) * h;
+  // ─── Conversion helpers ───
+  // Convert preview rendered pixels to mm
+  const px = (v: number) => (v / CARD_H_PX) * H;
+  const pxW = (v: number) => (v / CARD_W_PX) * W;
+  // Convert font size (in preview CSS px) to PDF points (1pt = 0.3528mm)
+  const fontPt = (cssPx: number) => (cssPx / CARD_H_PX) * H / 0.3528;
 
+  // ─── Read layout config ───
+  const lc = params.layoutConfig || {};
+  const headerHeight = lc.headerHeight ?? 88;
+  const headerPx = headerHeight * SCALE; // rendered header height in px
+  const headerMm = px(headerPx);
+  const bottomBarMm = px(BOTTOM_BAR_PX);
+  const stripeMm = px(1 * SCALE); // thin stripe
+  const bodyTopMm = headerMm + stripeMm;
+  const bodyHMm = H - bodyTopMm - bottomBarMm;
+
+  // Positions (percentage-based, same as preview)
   const logoPos = lc.logoPos ?? { x: 50, y: 20 };
-  const logoSizeMm = pxToMm((lc.logoSize ?? 32) * PREVIEW_SCALE);
   const schoolNamePos = lc.schoolNamePos ?? { x: 50, y: 55 };
   const cityPos = lc.cityPos ?? { x: 50, y: 72 };
   const yearPos = lc.yearPos ?? { x: 50, y: 85 };
   const photoPos = lc.photoPos ?? { x: 50, y: 15 };
-  const photoR = pxToMm((lc.photoSize ?? 56) * PREVIEW_SCALE) / 2;
   const namePos = lc.namePos ?? { x: 50, y: 52 };
   const badgePos = lc.badgePos ?? { x: 50, y: 62 };
   const docPos = lc.docPos ?? { x: 50, y: 74 };
   const qrPos = lc.qrPos ?? { x: 50, y: 85 };
-  const qrSizeMm = pxToMm((lc.qrSize ?? 44) * PREVIEW_SCALE);
-  const fontSizes = {
-    schoolName: lc.fontSizes?.schoolName ?? 8,
-    studentName: lc.fontSizes?.studentName ?? 9,
-    document: lc.fontSizes?.document ?? 8,
-  };
 
-  // Font scale: preview font is in px * scale, PDF needs pt
-  // At preview scale, 8px * 1.296 ≈ 10.4px on screen → ~3.5pt in 54mm card
-  const fontScale = (PREVIEW_SCALE / PREVIEW_CARD_H) * h * 0.42;
+  // Sizes (raw → rendered px → mm)
+  const logoSizeMm = px((lc.logoSize ?? 32) * SCALE);
+  const photoSizeMm = px((lc.photoSize ?? 56) * SCALE);
+  const photoR = photoSizeMm / 2;
+  const qrSizeMm = px((lc.qrSize ?? 44) * SCALE);
 
-  // Helper: convert percentage position to mm coordinates
-  const headerMm = (pos: { x: number; y: number }) => ({
-    x: (pos.x / 100) * w,
-    y: (pos.y / 100) * headerH,
+  // Font sizes (raw → rendered CSS px → PDF pt)
+  const schoolNamePt = fontPt((lc.fontSizes?.schoolName ?? 8) * SCALE);
+  const studentNamePt = fontPt((lc.fontSizes?.studentName ?? 9) * SCALE);
+  const documentPt = fontPt((lc.fontSizes?.document ?? 8) * SCALE);
+  const cityYearPt = fontPt(6 * SCALE); // city/year use 6*scale in preview
+  const badgePt = fontPt(8 * SCALE); // badge uses 8*scale in preview
+
+  // Position converters: % → mm
+  const hPos = (p: { x: number; y: number }) => ({
+    x: (p.x / 100) * W,
+    y: (p.y / 100) * headerMm,
   });
-  const stripeMm = 0.25; // thin stripe between header and body
-  const bodyTop = headerH + stripeMm;
-  const bottomBarMm = (BOTTOM_BAR_PX / PREVIEW_CARD_H) * h;
-  const bodyH = h - bodyTop - bottomBarMm;
-  const bodyMm = (pos: { x: number; y: number }) => ({
-    x: (pos.x / 100) * w,
-    y: bodyTop + (pos.y / 100) * bodyH,
+  const bPos = (p: { x: number; y: number }) => ({
+    x: (p.x / 100) * W,
+    y: bodyTopMm + (p.y / 100) * bodyHMm,
   });
 
-  // Parse colors
+  // ─── Colors ───
   const pc = hexToRgb(params.primaryColor || "#01051e");
   const sc = hexToRgb(params.secondaryColor || "#1e78c8");
   const sc2 = { r: Math.min(sc.r + 20, 255), g: Math.min(sc.g + 30, 255), b: Math.min(sc.b + 30, 255) };
 
-  // ── FRONT SIDE ──
+  // ─── BACKGROUND ───
   doc.setFillColor(255, 255, 255);
-  doc.rect(0, 0, w, h, "F");
+  doc.rect(0, 0, W, H, "F");
 
-  // Top header
+  // ─── HEADER ───
   doc.setFillColor(pc.r, pc.g, pc.b);
-  doc.rect(0, 0, w, headerH, "F");
+  doc.rect(0, 0, W, headerMm, "F");
 
-  // Symmetric triangles
-  const triH = headerH * 0.77;
+  // Triangles (same proportions as preview: 40*scale wide, 77% of header)
+  const triW = pxW(40 * SCALE);
+  const triH = headerMm * 0.77;
   doc.setFillColor(sc.r, sc.g, sc.b);
-  doc.triangle(0, 0, 10, 0, 0, triH, "F");
+  doc.triangle(0, 0, triW, 0, 0, triH, "F");
   doc.setFillColor(sc2.r, sc2.g, sc2.b);
-  doc.triangle(w, 0, w - 10, 0, w, triH, "F");
+  doc.triangle(W, 0, W - triW, 0, W, triH, "F");
 
   // Stripe
   doc.setFillColor(sc.r, sc.g, sc.b);
-  doc.rect(0, headerH, w, 1, "F");
+  doc.rect(0, headerMm, W, stripeMm, "F");
 
-  // School logo in header
+  // ─── HEADER: Logo ───
   if (params.schoolLogoUrl) {
     const logoB64 = await loadImageAsBase64(params.schoolLogoUrl);
     if (logoB64) {
-      const lp = headerMm(logoPos);
-      try { doc.addImage(logoB64, "PNG", lp.x - logoSizeMm / 2, lp.y - logoSizeMm / 2, logoSizeMm, logoSizeMm); } catch { /* ignore */ }
+      const lp = hPos(logoPos);
+      try {
+        doc.addImage(logoB64, "PNG",
+          lp.x - logoSizeMm / 2, lp.y - logoSizeMm / 2,
+          logoSizeMm, logoSizeMm);
+      } catch { /* ignore */ }
     }
   }
 
-  // School name
+  // ─── HEADER: School Name ───
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(fontSizes.schoolName * fontScale);
+  doc.setFontSize(schoolNamePt);
   doc.setFont("helvetica", "bold");
-  const snp = headerMm(schoolNamePos);
-  const nameLines = doc.splitTextToSize(params.schoolName.toUpperCase(), w - 16);
-  doc.text(nameLines, snp.x, snp.y, { align: "center" });
+  const snp = hPos(schoolNamePos);
+  const schoolLines = doc.splitTextToSize(params.schoolName.toUpperCase(), W - 6);
+  doc.text(schoolLines, snp.x, snp.y, { align: "center" });
 
-  // City/Location
-  doc.setFontSize(3);
+  // ─── HEADER: City ───
+  doc.setFontSize(cityYearPt);
   doc.setFont("helvetica", "normal");
-  const cp = headerMm(cityPos);
+  doc.setTextColor(255, 255, 255);
+  const cp = hPos(cityPos);
   doc.text(params.schoolLocation, cp.x, cp.y, { align: "center" });
 
-  // Year
-  const yp = headerMm(yearPos);
+  // ─── HEADER: Year ───
+  const yp = hPos(yearPos);
   doc.text(`Año Escolar: ${params.schoolYear}`, yp.x, yp.y, { align: "center" });
 
-  // ── Watermark ──
+  // ─── BODY: Watermark ───
   const wmUrl = params.watermarkUrl || params.schoolLogoUrl;
   const wmOpacity = params.watermarkOpacity ?? 0.06;
   const wmSize = params.watermarkSize ?? 30;
@@ -418,20 +435,22 @@ export async function downloadCarnet(params: {
       try {
         doc.saveGraphicsState();
         doc.setGState(new (doc as any).GState({ opacity: wmOpacity }));
-        const wmY = bodyTop + bodyH / 2 - wmSize / 2;
-        doc.addImage(wmB64, "PNG", w / 2 - wmSize / 2, wmY, wmSize, wmSize);
+        const wmCenterY = bodyTopMm + bodyHMm / 2;
+        doc.addImage(wmB64, "PNG",
+          W / 2 - wmSize / 2, wmCenterY - wmSize / 2,
+          wmSize, wmSize);
         doc.restoreGraphicsState();
       } catch { /* ignore */ }
     }
   }
 
-  // ── Photo circle ──
-  const pp = bodyMm(photoPos);
+  // ─── BODY: Photo ───
+  const pp = bPos(photoPos);
   doc.setFillColor(255, 255, 255);
-  doc.circle(pp.x, pp.y, photoR + 0.5, "F");
+  doc.circle(pp.x, pp.y, photoR + 0.4, "F");
   doc.setDrawColor(sc.r, sc.g, sc.b);
-  doc.setLineWidth(0.8);
-  doc.circle(pp.x, pp.y, photoR + 0.3);
+  doc.setLineWidth(0.6);
+  doc.circle(pp.x, pp.y, photoR + 0.2);
 
   if (params.photoUrl) {
     const photoB64 = await loadImageAsBase64(params.photoUrl);
@@ -439,56 +458,66 @@ export async function downloadCarnet(params: {
       try {
         const circularB64 = await createCircularImage(photoB64, 300);
         if (circularB64) {
-          doc.addImage(circularB64, "PNG", pp.x - photoR, pp.y - photoR, photoR * 2, photoR * 2);
+          doc.addImage(circularB64, "PNG",
+            pp.x - photoR, pp.y - photoR,
+            photoR * 2, photoR * 2);
         }
       } catch { /* ignore */ }
     }
   }
 
-  // ── Name ──
-  const np = bodyMm(namePos);
+  // ─── BODY: Student Name ───
+  const np = bPos(namePos);
   doc.setTextColor(pc.r, pc.g, pc.b);
-  doc.setFontSize(fontSizes.studentName * fontScale);
+  doc.setFontSize(studentNamePt);
   doc.setFont("helvetica", "bold");
-  const personLines = doc.splitTextToSize(params.personName.toUpperCase(), w - 8);
+  const personLines = doc.splitTextToSize(params.personName.toUpperCase(), W - 6);
   doc.text(personLines, np.x, np.y, { align: "center" });
 
-  // ── Role badge ──
-  const bp = bodyMm(badgePos);
-  doc.setFillColor(sc.r, sc.g, sc.b);
-  const badgeW = 22;
-  const badgeH2 = 4.5;
-  doc.roundedRect(bp.x - badgeW / 2, bp.y - badgeH2 / 2, badgeW, badgeH2, 1.5, 1.5, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(4.5);
-  doc.setFont("helvetica", "bold");
-  doc.text(params.role, bp.x, bp.y + 1.5, { align: "center" });
-
-  // ── Document ID ──
-  const dp = bodyMm(docPos);
+  // ─── BODY: Document ID ───
+  const dp = bPos(docPos);
   doc.setTextColor(pc.r, pc.g, pc.b);
-  doc.setFontSize(fontSizes.document * fontScale);
+  doc.setFontSize(documentPt);
   doc.setFont("helvetica", "bold");
   doc.text(params.documentId || "Sin documento", dp.x, dp.y, { align: "center" });
 
-  // ── QR Code ──
-  const qp = bodyMm(qrPos);
+  // ─── BODY: Role Badge ───
+  const bp = bPos(badgePos);
+  doc.setFillColor(sc.r, sc.g, sc.b);
+  // Badge size proportional to preview (px-4 py-0.5 with font 8*scale)
+  const badgeTextW = doc.getTextWidth(params.role);
+  doc.setFontSize(badgePt);
+  const bw = badgeTextW + 6;
+  const bh = badgePt * 0.3528 + 1.5; // font height in mm + padding
+  doc.roundedRect(bp.x - bw / 2, bp.y - bh / 2, bw, bh, bh / 2, bh / 2, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.text(params.role, bp.x, bp.y + bh * 0.2, { align: "center" });
+
+  // ─── BODY: QR Code ───
+  const qp = bPos(qrPos);
   const qrContent = params.documentId || params.personName;
   try {
     const qrDataUrl = await QRCode.toDataURL(qrContent, {
       width: 300, margin: 0,
       color: { dark: params.primaryColor || "#01051e", light: "#ffffff" },
     });
-    doc.addImage(qrDataUrl, "PNG", qp.x - qrSizeMm / 2, qp.y - qrSizeMm / 2, qrSizeMm, qrSizeMm);
+    doc.addImage(qrDataUrl, "PNG",
+      qp.x - qrSizeMm / 2, qp.y - qrSizeMm / 2,
+      qrSizeMm, qrSizeMm);
   } catch { /* ignore */ }
 
-  // ── Bottom bar ──
+  // ─── BOTTOM BAR ───
   doc.setFillColor(pc.r, pc.g, pc.b);
-  doc.rect(0, h - bottomBarMm, w, bottomBarMm, "F");
+  doc.rect(0, H - bottomBarMm, W, bottomBarMm, "F");
+  // Right triangle
+  const btTriW = pxW(40);
   doc.setFillColor(sc.r, sc.g, sc.b);
-  doc.triangle(w, h, w - 16, h, w, h - bottomBarMm, "F");
+  doc.triangle(W, H, W - btTriW, H, W, H - bottomBarMm, "F");
+  // Left triangle
+  const btTriWL = pxW(30);
   doc.setFillColor(sc2.r, sc2.g, sc2.b);
-  doc.triangle(0, h, 12, h, 0, h - bottomBarMm, "F");
+  doc.triangle(0, H, btTriWL, H, 0, H - bottomBarMm, "F");
 
   const safeName = params.personName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_");
   doc.save(`Carnet_${safeName}.pdf`);
