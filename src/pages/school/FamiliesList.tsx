@@ -98,10 +98,10 @@ export default function FamiliesList() {
       const familyIds = (familySchools || []).map((fs) => fs.family_id);
       if (familyIds.length === 0) return { families: 0, representatives: 0, students: 0 };
 
-      // Count reps and students in parallel
+      // Count reps and students in parallel (students via student_schools for school isolation)
       const [{ count: repsCount }, { count: studentsCount }] = await Promise.all([
         supabase.from("representatives").select("id", { count: "exact", head: true }).in("family_id", familyIds),
-        supabase.from("students").select("id", { count: "exact", head: true }).in("family_id", familyIds),
+        supabase.from("student_schools").select("id", { count: "exact", head: true }).eq("school_id", schoolId),
       ]);
 
       return {
@@ -135,14 +135,12 @@ export default function FamiliesList() {
       const userIds = data.map((f) => f.user_id);
       const familyIds = data.map((f) => f.id);
 
-      const [rolesRes, emailsRes, repsRes, studentsRes] = await Promise.all([
-        supabase.from("user_roles").select("user_id").eq("role", "representative").in("user_id", userIds),
+      const [emailsRes, repsRes, studentsRes] = await Promise.all([
         supabase.functions.invoke("get-user-emails", { body: { userIds } }),
         supabase.from("representatives").select("family_id, form_data").in("family_id", familyIds),
         supabase.from("students").select("family_id, form_data").in("family_id", familyIds),
       ]);
 
-      const repUserIds = new Set((rolesRes.data || []).map((r) => r.user_id));
       const emails = emailsRes.data?.emails || {};
 
       const repsByFamily = new Map<string, any[]>();
@@ -165,7 +163,6 @@ export default function FamiliesList() {
       };
 
       const families: FamilyWithEmail[] = data
-        .filter((f) => repUserIds.has(f.user_id))
         .map((family) => {
           const reps = repsByFamily.get(family.id) || [];
           const students = studentsByFamily.get(family.id) || [];
