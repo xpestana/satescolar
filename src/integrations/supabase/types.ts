@@ -93,6 +93,53 @@ export type Database = {
           },
         ]
       }
+      email_history: {
+        Row: {
+          body_html: string
+          created_at: string
+          error_message: string | null
+          id: string
+          recipient_count: number
+          recipients: Json
+          school_id: string
+          sent_by: string
+          status: string
+          subject: string
+        }
+        Insert: {
+          body_html: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          recipient_count?: number
+          recipients?: Json
+          school_id: string
+          sent_by: string
+          status?: string
+          subject: string
+        }
+        Update: {
+          body_html?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          recipient_count?: number
+          recipients?: Json
+          school_id?: string
+          sent_by?: string
+          status?: string
+          subject?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_history_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enrollment_display_config: {
         Row: {
           created_at: string
