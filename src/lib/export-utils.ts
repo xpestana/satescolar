@@ -330,8 +330,8 @@ export async function downloadCarnet(params: {
   const headerPx = headerHeight * SCALE; // rendered header height in px
   const headerMm = px(headerPx);
   const bottomBarMm = px(BOTTOM_BAR_PX);
-  const stripeMm = px(1 * SCALE); // thin stripe
-  const bodyTopMm = headerMm + stripeMm;
+  const stripeMm = px(1 * SCALE); // thin stripe (visual only)
+  const bodyTopMm = headerMm;
   const bodyHMm = H - bodyTopMm - bottomBarMm;
 
   // Positions (percentage-based, same as preview)
@@ -412,18 +412,18 @@ export async function downloadCarnet(params: {
   doc.setFont("helvetica", "bold");
   const snp = hPos(schoolNamePos);
   const schoolLines = doc.splitTextToSize(params.schoolName.toUpperCase(), W - 6);
-  doc.text(schoolLines, snp.x, snp.y, { align: "center" });
+  doc.text(schoolLines, snp.x, snp.y, { align: "center", baseline: "top" as any });
 
   // ─── HEADER: City ───
   doc.setFontSize(cityYearPt);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(255, 255, 255);
   const cp = hPos(cityPos);
-  doc.text(params.schoolLocation, cp.x, cp.y, { align: "center" });
+  doc.text(params.schoolLocation, cp.x, cp.y, { align: "center", baseline: "top" as any });
 
   // ─── HEADER: Year ───
   const yp = hPos(yearPos);
-  doc.text(`Año Escolar: ${params.schoolYear}`, yp.x, yp.y, { align: "center" });
+  doc.text(`Año Escolar: ${params.schoolYear}`, yp.x, yp.y, { align: "center", baseline: "top" as any });
 
   // ─── BODY: Watermark ───
   const wmUrl = params.watermarkUrl || params.schoolLogoUrl;
@@ -472,21 +472,21 @@ export async function downloadCarnet(params: {
   doc.setFontSize(studentNamePt);
   doc.setFont("helvetica", "bold");
   const personLines = doc.splitTextToSize(params.personName.toUpperCase(), W - 6);
-  doc.text(personLines, np.x, np.y, { align: "center" });
+  doc.text(personLines, np.x, np.y, { align: "center", baseline: "top" as any });
 
   // ─── BODY: Document ID ───
   const dp = bPos(docPos);
   doc.setTextColor(pc.r, pc.g, pc.b);
   doc.setFontSize(documentPt);
   doc.setFont("helvetica", "bold");
-  doc.text(params.documentId || "Sin documento", dp.x, dp.y, { align: "center" });
+  doc.text(params.documentId || "Sin documento", dp.x, dp.y, { align: "center", baseline: "top" as any });
 
   // ─── BODY: Role Badge ───
   const bp = bPos(badgePos);
   doc.setFillColor(sc.r, sc.g, sc.b);
   // Badge size proportional to preview (px-4 py-0.5 with font 8*scale)
-  const badgeTextW = doc.getTextWidth(params.role);
   doc.setFontSize(badgePt);
+  const badgeTextW = doc.getTextWidth(params.role);
   const bw = badgeTextW + 6;
   const bh = badgePt * 0.3528 + 1.5; // font height in mm + padding
   doc.roundedRect(bp.x - bw / 2, bp.y - bh / 2, bw, bh, bh / 2, bh / 2, "F");
