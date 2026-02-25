@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Save, Upload, RotateCcw, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { toast } from "sonner";
-import { CarnetEditor, CarnetLayoutConfig, DEFAULT_LAYOUT } from "@/components/utilities/CarnetEditor";
+import { CarnetLayoutConfig, DEFAULT_LAYOUT } from "@/components/utilities/CarnetEditor";
+import { CarnetControls } from "@/components/utilities/CarnetControls";
+import { CarnetPreview } from "@/components/utilities/CarnetPreview";
 
 const DEFAULT_PRIMARY = "#01051e";
 const DEFAULT_SECONDARY = "#1e78c8";
@@ -32,7 +33,7 @@ export default function UtilitiesSettings() {
   const [useCustomWatermark, setUseCustomWatermark] = useState(false);
   const [layout, setLayout] = useState<CarnetLayoutConfig>(DEFAULT_LAYOUT);
 
-  const { data: config, isLoading } = useQuery({
+  const { data: config } = useQuery({
     queryKey: ["carnet-config", schoolId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -46,7 +47,6 @@ export default function UtilitiesSettings() {
     enabled: !!schoolId,
   });
 
-  // Re-sync when config changes
   const [prevConfigId, setPrevConfigId] = useState<string | null>(null);
   if (config && config.id !== prevConfigId) {
     setPrevConfigId(config.id);
@@ -58,7 +58,6 @@ export default function UtilitiesSettings() {
       setWatermarkPreview(config.watermark_url);
       setUseCustomWatermark(true);
     }
-    // Load layout config
     const lc = config.layout_config as any;
     if (lc && typeof lc === "object" && lc.headerHeight) {
       setLayout({
@@ -154,153 +153,110 @@ export default function UtilitiesSettings() {
     <DashboardLayout>
       <PageHeader
         title="Utilidades"
-        breadcrumbs={[
-          { label: "Ajustes" },
-          { label: "Utilidades" },
-        ]}
+        breadcrumbs={[{ label: "Ajustes" }, { label: "Utilidades" }]}
       />
 
-      <div className="space-y-6">
-        <Accordion type="single" collapsible defaultValue="carnet">
-          <AccordionItem value="carnet" className="border rounded-lg bg-card overflow-visible">
-            <AccordionTrigger className="px-6 py-4 hover:no-underline">
-              <div className="flex items-center gap-3">
-                <CreditCard className="h-5 w-5 text-primary" />
-                <span className="text-lg font-semibold">Configuración de Carnet</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-6 pb-6 overflow-visible">
-              {/* Colors & Watermark controls */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div className="space-y-6">
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium">Colores que identifican al Colegio</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Color Principal</Label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="color"
-                              value={primaryColor}
-                              onChange={(e) => setPrimaryColor(e.target.value)}
-                              className="w-10 h-10 rounded cursor-pointer border-0 p-0"
-                            />
-                            <Input
-                              value={primaryColor}
-                              onChange={(e) => setPrimaryColor(e.target.value)}
-                              className="w-28 text-xs font-mono"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Color Secundario</Label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="color"
-                              value={secondaryColor}
-                              onChange={(e) => setSecondaryColor(e.target.value)}
-                              className="w-10 h-10 rounded cursor-pointer border-0 p-0"
-                            />
-                            <Input
-                              value={secondaryColor}
-                              onChange={(e) => setSecondaryColor(e.target.value)}
-                              className="w-28 text-xs font-mono"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+      <div className="flex items-center gap-3 mb-6">
+        <CreditCard className="h-5 w-5 text-primary" />
+        <h2 className="text-lg font-semibold">Configuración de Carnet</h2>
+      </div>
 
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium">Marca de Agua</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <p className="text-xs text-muted-foreground">
-                        Por defecto se usa el logo del colegio. Puedes subir una imagen personalizada.
-                      </p>
-                      <div>
-                        <Label className="text-xs">Imagen personalizada (opcional)</Label>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Button variant="outline" size="sm" onClick={() => document.getElementById("watermark-input")?.click()}>
-                            <Upload className="h-3 w-3 mr-1" /> Subir imagen
-                          </Button>
-                          {useCustomWatermark && (
-                            <Button variant="ghost" size="sm" onClick={() => { setUseCustomWatermark(false); setWatermarkFile(null); setWatermarkPreview(null); }}>
-                              Usar logo por defecto
-                            </Button>
-                          )}
-                        </div>
-                        <input id="watermark-input" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-                      </div>
-
-                      {watermarkPreview && useCustomWatermark && (
-                        <div className="w-20 h-20 border rounded p-1">
-                          <img src={watermarkPreview} alt="Watermark" className="w-full h-full object-contain" />
-                        </div>
-                      )}
-
-                      <div>
-                        <Label className="text-xs">Opacidad: {Math.round(watermarkOpacity * 100)}%</Label>
-                        <Slider
-                          value={[watermarkOpacity * 100]}
-                          onValueChange={(v) => setWatermarkOpacity(v[0] / 100)}
-                          min={2}
-                          max={20}
-                          step={1}
-                          className="mt-2"
-                        />
-                      </div>
-
-                      <div>
-                        <Label className="text-xs">Tamaño (mm): {watermarkSize}</Label>
-                        <Slider
-                          value={[watermarkSize]}
-                          onValueChange={(v) => setWatermarkSize(v[0])}
-                          min={15}
-                          max={45}
-                          step={1}
-                          className="mt-2"
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
+      {/* Main 2-column layout: controls left, preview right sticky */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* LEFT: All controls */}
+        <div className="space-y-6">
+          {/* Colors */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Colores que identifican al Colegio</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Color Principal</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0" />
+                    <Input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-28 text-xs font-mono" />
+                  </div>
                 </div>
-
-                {/* Empty right column placeholder - the CarnetEditor below handles preview */}
-                <div />
+                <div>
+                  <Label className="text-xs text-muted-foreground">Color Secundario</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-10 h-10 rounded cursor-pointer border-0 p-0" />
+                    <Input value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-28 text-xs font-mono" />
+                  </div>
+                </div>
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Interactive Carnet Editor */}
-              <CarnetEditor
-                primaryColor={primaryColor}
-                secondaryColor={secondaryColor}
-                schoolName={school?.name || ""}
-                logoUrl={previewLogoUrl}
-                watermarkUrl={useCustomWatermark && watermarkPreview ? watermarkPreview : null}
-                watermarkOpacity={watermarkOpacity}
-                watermarkSize={watermarkSize}
-                useCustomWatermark={useCustomWatermark}
-                layout={layout}
-                onLayoutChange={setLayout}
-              />
-
-              <div className="flex gap-2 mt-6">
-                <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-                  <Save className="h-4 w-4 mr-2" />
-                  {saveMutation.isPending ? "Guardando..." : "Guardar"}
-                </Button>
-                <Button variant="outline" onClick={resetDefaults}>
-                  <RotateCcw className="h-4 w-4 mr-2" /> Restablecer
-                </Button>
+          {/* Watermark */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium">Marca de Agua</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">Por defecto se usa el logo del colegio. Puedes subir una imagen personalizada.</p>
+              <div>
+                <Label className="text-xs">Imagen personalizada (opcional)</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <Button variant="outline" size="sm" onClick={() => document.getElementById("watermark-input")?.click()}>
+                    <Upload className="h-3 w-3 mr-1" /> Subir imagen
+                  </Button>
+                  {useCustomWatermark && (
+                    <Button variant="ghost" size="sm" onClick={() => { setUseCustomWatermark(false); setWatermarkFile(null); setWatermarkPreview(null); }}>
+                      Usar logo por defecto
+                    </Button>
+                  )}
+                </div>
+                <input id="watermark-input" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+              {watermarkPreview && useCustomWatermark && (
+                <div className="w-20 h-20 border rounded p-1">
+                  <img src={watermarkPreview} alt="Watermark" className="w-full h-full object-contain" />
+                </div>
+              )}
+              <div>
+                <Label className="text-xs">Opacidad: {Math.round(watermarkOpacity * 100)}%</Label>
+                <Slider value={[watermarkOpacity * 100]} onValueChange={(v) => setWatermarkOpacity(v[0] / 100)} min={2} max={20} step={1} className="mt-2" />
+              </div>
+              <div>
+                <Label className="text-xs">Tamaño (mm): {watermarkSize}</Label>
+                <Slider value={[watermarkSize]} onValueChange={(v) => setWatermarkSize(v[0])} min={15} max={45} step={1} className="mt-2" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Layout controls */}
+          <CarnetControls layout={layout} onLayoutChange={setLayout} />
+
+          {/* Actions */}
+          <div className="flex gap-2">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              <Save className="h-4 w-4 mr-2" />
+              {saveMutation.isPending ? "Guardando..." : "Guardar"}
+            </Button>
+            <Button variant="outline" onClick={resetDefaults}>
+              <RotateCcw className="h-4 w-4 mr-2" /> Restablecer
+            </Button>
+          </div>
+        </div>
+
+        {/* RIGHT: Sticky Preview */}
+        <div className="sticky top-4">
+          <CarnetPreview
+            primaryColor={primaryColor}
+            secondaryColor={secondaryColor}
+            schoolName={school?.name || ""}
+            logoUrl={previewLogoUrl}
+            watermarkUrl={useCustomWatermark && watermarkPreview ? watermarkPreview : null}
+            watermarkOpacity={watermarkOpacity}
+            watermarkSize={watermarkSize}
+            useCustomWatermark={useCustomWatermark}
+            layout={layout}
+            onLayoutChange={setLayout}
+          />
+        </div>
       </div>
     </DashboardLayout>
   );
