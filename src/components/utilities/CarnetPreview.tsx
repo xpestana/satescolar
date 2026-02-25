@@ -232,7 +232,7 @@ export function CarnetPreview({
             style={{ left: `${layout.qrPos.x}%`, top: `${layout.qrPos.y}%`, cursor: cursor("qr") }}
             onPointerDown={(e) => handlePointerDown(e, "qr")}
           >
-            <div className="bg-muted border rounded flex items-center justify-center" style={{ width: 52 * scale, height: 52 * scale }}>
+            <div className="bg-muted border rounded flex items-center justify-center" style={{ width: layout.qrSize * scale, height: layout.qrSize * scale }}>
               <span className="text-muted-foreground" style={{ fontSize: 8 * scale }}>QR</span>
             </div>
           </div>

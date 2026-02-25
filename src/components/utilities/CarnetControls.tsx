@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { GripHorizontal, Move, Type, Image } from "lucide-react";
+import { GripHorizontal, Move, Type, Image, QrCode } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { CarnetLayoutConfig } from "./CarnetEditor";
 
@@ -68,6 +68,25 @@ export function CarnetControls({ layout, onLayoutChange }: CarnetControlsProps) 
             onValueChange={(v) => onLayoutChange({ ...layout, photoSize: v[0] })}
             min={30}
             max={90}
+            step={1}
+            className="mt-2"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <QrCode className="h-4 w-4" /> Código QR
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Label className="text-xs">Tamaño: {layout.qrSize}px</Label>
+          <Slider
+            value={[layout.qrSize]}
+            onValueChange={(v) => onLayoutChange({ ...layout, qrSize: v[0] })}
+            min={20}
+            max={70}
             step={1}
             className="mt-2"
           />
