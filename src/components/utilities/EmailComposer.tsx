@@ -7,7 +7,7 @@ import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/utilities/RichTextEditor";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -133,7 +133,7 @@ export function EmailComposer() {
   const buildEmailHtml = () => {
     const logoUrl = school?.logo_url || "";
     const schoolName = school?.name || "Colegio";
-    const bodyHtml = message.replace(/\n/g, "<br/>");
+    const bodyHtml = message; // Already HTML from rich text editor
     const subjectText = subject || "Asunto del correo";
     const bodyContent = bodyHtml || '<span style="color:#9ca3af;font-style:italic;">El contenido de tu mensaje aparecerá aquí...</span>';
 
@@ -400,13 +400,12 @@ export function EmailComposer() {
               className="text-base font-medium"
             />
 
-            {/* Message body */}
-            <Textarea
-              placeholder="Escribe tu mensaje aquí..."
+            {/* Message body - Rich Text Editor */}
+            <RichTextEditor
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={10}
-              className="resize-none"
+              onChange={setMessage}
+              placeholder="Escribe tu mensaje aquí..."
+              minHeight={250}
             />
 
             {/* Send button */}
