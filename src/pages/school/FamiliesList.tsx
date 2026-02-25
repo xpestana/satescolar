@@ -117,10 +117,10 @@ export default function FamiliesList() {
       const familyIds = familiesData.filter((f) => repUserIds.has(f.user_id)).map((f) => f.id);
       if (familyIds.length === 0) return { families: 0, representatives: 0, students: 0 };
 
-      // Count reps and students in parallel (students via student_schools for school isolation)
+      // Count reps and students only for representative families in this school
       const [{ count: repsCount }, { count: studentsCount }] = await Promise.all([
         supabase.from("representatives").select("id", { count: "exact", head: true }).in("family_id", familyIds),
-        supabase.from("student_schools").select("id", { count: "exact", head: true }).eq("school_id", schoolId),
+        supabase.from("students").select("id", { count: "exact", head: true }).in("family_id", familyIds),
       ]);
 
       return {
