@@ -62,11 +62,17 @@ export default function UtilitiesSettings() {
     const lc = config.layout_config as any;
     if (lc && typeof lc === "object" && lc.headerHeight) {
       setLayout({
+        ...DEFAULT_LAYOUT,
         headerHeight: lc.headerHeight ?? DEFAULT_LAYOUT.headerHeight,
         photoSize: lc.photoSize ?? DEFAULT_LAYOUT.photoSize,
         photoPos: lc.photoPos ?? DEFAULT_LAYOUT.photoPos,
         namePos: lc.namePos ?? DEFAULT_LAYOUT.namePos,
         badgePos: lc.badgePos ?? DEFAULT_LAYOUT.badgePos,
+        docPos: lc.docPos ?? DEFAULT_LAYOUT.docPos,
+        qrPos: lc.qrPos ?? DEFAULT_LAYOUT.qrPos,
+        schoolNamePos: lc.schoolNamePos ?? DEFAULT_LAYOUT.schoolNamePos,
+        cityPos: lc.cityPos ?? DEFAULT_LAYOUT.cityPos,
+        yearPos: lc.yearPos ?? DEFAULT_LAYOUT.yearPos,
         fontSizes: {
           schoolName: lc.fontSizes?.schoolName ?? DEFAULT_LAYOUT.fontSizes.schoolName,
           studentName: lc.fontSizes?.studentName ?? DEFAULT_LAYOUT.fontSizes.studentName,
