@@ -227,6 +227,7 @@ export function CarnetEditor({
       </div>
 
       {/* Interactive Preview */}
+      <div className="lg:sticky lg:top-4 lg:self-start">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium">Vista Previa Interactiva</CardTitle>
@@ -375,6 +376,7 @@ export function CarnetEditor({
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
