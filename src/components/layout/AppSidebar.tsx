@@ -89,11 +89,21 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "ÁREA DE UTILIDADES",
+    requiredRole: "school",
+    items: [],
+  },
+  {
     title: "ÁREA DE INSCRIPCIONES",
     requiredRole: "school",
     items: [
       { label: "Inscripciones", href: "/inscripciones", icon: ClipboardCheck, requiredRole: "school" },
     ],
+  },
+  {
+    title: "ÁREA DE NOTAS",
+    requiredRole: "school",
+    items: [],
   },
   {
     title: "ÁREA ADMINISTRATIVA",
@@ -197,7 +207,7 @@ export function AppSidebar() {
             return !item.requiredRole || item.requiredRole === userRole;
           });
           
-          if (visibleItems.length === 0) {
+          if (visibleItems.length === 0 && !section.title) {
             return null;
           }
           
