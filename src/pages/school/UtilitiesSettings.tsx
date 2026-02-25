@@ -33,6 +33,41 @@ export default function UtilitiesSettings() {
   const [useCustomWatermark, setUseCustomWatermark] = useState(false);
   const [layout, setLayout] = useState<CarnetLayoutConfig>(DEFAULT_LAYOUT);
 
+  // Fetch school full details (location)
+  const { data: schoolFull } = useQuery({
+    queryKey: ["school-full-details", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("schools")
+        .select("*, cities(name), states(name)")
+        .eq("id", schoolId!)
+        .single();
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Fetch active school year
+  const { data: activeYear } = useQuery({
+    queryKey: ["active-school-year", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("school_years")
+        .select("year_range")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .maybeSingle();
+      return data?.year_range || "";
+    },
+    enabled: !!schoolId,
+  });
+
+  const schoolLocation = [
+    (schoolFull?.cities as any)?.name,
+    (schoolFull?.states as any)?.name,
+  ].filter(Boolean).join(", ") || "";
+  const schoolYear = activeYear || "";
+
   const { data: config } = useQuery({
     queryKey: ["carnet-config", schoolId],
     queryFn: async () => {
@@ -256,6 +291,8 @@ export default function UtilitiesSettings() {
             useCustomWatermark={useCustomWatermark}
             layout={layout}
             onLayoutChange={setLayout}
+            schoolLocation={schoolLocation}
+            schoolYear={schoolYear}
           />
         </div>
       </div>

@@ -31,12 +31,14 @@ interface CarnetPreviewProps {
   useCustomWatermark: boolean;
   layout: CarnetLayoutConfig;
   onLayoutChange: (layout: CarnetLayoutConfig) => void;
+  schoolLocation?: string;
+  schoolYear?: string;
 }
 
 export function CarnetPreview({
   primaryColor, secondaryColor, schoolName, logoUrl,
   watermarkUrl, watermarkOpacity, watermarkSize, useCustomWatermark,
-  layout, onLayoutChange,
+  layout, onLayoutChange, schoolLocation, schoolYear,
 }: CarnetPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<DragTarget>(null);
@@ -154,7 +156,7 @@ export function CarnetPreview({
             style={{ left: `${layout.cityPos.x}%`, top: `${layout.cityPos.y}%`, cursor: cursor("city") }}
             onPointerDown={(e) => handlePointerDown(e, "city")}
           >
-            <p className="text-white/80 text-center" style={{ fontSize: 6 * scale }}>Ciudad, Estado</p>
+            <p className="text-white/80 text-center" style={{ fontSize: 6 * scale }}>{schoolLocation || "Ciudad, Estado"}</p>
           </div>
 
           {/* Year */}
@@ -163,7 +165,9 @@ export function CarnetPreview({
             style={{ left: `${layout.yearPos.x}%`, top: `${layout.yearPos.y}%`, cursor: cursor("year") }}
             onPointerDown={(e) => handlePointerDown(e, "year")}
           >
-            <p className="text-white/70 text-center" style={{ fontSize: 6 * scale }}>Año Escolar: 2024-2025</p>
+            <p className="text-white/70 text-center" style={{ fontSize: 6 * scale }}>
+              {schoolYear ? `Año Escolar: ${schoolYear}` : "Año Escolar: 2024-2025"}
+            </p>
           </div>
 
           {/* Resize handle */}
