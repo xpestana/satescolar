@@ -305,40 +305,53 @@ export async function downloadCarnet(params: {
   const h = 85.6;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [w, h] });
 
-  // Layout defaults
+  // Layout defaults — use same proportions as CarnetPreview.tsx
+  // Preview: CARD_W=280, CARD_H=443, scale=280/216≈1.296
   const lc = params.layoutConfig || {};
-  const headerH = ((lc.headerHeight ?? 88) / 342) * h; // convert from px proportion to mm
+  const PREVIEW_CARD_W = 280;
+  const PREVIEW_CARD_H = 443;
+  const PREVIEW_SCALE = PREVIEW_CARD_W / 216;
+  const BOTTOM_BAR_PX = 20;
+
+  // Header: in preview headerRenderedH = headerHeight * scale
+  const headerHeightRaw = lc.headerHeight ?? 88;
+  const headerRenderedPx = headerHeightRaw * PREVIEW_SCALE;
+  const headerH = (headerRenderedPx / PREVIEW_CARD_H) * h;
+
+  // Sizes: convert from preview px (raw * scale) to mm
+  const pxToMm = (px: number) => (px / PREVIEW_CARD_H) * h;
+
   const logoPos = lc.logoPos ?? { x: 50, y: 20 };
-  const logoSizePx = lc.logoSize ?? 32;
-  const logoSizeMm = (logoSizePx / 342) * h;
+  const logoSizeMm = pxToMm((lc.logoSize ?? 32) * PREVIEW_SCALE);
   const schoolNamePos = lc.schoolNamePos ?? { x: 50, y: 55 };
   const cityPos = lc.cityPos ?? { x: 50, y: 72 };
   const yearPos = lc.yearPos ?? { x: 50, y: 85 };
   const photoPos = lc.photoPos ?? { x: 50, y: 15 };
-  const photoSizePx = lc.photoSize ?? 56;
-  const photoR = ((photoSizePx / 342) * h) / 2;
+  const photoR = pxToMm((lc.photoSize ?? 56) * PREVIEW_SCALE) / 2;
   const namePos = lc.namePos ?? { x: 50, y: 52 };
   const badgePos = lc.badgePos ?? { x: 50, y: 62 };
   const docPos = lc.docPos ?? { x: 50, y: 74 };
   const qrPos = lc.qrPos ?? { x: 50, y: 85 };
-  const qrSizePx = lc.qrSize ?? 44;
-  const qrSizeMm = ((qrSizePx / 342) * h);
+  const qrSizeMm = pxToMm((lc.qrSize ?? 44) * PREVIEW_SCALE);
   const fontSizes = {
     schoolName: lc.fontSizes?.schoolName ?? 8,
     studentName: lc.fontSizes?.studentName ?? 9,
     document: lc.fontSizes?.document ?? 8,
   };
 
-  // Scale font from preview px to PDF points (preview is 342px tall = 85.6mm)
-  const fontScale = 0.55; // approximate px-to-pt ratio for this card size
+  // Font scale: preview font is in px * scale, PDF needs pt
+  // At preview scale, 8px * 1.296 ≈ 10.4px on screen → ~3.5pt in 54mm card
+  const fontScale = (PREVIEW_SCALE / PREVIEW_CARD_H) * h * 0.42;
 
   // Helper: convert percentage position to mm coordinates
   const headerMm = (pos: { x: number; y: number }) => ({
     x: (pos.x / 100) * w,
     y: (pos.y / 100) * headerH,
   });
-  const bodyTop = headerH + (1 / 342) * h; // after stripe
-  const bodyH = h - bodyTop - 4; // minus bottom bar
+  const stripeMm = 0.25; // thin stripe between header and body
+  const bodyTop = headerH + stripeMm;
+  const bottomBarMm = (BOTTOM_BAR_PX / PREVIEW_CARD_H) * h;
+  const bodyH = h - bodyTop - bottomBarMm;
   const bodyMm = (pos: { x: number; y: number }) => ({
     x: (pos.x / 100) * w,
     y: bodyTop + (pos.y / 100) * bodyH,
@@ -471,11 +484,11 @@ export async function downloadCarnet(params: {
 
   // ── Bottom bar ──
   doc.setFillColor(pc.r, pc.g, pc.b);
-  doc.rect(0, h - 4, w, 4, "F");
+  doc.rect(0, h - bottomBarMm, w, bottomBarMm, "F");
   doc.setFillColor(sc.r, sc.g, sc.b);
-  doc.triangle(w, h, w - 16, h, w, h - 4, "F");
+  doc.triangle(w, h, w - 16, h, w, h - bottomBarMm, "F");
   doc.setFillColor(sc2.r, sc2.g, sc2.b);
-  doc.triangle(0, h, 12, h, 0, h - 4, "F");
+  doc.triangle(0, h, 12, h, 0, h - bottomBarMm, "F");
 
   const safeName = params.personName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_");
   doc.save(`Carnet_${safeName}.pdf`);

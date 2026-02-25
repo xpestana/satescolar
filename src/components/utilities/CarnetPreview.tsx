@@ -43,7 +43,11 @@ export function CarnetPreview({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, startVal: { x: 0, y: 0 } });
   const [selectedElement, setSelectedElement] = useState<DragTarget>(null);
 
-  const bodyH = CARD_H - layout.headerHeight - 16;
+  // Scale factors for preview (original design was 216x342)
+  const scale = CARD_W / 216;
+  const headerRenderedH = layout.headerHeight * scale;
+  const bottomBarH = 20;
+  const bodyH = CARD_H - headerRenderedH - bottomBarH;
   const effectiveWatermark = useCustomWatermark && watermarkUrl ? watermarkUrl : logoUrl || "";
 
   const handlePointerDown = (e: React.PointerEvent, target: DragTarget) => {
@@ -99,8 +103,7 @@ export function CarnetPreview({
   const cursor = (t: DragTarget) =>
     dragging === t ? "grabbing" : "grab";
 
-  // Scale factors for preview (original design was 216x342)
-  const scale = CARD_W / 216;
+  // scale is defined above
 
   return (
     <div className="flex flex-col items-center">
