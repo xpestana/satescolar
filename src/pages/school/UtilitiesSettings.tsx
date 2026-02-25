@@ -73,6 +73,8 @@ export default function UtilitiesSettings() {
         schoolNamePos: lc.schoolNamePos ?? DEFAULT_LAYOUT.schoolNamePos,
         cityPos: lc.cityPos ?? DEFAULT_LAYOUT.cityPos,
         yearPos: lc.yearPos ?? DEFAULT_LAYOUT.yearPos,
+        logoPos: lc.logoPos ?? DEFAULT_LAYOUT.logoPos,
+        logoSize: lc.logoSize ?? DEFAULT_LAYOUT.logoSize,
         fontSizes: {
           schoolName: lc.fontSizes?.schoolName ?? DEFAULT_LAYOUT.fontSizes.schoolName,
           studentName: lc.fontSizes?.studentName ?? DEFAULT_LAYOUT.fontSizes.studentName,
@@ -160,14 +162,14 @@ export default function UtilitiesSettings() {
 
       <div className="space-y-6">
         <Accordion type="single" collapsible defaultValue="carnet">
-          <AccordionItem value="carnet" className="border rounded-lg bg-card">
+          <AccordionItem value="carnet" className="border rounded-lg bg-card overflow-visible">
             <AccordionTrigger className="px-6 py-4 hover:no-underline">
               <div className="flex items-center gap-3">
                 <CreditCard className="h-5 w-5 text-primary" />
                 <span className="text-lg font-semibold">Configuración de Carnet</span>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-6 pb-6">
+            <AccordionContent className="px-6 pb-6 overflow-visible">
               {/* Colors & Watermark controls */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 <div className="space-y-6">
