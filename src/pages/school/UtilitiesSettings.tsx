@@ -167,7 +167,7 @@ export default function UtilitiesSettings() {
                 <div className="space-y-6">
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-medium">Colores del Carnet</CardTitle>
+                      <CardTitle className="text-sm font-medium">Colores que identifican al Colegio</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="flex items-center gap-4">
