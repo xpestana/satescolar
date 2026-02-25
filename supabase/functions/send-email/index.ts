@@ -42,10 +42,11 @@ serve(async (req) => {
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
+      .eq("role", "admin")
       .maybeSingle();
 
-    if (!roleData || !["admin", "school"].includes(roleData.role)) {
-      return new Response(JSON.stringify({ error: "Unauthorized: Admin or School only" }), {
+    if (!roleData) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Admin only" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
