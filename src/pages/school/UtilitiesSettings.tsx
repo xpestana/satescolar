@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Save, Upload, RotateCcw, CreditCard } from "lucide-react";
+import { Save, Upload, RotateCcw, CreditCard, Mail } from "lucide-react";
+import EmailComposer from "@/components/utilities/EmailComposer";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
@@ -149,7 +150,7 @@ export default function UtilitiesSettings() {
       />
 
       <div className="space-y-6">
-        <Accordion type="single" collapsible defaultValue="carnet">
+        <Accordion type="multiple" defaultValue={["carnet"]}>
           <AccordionItem value="carnet" className="border rounded-lg bg-card">
             <AccordionTrigger className="px-6 py-4 hover:no-underline">
               <div className="flex items-center gap-3">
@@ -361,6 +362,18 @@ export default function UtilitiesSettings() {
                   </CardContent>
                 </Card>
               </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="email" className="border rounded-lg bg-card">
+            <AccordionTrigger className="px-6 py-4 hover:no-underline">
+              <div className="flex items-center gap-3">
+                <Mail className="h-5 w-5 text-primary" />
+                <span className="text-lg font-semibold">Envío de Correos</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="px-6 pb-6">
+              <EmailComposer />
             </AccordionContent>
           </AccordionItem>
         </Accordion>
