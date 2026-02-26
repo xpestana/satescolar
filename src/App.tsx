@@ -18,6 +18,7 @@ import AddStudent from "./pages/school/AddStudent";
 import AddRepresentative from "./pages/school/AddRepresentative";
 import AdvancedSearch from "./pages/school/AdvancedSearch";
 import SubjectsList from "./pages/school/SubjectsList";
+import SubjectAssignments from "./pages/school/SubjectAssignments";
 import TeachersList from "./pages/school/TeachersList";
 import AddTeacher from "./pages/school/AddTeacher";
 import EnrollmentsList from "./pages/school/EnrollmentsList";
@@ -148,7 +149,15 @@ const App = () => (
               } 
             />
             <Route 
-              path="/registros/docentes" 
+              path="/registros/asignacion-areas" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <SubjectAssignments />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/docentes"
               element={
                 <ProtectedRoute requiredRole="school">
                   <TeachersList />
