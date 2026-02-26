@@ -189,11 +189,26 @@ export function GroupedFormFields({
   useMemo(() => {
     paisFields.forEach(f => {
       if (!formData[f.field_name]) {
-        // Use setTimeout to avoid updating state during render
         setTimeout(() => onFieldChange(f.field_name, "Venezuela"), 0);
       }
     });
   }, [paisFields, formData, onFieldChange]);
+
+  // Auto-persist geographic initial values into formData when they exist but aren't saved yet
+  useMemo(() => {
+    const geoInitials: { base: GeoBase; value: string | null | undefined }[] = [
+      { base: "estado", value: initialStateId },
+      { base: "municipio", value: initialMunicipalityId },
+      { base: "ciudad", value: initialCityId },
+      { base: "parroquia", value: initialParishId },
+    ];
+    geoInitials.forEach(({ base, value }) => {
+      const key = geoKey(base);
+      if (value && !formData[key]) {
+        setTimeout(() => onFieldChange(key, value), 0);
+      }
+    });
+  }, [initialStateId, initialMunicipalityId, initialCityId, initialParishId, geoKey, formData, onFieldChange]);
 
   const renderGeographicField = (field: FormField, base: GeoBase) => {
     if (base === "pais") {
