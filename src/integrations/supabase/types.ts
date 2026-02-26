@@ -232,6 +232,7 @@ export type Database = {
           enrollment_date: string | null
           enrollment_type: string | null
           id: string
+          observations: string | null
           school_id: string
           school_year_id: string
           section_id: string
@@ -244,6 +245,7 @@ export type Database = {
           enrollment_date?: string | null
           enrollment_type?: string | null
           id?: string
+          observations?: string | null
           school_id: string
           school_year_id: string
           section_id: string
@@ -256,6 +258,7 @@ export type Database = {
           enrollment_date?: string | null
           enrollment_type?: string | null
           id?: string
+          observations?: string | null
           school_id?: string
           school_year_id?: string
           section_id?: string
