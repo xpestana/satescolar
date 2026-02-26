@@ -57,6 +57,8 @@ const FIXED_COLUMNS_REP: ColumnDef[] = [
   { key: "email", label: "Email", isFormData: false },
   { key: "phone", label: "Teléfono", isFormData: false },
   { key: "family_name", label: "Familia", isFormData: false },
+  { key: "family_students", label: "Estudiantes", isFormData: false },
+  { key: "family_students_count", label: "Nº Estudiantes", isFormData: false },
 ];
 
 const FIXED_COLUMNS_TEACHER: ColumnDef[] = [
@@ -328,10 +330,30 @@ export default function AdvancedSearch() {
       } else if (formType === "representative") {
         const { data, error } = await supabase
           .from("representatives")
-          .select("*, families!inner(father_last_name, mother_last_name, is_suspended, contact_phone, address, family_schools!inner(school_id))")
+          .select("*, families!inner(id, father_last_name, mother_last_name, is_suspended, contact_phone, address, family_schools!inner(school_id))")
           .eq("families.family_schools.school_id", schoolId!);
         if (error) throw error;
-        return data as any[];
+
+        // Fetch students for all families
+        const familyIds = [...new Set((data || []).map((r: any) => r.family_id))];
+        let studentsMap: Record<string, { name: string }[]> = {};
+        if (familyIds.length > 0) {
+          const { data: allStudents } = await supabase
+            .from("students")
+            .select("family_id, form_data")
+            .in("family_id", familyIds);
+          for (const s of (allStudents || [])) {
+            const fd = (s.form_data as Record<string, any>) || {};
+            const name = [fd.primer_nombre, fd.primer_apellido].filter(Boolean).join(" ") || "Sin nombre";
+            if (!studentsMap[s.family_id]) studentsMap[s.family_id] = [];
+            studentsMap[s.family_id].push({ name });
+          }
+        }
+
+        return (data || []).map((r: any) => ({
+          ...r,
+          _family_students: studentsMap[r.family_id] || [],
+        })) as any[];
       } else {
         const { data, error } = await supabase
           .from("teachers")
@@ -400,6 +422,13 @@ export default function AdvancedSearch() {
       const f = record.families as any;
       return [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "—";
     }
+    if (col.key === "family_students") {
+      const students = (record._family_students || []) as { name: string }[];
+      return students.length > 0 ? students.map(s => s.name).join(", ") : "—";
+    }
+    if (col.key === "family_students_count") {
+      return (record._family_students || []).length;
+    }
     if (col.isFormData) {
       const fd = (record.form_data ?? {}) as Record<string, any>;
       const val = fd[col.key];
@@ -415,6 +444,14 @@ export default function AdvancedSearch() {
     if (col.key === "family_name") {
       const f = record.families as any;
       return [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "";
+    }
+    if (col.key === "family_students") {
+      const students = (record._family_students || []) as { name: string }[];
+      return students.map(s => s.name).join(", ");
+    }
+    if (col.key === "family_students_count") {
+      return String((record._family_students || []).length);
+    }
     }
     if (col.isFormData) {
       const fd = (record.form_data ?? {}) as Record<string, any>;
