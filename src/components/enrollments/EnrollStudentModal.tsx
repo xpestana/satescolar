@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -93,6 +94,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [enrollmentType, setEnrollmentType] = useState("");
   const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [observations, setObservations] = useState("");
 
   // Fetch existing enrollment data for pre-population
   const { data: existingEnrollment } = useQuery({
@@ -100,7 +102,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     queryFn: async () => {
       const { data, error } = await supabase
         .from("enrollments")
-        .select("section_id, enrollment_type, enrollment_date")
+        .select("section_id, enrollment_type, enrollment_date, observations")
         .eq("student_id", student.id)
         .eq("school_year_id", activeYear.id)
         .eq("school_id", schoolId)
@@ -117,6 +119,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       setSelectedSectionId(existingEnrollment.section_id || "");
       setEnrollmentType(existingEnrollment.enrollment_type || "");
       setEnrollmentDate(existingEnrollment.enrollment_date || new Date().toISOString().split("T")[0]);
+      setObservations(existingEnrollment.observations || "");
     }
   }, [existingEnrollment, open]);
 
@@ -127,6 +130,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         setSelectedSectionId("");
         setEnrollmentType("");
         setEnrollmentDate(new Date().toISOString().split("T")[0]);
+        setObservations("");
       }
     }
   }, [open, student.isEnrolled]);
@@ -238,6 +242,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
           school_id: schoolId,
           enrollment_type: enrollmentType,
           enrollment_date: enrollmentDate || null,
+          observations: observations.trim() || null,
         } as any, { onConflict: "student_id,school_year_id,school_id" });
 
       if (error) throw error;
@@ -285,6 +290,11 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     acc[label].push(s);
     return acc;
   }, {} as Record<string, typeof sections>);
+
+  // Check if planilla has an "Observaciones" section
+  const hasObservationsSection = planillaSections.some(s =>
+    s.title?.toLowerCase().includes("observacion") || s.title?.toLowerCase().includes("observación")
+  );
 
   // Resolve field label for missing fields display
   const resolveLabel = (prefixed: string) => {
@@ -431,6 +441,19 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
             </Select>
           </div>
         </div>
+
+        {hasObservationsSection && (
+          <div className="my-2">
+            <Label className="text-sm font-medium">Observaciones</Label>
+            <Textarea
+              placeholder="Observaciones particulares del estudiante para este año escolar (opcional)"
+              value={observations}
+              onChange={(e) => setObservations(e.target.value)}
+              className="mt-1 resize-none"
+              rows={3}
+            />
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
