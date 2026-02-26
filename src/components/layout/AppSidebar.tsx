@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -18,11 +18,14 @@ import {
   ClipboardCheck,
   Mail,
   LinkIcon,
+  Menu,
+  PanelRightClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
+import { useSidebarState } from "@/hooks/useSidebarState";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -157,7 +160,27 @@ export function AppSidebar() {
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
   const { familyName } = useRepresentativeFamily();
+  const { collapsed, hovering, toggleCollapsed, setHovering, isVisible } = useSidebarState();
   const [openDropdowns, setOpenDropdowns] = useState<string[]>([]);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (!collapsed) return;
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setHovering(true);
+  }, [collapsed, setHovering]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!collapsed) return;
+    hoverTimeoutRef.current = setTimeout(() => setHovering(false), 300);
+  }, [collapsed, setHovering]);
+
+  // Hover trigger zone (invisible strip on the right edge when collapsed)
+  const handleEdgeEnter = useCallback(() => {
+    if (!collapsed) return;
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    setHovering(true);
+  }, [collapsed, setHovering]);
 
   const toggleDropdown = (label: string) => {
     setOpenDropdowns((prev) =>
@@ -174,14 +197,10 @@ export function AppSidebar() {
 
   const getRoleLabel = (role: string | null) => {
     switch (role) {
-      case "admin":
-        return "Admin";
-      case "school":
-        return "Escolar";
-      case "representative":
-        return "Representante";
-      default:
-        return "Usuario";
+      case "admin": return "Admin";
+      case "school": return "Escolar";
+      case "representative": return "Representante";
+      default: return "Usuario";
     }
   };
 
@@ -190,11 +209,37 @@ export function AppSidebar() {
   };
 
   return (
-    <aside className="fixed right-0 top-0 z-40 flex h-screen w-72 flex-col">
-      {/* Logo Section - Dark Blue */}
-      <div className="flex items-center justify-center py-6 bg-[#01051e]">
-        <img src={logo} alt="SAT Escolar" className="h-28" />
-      </div>
+    <>
+      {/* Hover trigger zone on right edge when collapsed */}
+      {collapsed && !hovering && (
+        <div
+          className="fixed right-0 top-0 z-40 h-screen w-4 cursor-pointer"
+          onMouseEnter={handleEdgeEnter}
+        />
+      )}
+
+      <aside
+        className={cn(
+          "fixed right-0 top-0 z-40 flex h-screen w-72 flex-col transition-transform duration-300 ease-in-out",
+          collapsed && !hovering && "translate-x-full"
+        )}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        style={collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : undefined}
+      >
+        {/* Logo Section - Dark Blue */}
+        <div className="flex items-center justify-between py-6 px-4 bg-[#01051e]">
+          <img src={logo} alt="SAT Escolar" className="h-28 mx-auto" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleCollapsed}
+            className="absolute top-3 left-3 text-white/70 hover:text-white hover:bg-white/10"
+            title={collapsed ? "Fijar menú" : "Ocultar menú"}
+          >
+            {collapsed ? <Menu className="h-5 w-5" /> : <PanelRightClose className="h-5 w-5" />}
+          </Button>
+        </div>
 
       {/* Navigation - White Background */}
       <nav className="flex-1 overflow-y-auto px-4 py-4 bg-white border-l border-border">
@@ -339,5 +384,6 @@ export function AppSidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useSchoolData } from "@/hooks/useSchoolData";
+import { useSidebarState } from "@/hooks/useSidebarState";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -9,12 +10,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.svg";
 
 export function TopBar() {
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
+  const { collapsed, toggleCollapsed } = useSidebarState();
 
   const displayLogo = userRole === "school" && school?.logo_url ? school.logo_url : logo;
   const isSchoolLogo = userRole === "school" && !!school?.logo_url;
@@ -26,19 +29,18 @@ export function TopBar() {
 
   const getRoleLabel = (role: string | null) => {
     switch (role) {
-      case "admin":
-        return "Administrador";
-      case "school":
-        return "Usuario Escolar";
-      case "representative":
-        return "Representante";
-      default:
-        return "Usuario";
+      case "admin": return "Administrador";
+      case "school": return "Usuario Escolar";
+      case "representative": return "Representante";
+      default: return "Usuario";
     }
   };
 
   return (
-    <header className="fixed top-0 left-0 right-72 z-30 h-16 bg-transparent flex items-center px-6">
+    <header
+      className="fixed top-0 left-0 z-30 h-16 bg-transparent flex items-center justify-between px-6 transition-[right] duration-300 ease-in-out"
+      style={{ right: collapsed ? 0 : "18rem" }}
+    >
       <div className="flex items-center gap-4">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -78,6 +80,19 @@ export function TopBar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Hamburger toggle - visible when sidebar is collapsed */}
+      {collapsed && (
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={toggleCollapsed}
+          className="bg-white/90 hover:bg-white shadow-md"
+          title="Abrir menú"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      )}
     </header>
   );
 }
