@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -25,6 +25,39 @@ const GRADE_LABELS: Record<string, string> = {
   primaria: "Primaria",
   media_general: "Media General",
   media_tecnica: "Media Técnica",
+};
+
+// Map student nivel_grado values to section grade_level enum(s)
+const NIVEL_TO_GRADE: Record<string, string[]> = {
+  // Direct matches
+  "Pre-Maternal": ["pre_maternal"],
+  "pre_maternal": ["pre_maternal"],
+  "Maternal": ["maternal"],
+  "maternal": ["maternal"],
+  "Inicial": ["inicial"],
+  "inicial": ["inicial"],
+  "Preescolar": ["inicial"],
+  "1er Nivel": ["inicial"],
+  "2do Nivel": ["inicial"],
+  "3er Nivel": ["inicial"],
+  "Primaria": ["primaria"],
+  "primaria": ["primaria"],
+  "1er Grado": ["primaria"],
+  "2do Grado": ["primaria"],
+  "3er Grado": ["primaria"],
+  "4to Grado": ["primaria"],
+  "5to Grado": ["primaria"],
+  "6to Grado": ["primaria"],
+  "Media General": ["media_general"],
+  "media_general": ["media_general"],
+  "Media Técnica": ["media_tecnica"],
+  "media_tecnica": ["media_tecnica"],
+  "1er Año": ["media_general", "media_tecnica"],
+  "2do Año": ["media_general", "media_tecnica"],
+  "3er Año": ["media_general", "media_tecnica"],
+  "4to Año": ["media_general", "media_tecnica"],
+  "5to Año": ["media_general", "media_tecnica"],
+  "6to Año": ["media_tecnica"],
 };
 
 const ENROLLMENT_TYPES = [
@@ -236,7 +269,17 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         { name: "nivel_grado", label: "Grado" },
       ];
 
-  const sectionsByGrade = sections.reduce((acc, s) => {
+  // Filter sections based on student's nivel_grado
+  const studentGrade = student.form_data?.nivel_grado || student.form_data?.grado || "";
+  const matchedGradeLevels = studentGrade ? NIVEL_TO_GRADE[studentGrade] || [] : [];
+
+  const filteredSections = matchedGradeLevels.length > 0
+    ? sections.filter(s => matchedGradeLevels.includes(s.grade_level))
+    : sections; // If no grade or no mapping found, show all
+
+  const hasGradeButNoSections = matchedGradeLevels.length > 0 && filteredSections.length === 0;
+
+  const sectionsByGrade = filteredSections.reduce((acc, s) => {
     const label = GRADE_LABELS[s.grade_level] || s.grade_level;
     if (!acc[label]) acc[label] = [];
     acc[label].push(s);
@@ -342,23 +385,36 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
 
           <div>
             <Label className="text-sm font-medium">Sección *</Label>
-            <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Seleccionar sección..." />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(sectionsByGrade).map(([grade, secs]) => (
-                  <div key={grade}>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{grade}</div>
-                    {secs.map(s => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {grade} - Sección {s.name}
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
+            {hasGradeButNoSections ? (
+              <div className="mt-1 text-sm text-muted-foreground border rounded-md p-2 bg-muted/50">
+                No hay secciones para <strong>{studentGrade}</strong>.{" "}
+                <Link
+                  to="/periodos-secciones"
+                  className="text-primary underline hover:no-underline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Agregar secciones
+                </Link>
+              </div>
+            ) : (
+              <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Seleccionar sección..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(sectionsByGrade).map(([grade, secs]) => (
+                    <div key={grade}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{grade}</div>
+                      {secs.map(s => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {grade} - Sección {s.name}
+                        </SelectItem>
+                      ))}
+                    </div>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div>
