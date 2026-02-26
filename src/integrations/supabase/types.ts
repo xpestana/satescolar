@@ -740,6 +740,56 @@ export type Database = {
           },
         ]
       }
+      school_subjects: {
+        Row: {
+          created_at: string
+          display_order: number
+          evaluation_type: string
+          id: string
+          is_suspended: boolean
+          name: string
+          school_id: string
+          show_in_planilla: boolean
+          show_in_report_card: boolean
+          subject_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          evaluation_type?: string
+          id?: string
+          is_suspended?: boolean
+          name: string
+          school_id: string
+          show_in_planilla?: boolean
+          show_in_report_card?: boolean
+          subject_type?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          evaluation_type?: string
+          id?: string
+          is_suspended?: boolean
+          name?: string
+          school_id?: string
+          show_in_planilla?: boolean
+          show_in_report_card?: boolean
+          subject_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_subjects_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_years: {
         Row: {
           created_at: string
