@@ -3,16 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { AppSidebar } from "./AppSidebar";
 import { TopBar } from "./TopBar";
 import { useAuth } from "@/hooks/useAuth";
-import { SidebarProvider, useSidebarState } from "@/hooks/useSidebarState";
+import { useSidebarState } from "@/hooks/useSidebarState";
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-function DashboardContent({ children }: DashboardLayoutProps) {
+export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const { collapsed, isVisible } = useSidebarState();
+  const { collapsed } = useSidebarState();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -46,13 +46,5 @@ function DashboardContent({ children }: DashboardLayoutProps) {
         {children}
       </main>
     </div>
-  );
-}
-
-export function DashboardLayout({ children }: DashboardLayoutProps) {
-  return (
-    <SidebarProvider>
-      <DashboardContent>{children}</DashboardContent>
-    </SidebarProvider>
   );
 }
