@@ -628,16 +628,7 @@ function resolveFieldValue(
       if (fieldName === "fecha_nacimiento") return formatDate(studentFd.fecha_nacimiento);
       if (fieldName === "documento") return data.student?.document_id || studentFd.documento || "No registrado";
       if (fieldName === "grado" || fieldName === "nivel_grado") {
-        if (data.enrollmentSection) {
-          const gradeLevel = data.enrollmentSection.grade_level || "";
-          const sectionName = data.enrollmentSection.name || "";
-          const GRADE_LABELS: Record<string, string> = {
-            pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
-            primaria: "Primaria", media_general: "Media General", media_tecnica: "Media Técnica",
-          };
-          const gradeLabel = GRADE_LABELS[gradeLevel] || gradeLevel;
-          return `${gradeLabel}${sectionName ? ` - Sección ${sectionName}` : ""}` || studentFd.nivel_grado || studentFd.grado || "No registrado";
-        }
+        // Show the student's own nivel_grado value (e.g. "1er Año"), not the section grade_level
         return studentFd.nivel_grado || studentFd.grado || "No registrado";
       }
       const val = studentFd[fieldName] || "No registrado";
@@ -688,9 +679,7 @@ function resolveFieldValue(
         return formatDate(data.enrollment.enrollment_date);
       }
       if (fieldName === "grupo_asignado" && data.enrollmentSection) {
-        const gradeLabel = data.enrollmentSection.grade_level || "";
-        const sectionName = data.enrollmentSection.name || "";
-        return `${gradeLabel} - ${sectionName}`.trim() || "No registrado";
+        return data.enrollmentSection.name || "No registrado";
       }
       return studentFd[fieldName] || "No registrado";
     }
