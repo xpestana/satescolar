@@ -399,7 +399,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
               <div className="mt-1 text-sm text-muted-foreground border rounded-md p-2 bg-muted/50">
                 No hay secciones para <strong>{studentGrade}</strong>.{" "}
                 <Link
-                  to="/periodos-secciones"
+                  to="/school/configuraciones/anos-secciones"
                   className="text-primary underline hover:no-underline"
                   onClick={() => onOpenChange(false)}
                 >
