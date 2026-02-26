@@ -17,6 +17,7 @@ import EditFamily from "./pages/school/EditFamily";
 import AddStudent from "./pages/school/AddStudent";
 import AddRepresentative from "./pages/school/AddRepresentative";
 import AdvancedSearch from "./pages/school/AdvancedSearch";
+import SubjectsList from "./pages/school/SubjectsList";
 import TeachersList from "./pages/school/TeachersList";
 import AddTeacher from "./pages/school/AddTeacher";
 import EnrollmentsList from "./pages/school/EnrollmentsList";
@@ -135,6 +136,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="school">
                   <AdvancedSearch />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/registros/areas" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <SubjectsList />
                 </ProtectedRoute>
               } 
             />
