@@ -17,6 +17,7 @@ import {
   Home as HomeIcon,
   ClipboardCheck,
   Mail,
+  LinkIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -86,6 +87,7 @@ const navSections: NavSection[] = [
       { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school" },
       { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school" },
       { label: "Áreas", href: "/registros/areas", icon: GraduationCap, requiredRole: "school" },
+      { label: "Asignación de Áreas", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school" },
       { label: "Búsqueda Avanzada", href: "/registros/busqueda-avanzada", icon: Search, requiredRole: "school" },
     ],
   },
