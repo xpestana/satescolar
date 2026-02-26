@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Pagination } from "@/components/ui/data-pagination";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown, Eye, Edit, IdCard, Star } from "lucide-react";
+import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown, Eye, Edit, IdCard, Star, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
@@ -103,6 +103,7 @@ export default function AdvancedSearch() {
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [exportColumns, setExportColumns] = useState<string[] | null>(null);
   const [viewRecord, setViewRecord] = useState<any>(null);
+  const [filterPrimary, setFilterPrimary] = useState<boolean | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -369,9 +370,16 @@ export default function AdvancedSearch() {
   // Filter
   const filtered = useMemo(() => {
     if (!records) return [];
-    if (!searchTerm.trim()) return records;
+    let result = records;
+
+    // Filter by primary representative
+    if (formType === "representative" && filterPrimary !== null) {
+      result = result.filter((r: any) => r.is_primary === filterPrimary);
+    }
+
+    if (!searchTerm.trim()) return result;
     const term = searchTerm.toLowerCase();
-    return records.filter((r: any) => {
+    return result.filter((r: any) => {
       const fixedVals = [r.document_id, r.email, r.phone].filter(Boolean);
       if (formType !== "teacher") {
         const familyName = [
@@ -393,7 +401,7 @@ export default function AdvancedSearch() {
         String(v).toLowerCase().includes(term)
       );
     });
-  }, [records, searchTerm, activeColumnKeys, allColumns]);
+  }, [records, searchTerm, activeColumnKeys, allColumns, formType, filterPrimary]);
 
   // Paginate
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -597,6 +605,27 @@ export default function AdvancedSearch() {
               className="pl-9"
             />
           </div>
+
+          {formType === "representative" && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant={filterPrimary === true ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterPrimary(filterPrimary === true ? null : true)}
+              >
+                <Star className="h-4 w-4 mr-1" />
+                Principales
+              </Button>
+              <Button
+                variant={filterPrimary === false ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterPrimary(filterPrimary === false ? null : false)}
+              >
+                <Users className="h-4 w-4 mr-1" />
+                No principales
+              </Button>
+            </div>
+          )}
 
           {/* Column visibility */}
           <Popover>
