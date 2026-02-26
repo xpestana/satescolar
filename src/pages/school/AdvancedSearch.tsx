@@ -452,7 +452,6 @@ export default function AdvancedSearch() {
     if (col.key === "family_students_count") {
       return String((record._family_students || []).length);
     }
-    }
     if (col.isFormData) {
       const fd = (record.form_data ?? {}) as Record<string, any>;
       const val = fd[col.key];
