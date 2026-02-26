@@ -293,6 +293,27 @@ export default function AdvancedSearch() {
     enabled: !!schoolId,
   });
 
+  // Fetch all geo entities for UUID resolution
+  const { data: geoCache } = useQuery({
+    queryKey: ["geo-cache-all"],
+    queryFn: async () => {
+      const [stR, muR, ciR, paR] = await Promise.all([
+        supabase.from("states").select("id, name"),
+        supabase.from("municipalities").select("id, name"),
+        supabase.from("cities").select("id, name"),
+        supabase.from("parishes").select("id, name"),
+      ]);
+      const cache: Record<string, string> = {};
+      for (const r of (stR.data || [])) cache[r.id] = r.name;
+      for (const r of (muR.data || [])) cache[r.id] = r.name;
+      for (const r of (ciR.data || [])) cache[r.id] = r.name;
+      for (const r of (paR.data || [])) cache[r.id] = r.name;
+      return cache;
+    },
+  });
+
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
+
   // Fetch data
   const { data: records, isLoading: recordsLoading } = useQuery({
     queryKey: ["adv-search-records", schoolId, formType],
@@ -381,7 +402,11 @@ export default function AdvancedSearch() {
     }
     if (col.isFormData) {
       const fd = (record.form_data ?? {}) as Record<string, any>;
-      return fd[col.key] ?? "—";
+      const val = fd[col.key];
+      if (val && typeof val === "string" && uuidPattern.test(val) && geoCache?.[val]) {
+        return geoCache[val];
+      }
+      return val ?? "—";
     }
     return record[col.key] ?? "—";
   };
@@ -393,7 +418,11 @@ export default function AdvancedSearch() {
     }
     if (col.isFormData) {
       const fd = (record.form_data ?? {}) as Record<string, any>;
-      return fd[col.key] != null ? String(fd[col.key]) : "";
+      const val = fd[col.key];
+      if (val && typeof val === "string" && uuidPattern.test(val) && geoCache?.[val]) {
+        return geoCache[val];
+      }
+      return val != null ? String(val) : "";
     }
     return record[col.key] != null ? String(record[col.key]) : "";
   };
