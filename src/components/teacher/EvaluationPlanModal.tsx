@@ -16,6 +16,7 @@ interface EvaluationPlanModalProps {
   subjectName: string;
   sectionLabel: string;
   usePercentage: boolean;
+  planLabel?: string;
 }
 
 interface PlanItem {
@@ -33,6 +34,7 @@ export function EvaluationPlanModal({
   subjectName,
   sectionLabel,
   usePercentage,
+  planLabel = "Plan de Evaluación",
 }: EvaluationPlanModalProps) {
   const queryClient = useQueryClient();
   const [newDescription, setNewDescription] = useState("");
@@ -137,7 +139,7 @@ export function EvaluationPlanModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Plan de Evaluación</DialogTitle>
+          <DialogTitle>{planLabel}</DialogTitle>
           <DialogDescription>
             {subjectName} — {sectionLabel}
           </DialogDescription>
