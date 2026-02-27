@@ -256,15 +256,13 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         { name: "nivel_grado", label: "Grado" },
       ];
 
-  // Show all sections grouped by grade level (no filtering by student's grado)
-  const sectionsByGrade = sections.reduce((acc, s) => {
-    const label = GRADE_LABELS[s.grade_level] || s.grade_level;
-    if (!acc[label]) acc[label] = [];
-    acc[label].push(s);
-    return acc;
-  }, {} as Record<string, typeof sections>);
+  // Filter sections by student's grade level
+  const studentGrade = student.form_data?.nivel_grado as string | undefined;
+  const filteredSections = studentGrade
+    ? sections.filter(s => s.grade_level === studentGrade)
+    : sections;
 
-  const hasNoSections = sections.length === 0;
+  const hasNoSections = filteredSections.length === 0;
 
   // Check if planilla has an "Observaciones" section
   const hasObservationsSection = planillaSections.some(s =>
@@ -387,16 +385,14 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
                   <SelectValue placeholder="Seleccionar sección..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(sectionsByGrade).map(([grade, secs]) => (
-                    <div key={grade}>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{grade}</div>
-                      {secs.map(s => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {grade} - Sección {s.name}
-                        </SelectItem>
-                      ))}
-                    </div>
-                  ))}
+                  {filteredSections.map(s => {
+                    const gradeLabel = GRADE_LABELS[s.grade_level] || s.grade_level;
+                    return (
+                      <SelectItem key={s.id} value={s.id}>
+                        {gradeLabel} - Sección {s.name}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             )}
