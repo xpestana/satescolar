@@ -256,10 +256,16 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         { name: "nivel_grado", label: "Grado" },
       ];
 
+  // Reverse map: label -> enum key
+  const GRADE_LABEL_TO_KEY = Object.fromEntries(
+    Object.entries(GRADE_LABELS).map(([k, v]) => [v, k])
+  );
+
   // Filter sections by student's grade level
-  const studentGrade = student.form_data?.nivel_grado as string | undefined;
-  const filteredSections = studentGrade
-    ? sections.filter(s => s.grade_level === studentGrade)
+  const studentGradeLabel = student.form_data?.nivel_grado as string | undefined;
+  const studentGradeKey = studentGradeLabel ? (GRADE_LABEL_TO_KEY[studentGradeLabel] || studentGradeLabel) : undefined;
+  const filteredSections = studentGradeKey
+    ? sections.filter(s => s.grade_level === studentGradeKey)
     : sections;
 
   const hasNoSections = filteredSections.length === 0;
