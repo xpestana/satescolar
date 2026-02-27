@@ -20,16 +20,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -42,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserPlus, Trash2, Info, X, Edit, Check, Power } from "lucide-react";
+import { UserPlus, Info, X, Edit, Check, ChevronDown, ChevronUp } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 interface SchoolYear {
@@ -121,6 +111,9 @@ const GRADE_CATEGORIES: GradeCategory[] = [
 
 const ALL_GRADE_LEVELS = GRADE_CATEGORIES.flatMap(c => c.levels);
 
+// Categories that use direct buttons (one per level)
+const DIRECT_CATEGORIES = ["Pre-Maternal / Maternal"];
+
 export default function SchoolYearsSections() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -128,8 +121,10 @@ export default function SchoolYearsSections() {
   const [isYearModalOpen, setIsYearModalOpen] = useState(false);
   const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState<GradeLevel | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<GradeCategory | null>(null);
   const [yearRange, setYearRange] = useState("");
   const [userSchoolId, setUserSchoolId] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   
   // Section modal state
   const [newSectionName, setNewSectionName] = useState("");
@@ -367,31 +362,7 @@ export default function SchoolYearsSections() {
     },
   });
 
-  // Delete section mutation
-  const deleteSectionMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("sections")
-        .delete()
-        .eq("id", id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sections"] });
-      toast({
-        title: "Sección eliminada",
-        description: "La sección se ha eliminado correctamente.",
-      });
-    },
-    onError: () => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se pudo eliminar la sección.",
-      });
-    },
-  });
+  // Delete section removed - sections cannot be deleted
 
   const handleYearSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -410,8 +381,19 @@ export default function SchoolYearsSections() {
     createYearMutation.mutate(normalized);
   };
 
-  const openSectionModal = (grade: GradeLevel) => {
+  const openSectionModalDirect = (grade: GradeLevel) => {
     setSelectedGrade(grade);
+    setSelectedCategory(null);
+    setSectionsToCreate([]);
+    setNewSectionName("");
+    setEditingSectionId(null);
+    setEditingSectionName("");
+    setIsSectionModalOpen(true);
+  };
+
+  const openSectionModalCategory = (cat: GradeCategory) => {
+    setSelectedCategory(cat);
+    setSelectedGrade(cat.levels[0]?.value || null);
     setSectionsToCreate([]);
     setNewSectionName("");
     setEditingSectionId(null);
@@ -422,10 +404,19 @@ export default function SchoolYearsSections() {
   const closeSectionModal = () => {
     setIsSectionModalOpen(false);
     setSelectedGrade(null);
+    setSelectedCategory(null);
     setSectionsToCreate([]);
     setNewSectionName("");
     setEditingSectionId(null);
     setEditingSectionName("");
+  };
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => 
+      prev.includes(category) 
+        ? prev.filter(c => c !== category) 
+        : [...prev, category]
+    );
   };
 
   const addSectionToCreate = () => {
@@ -639,39 +630,107 @@ export default function SchoolYearsSections() {
           <CardTitle className="text-lg font-semibold">Secciones del Colegio</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {GRADE_CATEGORIES.map((cat) => (
-              <div key={cat.category}>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  {cat.category}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {cat.levels.map((grade) => {
-                    const sections = getSectionsForGrade(grade.value);
-                    return (
-                      <div key={grade.value} className="space-y-2">
+          <div className="space-y-4">
+            {GRADE_CATEGORIES.map((cat) => {
+              const isDirect = DIRECT_CATEGORIES.includes(cat.category);
+              const isExpanded = expandedCategories.includes(cat.category);
+              const categorySections = cat.levels.flatMap(l => getSectionsForGrade(l.value));
+              
+              if (isDirect) {
+                // Pre-Maternal / Maternal: direct buttons per level
+                return (
+                  <div key={cat.category} className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                      {cat.category}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {cat.levels.map((grade) => {
+                        const sections = getSectionsForGrade(grade.value);
+                        return (
+                          <div key={grade.value} className="space-y-2">
+                            <Button
+                              variant="outline"
+                              className="w-full h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
+                              onClick={() => openSectionModalDirect(grade.value)}
+                            >
+                              Agregar Sección En {grade.label}
+                            </Button>
+                            {sections.length > 0 && (
+                              <div className="flex flex-wrap gap-1 px-2">
+                                {sections.map(s => (
+                                  <Badge key={s.id} variant="secondary" className="text-xs">
+                                    {s.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Grouped categories: one button that opens modal with level selector
+              return (
+                <div key={cat.category} className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
+                    onClick={() => toggleCategory(cat.category)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                        {cat.category}
+                      </h3>
+                      {categorySections.length > 0 && (
+                        <Badge variant="outline" className="text-xs">
+                          {categorySections.length} {categorySections.length === 1 ? "sección" : "secciones"}
+                        </Badge>
+                      )}
+                    </div>
+                    {isExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="px-4 pb-4 space-y-3 border-t">
+                      <div className="pt-3">
                         <Button
                           variant="outline"
-                          className="w-full h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
-                          onClick={() => openSectionModal(grade.value)}
+                          className="w-full sm:w-auto h-auto py-3 px-6 justify-center border-primary text-primary hover:bg-primary/10"
+                          onClick={() => openSectionModalCategory(cat)}
                         >
-                          Agregar Sección En {grade.label}
+                          Agregar Secciones en {cat.category}
                         </Button>
-                        {sections.length > 0 && (
-                          <div className="flex flex-wrap gap-1 px-2">
+                      </div>
+                      
+                      {/* Show existing sections grouped by level */}
+                      {cat.levels.map((grade) => {
+                        const sections = getSectionsForGrade(grade.value);
+                        if (sections.length === 0) return null;
+                        return (
+                          <div key={grade.value} className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-muted-foreground min-w-[100px]">
+                              {grade.label}:
+                            </span>
                             {sections.map(s => (
                               <Badge key={s.id} variant="secondary" className="text-xs">
                                 {s.name}
                               </Badge>
                             ))}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -724,20 +783,44 @@ export default function SchoolYearsSections() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader className="bg-primary -m-6 mb-4 p-6 rounded-t-lg">
             <DialogTitle className="text-white text-xl">
-              {editingSectionId ? "Modificar sección" : "Agregar sección"}
+              {editingSectionId ? "Modificar sección" : selectedCategory ? `Agregar Secciones en ${selectedCategory.category}` : "Agregar sección"}
             </DialogTitle>
           </DialogHeader>
           
           <div className="py-4 space-y-4">
-            <div className="flex items-center gap-4">
-              <Label className="font-medium w-20">Grado:</Label>
-              <span className="text-muted-foreground">
-                {selectedGrade && getGradeLabel(selectedGrade)}
-              </span>
-            </div>
+            {/* Grade selector for categories, static label for direct */}
+            {selectedCategory ? (
+              <div className="flex items-center gap-4">
+                <Label className="font-medium w-20">Nivel:</Label>
+                <Select
+                  value={selectedGrade || ""}
+                  onValueChange={(val) => {
+                    setSelectedGrade(val as GradeLevel);
+                    setSectionsToCreate([]);
+                    setEditingSectionId(null);
+                    setEditingSectionName("");
+                  }}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedCategory.levels.map(l => (
+                      <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <Label className="font-medium w-20">Grado:</Label>
+                <span className="text-muted-foreground">
+                  {selectedGrade && getGradeLabel(selectedGrade)}
+                </span>
+              </div>
+            )}
             
             {editingSectionId ? (
-              // Editing existing section
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <Label className="font-medium w-20">Sección:</Label>
@@ -753,11 +836,7 @@ export default function SchoolYearsSections() {
                   />
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={cancelEditingSection}
-                  >
+                  <Button type="button" variant="outline" onClick={cancelEditingSection}>
                     Cancelar
                   </Button>
                   <Button 
@@ -770,7 +849,6 @@ export default function SchoolYearsSections() {
                 </div>
               </div>
             ) : (
-              // Creating new sections
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <Label className="font-medium w-20">Sección:</Label>
@@ -788,8 +866,7 @@ export default function SchoolYearsSections() {
                       autoFocus
                     />
                     <Button 
-                      type="button" 
-                      size="sm" 
+                      type="button" size="sm" 
                       onClick={addSectionToCreate}
                       disabled={!newSectionName.trim()}
                       className="h-9"
@@ -804,17 +881,9 @@ export default function SchoolYearsSections() {
                     <Label className="text-sm text-muted-foreground">Secciones a crear:</Label>
                     <div className="flex flex-wrap gap-1">
                       {sectionsToCreate.map(name => (
-                        <Badge 
-                          key={name} 
-                          variant="default"
-                          className="gap-1"
-                        >
+                        <Badge key={name} variant="default" className="gap-1">
                           {name}
-                          <button
-                            type="button"
-                            onClick={() => removeSectionToCreate(name)}
-                            className="ml-1 hover:text-destructive"
-                          >
+                          <button type="button" onClick={() => removeSectionToCreate(name)} className="ml-1 hover:text-destructive">
                             <X className="h-3 w-3" />
                           </button>
                         </Badge>
@@ -831,8 +900,7 @@ export default function SchoolYearsSections() {
                     <div className="flex flex-wrap gap-1">
                       {currentGradeSections.map(s => (
                         <Badge 
-                          key={s.id} 
-                          variant="secondary"
+                          key={s.id} variant="secondary"
                           className="cursor-pointer hover:bg-secondary/80"
                           onClick={() => startEditingSection(s)}
                         >
@@ -848,11 +916,7 @@ export default function SchoolYearsSections() {
 
           {!editingSectionId && (
             <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={closeSectionModal}
-              >
+              <Button type="button" variant="ghost" onClick={closeSectionModal}>
                 Cancelar
               </Button>
               {sectionsToCreate.length > 0 && (
