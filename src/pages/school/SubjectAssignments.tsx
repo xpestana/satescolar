@@ -14,7 +14,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, LinkIcon, BookOpen } from "lucide-react";
+import { Plus, Trash2, Loader2, LinkIcon } from "lucide-react";
 
 interface SchoolYear {
   id: string;
@@ -36,18 +36,38 @@ interface Teacher {
   document_id: string | null;
 }
 
+interface Section {
+  id: string;
+  name: string;
+  grade_level: string;
+}
+
 interface Assignment {
   id: string;
   subject_id: string;
   teacher_id: string;
   school_year_id: string;
   school_id: string;
+  section_id: string;
 }
+
+const GRADE_LABELS: Record<string, string> = {
+  pre_maternal: "Pre-Maternal",
+  maternal: "Maternal",
+  inicial: "Inicial",
+  primaria: "Primaria",
+  media_general: "Media General",
+  media_tecnica: "Media Técnica",
+};
 
 function getTeacherName(t: Teacher): string {
   const fd = t.form_data || {};
   const parts = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido].filter(Boolean);
   return parts.length > 0 ? parts.join(" ") : t.document_id || "Sin nombre";
+}
+
+function getSectionLabel(s: Section): string {
+  return `${GRADE_LABELS[s.grade_level] || s.grade_level} - ${s.name}`;
 }
 
 export default function SubjectAssignments() {
@@ -58,6 +78,7 @@ export default function SubjectAssignments() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formSubjectId, setFormSubjectId] = useState("");
   const [formTeacherId, setFormTeacherId] = useState("");
+  const [formSectionId, setFormSectionId] = useState("");
 
   // Fetch school years
   const { data: schoolYears = [] } = useQuery({
@@ -115,6 +136,22 @@ export default function SubjectAssignments() {
     enabled: !!schoolId,
   });
 
+  // Fetch sections
+  const { data: sections = [] } = useQuery({
+    queryKey: ["school-sections", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sections")
+        .select("id, name, grade_level")
+        .eq("school_id", schoolId!)
+        .order("grade_level")
+        .order("name");
+      if (error) throw error;
+      return data as Section[];
+    },
+    enabled: !!schoolId,
+  });
+
   // Fetch assignments for selected year
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
     queryKey: ["subject-teacher-assignments", schoolId, selectedYearId],
@@ -133,7 +170,7 @@ export default function SubjectAssignments() {
   // Create assignment
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!formSubjectId || !formTeacherId) throw new Error("Selecciona área y docente");
+      if (!formSubjectId || !formTeacherId || !formSectionId) throw new Error("Selecciona área, docente y sección");
       const { error } = await supabase
         .from("subject_teacher_assignments" as any)
         .insert({
@@ -141,9 +178,10 @@ export default function SubjectAssignments() {
           subject_id: formSubjectId,
           teacher_id: formTeacherId,
           school_year_id: selectedYearId,
+          section_id: formSectionId,
         } as any);
       if (error) {
-        if (error.code === "23505") throw new Error("Esta asignación ya existe");
+        if (error.code === "23505") throw new Error("Esta asignación ya existe para esa sección");
         throw error;
       }
     },
@@ -153,6 +191,7 @@ export default function SubjectAssignments() {
       setDialogOpen(false);
       setFormSubjectId("");
       setFormTeacherId("");
+      setFormSectionId("");
     },
     onError: (err: any) => {
       toast({ variant: "destructive", title: "Error", description: err.message });
@@ -182,9 +221,16 @@ export default function SubjectAssignments() {
     return assignments.map((a) => {
       const subject = subjects.find((s) => s.id === a.subject_id);
       const teacher = teachers.find((t) => t.id === a.teacher_id);
-      return { ...a, subjectName: subject?.name || "—", subjectType: subject?.subject_type || "regular", teacherName: teacher ? getTeacherName(teacher) : "—" };
+      const section = sections.find((s) => s.id === a.section_id);
+      return {
+        ...a,
+        subjectName: subject?.name || "—",
+        subjectType: subject?.subject_type || "regular",
+        teacherName: teacher ? getTeacherName(teacher) : "—",
+        sectionLabel: section ? getSectionLabel(section) : "—",
+      };
     });
-  }, [assignments, subjects, teachers]);
+  }, [assignments, subjects, teachers, sections]);
 
   // Group by subject
   const groupedBySubject = useMemo(() => {
@@ -233,7 +279,7 @@ export default function SubjectAssignments() {
             </Select>
           </div>
 
-          <Button onClick={() => setDialogOpen(true)} disabled={!selectedYearId || subjects.length === 0 || teachers.length === 0}>
+          <Button onClick={() => setDialogOpen(true)} disabled={!selectedYearId || subjects.length === 0 || teachers.length === 0 || sections.length === 0}>
             <Plus className="h-4 w-4 mr-2" /> Nueva Asignación
           </Button>
         </div>
@@ -257,6 +303,7 @@ export default function SubjectAssignments() {
               <p className="text-muted-foreground">No hay asignaciones para {selectedYear?.year_range}</p>
               {subjects.length === 0 && <p className="text-sm text-muted-foreground mt-2">Primero debes crear áreas en la sección de Áreas</p>}
               {teachers.length === 0 && <p className="text-sm text-muted-foreground mt-2">Primero debes registrar docentes</p>}
+              {sections.length === 0 && <p className="text-sm text-muted-foreground mt-2">Primero debes crear secciones en Años / Secciones</p>}
             </CardContent>
           </Card>
         ) : (
@@ -269,6 +316,7 @@ export default function SubjectAssignments() {
                       <TableHead>Área / Materia</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Docente</TableHead>
+                      <TableHead>Sección / Grado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -289,6 +337,7 @@ export default function SubjectAssignments() {
                             </>
                           ) : null}
                           <TableCell>{a.teacherName}</TableCell>
+                          <TableCell>{a.sectionLabel}</TableCell>
                           <TableCell className="text-right">
                             <Button
                               size="sm"
@@ -348,12 +397,28 @@ export default function SubjectAssignments() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>Sección *</Label>
+              <Select value={formSectionId} onValueChange={setFormSectionId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar sección" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sections.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {getSectionLabel(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !formSubjectId || !formTeacherId}
+              disabled={createMutation.isPending || !formSubjectId || !formTeacherId || !formSectionId}
             >
               {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Asignar

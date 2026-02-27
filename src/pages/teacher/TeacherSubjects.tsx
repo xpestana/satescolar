@@ -7,6 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { BookOpen } from "lucide-react";
 
+const GRADE_LABELS: Record<string, string> = {
+  pre_maternal: "Pre-Maternal",
+  maternal: "Maternal",
+  inicial: "Inicial",
+  primaria: "Primaria",
+  media_general: "Media General",
+  media_tecnica: "Media Técnica",
+};
+
 interface AssignmentWithDetails {
   id: string;
   subject: {
@@ -20,6 +29,11 @@ interface AssignmentWithDetails {
     year_range: string;
     is_active: boolean;
   };
+  section: {
+    id: string;
+    name: string;
+    grade_level: string;
+  } | null;
 }
 
 export default function TeacherSubjects() {
@@ -33,7 +47,8 @@ export default function TeacherSubjects() {
         .select(`
           id,
           subject:subject_id(id, name, subject_type, evaluation_type),
-          school_year:school_year_id(id, year_range, is_active)
+          school_year:school_year_id(id, year_range, is_active),
+          section:section_id(id, name, grade_level)
         `)
         .eq("teacher_id", teacher!.id);
 
@@ -82,26 +97,32 @@ export default function TeacherSubjects() {
                   )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {yearAssignments.map((a) => (
-                    <Card key={a.id} className="hover:shadow-md transition-shadow">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-foreground">{a.subject?.name}</h4>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <Badge variant={a.subject?.subject_type === "gcrp" ? "secondary" : "outline"} className="text-xs">
-                                {a.subject?.subject_type === "gcrp" ? "GCRP" : "Regular"}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                {a.subject?.evaluation_type === "literal" ? "Literal" : "Numérica"}
-                              </Badge>
+                  {yearAssignments.map((a) => {
+                    const sectionLabel = a.section
+                      ? `${GRADE_LABELS[a.section.grade_level] || a.section.grade_level} - Sección ${a.section.name}`
+                      : "Sin sección";
+                    return (
+                      <Card key={a.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-foreground">{a.subject?.name}</h4>
+                              <p className="text-sm text-muted-foreground mt-1">{sectionLabel}</p>
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                <Badge variant={a.subject?.subject_type === "gcrp" ? "secondary" : "outline"} className="text-xs">
+                                  {a.subject?.subject_type === "gcrp" ? "GCRP" : "Regular"}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {a.subject?.evaluation_type === "literal" ? "Literal" : "Numérica"}
+                                </Badge>
+                              </div>
                             </div>
+                            <BookOpen className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                           </div>
-                          <BookOpen className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             );
