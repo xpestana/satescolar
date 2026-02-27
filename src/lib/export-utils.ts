@@ -628,7 +628,21 @@ function resolveFieldValue(
       if (fieldName === "fecha_nacimiento") return formatDate(studentFd.fecha_nacimiento);
       if (fieldName === "documento") return data.student?.document_id || studentFd.documento || "No registrado";
       if (fieldName === "grado" || fieldName === "nivel_grado") {
-        // Show the student's own nivel_grado value (e.g. "1er Año"), not the section grade_level
+        // Show the grade from the enrollment section (e.g. "1er Año"), falling back to student form_data
+        if (data.enrollmentSection?.grade_level) {
+          const GRADE_LABELS: Record<string, string> = {
+            pre_maternal: "Pre-Maternal", maternal: "Maternal",
+            inicial: "Inicial", i_nivel: "I Nivel", ii_nivel: "II Nivel", iii_nivel: "III Nivel",
+            primaria: "Primaria",
+            "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
+            "4_grado": "4to Grado", "5_grado": "5to Grado", "6_grado": "6to Grado",
+            media_general: "Media General",
+            "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
+            "4_ano": "4to Año", "5_ano": "5to Año",
+            media_tecnica: "Media Técnica", "6_ano": "6to Año",
+          };
+          return GRADE_LABELS[data.enrollmentSection.grade_level] || data.enrollmentSection.grade_level;
+        }
         return studentFd.nivel_grado || studentFd.grado || "No registrado";
       }
       const val = studentFd[fieldName] || "No registrado";
