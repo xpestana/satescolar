@@ -1282,6 +1282,21 @@ export type Database = {
         | "primaria"
         | "media_general"
         | "media_tecnica"
+        | "i_nivel"
+        | "ii_nivel"
+        | "iii_nivel"
+        | "1_grado"
+        | "2_grado"
+        | "3_grado"
+        | "4_grado"
+        | "5_grado"
+        | "6_grado"
+        | "1_ano"
+        | "2_ano"
+        | "3_ano"
+        | "4_ano"
+        | "5_ano"
+        | "6_ano"
       institution_type: "public" | "private" | "subsidized" | "other"
       student_status: "active" | "suspended" | "graduated" | "completed"
     }
@@ -1431,6 +1446,21 @@ export const Constants = {
         "primaria",
         "media_general",
         "media_tecnica",
+        "i_nivel",
+        "ii_nivel",
+        "iii_nivel",
+        "1_grado",
+        "2_grado",
+        "3_grado",
+        "4_grado",
+        "5_grado",
+        "6_grado",
+        "1_ano",
+        "2_ano",
+        "3_ano",
+        "4_ano",
+        "5_ano",
+        "6_ano",
       ],
       institution_type: ["public", "private", "subsidized", "other"],
       student_status: ["active", "suspended", "graduated", "completed"],
