@@ -1091,6 +1091,7 @@ export type Database = {
           id: string
           school_id: string
           school_year_id: string
+          section_id: string
           subject_id: string
           teacher_id: string
           updated_at: string
@@ -1100,6 +1101,7 @@ export type Database = {
           id?: string
           school_id: string
           school_year_id: string
+          section_id: string
           subject_id: string
           teacher_id: string
           updated_at?: string
@@ -1109,6 +1111,7 @@ export type Database = {
           id?: string
           school_id?: string
           school_year_id?: string
+          section_id?: string
           subject_id?: string
           teacher_id?: string
           updated_at?: string
@@ -1126,6 +1129,13 @@ export type Database = {
             columns: ["school_year_id"]
             isOneToOne: false
             referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subject_teacher_assignments_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
             referencedColumns: ["id"]
           },
           {
