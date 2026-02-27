@@ -39,20 +39,20 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
-  requiredRole?: "admin" | "school" | "representative";
+  requiredRole?: "admin" | "school" | "representative" | "teacher";
 }
 
 interface NavItemWithSub {
   label: string;
   icon: React.ElementType;
-  requiredRole?: "admin" | "school" | "representative";
+  requiredRole?: "admin" | "school" | "representative" | "teacher";
   subItems: NavItem[];
 }
 
 interface NavSection {
   title?: string;
   items: (NavItem | NavItemWithSub)[];
-  requiredRole?: "admin" | "school" | "representative";
+  requiredRole?: "admin" | "school" | "representative" | "teacher";
 }
 
 function isNavItemWithSub(item: NavItem | NavItemWithSub): item is NavItemWithSub {
@@ -154,6 +154,21 @@ const navSections: NavSection[] = [
       { label: "Datos de Familia", href: "/representative/datos-familia", icon: HomeIcon, requiredRole: "representative" },
     ],
   },
+  // Teacher sections
+  {
+    requiredRole: "teacher",
+    items: [
+      { label: "Inicio", href: "/teacher/dashboard", icon: LayoutDashboard, requiredRole: "teacher" },
+    ],
+  },
+  {
+    title: "MI ÁREA ACADÉMICA",
+    requiredRole: "teacher",
+    items: [
+      { label: "Mis Materias", href: "/teacher/materias", icon: BookOpen, requiredRole: "teacher" },
+      { label: "Mi Carnet", href: "/teacher/carnet", icon: CreditCard, requiredRole: "teacher" },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -161,6 +176,7 @@ export function AppSidebar() {
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
   const { familyName } = useRepresentativeFamily();
+  
   const { collapsed, hovering, toggleCollapsed, setHovering, isVisible } = useSidebarState();
   const [openDropdowns, setOpenDropdowns] = useState<string[]>([]);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -201,6 +217,7 @@ export function AppSidebar() {
       case "admin": return "Admin";
       case "school": return "Escolar";
       case "representative": return "Representante";
+      case "teacher": return "Docente";
       default: return "Usuario";
     }
   };
