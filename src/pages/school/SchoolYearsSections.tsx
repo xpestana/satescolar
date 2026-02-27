@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { UserPlus, Info, X, Edit, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { UserPlus, Info, X, Edit, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
 interface SchoolYear {
@@ -124,7 +124,7 @@ export default function SchoolYearsSections() {
   const [selectedCategory, setSelectedCategory] = useState<GradeCategory | null>(null);
   const [yearRange, setYearRange] = useState("");
   const [userSchoolId, setUserSchoolId] = useState<string | null>(null);
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+  
   
   // Section modal state
   const [newSectionName, setNewSectionName] = useState("");
@@ -411,13 +411,6 @@ export default function SchoolYearsSections() {
     setEditingSectionName("");
   };
 
-  const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => 
-      prev.includes(category) 
-        ? prev.filter(c => c !== category) 
-        : [...prev, category]
-    );
-  };
 
   const addSectionToCreate = () => {
     if (!newSectionName.trim()) return;
@@ -630,19 +623,19 @@ export default function SchoolYearsSections() {
           <CardTitle className="text-lg font-semibold">Secciones del Colegio</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-6">
             {GRADE_CATEGORIES.map((cat) => {
               const isDirect = DIRECT_CATEGORIES.includes(cat.category);
-              const isExpanded = expandedCategories.includes(cat.category);
               const categorySections = cat.levels.flatMap(l => getSectionsForGrade(l.value));
               
-              if (isDirect) {
-                // Pre-Maternal / Maternal: direct buttons per level
-                return (
-                  <div key={cat.category} className="space-y-3">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                      {cat.category}
-                    </h3>
+              return (
+                <div key={cat.category} className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                    {cat.category}
+                  </h3>
+                  
+                  {isDirect ? (
+                    // Pre-Maternal / Maternal: one button per level
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {cat.levels.map((grade) => {
                         const sections = getSectionsForGrade(grade.value);
@@ -668,64 +661,37 @@ export default function SchoolYearsSections() {
                         );
                       })}
                     </div>
-                  </div>
-                );
-              }
-
-              // Grouped categories: one button that opens modal with level selector
-              return (
-                <div key={cat.category} className="border rounded-lg overflow-hidden">
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
-                    onClick={() => toggleCategory(cat.category)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                        {cat.category}
-                      </h3>
-                      {categorySections.length > 0 && (
-                        <Badge variant="outline" className="text-xs">
-                          {categorySections.length} {categorySections.length === 1 ? "sección" : "secciones"}
-                        </Badge>
-                      )}
-                    </div>
-                    {isExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </button>
-                  
-                  {isExpanded && (
-                    <div className="px-4 pb-4 space-y-3 border-t">
-                      <div className="pt-3">
-                        <Button
-                          variant="outline"
-                          className="w-full sm:w-auto h-auto py-3 px-6 justify-center border-primary text-primary hover:bg-primary/10"
-                          onClick={() => openSectionModalCategory(cat)}
-                        >
-                          Agregar Secciones en {cat.category}
-                        </Button>
-                      </div>
+                  ) : (
+                    // Grouped categories: single button + sections listed below
+                    <div className="space-y-3">
+                      <Button
+                        variant="outline"
+                        className="h-auto py-3 px-6 justify-center border-primary text-primary hover:bg-primary/10"
+                        onClick={() => openSectionModalCategory(cat)}
+                      >
+                        Agregar Secciones en {cat.category}
+                      </Button>
                       
-                      {/* Show existing sections grouped by level */}
-                      {cat.levels.map((grade) => {
-                        const sections = getSectionsForGrade(grade.value);
-                        if (sections.length === 0) return null;
-                        return (
-                          <div key={grade.value} className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium text-muted-foreground min-w-[100px]">
-                              {grade.label}:
-                            </span>
-                            {sections.map(s => (
-                              <Badge key={s.id} variant="secondary" className="text-xs">
-                                {s.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        );
-                      })}
+                      {categorySections.length > 0 && (
+                        <div className="space-y-2 pl-2">
+                          {cat.levels.map((grade) => {
+                            const sections = getSectionsForGrade(grade.value);
+                            if (sections.length === 0) return null;
+                            return (
+                              <div key={grade.value} className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-muted-foreground min-w-[100px]">
+                                  {grade.label}:
+                                </span>
+                                {sections.map(s => (
+                                  <Badge key={s.id} variant="secondary" className="text-xs">
+                                    {s.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
