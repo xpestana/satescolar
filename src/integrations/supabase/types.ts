@@ -296,6 +296,54 @@ export type Database = {
           },
         ]
       }
+      evaluation_plan_items: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          percentage: number | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          description: string
+          display_order?: number
+          id?: string
+          percentage?: number | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          percentage?: number | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evaluation_plan_items_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evaluation_plan_items_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       families: {
         Row: {
           additional_phone: string | null

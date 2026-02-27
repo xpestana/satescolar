@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useTeacherData } from "@/hooks/useTeacherData";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { BookOpen } from "lucide-react";
+import { BookOpen, ClipboardList } from "lucide-react";
+import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal",
@@ -33,6 +36,7 @@ const GRADE_LABELS: Record<string, string> = {
 
 interface AssignmentWithDetails {
   id: string;
+  school_id: string;
   subject: {
     id: string;
     name: string;
@@ -53,6 +57,7 @@ interface AssignmentWithDetails {
 
 export default function TeacherSubjects() {
   const { teacher, isLoading: teacherLoading } = useTeacherData();
+  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null);
 
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
     queryKey: ["teacher-subjects", teacher?.id],
@@ -61,6 +66,7 @@ export default function TeacherSubjects() {
         .from("subject_teacher_assignments")
         .select(`
           id,
+          school_id,
           subject:subject_id(id, name, subject_type, evaluation_type),
           school_year:school_year_id(id, year_range, is_active),
           section:section_id(id, name, grade_level)
@@ -73,6 +79,22 @@ export default function TeacherSubjects() {
     enabled: !!teacher?.id,
   });
 
+  // Fetch grades config to know if percentage mode is on
+  const { data: gradesConfig } = useQuery({
+    queryKey: ["grades-config", teacher?.school_id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("grades_config")
+        .select("use_percentage_plan")
+        .eq("school_id", teacher!.school_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!teacher?.school_id,
+  });
+
+  const usePercentage = gradesConfig?.use_percentage_plan ?? false;
   const loading = teacherLoading || assignmentsLoading;
 
   // Group by school year
@@ -82,6 +104,11 @@ export default function TeacherSubjects() {
     acc[key].push(a);
     return acc;
   }, {});
+
+  const getSectionLabel = (a: AssignmentWithDetails) =>
+    a.section
+      ? `${GRADE_LABELS[a.section.grade_level] || a.section.grade_level} - Sección ${a.section.name}`
+      : "Sin sección";
 
   return (
     <DashboardLayout>
@@ -113,9 +140,7 @@ export default function TeacherSubjects() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {yearAssignments.map((a) => {
-                    const sectionLabel = a.section
-                      ? `${GRADE_LABELS[a.section.grade_level] || a.section.grade_level} - Sección ${a.section.name}`
-                      : "Sin sección";
+                    const sectionLabel = getSectionLabel(a);
                     return (
                       <Card key={a.id} className="hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
@@ -134,6 +159,15 @@ export default function TeacherSubjects() {
                             </div>
                             <BookOpen className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                           </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full mt-3"
+                            onClick={() => setSelectedAssignment(a)}
+                          >
+                            <ClipboardList className="h-4 w-4 mr-2" />
+                            Plan de Evaluación
+                          </Button>
                         </CardContent>
                       </Card>
                     );
@@ -143,6 +177,18 @@ export default function TeacherSubjects() {
             );
           })}
         </div>
+      )}
+
+      {selectedAssignment && (
+        <EvaluationPlanModal
+          open={!!selectedAssignment}
+          onClose={() => setSelectedAssignment(null)}
+          assignmentId={selectedAssignment.id}
+          schoolId={selectedAssignment.school_id}
+          subjectName={selectedAssignment.subject?.name || ""}
+          sectionLabel={getSectionLabel(selectedAssignment)}
+          usePercentage={usePercentage}
+        />
       )}
     </DashboardLayout>
   );
