@@ -1,0 +1,16 @@
+-- Add new granular grade levels to the enum
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS 'i_nivel';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS 'ii_nivel';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS 'iii_nivel';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '1_grado';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '2_grado';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '3_grado';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '4_grado';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '5_grado';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '6_grado';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '1_ano';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '2_ano';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '3_ano';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '4_ano';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '5_ano';
+ALTER TYPE public.grade_level ADD VALUE IF NOT EXISTS '6_ano';

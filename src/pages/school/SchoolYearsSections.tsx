@@ -53,7 +53,14 @@ interface SchoolYear {
   created_at: string;
 }
 
-type GradeLevel = "pre_maternal" | "maternal" | "inicial" | "primaria" | "media_general" | "media_tecnica";
+type GradeLevel = 
+  | "pre_maternal" | "maternal"
+  | "i_nivel" | "ii_nivel" | "iii_nivel"
+  | "1_grado" | "2_grado" | "3_grado" | "4_grado" | "5_grado" | "6_grado"
+  | "1_ano" | "2_ano" | "3_ano" | "4_ano" | "5_ano"
+  | "6_ano"
+  // Legacy values (kept for backward compatibility)
+  | "inicial" | "primaria" | "media_general" | "media_tecnica";
 
 interface Section {
   id: string;
@@ -62,14 +69,57 @@ interface Section {
   name: string;
 }
 
-const GRADE_LEVELS: { value: GradeLevel; label: string }[] = [
-  { value: "pre_maternal", label: "Pre-Maternal" },
-  { value: "maternal", label: "Maternal" },
-  { value: "inicial", label: "Inicial" },
-  { value: "primaria", label: "Primaria" },
-  { value: "media_general", label: "Media General" },
-  { value: "media_tecnica", label: "Media Técnica" },
+interface GradeCategory {
+  category: string;
+  levels: { value: GradeLevel; label: string }[];
+}
+
+const GRADE_CATEGORIES: GradeCategory[] = [
+  {
+    category: "Pre-Maternal / Maternal",
+    levels: [
+      { value: "pre_maternal", label: "Pre-Maternal" },
+      { value: "maternal", label: "Maternal" },
+    ],
+  },
+  {
+    category: "Inicial",
+    levels: [
+      { value: "i_nivel", label: "I Nivel" },
+      { value: "ii_nivel", label: "II Nivel" },
+      { value: "iii_nivel", label: "III Nivel" },
+    ],
+  },
+  {
+    category: "Primaria",
+    levels: [
+      { value: "1_grado", label: "1er Grado" },
+      { value: "2_grado", label: "2do Grado" },
+      { value: "3_grado", label: "3er Grado" },
+      { value: "4_grado", label: "4to Grado" },
+      { value: "5_grado", label: "5to Grado" },
+      { value: "6_grado", label: "6to Grado" },
+    ],
+  },
+  {
+    category: "Media General",
+    levels: [
+      { value: "1_ano", label: "1er Año" },
+      { value: "2_ano", label: "2do Año" },
+      { value: "3_ano", label: "3er Año" },
+      { value: "4_ano", label: "4to Año" },
+      { value: "5_ano", label: "5to Año" },
+    ],
+  },
+  {
+    category: "Media Técnica",
+    levels: [
+      { value: "6_ano", label: "6to Año" },
+    ],
+  },
 ];
+
+const ALL_GRADE_LEVELS = GRADE_CATEGORIES.flatMap(c => c.levels);
 
 export default function SchoolYearsSections() {
   const { toast } = useToast();
@@ -440,7 +490,7 @@ export default function SchoolYearsSections() {
   };
 
   const getGradeLabel = (grade: GradeLevel) => {
-    return GRADE_LEVELS.find(g => g.value === grade)?.label || grade;
+    return ALL_GRADE_LEVELS.find(g => g.value === grade)?.label || grade;
   };
 
   const getSectionsForGrade = (grade: GradeLevel) => {
@@ -589,30 +639,39 @@ export default function SchoolYearsSections() {
           <CardTitle className="text-lg font-semibold">Secciones del Colegio</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {GRADE_LEVELS.map((grade) => {
-              const sections = getSectionsForGrade(grade.value);
-              return (
-                <div key={grade.value} className="space-y-2">
-                  <Button
-                    variant="outline"
-                    className="w-full h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
-                    onClick={() => openSectionModal(grade.value)}
-                  >
-                    Agregar Sección En {grade.label}
-                  </Button>
-                  {sections.length > 0 && (
-                    <div className="flex flex-wrap gap-1 px-2">
-                      {sections.map(s => (
-                        <Badge key={s.id} variant="secondary" className="text-xs">
-                          {s.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
+          <div className="space-y-6">
+            {GRADE_CATEGORIES.map((cat) => (
+              <div key={cat.category}>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                  {cat.category}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {cat.levels.map((grade) => {
+                    const sections = getSectionsForGrade(grade.value);
+                    return (
+                      <div key={grade.value} className="space-y-2">
+                        <Button
+                          variant="outline"
+                          className="w-full h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
+                          onClick={() => openSectionModal(grade.value)}
+                        >
+                          Agregar Sección En {grade.label}
+                        </Button>
+                        {sections.length > 0 && (
+                          <div className="flex flex-wrap gap-1 px-2">
+                            {sections.map(s => (
+                              <Badge key={s.id} variant="secondary" className="text-xs">
+                                {s.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
