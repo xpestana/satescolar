@@ -93,6 +93,7 @@ export default function SubjectAssignments() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formSubjectId, setFormSubjectId] = useState("");
   const [formTeacherId, setFormTeacherId] = useState("");
+  const [formGradeLevel, setFormGradeLevel] = useState("");
   const [formSectionId, setFormSectionId] = useState("");
 
   // Fetch school years
@@ -185,7 +186,7 @@ export default function SubjectAssignments() {
   // Create assignment
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!formSubjectId || !formTeacherId || !formSectionId) throw new Error("Selecciona área, docente y sección");
+      if (!formSubjectId || !formTeacherId || !formSectionId || !formGradeLevel) throw new Error("Selecciona área, docente, nivel y sección");
       const { error } = await supabase
         .from("subject_teacher_assignments" as any)
         .insert({
@@ -206,6 +207,7 @@ export default function SubjectAssignments() {
       setDialogOpen(false);
       setFormSubjectId("");
       setFormTeacherId("");
+      setFormGradeLevel("");
       setFormSectionId("");
     },
     onError: (err: any) => {
@@ -230,6 +232,19 @@ export default function SubjectAssignments() {
       toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar la asignación" });
     },
   });
+
+  // Available grade levels from existing sections
+  const availableGrades = useMemo(() => {
+    const grades = new Set(sections.map((s) => s.grade_level));
+    const ordered = Object.keys(GRADE_LABELS).filter((k) => grades.has(k));
+    return ordered;
+  }, [sections]);
+
+  // Sections filtered by selected grade
+  const filteredSections = useMemo(() => {
+    if (!formGradeLevel) return [];
+    return sections.filter((s) => s.grade_level === formGradeLevel);
+  }, [sections, formGradeLevel]);
 
   // Build enriched list
   const enrichedAssignments = useMemo(() => {
@@ -414,15 +429,31 @@ export default function SubjectAssignments() {
             </div>
 
             <div className="space-y-2">
-              <Label>Sección *</Label>
-              <Select value={formSectionId} onValueChange={setFormSectionId}>
+              <Label>Nivel / Grado *</Label>
+              <Select value={formGradeLevel} onValueChange={(val) => { setFormGradeLevel(val); setFormSectionId(""); }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar sección" />
+                  <SelectValue placeholder="Seleccionar nivel o grado" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sections.map((s) => (
+                  {availableGrades.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {GRADE_LABELS[g] || g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Sección *</Label>
+              <Select value={formSectionId} onValueChange={setFormSectionId} disabled={!formGradeLevel}>
+                <SelectTrigger>
+                  <SelectValue placeholder={formGradeLevel ? "Seleccionar sección" : "Primero selecciona un nivel"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredSections.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {getSectionLabel(s)}
+                      {s.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -433,7 +464,7 @@ export default function SubjectAssignments() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
             <Button
               onClick={() => createMutation.mutate()}
-              disabled={createMutation.isPending || !formSubjectId || !formTeacherId || !formSectionId}
+              disabled={createMutation.isPending || !formSubjectId || !formTeacherId || !formGradeLevel || !formSectionId}
             >
               {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Asignar
