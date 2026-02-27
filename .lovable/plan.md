@@ -1,68 +1,66 @@
 
 
-# Panel de Envio de Correos para Colegios
+## Agregar Sección y Grado a la Asignación de Áreas
 
-## Resumen
-Crear un panel de envio de correos dentro del "Area de Utilidades" del sidebar, con una interfaz tipo Gmail moderna. El colegio podra enviar correos individuales o masivos a docentes, familias, o correos personalizados. Los correos se enviaran con un template HTML profesional similar a la imagen de referencia (estilo e-commerce/formal), usando los colores configurados del carnet y el logo del colegio.
+Actualmente cada asignación solo vincula Area + Docente + Ano Escolar. Falta indicar en que seccion (y su grado/ano) se imparte. Este cambio agrega ese campo tanto en la base de datos como en ambas interfaces (colegio y docente).
 
-## Cambios a realizar
+---
 
-### 1. Agregar link en el sidebar
-Agregar "Correo" como item dentro de "AREA DE UTILIDADES" en `AppSidebar.tsx`, con icono Mail y ruta `/utilidades/correo`.
+### 1. Migración de base de datos
 
-### 2. Nueva pagina: `src/pages/school/EmailSender.tsx`
-Pagina principal con DashboardLayout que contiene el componente EmailComposer. Se conecta con la ruta protegida para rol "school".
+Agregar columna `section_id` a la tabla `subject_teacher_assignments`:
 
-### 3. Nuevo componente: `src/components/utilities/EmailComposer.tsx`
-Panel con diseno tipo Gmail, layout de 2 columnas en desktop:
+- Nueva columna `section_id UUID NOT NULL` con referencia a `sections(id)` y `ON DELETE CASCADE`
+- Eliminar la restriccion unica actual `(subject_id, teacher_id, school_year_id)` y reemplazarla por `(subject_id, teacher_id, school_year_id, section_id)` -- ya que un mismo docente puede dar la misma materia en diferentes secciones
+- Agregar politica RLS para que los docentes puedan ver las secciones de su colegio
 
-**Columna izquierda - Formulario de composicion:**
-- **Seccion de destinatarios**: 
-  - Botones rapidos: "Todos los docentes", "Todas las familias"
-  - Dropdowns para seleccionar docentes individuales (nombre + email) y familias individuales (representante principal + email)
-  - Input manual para agregar correos libres
-  - Los destinatarios seleccionados se muestran como chips/badges removibles con X
-- **Campo Asunto**: Input de texto
-- **Campo Mensaje**: Textarea grande para el cuerpo del correo
-- **Boton Enviar**: Con confirmacion y estado de carga
+### 2. Actualizar pagina de Asignacion de Areas (colegio)
 
-**Columna derecha - Vista previa en tiempo real:**
-- Renderizado del template HTML del email tal como lo recibira el destinatario
-- Se actualiza en tiempo real mientras el usuario escribe
+**Archivo:** `src/pages/school/SubjectAssignments.tsx`
 
-### 4. Template HTML del email
-Estructura similar a la imagen de referencia:
-- Header con color primario del colegio + logo centrado + nombre del colegio
-- Titulo/asunto en texto grande
-- Cuerpo del mensaje
-- Linea separadora con color secundario
-- Footer: "Desarrollado por SATEscolar" con link a satescolar.com, fondo con color primario
+- Agregar fetch de secciones del colegio (`sections` table)
+- Agregar un tercer Select en el dialogo de "Nueva Asignacion" para elegir la seccion (mostrando grado + nombre, ej: "1er Ano - A")
+- Incluir `section_id` en el insert de la mutacion
+- Actualizar la tabla de asignaciones para mostrar una columna "Seccion / Grado" con el nombre de la seccion y su grado
+- Actualizar la interface `Assignment` para incluir `section_id`
+- Actualizar la restriccion unique en la validacion de error 23505
 
-### 5. Modificar edge function: `supabase/functions/send-email/index.ts`
-- Ampliar validacion de roles para aceptar tanto `admin` como `school`
-- Para rol `school`, verificar que el usuario tiene un `school_id` asociado (seguridad basica)
-- El body ya llega como HTML desde el frontend
+### 3. Actualizar vista del docente (Mis Materias)
 
-### 6. Agregar ruta en `src/App.tsx`
-Nueva ruta `/utilidades/correo` protegida con rol "school" que renderiza EmailSender.
+**Archivo:** `src/pages/teacher/TeacherSubjects.tsx`
 
-## Flujo de datos para destinatarios
-- **Docentes**: Query a tabla `teachers` filtrada por `school_id`, extrayendo `email` y nombre desde `form_data`
-- **Familias**: Query a `representatives` con `is_primary = true`, unido via `families` -> `family_schools` filtrado por `school_id`, obteniendo `email` y nombre desde `form_data`
-- **Manual**: Input libre de correos
+- Incluir la relacion `section:section_id(id, name, grade_level)` en el query de asignaciones
+- Mostrar en cada tarjeta de materia la seccion y grado correspondiente (ej: "1er Ano - Seccion A")
+- Actualizar la interface `AssignmentWithDetails` para incluir los datos de seccion
 
-## Detalles tecnicos
+---
 
-### Archivos a crear:
-- `src/pages/school/EmailSender.tsx` - Pagina wrapper
-- `src/components/utilities/EmailComposer.tsx` - Componente principal con toda la logica
+### Detalles tecnicos
 
-### Archivos a modificar:
-- `src/components/layout/AppSidebar.tsx` - Agregar item "Correo" en Area de Utilidades
-- `src/App.tsx` - Agregar ruta `/utilidades/correo`
-- `supabase/functions/send-email/index.ts` - Permitir rol "school" ademas de "admin"
+**Migracion SQL:**
+```sql
+ALTER TABLE public.subject_teacher_assignments
+  ADD COLUMN section_id UUID NOT NULL REFERENCES public.sections(id) ON DELETE CASCADE;
 
-### Dependencias: No se necesitan nuevas dependencias. Se reutilizan componentes existentes (Badge, Button, Input, Textarea, Card, Popover, Command) y la edge function send-email existente con SMTP.
+-- Reemplazar constraint unica
+ALTER TABLE public.subject_teacher_assignments
+  DROP CONSTRAINT IF EXISTS subject_teacher_year_unique;
 
-### Seguridad: La edge function valida que el usuario autenticado tenga rol `admin` o `school` en la tabla `user_roles`. No se exponen datos de otros colegios gracias al filtro por `school_id` en las queries de docentes y familias (protegidas por RLS).
+ALTER TABLE public.subject_teacher_assignments
+  ADD CONSTRAINT subject_teacher_year_section_unique
+  UNIQUE (subject_id, teacher_id, school_year_id, section_id);
+
+-- RLS: docentes pueden ver secciones de su colegio
+CREATE POLICY "Teachers can view school sections"
+  ON public.sections FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM teachers t
+    WHERE t.user_id = auth.uid() AND t.school_id = sections.school_id
+  ));
+```
+
+**Archivos a modificar:**
+- Nueva migracion SQL
+- `src/pages/school/SubjectAssignments.tsx` -- agregar selector de seccion y columna en tabla
+- `src/pages/teacher/TeacherSubjects.tsx` -- mostrar seccion/grado en cada tarjeta
 
