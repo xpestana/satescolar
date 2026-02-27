@@ -132,6 +132,7 @@ const navSections: NavSection[] = [
           { label: "Año escolar y secciones", href: "/school/configuraciones/anos-secciones", icon: SlidersHorizontal, requiredRole: "school" },
           { label: "Formularios", href: "/school/configuraciones/formularios", icon: FileText, requiredRole: "school" },
           { label: "Configuración de Planillas", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school" },
+          { label: "Ajustes de Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school" },
           { label: "Utilidades", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school" },
         ],
       },

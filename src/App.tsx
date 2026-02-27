@@ -25,6 +25,7 @@ import AddTeacher from "./pages/school/AddTeacher";
 import EnrollmentsList from "./pages/school/EnrollmentsList";
 import EnrollmentDisplayConfig from "./pages/school/EnrollmentDisplayConfig";
 import UtilitiesSettings from "./pages/school/UtilitiesSettings";
+import GradesSettings from "./pages/school/GradesSettings";
 import EmailSender from "./pages/school/EmailSender";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
@@ -107,6 +108,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="school">
                   <UtilitiesSettings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/school/configuraciones/ajustes-notas" 
+              element={
+                <ProtectedRoute requiredRole="school">
+                  <GradesSettings />
                 </ProtectedRoute>
               } 
             />

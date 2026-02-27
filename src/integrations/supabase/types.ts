@@ -561,6 +561,38 @@ export type Database = {
           },
         ]
       }
+      grades_config: {
+        Row: {
+          created_at: string
+          id: string
+          school_id: string
+          updated_at: string
+          use_percentage_plan: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          school_id: string
+          updated_at?: string
+          use_percentage_plan?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          school_id?: string
+          updated_at?: string
+          use_percentage_plan?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grades_config_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       municipalities: {
         Row: {
           created_at: string
