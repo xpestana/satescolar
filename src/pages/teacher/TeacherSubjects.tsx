@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useTeacherData } from "@/hooks/useTeacherData";
@@ -7,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { BookOpen, ClipboardList } from "lucide-react";
+import { BookOpen, ClipboardList, CheckCircle2, AlertCircle } from "lucide-react";
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 
 const GRADE_LABELS: Record<string, string> = {
@@ -57,6 +58,7 @@ interface AssignmentWithDetails {
 
 export default function TeacherSubjects() {
   const { teacher, isLoading: teacherLoading } = useTeacherData();
+  const queryClient = useQueryClient();
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null);
 
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
@@ -78,6 +80,23 @@ export default function TeacherSubjects() {
     },
     enabled: !!teacher?.id,
   });
+
+  // Fetch which assignments have evaluation plan items
+  const assignmentIds = assignments.map(a => a.id);
+  const { data: planCounts = [] } = useQuery({
+    queryKey: ["evaluation-plan-counts", assignmentIds],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("evaluation_plan_items" as any)
+        .select("assignment_id")
+        .in("assignment_id", assignmentIds);
+      if (error) throw error;
+      return data as unknown as { assignment_id: string }[];
+    },
+    enabled: assignmentIds.length > 0,
+  });
+
+  const assignmentsWithPlan = new Set(planCounts.map(p => p.assignment_id));
 
   // Fetch grades config to know if percentage mode is on
   const { data: gradesConfig } = useQuery({
@@ -159,15 +178,24 @@ export default function TeacherSubjects() {
                             </div>
                             <BookOpen className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full mt-3"
-                            onClick={() => setSelectedAssignment(a)}
-                          >
-                            <ClipboardList className="h-4 w-4 mr-2" />
-                            Plan de Evaluación
-                          </Button>
+                          {(() => {
+                            const hasPlan = assignmentsWithPlan.has(a.id);
+                            return (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full mt-3"
+                                onClick={() => setSelectedAssignment(a)}
+                              >
+                                {hasPlan ? (
+                                  <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                                ) : (
+                                  <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                                )}
+                                Plan de Evaluación
+                              </Button>
+                            );
+                          })()}
                         </CardContent>
                       </Card>
                     );
@@ -182,7 +210,7 @@ export default function TeacherSubjects() {
       {selectedAssignment && (
         <EvaluationPlanModal
           open={!!selectedAssignment}
-          onClose={() => setSelectedAssignment(null)}
+          onClose={() => { setSelectedAssignment(null); queryClient.invalidateQueries({ queryKey: ["evaluation-plan-counts", assignmentIds] }); }}
           assignmentId={selectedAssignment.id}
           schoolId={selectedAssignment.school_id}
           subjectName={selectedAssignment.subject?.name || ""}
