@@ -113,7 +113,15 @@ export default function TeacherSubjects() {
     enabled: !!teacher?.school_id,
   });
 
-  const usePercentage = gradesConfig?.use_percentage_plan ?? false;
+  const percentageEnabled = gradesConfig?.use_percentage_plan ?? false;
+
+  const SECONDARY_GRADES = new Set([
+    "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
+    "media_tecnica", "6_ano",
+  ]);
+
+  const isSecondary = (a: AssignmentWithDetails) =>
+    a.section ? SECONDARY_GRADES.has(a.section.grade_level) : false;
   const loading = teacherLoading || assignmentsLoading;
 
   // Group by school year
@@ -215,7 +223,7 @@ export default function TeacherSubjects() {
           schoolId={selectedAssignment.school_id}
           subjectName={selectedAssignment.subject?.name || ""}
           sectionLabel={getSectionLabel(selectedAssignment)}
-          usePercentage={usePercentage}
+          usePercentage={percentageEnabled && isSecondary(selectedAssignment)}
         />
       )}
     </DashboardLayout>
