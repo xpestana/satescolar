@@ -40,6 +40,7 @@ import RepAddStudent from "./pages/representative/RepAddStudent";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherSubjects from "./pages/teacher/TeacherSubjects";
 import TeacherCarnet from "./pages/teacher/TeacherCarnet";
+import TeacherGrades from "./pages/teacher/TeacherGrades";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -286,6 +287,7 @@ const App = () => (
             {/* Teacher routes */}
             <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
             <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
+            <Route path="/teacher/materias/:assignmentId/notas" element={<ProtectedRoute requiredRole="teacher"><TeacherGrades /></ProtectedRoute>} />
             <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

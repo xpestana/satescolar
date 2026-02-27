@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -8,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { BookOpen, ClipboardList, CheckCircle2, AlertCircle } from "lucide-react";
+import { BookOpen, ClipboardList, CheckCircle2, AlertCircle, FileEdit } from "lucide-react";
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 
 const GRADE_LABELS: Record<string, string> = {
@@ -59,6 +60,7 @@ interface AssignmentWithDetails {
 export default function TeacherSubjects() {
   const { teacher, isLoading: teacherLoading } = useTeacherData();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null);
 
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
@@ -189,19 +191,32 @@ export default function TeacherSubjects() {
                           {(() => {
                             const hasPlan = assignmentsWithPlan.has(a.id);
                             return (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="w-full mt-3"
-                                onClick={() => setSelectedAssignment(a)}
-                              >
-                                {hasPlan ? (
-                                  <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
-                                ) : (
-                                  <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                              <div className="flex flex-col gap-2 mt-3">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => setSelectedAssignment(a)}
+                                >
+                                  {hasPlan ? (
+                                    <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                                  ) : (
+                                    <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                                  )}
+                                  Plan de Evaluación
+                                </Button>
+                                {hasPlan && (
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => navigate(`/teacher/materias/${a.id}/notas`)}
+                                  >
+                                    <FileEdit className="h-4 w-4 mr-2" />
+                                    Registrar Notas
+                                  </Button>
                                 )}
-                                Plan de Evaluación
-                              </Button>
+                              </div>
                             );
                           })()}
                         </CardContent>

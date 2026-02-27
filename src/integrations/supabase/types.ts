@@ -1056,6 +1056,68 @@ export type Database = {
         }
         Relationships: []
       }
+      student_grades: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          evaluation_plan_item_id: string
+          grade_value: string | null
+          id: string
+          school_id: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          evaluation_plan_item_id: string
+          grade_value?: string | null
+          id?: string
+          school_id: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          evaluation_plan_item_id?: string
+          grade_value?: string | null
+          id?: string
+          school_id?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_grades_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_grades_evaluation_plan_item_id_fkey"
+            columns: ["evaluation_plan_item_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_grades_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_grades_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_schools: {
         Row: {
           created_at: string
