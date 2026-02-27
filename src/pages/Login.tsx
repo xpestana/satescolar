@@ -37,6 +37,8 @@ export default function Login() {
         navigate("/school/dashboard", { replace: true });
       } else if (userRole === "representative") {
         navigate("/representative/dashboard", { replace: true });
+      } else if (userRole === "teacher") {
+        navigate("/teacher/dashboard", { replace: true });
       } else {
         navigate("/dashboard", { replace: true });
       }
