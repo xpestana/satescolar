@@ -4,6 +4,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Table,
   TableBody,
@@ -19,13 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -128,7 +122,8 @@ export default function SchoolYearsSections() {
   
   // Section modal state
   const [newSectionName, setNewSectionName] = useState("");
-  const [sectionsToCreate, setSectionsToCreate] = useState<string[]>([]);
+  const [pendingSections, setPendingSections] = useState<Record<string, string[]>>({});
+  const [activeAccordionGrade, setActiveAccordionGrade] = useState<string>("");
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionName, setEditingSectionName] = useState("");
   
@@ -296,14 +291,13 @@ export default function SchoolYearsSections() {
     },
   });
 
-  // Create sections mutation
   const createSectionsMutation = useMutation({
-    mutationFn: async (names: string[]) => {
-      if (!userSchoolId || !selectedGrade) throw new Error("No school or grade selected");
+    mutationFn: async ({ grade, names }: { grade: GradeLevel; names: string[] }) => {
+      if (!userSchoolId) throw new Error("No school selected");
       
       const sectionsToInsert = names.map(name => ({
         school_id: userSchoolId,
-        grade_level: selectedGrade,
+        grade_level: grade,
         name: name.trim().toUpperCase(),
       }));
       
@@ -315,7 +309,6 @@ export default function SchoolYearsSections() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sections"] });
-      setSectionsToCreate([]);
       toast({
         title: "Secciones creadas",
         description: "Las secciones se han creado correctamente.",
@@ -384,20 +377,22 @@ export default function SchoolYearsSections() {
   const openSectionModalDirect = (grade: GradeLevel) => {
     setSelectedGrade(grade);
     setSelectedCategory(null);
-    setSectionsToCreate([]);
+    setPendingSections({});
     setNewSectionName("");
     setEditingSectionId(null);
     setEditingSectionName("");
+    setActiveAccordionGrade(grade);
     setIsSectionModalOpen(true);
   };
 
   const openSectionModalCategory = (cat: GradeCategory) => {
     setSelectedCategory(cat);
-    setSelectedGrade(cat.levels[0]?.value || null);
-    setSectionsToCreate([]);
+    setSelectedGrade(null);
+    setPendingSections({});
     setNewSectionName("");
     setEditingSectionId(null);
     setEditingSectionName("");
+    setActiveAccordionGrade(cat.levels[0]?.value || "");
     setIsSectionModalOpen(true);
   };
 
@@ -405,56 +400,58 @@ export default function SchoolYearsSections() {
     setIsSectionModalOpen(false);
     setSelectedGrade(null);
     setSelectedCategory(null);
-    setSectionsToCreate([]);
+    setPendingSections({});
     setNewSectionName("");
     setEditingSectionId(null);
     setEditingSectionName("");
+    setActiveAccordionGrade("");
   };
 
 
-  const addSectionToCreate = () => {
+  const addSectionToGrade = (grade: GradeLevel) => {
     if (!newSectionName.trim()) return;
     
     const normalized = newSectionName.trim().toUpperCase();
     
-    // Validate: must be a single letter A-Z
     if (!/^[A-Z]$/.test(normalized)) {
-      toast({
-        variant: "destructive",
-        title: "Formato inválido",
-        description: "La sección debe ser una sola letra (A-Z).",
-      });
+      toast({ variant: "destructive", title: "Formato inválido", description: "La sección debe ser una sola letra (A-Z)." });
       return;
     }
     
-    if (sectionsToCreate.includes(normalized)) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Ya agregaste esta sección.",
-      });
+    const existing = pendingSections[grade] || [];
+    if (existing.includes(normalized)) {
+      toast({ variant: "destructive", title: "Error", description: "Ya agregaste esta sección." });
       return;
     }
-    if (currentGradeSections.some(s => s.name === normalized)) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Esta sección ya existe.",
-      });
+    const gradeSections = getSectionsForGrade(grade);
+    if (gradeSections.some(s => s.name === normalized)) {
+      toast({ variant: "destructive", title: "Error", description: "Esta sección ya existe." });
       return;
     }
     
-    setSectionsToCreate([...sectionsToCreate, normalized]);
+    setPendingSections(prev => ({ ...prev, [grade]: [...(prev[grade] || []), normalized] }));
     setNewSectionName("");
   };
 
-  const removeSectionToCreate = (name: string) => {
-    setSectionsToCreate(sectionsToCreate.filter(s => s !== name));
+  const removePendingSection = (grade: string, name: string) => {
+    setPendingSections(prev => ({
+      ...prev,
+      [grade]: (prev[grade] || []).filter(s => s !== name),
+    }));
   };
 
-  const handleSaveSections = () => {
-    if (sectionsToCreate.length > 0) {
-      createSectionsMutation.mutate(sectionsToCreate);
+  const handleSaveSectionsForGrade = (grade: GradeLevel) => {
+    const names = pendingSections[grade];
+    if (names && names.length > 0) {
+      createSectionsMutation.mutate({ grade, names }, {
+        onSuccess: () => {
+          setPendingSections(prev => {
+            const next = { ...prev };
+            delete next[grade];
+            return next;
+          });
+        },
+      });
     }
   };
 
@@ -732,39 +729,8 @@ export default function SchoolYearsSections() {
           </DialogHeader>
           
           <div className="py-4 space-y-4">
-            {/* Grade selector for categories, static label for direct */}
-            {selectedCategory ? (
-              <div className="flex items-center gap-4">
-                <Label className="font-medium w-20">Nivel:</Label>
-                <Select
-                  value={selectedGrade || ""}
-                  onValueChange={(val) => {
-                    setSelectedGrade(val as GradeLevel);
-                    setSectionsToCreate([]);
-                    setEditingSectionId(null);
-                    setEditingSectionName("");
-                  }}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Seleccionar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedCategory.levels.map(l => (
-                      <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <Label className="font-medium w-20">Grado:</Label>
-                <span className="text-muted-foreground">
-                  {selectedGrade && getGradeLabel(selectedGrade)}
-                </span>
-              </div>
-            )}
-            
             {editingSectionId ? (
+              // Editing a specific section
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <Label className="font-medium w-20">Sección:</Label>
@@ -792,8 +758,112 @@ export default function SchoolYearsSections() {
                   </Button>
                 </div>
               </div>
-            ) : (
+            ) : selectedCategory ? (
+              // Category mode: accordion with all levels
+              <Accordion 
+                type="single" 
+                collapsible 
+                value={activeAccordionGrade}
+                onValueChange={setActiveAccordionGrade}
+              >
+                {selectedCategory.levels.map((grade) => {
+                  const gradeSections = getSectionsForGrade(grade.value);
+                  const gradePending = pendingSections[grade.value] || [];
+                  return (
+                    <AccordionItem key={grade.value} value={grade.value}>
+                      <AccordionTrigger className="text-sm py-3">
+                        <div className="flex items-center gap-2">
+                          {grade.label}
+                          {gradeSections.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {gradeSections.map(s => s.name).join(", ")}
+                            </Badge>
+                          )}
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-3">
+                          {/* Add new section */}
+                          <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium">Sección:</Label>
+                            <Input
+                              placeholder="Ej: A"
+                              value={activeAccordionGrade === grade.value ? newSectionName : ""}
+                              onChange={(e) => {
+                                const value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+                                setNewSectionName(value);
+                              }}
+                              maxLength={1}
+                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSectionToGrade(grade.value))}
+                              className="h-9 text-center uppercase w-16"
+                            />
+                            <Button 
+                              type="button" size="sm" 
+                              onClick={() => addSectionToGrade(grade.value)}
+                              disabled={!newSectionName.trim()}
+                              className="h-9"
+                            >
+                              +
+                            </Button>
+                          </div>
+                          
+                          {/* Pending sections */}
+                          {gradePending.length > 0 && (
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground">Por guardar:</Label>
+                              <div className="flex flex-wrap gap-1">
+                                {gradePending.map(name => (
+                                  <Badge key={name} variant="default" className="gap-1">
+                                    {name}
+                                    <button type="button" onClick={() => removePendingSection(grade.value, name)} className="ml-1 hover:text-destructive">
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleSaveSectionsForGrade(grade.value)}
+                                disabled={createSectionsMutation.isPending}
+                              >
+                                {createSectionsMutation.isPending ? "Guardando..." : "Guardar"}
+                              </Button>
+                            </div>
+                          )}
+                          
+                          {/* Existing sections */}
+                          {gradeSections.length > 0 && (
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">
+                                Existentes (clic para editar):
+                              </Label>
+                              <div className="flex flex-wrap gap-1">
+                                {gradeSections.map(s => (
+                                  <Badge 
+                                    key={s.id} variant="secondary"
+                                    className="cursor-pointer hover:bg-secondary/80"
+                                    onClick={() => startEditingSection(s)}
+                                  >
+                                    {s.name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            ) : selectedGrade ? (
+              // Direct mode (Pre-Maternal / Maternal)
               <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Label className="font-medium w-20">Grado:</Label>
+                  <span className="text-muted-foreground">{getGradeLabel(selectedGrade)}</span>
+                </div>
                 <div className="flex items-center gap-4">
                   <Label className="font-medium w-20">Sección:</Label>
                   <div className="flex gap-2">
@@ -805,13 +875,13 @@ export default function SchoolYearsSections() {
                         setNewSectionName(value);
                       }}
                       maxLength={1}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSectionToCreate())}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSectionToGrade(selectedGrade))}
                       className="h-9 text-center uppercase w-16"
                       autoFocus
                     />
                     <Button 
                       type="button" size="sm" 
-                      onClick={addSectionToCreate}
+                      onClick={() => addSectionToGrade(selectedGrade)}
                       disabled={!newSectionName.trim()}
                       className="h-9"
                     >
@@ -820,14 +890,14 @@ export default function SchoolYearsSections() {
                   </div>
                 </div>
                 
-                {sectionsToCreate.length > 0 && (
+                {(pendingSections[selectedGrade] || []).length > 0 && (
                   <div className="space-y-2">
                     <Label className="text-sm text-muted-foreground">Secciones a crear:</Label>
                     <div className="flex flex-wrap gap-1">
-                      {sectionsToCreate.map(name => (
+                      {(pendingSections[selectedGrade] || []).map(name => (
                         <Badge key={name} variant="default" className="gap-1">
                           {name}
-                          <button type="button" onClick={() => removeSectionToCreate(name)} className="ml-1 hover:text-destructive">
+                          <button type="button" onClick={() => removePendingSection(selectedGrade, name)} className="ml-1 hover:text-destructive">
                             <X className="h-3 w-3" />
                           </button>
                         </Badge>
@@ -855,23 +925,31 @@ export default function SchoolYearsSections() {
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
 
-          {!editingSectionId && (
+          {!editingSectionId && !selectedCategory && (
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={closeSectionModal}>
                 Cancelar
               </Button>
-              {sectionsToCreate.length > 0 && (
+              {selectedGrade && (pendingSections[selectedGrade] || []).length > 0 && (
                 <Button
                   type="button"
-                  onClick={handleSaveSections}
+                  onClick={() => selectedGrade && handleSaveSectionsForGrade(selectedGrade)}
                   disabled={createSectionsMutation.isPending}
                 >
                   {createSectionsMutation.isPending ? "Guardando..." : "Guardar secciones"}
                 </Button>
               )}
+            </DialogFooter>
+          )}
+          
+          {!editingSectionId && selectedCategory && (
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={closeSectionModal}>
+                Cerrar
+              </Button>
             </DialogFooter>
           )}
         </DialogContent>
