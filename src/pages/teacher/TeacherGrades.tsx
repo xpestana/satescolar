@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Check } from "lucide-react";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -51,7 +51,8 @@ export default function TeacherGrades() {
 
   // Local state: { [studentId-planItemId]: gradeValue }
   const [grades, setGrades] = useState<Record<string, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
+  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
 
   // Fetch assignment details
   const { data: assignment, isLoading: assignmentLoading } = useQuery({
@@ -157,59 +158,43 @@ export default function TeacherGrades() {
     setGrades((prev) => ({ ...prev, [gradeKey(studentId, planItemId)]: value }));
   };
 
-  const handleSave = async () => {
+  const saveGrade = useCallback(async (studentId: string, planItemId: string) => {
     if (!assignmentId || !assignment) return;
-    setIsSaving(true);
-    try {
-      // Build upsert rows for all grades that have values
-      const rows: any[] = [];
-      students.forEach((s) => {
-        planItems.forEach((pi) => {
-          const val = grades[gradeKey(s.student_id, pi.id)];
-          if (val !== undefined && val !== "") {
-            rows.push({
-              student_id: s.student_id,
-              evaluation_plan_item_id: pi.id,
-              assignment_id: assignmentId,
-              school_id: assignment.school_id,
-              grade_value: val,
-              updated_at: new Date().toISOString(),
-            });
-          }
-        });
-      });
+    const key = gradeKey(studentId, planItemId);
+    const val = grades[key];
 
-      if (rows.length > 0) {
+    setSavingKeys((prev) => new Set(prev).add(key));
+    try {
+      if (val && val.trim() !== "") {
         const { error } = await supabase
           .from("student_grades" as any)
-          .upsert(rows as any, { onConflict: "student_id,evaluation_plan_item_id" });
+          .upsert({
+            student_id: studentId,
+            evaluation_plan_item_id: planItemId,
+            assignment_id: assignmentId,
+            school_id: assignment.school_id,
+            grade_value: val.trim(),
+            updated_at: new Date().toISOString(),
+          } as any, { onConflict: "student_id,evaluation_plan_item_id" });
         if (error) throw error;
-      }
-
-      // Delete grades that were cleared
-      const toDelete: { studentId: string; planItemId: string }[] = [];
-      existingGrades.forEach((g) => {
-        const val = grades[gradeKey(g.student_id, g.evaluation_plan_item_id)];
-        if (val === undefined || val === "") {
-          toDelete.push({ studentId: g.student_id, planItemId: g.evaluation_plan_item_id });
-        }
-      });
-      for (const d of toDelete) {
+      } else {
         await supabase
           .from("student_grades" as any)
           .delete()
-          .eq("student_id", d.studentId)
-          .eq("evaluation_plan_item_id", d.planItemId);
+          .eq("student_id", studentId)
+          .eq("evaluation_plan_item_id", planItemId);
       }
-
-      queryClient.invalidateQueries({ queryKey: ["student-grades", assignmentId] });
-      toast.success("Notas guardadas correctamente");
+      setSavedKeys((prev) => {
+        const next = new Set(prev).add(key);
+        setTimeout(() => setSavedKeys((p) => { const n = new Set(p); n.delete(key); return n; }), 1500);
+        return next;
+      });
     } catch (e: any) {
-      toast.error(e.message || "Error al guardar notas");
+      toast.error("Error al guardar nota");
     } finally {
-      setIsSaving(false);
+      setSavingKeys((prev) => { const next = new Set(prev); next.delete(key); return next; });
     }
-  };
+  }, [assignmentId, assignment, grades]);
 
   const loading = assignmentLoading || planLoading || studentsLoading || gradesLoading;
 
@@ -240,10 +225,11 @@ export default function TeacherGrades() {
           <Badge variant={isNumeric ? "default" : "secondary"}>
             {isNumeric ? "Numérica (1-20)" : "Descriptiva"}
           </Badge>
-          <Button onClick={handleSave} disabled={isSaving || loading}>
-            {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-            Guardar Notas
-          </Button>
+          {savingKeys.size > 0 && (
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Guardando...
+            </div>
+          )}
         </div>
       </div>
 
@@ -282,28 +268,43 @@ export default function TeacherGrades() {
                 <TableRow key={s.student_id}>
                   <TableCell className="sticky left-0 bg-background z-10 font-medium">{s.student_name}</TableCell>
                   <TableCell className="sticky left-[200px] bg-background z-10 text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
-                  {planItems.map((pi) => (
-                    <TableCell key={pi.id} className="text-center p-1.5">
-                      {isNumeric ? (
-                        <Input
-                          type="number"
-                          min={1}
-                          max={20}
-                          value={grades[gradeKey(s.student_id, pi.id)] || ""}
-                          onChange={(e) => handleGradeChange(s.student_id, pi.id, e.target.value)}
-                          className="h-8 w-16 mx-auto text-center text-sm"
-                          placeholder="—"
-                        />
-                      ) : (
-                        <Textarea
-                          value={grades[gradeKey(s.student_id, pi.id)] || ""}
-                          onChange={(e) => handleGradeChange(s.student_id, pi.id, e.target.value)}
-                          className="min-h-[60px] text-sm resize-y"
-                          placeholder="Escribir nota descriptiva..."
-                        />
-                      )}
-                    </TableCell>
-                  ))}
+                  {planItems.map((pi) => {
+                    const key = gradeKey(s.student_id, pi.id);
+                    const isCellSaving = savingKeys.has(key);
+                    const isCellSaved = savedKeys.has(key);
+                    return (
+                      <TableCell key={pi.id} className="text-center p-1.5">
+                        <div className="relative">
+                          {isNumeric ? (
+                            <Input
+                              type="number"
+                              min={1}
+                              max={20}
+                              value={grades[key] || ""}
+                              onChange={(e) => handleGradeChange(s.student_id, pi.id, e.target.value)}
+                              onBlur={() => saveGrade(s.student_id, pi.id)}
+                              className="h-8 w-16 mx-auto text-center text-sm"
+                              placeholder="—"
+                            />
+                          ) : (
+                            <Textarea
+                              value={grades[key] || ""}
+                              onChange={(e) => handleGradeChange(s.student_id, pi.id, e.target.value)}
+                              onBlur={() => saveGrade(s.student_id, pi.id)}
+                              className="min-h-[60px] text-sm resize-y"
+                              placeholder="Escribir nota descriptiva..."
+                            />
+                          )}
+                          {isCellSaving && (
+                            <Loader2 className="absolute top-1 right-1 h-3 w-3 animate-spin text-muted-foreground" />
+                          )}
+                          {isCellSaved && !isCellSaving && (
+                            <Check className="absolute top-1 right-1 h-3 w-3 text-green-500" />
+                          )}
+                        </div>
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableBody>
