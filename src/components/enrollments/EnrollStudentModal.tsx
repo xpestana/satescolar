@@ -23,42 +23,24 @@ const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal",
   maternal: "Maternal",
   inicial: "Inicial",
+  i_nivel: "I Nivel",
+  ii_nivel: "II Nivel",
+  iii_nivel: "III Nivel",
   primaria: "Primaria",
+  "1_grado": "1er Grado",
+  "2_grado": "2do Grado",
+  "3_grado": "3er Grado",
+  "4_grado": "4to Grado",
+  "5_grado": "5to Grado",
+  "6_grado": "6to Grado",
   media_general: "Media General",
+  "1_ano": "1er Año",
+  "2_ano": "2do Año",
+  "3_ano": "3er Año",
+  "4_ano": "4to Año",
+  "5_ano": "5to Año",
   media_tecnica: "Media Técnica",
-};
-
-// Map student nivel_grado values to section grade_level enum(s)
-const NIVEL_TO_GRADE: Record<string, string[]> = {
-  // Direct matches
-  "Pre-Maternal": ["pre_maternal"],
-  "pre_maternal": ["pre_maternal"],
-  "Maternal": ["maternal"],
-  "maternal": ["maternal"],
-  "Inicial": ["inicial"],
-  "inicial": ["inicial"],
-  "Preescolar": ["inicial"],
-  "1er Nivel": ["inicial"],
-  "2do Nivel": ["inicial"],
-  "3er Nivel": ["inicial"],
-  "Primaria": ["primaria"],
-  "primaria": ["primaria"],
-  "1er Grado": ["primaria"],
-  "2do Grado": ["primaria"],
-  "3er Grado": ["primaria"],
-  "4to Grado": ["primaria"],
-  "5to Grado": ["primaria"],
-  "6to Grado": ["primaria"],
-  "Media General": ["media_general"],
-  "media_general": ["media_general"],
-  "Media Técnica": ["media_tecnica"],
-  "media_tecnica": ["media_tecnica"],
-  "1er Año": ["media_general", "media_tecnica"],
-  "2do Año": ["media_general", "media_tecnica"],
-  "3er Año": ["media_general", "media_tecnica"],
-  "4to Año": ["media_general", "media_tecnica"],
-  "5to Año": ["media_general", "media_tecnica"],
-  "6to Año": ["media_tecnica"],
+  "6_ano": "6to Año",
 };
 
 const ENROLLMENT_TYPES = [
@@ -274,22 +256,15 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         { name: "nivel_grado", label: "Grado" },
       ];
 
-  // Filter sections based on student's nivel_grado
-  const studentGrade = student.form_data?.nivel_grado || student.form_data?.grado || "";
-  const matchedGradeLevels = studentGrade ? NIVEL_TO_GRADE[studentGrade] || [] : [];
-
-  const filteredSections = matchedGradeLevels.length > 0
-    ? sections.filter(s => matchedGradeLevels.includes(s.grade_level))
-    : sections; // If no grade or no mapping found, show all
-
-  const hasGradeButNoSections = matchedGradeLevels.length > 0 && filteredSections.length === 0;
-
-  const sectionsByGrade = filteredSections.reduce((acc, s) => {
+  // Show all sections grouped by grade level (no filtering by student's grado)
+  const sectionsByGrade = sections.reduce((acc, s) => {
     const label = GRADE_LABELS[s.grade_level] || s.grade_level;
     if (!acc[label]) acc[label] = [];
     acc[label].push(s);
     return acc;
   }, {} as Record<string, typeof sections>);
+
+  const hasNoSections = sections.length === 0;
 
   // Check if planilla has an "Observaciones" section
   const hasObservationsSection = planillaSections.some(s =>
@@ -395,9 +370,9 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
 
           <div>
             <Label className="text-sm font-medium">Sección *</Label>
-            {hasGradeButNoSections ? (
+            {hasNoSections ? (
               <div className="mt-1 text-sm text-muted-foreground border rounded-md p-2 bg-muted/50">
-                No hay secciones para <strong>{studentGrade}</strong>.{" "}
+                No hay secciones creadas.{" "}
                 <Link
                   to="/school/configuraciones/anos-secciones"
                   className="text-primary underline hover:no-underline"
