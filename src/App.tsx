@@ -37,6 +37,9 @@ import RepStudentsList from "./pages/representative/StudentsList";
 import EditFamilyData from "./pages/representative/EditFamilyData";
 import RepAddRepresentative from "./pages/representative/RepAddRepresentative";
 import RepAddStudent from "./pages/representative/RepAddStudent";
+import TeacherDashboard from "./pages/teacher/TeacherDashboard";
+import TeacherSubjects from "./pages/teacher/TeacherSubjects";
+import TeacherCarnet from "./pages/teacher/TeacherCarnet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -280,6 +283,10 @@ const App = () => (
             <Route path="/representative/representante/:representativeId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddRepresentative /></ProtectedRoute>} />
             <Route path="/representative/estudiante/nuevo" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
             <Route path="/representative/estudiante/:studentId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
+            {/* Teacher routes */}
+            <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
+            <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
+            <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

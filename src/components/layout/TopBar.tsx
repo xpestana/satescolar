@@ -32,6 +32,7 @@ export function TopBar() {
       case "admin": return "Administrador";
       case "school": return "Usuario Escolar";
       case "representative": return "Representante";
+      case "teacher": return "Docente";
       default: return "Usuario";
     }
   };

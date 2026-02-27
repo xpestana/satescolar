@@ -2,7 +2,7 @@ import { ReactNode, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
-type AppRole = "admin" | "school" | "representative";
+type AppRole = "admin" | "school" | "representative" | "teacher";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -25,6 +25,8 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
         navigate("/school/dashboard");
       } else if (userRole === "representative") {
         navigate("/representative/dashboard");
+      } else if (userRole === "teacher") {
+        navigate("/teacher/dashboard");
       } else {
         navigate("/login");
       }
