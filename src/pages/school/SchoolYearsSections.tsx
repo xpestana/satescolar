@@ -623,75 +623,53 @@ export default function SchoolYearsSections() {
           <CardTitle className="text-lg font-semibold">Secciones del Colegio</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {GRADE_CATEGORIES.map((cat) => {
               const isDirect = DIRECT_CATEGORIES.includes(cat.category);
-              const categorySections = cat.levels.flatMap(l => getSectionsForGrade(l.value));
               
-              return (
-                <div key={cat.category} className="space-y-3">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                    {cat.category}
-                  </h3>
-                  
-                  {isDirect ? (
-                    // Pre-Maternal / Maternal: one button per level
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {cat.levels.map((grade) => {
-                        const sections = getSectionsForGrade(grade.value);
-                        return (
-                          <div key={grade.value} className="space-y-2">
-                            <Button
-                              variant="outline"
-                              className="w-full h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
-                              onClick={() => openSectionModalDirect(grade.value)}
-                            >
-                              Agregar Sección En {grade.label}
-                            </Button>
-                            {sections.length > 0 && (
-                              <div className="flex flex-wrap gap-1 px-2">
-                                {sections.map(s => (
-                                  <Badge key={s.id} variant="secondary" className="text-xs">
-                                    {s.name}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    // Grouped categories: single button + sections listed below
-                    <div className="space-y-3">
+              if (isDirect) {
+                return cat.levels.map((grade) => {
+                  const sections = getSectionsForGrade(grade.value);
+                  return (
+                    <div key={grade.value} className="space-y-2">
                       <Button
                         variant="outline"
-                        className="h-auto py-3 px-6 justify-center border-primary text-primary hover:bg-primary/10"
-                        onClick={() => openSectionModalCategory(cat)}
+                        className="w-full h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
+                        onClick={() => openSectionModalDirect(grade.value)}
                       >
-                        Agregar Secciones en {cat.category}
+                        Agregar Sección En {grade.label}
                       </Button>
-                      
-                      {categorySections.length > 0 && (
-                        <div className="space-y-2 pl-2">
-                          {cat.levels.map((grade) => {
-                            const sections = getSectionsForGrade(grade.value);
-                            if (sections.length === 0) return null;
-                            return (
-                              <div key={grade.value} className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium text-muted-foreground min-w-[100px]">
-                                  {grade.label}:
-                                </span>
-                                {sections.map(s => (
-                                  <Badge key={s.id} variant="secondary" className="text-xs">
-                                    {s.name}
-                                  </Badge>
-                                ))}
-                              </div>
-                            );
-                          })}
+                      {sections.length > 0 && (
+                        <div className="flex flex-wrap gap-1 px-2">
+                          {sections.map(s => (
+                            <Badge key={s.id} variant="secondary" className="text-xs">
+                              {s.name}
+                            </Badge>
+                          ))}
                         </div>
                       )}
+                    </div>
+                  );
+                });
+              }
+
+              const categorySections = cat.levels.flatMap(l => getSectionsForGrade(l.value));
+              return (
+                <div key={cat.category} className="space-y-2">
+                  <Button
+                    variant="outline"
+                    className="w-full h-auto py-3 justify-center border-primary text-primary hover:bg-primary/10"
+                    onClick={() => openSectionModalCategory(cat)}
+                  >
+                    Agregar Secciones en {cat.category}
+                  </Button>
+                  {categorySections.length > 0 && (
+                    <div className="flex flex-wrap gap-1 px-2">
+                      {categorySections.map(s => (
+                        <Badge key={s.id} variant="secondary" className="text-xs" title={getGradeLabel(s.grade_level)}>
+                          {getGradeLabel(s.grade_level)} - {s.name}
+                        </Badge>
+                      ))}
                     </div>
                   )}
                 </div>
