@@ -111,7 +111,9 @@ const navSections: NavSection[] = [
   {
     title: "ÁREA DE NOTAS",
     requiredRole: "school",
-    items: [],
+    items: [
+      { label: "Consulta de Notas", href: "/notas/consulta", icon: Search, requiredRole: "school" },
+    ],
   },
   {
     title: "ÁREA ADMINISTRATIVA",
