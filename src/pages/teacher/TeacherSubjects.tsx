@@ -9,7 +9,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookOpen, ClipboardList, CheckCircle2, AlertCircle, FileEdit } from "lucide-react";
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 
@@ -162,23 +161,28 @@ export default function TeacherSubjects() {
             const isActive = yearAssignments[0]?.school_year?.is_active;
             return (
               <div key={yearRange}>
-                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <div className="flex items-center gap-3 mb-4 flex-wrap">
                   <h3 className="text-lg font-semibold text-foreground">
                     Año Escolar: {yearRange}
                   </h3>
                   {isActive && (
                     <Badge variant="default" className="text-xs">Activo</Badge>
                   )}
-                  <Select value={currentMomento.toString()} onValueChange={(v) => setCurrentMomento(Number(v))}>
-                    <SelectTrigger className="w-[160px] h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Momento 1</SelectItem>
-                      <SelectItem value="2">Momento 2</SelectItem>
-                      <SelectItem value="3">Momento 3</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="ml-auto flex items-center rounded-lg border bg-muted/40 p-0.5">
+                    {[1, 2, 3].map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setCurrentMomento(m)}
+                        className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                          currentMomento === m
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        Momento {m}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {yearAssignments.map((a) => {
