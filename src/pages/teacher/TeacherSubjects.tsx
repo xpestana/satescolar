@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BookOpen, ClipboardList, CheckCircle2, AlertCircle, FileEdit } from "lucide-react";
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 
@@ -62,6 +63,7 @@ export default function TeacherSubjects() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null);
+  const [currentMomento, setCurrentMomento] = useState<number>(1);
 
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
     queryKey: ["teacher-subjects", teacher?.id],
@@ -83,15 +85,16 @@ export default function TeacherSubjects() {
     enabled: !!teacher?.id,
   });
 
-  // Fetch which assignments have evaluation plan items
+  // Fetch which assignments have evaluation plan items for current momento
   const assignmentIds = assignments.map(a => a.id);
   const { data: planCounts = [] } = useQuery({
-    queryKey: ["evaluation-plan-counts", assignmentIds],
+    queryKey: ["evaluation-plan-counts", assignmentIds, currentMomento],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("evaluation_plan_items" as any)
         .select("assignment_id")
-        .in("assignment_id", assignmentIds);
+        .in("assignment_id", assignmentIds)
+        .eq("momento", currentMomento);
       if (error) throw error;
       return data as unknown as { assignment_id: string }[];
     },
@@ -159,13 +162,23 @@ export default function TeacherSubjects() {
             const isActive = yearAssignments[0]?.school_year?.is_active;
             return (
               <div key={yearRange}>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <h3 className="text-lg font-semibold text-foreground">
                     Año Escolar: {yearRange}
                   </h3>
                   {isActive && (
                     <Badge variant="default" className="text-xs">Activo</Badge>
                   )}
+                  <Select value={currentMomento.toString()} onValueChange={(v) => setCurrentMomento(Number(v))}>
+                    <SelectTrigger className="w-[160px] h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Momento 1</SelectItem>
+                      <SelectItem value="2">Momento 2</SelectItem>
+                      <SelectItem value="3">Momento 3</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {yearAssignments.map((a) => {
@@ -211,7 +224,7 @@ export default function TeacherSubjects() {
                                     variant="default"
                                     size="sm"
                                     className="w-full"
-                                    onClick={() => navigate(`/teacher/materias/${a.id}/notas`)}
+                                    onClick={() => navigate(`/teacher/materias/${a.id}/notas?momento=${currentMomento}`)}
                                   >
                                     <FileEdit className="h-4 w-4 mr-2" />
                                     Registrar Notas
@@ -241,6 +254,7 @@ export default function TeacherSubjects() {
           sectionLabel={getSectionLabel(selectedAssignment)}
           usePercentage={percentageEnabled && isSecondary(selectedAssignment)}
           planLabel={isSecondary(selectedAssignment) ? "Plan de Evaluación" : "Plan de Clases"}
+          momento={currentMomento}
         />
       )}
     </DashboardLayout>

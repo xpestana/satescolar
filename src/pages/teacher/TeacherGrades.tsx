@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -35,6 +35,7 @@ interface PlanItem {
   description: string;
   percentage: number | null;
   display_order: number;
+  momento: number;
 }
 
 interface StudentRow {
@@ -46,6 +47,8 @@ interface StudentRow {
 export default function TeacherGrades() {
   const { assignmentId } = useParams<{ assignmentId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const momento = Number(searchParams.get("momento")) || 1;
   const { teacher } = useTeacherData();
   const queryClient = useQueryClient();
 
@@ -80,14 +83,15 @@ export default function TeacherGrades() {
     ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${assignment.section.name}`
     : "";
 
-  // Fetch evaluation plan items
+  // Fetch evaluation plan items for the current momento
   const { data: planItems = [], isLoading: planLoading } = useQuery({
-    queryKey: ["evaluation-plan", assignmentId],
+    queryKey: ["evaluation-plan", assignmentId, momento],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("evaluation_plan_items" as any)
         .select("*")
         .eq("assignment_id", assignmentId!)
+        .eq("momento", momento)
         .order("display_order", { ascending: true });
       if (error) throw error;
       return (data as unknown as PlanItem[]) || [];
@@ -217,7 +221,7 @@ export default function TeacherGrades() {
           {assignment && (
             <div>
               <h2 className="text-lg font-semibold text-foreground">{assignment.subject?.name}</h2>
-              <p className="text-sm text-muted-foreground">{sectionLabel} — {assignment.school_year?.year_range}</p>
+              <p className="text-sm text-muted-foreground">{sectionLabel} — {assignment.school_year?.year_range} — <span className="font-medium text-foreground">Momento {momento}</span></p>
             </div>
           )}
         </div>
