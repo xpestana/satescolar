@@ -13,7 +13,7 @@ export default {
       },
     },
     fontSize: {
-        sm: ["0.90625rem", { lineHeight: "1.25rem" }],
+        sm: ["0.875rem", { lineHeight: "1.25rem" }],
       },
       extend: {
       colors: {
