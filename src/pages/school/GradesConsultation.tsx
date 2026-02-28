@@ -7,7 +7,9 @@ import { useSchoolId } from "@/hooks/useSchoolId";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Loader2, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 const GRADE_LABELS: Record<string, string> = {
@@ -34,6 +36,7 @@ export default function GradesConsultation() {
   const [selectedSection, setSelectedSection] = useState<string>("");
   const [selectedMomento, setSelectedMomento] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [gradeModal, setGradeModal] = useState<{ studentName: string; itemName: string; value: string } | null>(null);
 
   // School years
   const { data: schoolYears = [] } = useQuery({
@@ -328,16 +331,22 @@ export default function GradesConsultation() {
                         const val = gradesMap[`${s.student_id}-${pi.id}`];
                         return (
                           <TableCell key={pi.id} className="text-center">
-                            {val ? (
-                              isNumeric ? (
-                                <span className={`font-semibold ${Number(val) >= 10 ? "text-green-600" : "text-destructive"}`}>
-                                  {val}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-foreground">{val}</span>
-                              )
-                            ) : (
+                            {!val ? (
                               <span className="text-muted-foreground">—</span>
+                            ) : isNumeric ? (
+                              <span className={`font-semibold ${Number(val) >= 10 ? "text-green-600" : "text-destructive"}`}>
+                                {val}
+                              </span>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 gap-1 text-xs"
+                                onClick={() => setGradeModal({ studentName: s.student_name, itemName: pi.description, value: val })}
+                              >
+                                <Eye className="h-3 w-3" />
+                                Ver
+                              </Button>
                             )}
                           </TableCell>
                         );
@@ -350,6 +359,33 @@ export default function GradesConsultation() {
           </div>
         </>
       )}
+
+      {/* Modal for qualitative grade detail */}
+      <Dialog open={!!gradeModal} onOpenChange={() => setGradeModal(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Evaluación Cualitativa</DialogTitle>
+          </DialogHeader>
+          {gradeModal && (
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">Estudiante</span>
+                <span className="font-medium">{gradeModal.studentName}</span>
+              </div>
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">Evaluación</span>
+                <span className="font-medium">{gradeModal.itemName}</span>
+              </div>
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-muted-foreground">Descripción</span>
+                <div className="rounded-md border bg-muted/30 p-3 whitespace-pre-wrap text-sm">
+                  {gradeModal.value}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
