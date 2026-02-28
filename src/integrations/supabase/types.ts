@@ -303,6 +303,7 @@ export type Database = {
           description: string
           display_order: number
           id: string
+          momento: number
           percentage: number | null
           school_id: string
           updated_at: string
@@ -313,6 +314,7 @@ export type Database = {
           description: string
           display_order?: number
           id?: string
+          momento?: number
           percentage?: number | null
           school_id: string
           updated_at?: string
@@ -323,6 +325,7 @@ export type Database = {
           description?: string
           display_order?: number
           id?: string
+          momento?: number
           percentage?: number | null
           school_id?: string
           updated_at?: string

@@ -17,6 +17,7 @@ interface EvaluationPlanModalProps {
   sectionLabel: string;
   usePercentage: boolean;
   planLabel?: string;
+  momento: number;
 }
 
 interface PlanItem {
@@ -24,6 +25,7 @@ interface PlanItem {
   description: string;
   percentage: number | null;
   display_order: number;
+  momento: number;
 }
 
 export function EvaluationPlanModal({
@@ -35,6 +37,7 @@ export function EvaluationPlanModal({
   sectionLabel,
   usePercentage,
   planLabel = "Plan de Evaluación",
+  momento,
 }: EvaluationPlanModalProps) {
   const queryClient = useQueryClient();
   const [newDescription, setNewDescription] = useState("");
@@ -43,7 +46,7 @@ export function EvaluationPlanModal({
   const [editDescription, setEditDescription] = useState("");
   const [editPercentage, setEditPercentage] = useState("");
 
-  const queryKey = ["evaluation-plan", assignmentId];
+  const queryKey = ["evaluation-plan", assignmentId, momento];
 
   const { data: items = [], isLoading } = useQuery({
     queryKey,
@@ -52,6 +55,7 @@ export function EvaluationPlanModal({
         .from("evaluation_plan_items" as any)
         .select("*")
         .eq("assignment_id", assignmentId)
+        .eq("momento", momento)
         .order("display_order", { ascending: true });
       if (error) throw error;
       return (data as unknown as PlanItem[]) || [];
@@ -78,6 +82,7 @@ export function EvaluationPlanModal({
           description: desc,
           percentage: pct,
           display_order: items.length,
+          momento,
         } as any);
       if (error) throw error;
     },
@@ -139,7 +144,7 @@ export function EvaluationPlanModal({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{planLabel}</DialogTitle>
+          <DialogTitle>{planLabel} — Momento {momento}</DialogTitle>
           <DialogDescription>
             {subjectName} — {sectionLabel}
           </DialogDescription>
