@@ -1202,6 +1202,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_suspended: boolean
           school_id: string
           school_year_id: string
           section_id: string
@@ -1212,6 +1213,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_suspended?: boolean
           school_id: string
           school_year_id: string
           section_id: string
@@ -1222,6 +1224,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_suspended?: boolean
           school_id?: string
           school_year_id?: string
           section_id?: string

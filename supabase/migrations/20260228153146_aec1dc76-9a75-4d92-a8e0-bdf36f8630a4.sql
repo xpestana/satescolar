@@ -1,0 +1,1 @@
+ALTER TABLE public.subject_teacher_assignments ADD COLUMN is_suspended boolean NOT NULL DEFAULT false;

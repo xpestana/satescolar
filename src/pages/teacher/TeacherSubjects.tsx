@@ -76,7 +76,8 @@ export default function TeacherSubjects() {
           school_year:school_year_id(id, year_range, is_active),
           section:section_id(id, name, grade_level)
         `)
-        .eq("teacher_id", teacher!.id);
+        .eq("teacher_id", teacher!.id)
+        .eq("is_suspended", false);
 
       if (error) throw error;
       return (data as unknown as AssignmentWithDetails[]) || [];

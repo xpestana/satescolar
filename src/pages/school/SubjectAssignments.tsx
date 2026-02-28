@@ -14,7 +14,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, LinkIcon } from "lucide-react";
+import { Plus, Trash2, Loader2, LinkIcon, BanIcon, PlayCircle } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SchoolYear {
   id: string;
@@ -49,6 +53,7 @@ interface Assignment {
   school_year_id: string;
   school_id: string;
   section_id: string;
+  is_suspended: boolean;
 }
 
 const GRADE_LABELS: Record<string, string> = {
@@ -95,7 +100,7 @@ export default function SubjectAssignments() {
   const [formTeacherId, setFormTeacherId] = useState("");
   const [formGradeLevel, setFormGradeLevel] = useState("");
   const [formSectionId, setFormSectionId] = useState("");
-
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   // Fetch school years
   const { data: schoolYears = [] } = useQuery({
     queryKey: ["school-years", schoolId],
@@ -215,9 +220,22 @@ export default function SubjectAssignments() {
     },
   });
 
-  // Delete assignment
+  // Delete assignment (only if no linked plans/grades)
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      // Check for evaluation plan items
+      const { count: planCount } = await supabase
+        .from("evaluation_plan_items" as any)
+        .select("id", { count: "exact", head: true })
+        .eq("assignment_id", id);
+      // Check for student grades
+      const { count: gradeCount } = await supabase
+        .from("student_grades")
+        .select("id", { count: "exact", head: true })
+        .eq("assignment_id", id);
+      if ((planCount || 0) > 0 || (gradeCount || 0) > 0) {
+        throw new Error("No se puede eliminar esta asignación porque tiene planes de evaluación o notas registradas. Puedes suspenderla en su lugar.");
+      }
       const { error } = await supabase
         .from("subject_teacher_assignments" as any)
         .delete()
@@ -227,9 +245,29 @@ export default function SubjectAssignments() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subject-teacher-assignments", schoolId, selectedYearId] });
       toast({ title: "Eliminada", description: "Asignación eliminada exitosamente" });
+      setDeleteConfirm(null);
+    },
+    onError: (err: any) => {
+      toast({ variant: "destructive", title: "No se puede eliminar", description: err.message });
+      setDeleteConfirm(null);
+    },
+  });
+
+  // Suspend/unsuspend assignment
+  const suspendMutation = useMutation({
+    mutationFn: async ({ id, suspend }: { id: string; suspend: boolean }) => {
+      const { error } = await supabase
+        .from("subject_teacher_assignments" as any)
+        .update({ is_suspended: suspend } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, { suspend }) => {
+      queryClient.invalidateQueries({ queryKey: ["subject-teacher-assignments", schoolId, selectedYearId] });
+      toast({ title: suspend ? "Suspendida" : "Reactivada", description: suspend ? "La asignación ha sido suspendida" : "La asignación ha sido reactivada" });
     },
     onError: () => {
-      toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar la asignación" });
+      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar la asignación" });
     },
   });
 
@@ -367,16 +405,37 @@ export default function SubjectAssignments() {
                             </>
                           ) : null}
                           <TableCell>{a.teacherName}</TableCell>
-                          <TableCell>{a.sectionLabel}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {a.sectionLabel}
+                              {a.is_suspended && (
+                                <Badge variant="outline" className="text-xs border-destructive text-destructive">Suspendida</Badge>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => deleteMutation.mutate(a.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="h-3 w-3 mr-1" /> Eliminar
-                            </Button>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant={a.is_suspended ? "outline" : "secondary"}
+                                onClick={() => suspendMutation.mutate({ id: a.id, suspend: !a.is_suspended })}
+                                disabled={suspendMutation.isPending}
+                              >
+                                {a.is_suspended ? (
+                                  <><PlayCircle className="h-3 w-3 mr-1" /> Reactivar</>
+                                ) : (
+                                  <><BanIcon className="h-3 w-3 mr-1" /> Suspender</>
+                                )}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => setDeleteConfirm(a.id)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" /> Eliminar
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -472,6 +531,24 @@ export default function SubjectAssignments() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar asignación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará la asignación permanentemente. Solo es posible si no tiene planes de evaluación ni notas registradas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm)}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
