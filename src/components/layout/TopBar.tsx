@@ -40,7 +40,7 @@ export function TopBar() {
   return (
     <header
       className="fixed top-0 left-0 z-30 h-16 bg-transparent flex items-center justify-between px-6 transition-[right] duration-300 ease-in-out"
-      style={{ right: collapsed ? 0 : "18rem" }}
+      style={{ right: collapsed ? 0 : "20rem" }}
     >
       <div className="flex items-center gap-4">
         <DropdownMenu>
