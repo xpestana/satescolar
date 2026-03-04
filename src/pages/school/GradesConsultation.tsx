@@ -201,48 +201,86 @@ export default function GradesConsultation() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">Año Escolar</label>
-          <Select value={effectiveYear} onValueChange={setSelectedYear}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione año" />
-            </SelectTrigger>
-            <SelectContent>
-              {schoolYears.map((y) => (
-                <SelectItem key={y.id} value={y.id}>
-                  {y.year_range} {y.is_active ? "(Activo)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={openYear} onOpenChange={setOpenYear}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" aria-expanded={openYear} className="w-full justify-between font-normal">
+                {effectiveYear ? (schoolYears.find(y => y.id === effectiveYear)?.year_range + (schoolYears.find(y => y.id === effectiveYear)?.is_active ? " (Activo)" : "")) : "Seleccione año"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+              <Command>
+                <CommandInput placeholder="Buscar año..." />
+                <CommandList>
+                  <CommandEmpty>No se encontró.</CommandEmpty>
+                  <CommandGroup>
+                    {schoolYears.map((y) => (
+                      <CommandItem key={y.id} value={y.year_range} onSelect={() => { setSelectedYear(y.id); setOpenYear(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", effectiveYear === y.id ? "opacity-100" : "opacity-0")} />
+                        {y.year_range} {y.is_active ? "(Activo)" : ""}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">Área / Materia</label>
-          <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione área" />
-            </SelectTrigger>
-            <SelectContent>
-              {subjects.map((s) => (
-                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={openSubject} onOpenChange={setOpenSubject}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" aria-expanded={openSubject} className="w-full justify-between font-normal">
+                {selectedSubject ? subjects.find(s => s.id === selectedSubject)?.name || "Seleccione área" : "Seleccione área"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+              <Command>
+                <CommandInput placeholder="Buscar área..." />
+                <CommandList>
+                  <CommandEmpty>No se encontró.</CommandEmpty>
+                  <CommandGroup>
+                    {subjects.map((s) => (
+                      <CommandItem key={s.id} value={s.name} onSelect={() => { setSelectedSubject(s.id); setOpenSubject(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", selectedSubject === s.id ? "opacity-100" : "opacity-0")} />
+                        {s.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">Sección</label>
-          <Select value={selectedSection} onValueChange={setSelectedSection}>
-            <SelectTrigger>
-              <SelectValue placeholder="Seleccione sección" />
-            </SelectTrigger>
-            <SelectContent>
-              {sections.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {GRADE_LABELS[s.grade_level] || s.grade_level} - {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={openSection} onOpenChange={setOpenSection}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" role="combobox" aria-expanded={openSection} className="w-full justify-between font-normal">
+                {selectedSection ? `${GRADE_LABELS[sections.find(s => s.id === selectedSection)?.grade_level || ""] || ""} - ${sections.find(s => s.id === selectedSection)?.name || ""}` : "Seleccione sección"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+              <Command>
+                <CommandInput placeholder="Buscar sección..." />
+                <CommandList>
+                  <CommandEmpty>No se encontró.</CommandEmpty>
+                  <CommandGroup>
+                    {sections.map((s) => (
+                      <CommandItem key={s.id} value={`${GRADE_LABELS[s.grade_level] || s.grade_level} ${s.name}`} onSelect={() => { setSelectedSection(s.id); setOpenSection(false); }}>
+                        <Check className={cn("mr-2 h-4 w-4", selectedSection === s.id ? "opacity-100" : "opacity-0")} />
+                        {GRADE_LABELS[s.grade_level] || s.grade_level} - {s.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div>
