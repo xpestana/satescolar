@@ -71,7 +71,7 @@ const navSections: NavSection[] = [
       { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school" },
       { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school" },
       { label: "Áreas", href: "/registros/areas", icon: GraduationCap, requiredRole: "school" },
-      { label: "Asignación", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school" },
+      { label: "Asignación de Áreas", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school" },
       { label: "Búsqueda", href: "/registros/busqueda-avanzada", icon: Search, requiredRole: "school" },
     ],
   },
