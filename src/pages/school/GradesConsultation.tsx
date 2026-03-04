@@ -321,7 +321,7 @@ export default function GradesConsultation() {
               <TableBody>
                 {filteredStudents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={2 + planItems.length} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={2 + Math.max(planItems.length, 1)} className="text-center text-muted-foreground py-8">
                       No se encontraron estudiantes.
                     </TableCell>
                   </TableRow>
