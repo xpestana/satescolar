@@ -262,7 +262,7 @@ export function AppSidebar() {
                         )}
                       >
                         <Icon className="h-4 w-4 flex-shrink-0" />
-                        <span className="text-sm leading-tight line-clamp-2">{item.label}</span>
+                        <span className="leading-tight line-clamp-2" style={{ fontSize: "14.5px" }}>{item.label}</span>
                       </Link>
                     );
                   })}
