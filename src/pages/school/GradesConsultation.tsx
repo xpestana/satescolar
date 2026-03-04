@@ -154,15 +154,15 @@ export default function GradesConsultation() {
 
   // Grades
   const { data: grades = [], isLoading: gradesLoading } = useQuery({
-    queryKey: ["consult-grades", assignment?.id],
+    queryKey: ["consult-grades", assignmentIds],
     queryFn: async () => {
       const { data } = await supabase
         .from("student_grades")
         .select("student_id, evaluation_plan_item_id, grade_value")
-        .eq("assignment_id", assignment!.id);
+        .in("assignment_id", assignmentIds);
       return data || [];
     },
-    enabled: !!assignment?.id,
+    enabled: assignmentIds.length > 0,
   });
 
   const gradesMap = useMemo(() => {
