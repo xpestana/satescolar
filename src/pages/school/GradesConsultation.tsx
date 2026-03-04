@@ -330,7 +330,7 @@ export default function GradesConsultation() {
                     <TableRow key={s.student_id}>
                       <TableCell className="sticky left-0 bg-background z-10 font-medium">{s.student_name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
-                      {planItems.map((pi: any) => {
+                      {planItems.length > 0 ? planItems.map((pi: any) => {
                         const val = gradesMap[`${s.student_id}-${pi.id}`];
                         return (
                           <TableCell key={pi.id} className="text-center">
@@ -353,7 +353,11 @@ export default function GradesConsultation() {
                             )}
                           </TableCell>
                         );
-                      })}
+                      }) : (
+                        <TableCell className="text-center">
+                          <span className="text-sm text-muted-foreground italic">El docente no ha registrado notas</span>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
