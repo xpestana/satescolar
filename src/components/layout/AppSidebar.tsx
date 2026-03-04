@@ -221,7 +221,7 @@ export function AppSidebar() {
         </div>
 
         {/* Navigation - Grid Layout */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 bg-white border-l border-border">
+        <nav className="flex-1 overflow-y-auto px-4 py-4 bg-white border-l border-border">
           {navSections.map((section, sectionIndex) => {
             if (section.requiredRole && userRole !== section.requiredRole) return null;
 
@@ -230,14 +230,23 @@ export function AppSidebar() {
             );
             if (visibleItems.length === 0 && !section.title) return null;
 
+            // Check if this is the first visible section for this role
+            const previousSections = navSections.slice(0, sectionIndex);
+            const hasPreviousVisible = previousSections.some(
+              (s) => (!s.requiredRole || s.requiredRole === userRole) && s.items.some((i) => !i.requiredRole || i.requiredRole === userRole)
+            );
+
             return (
-              <div key={sectionIndex} className="mb-4">
+              <div key={sectionIndex}>
+                {hasPreviousVisible && (
+                  <div className="border-t border-border my-3" />
+                )}
                 {section.title && (
-                  <h3 className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <h3 className="mb-2 text-xs font-bold text-foreground">
                     {section.title}
                   </h3>
                 )}
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
                   {visibleItems.map((item) => {
                     const isActive = location.pathname === item.href;
                     const Icon = item.icon;
@@ -246,25 +255,14 @@ export function AppSidebar() {
                         key={item.href}
                         to={item.href}
                         className={cn(
-                          "flex flex-col items-center justify-center gap-1.5 rounded-xl p-2.5 text-center transition-all duration-200 group",
+                          "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
                           isActive
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            ? "text-primary font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
                         )}
                       >
-                        <div
-                          className={cn(
-                            "flex items-center justify-center h-9 w-9 rounded-lg transition-colors",
-                            isActive
-                              ? "bg-primary-foreground/20"
-                              : "bg-muted/60 group-hover:bg-primary/10"
-                          )}
-                        >
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <span className="text-[10px] font-semibold leading-tight line-clamp-2">
-                          {item.label}
-                        </span>
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate text-[13px]">{item.label}</span>
                       </Link>
                     );
                   })}
