@@ -79,7 +79,7 @@ const navSections: NavSection[] = [
     title: "Utilidades",
     requiredRole: "school",
     items: [
-      { label: "Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school" },
+      { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school" },
     ],
   },
   {
@@ -93,7 +93,7 @@ const navSections: NavSection[] = [
     title: "Notas",
     requiredRole: "school",
     items: [
-      { label: "Consulta", href: "/notas/consulta", icon: Search, requiredRole: "school" },
+      { label: "Consulta de Notas", href: "/notas/consulta", icon: Search, requiredRole: "school" },
     ],
   },
   {
@@ -104,7 +104,7 @@ const navSections: NavSection[] = [
     ],
   },
   {
-    title: "Gestión",
+    title: "Ajustes del Colegio",
     requiredRole: "school",
     items: [
       { label: "Años y Secciones", href: "/school/configuraciones/anos-secciones", icon: SlidersHorizontal, requiredRole: "school" },
