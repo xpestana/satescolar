@@ -90,22 +90,25 @@ export default function GradesConsultation() {
     enabled: !!schoolId,
   });
 
-  // Find the assignment for the selected filters
-  const { data: assignment, isLoading: assignmentLoading } = useQuery({
+  // Find the assignment(s) for the selected filters
+  const { data: assignments = [], isLoading: assignmentLoading } = useQuery({
     queryKey: ["assignment-lookup", effectiveYear, selectedSubject, selectedSection],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("subject_teacher_assignments")
         .select("id, section:section_id(id, grade_level)")
         .eq("school_year_id", effectiveYear)
         .eq("subject_id", selectedSubject)
         .eq("section_id", selectedSection)
-        .eq("school_id", schoolId!)
-        .maybeSingle();
-      return data as any;
+        .eq("school_id", schoolId!);
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!effectiveYear && !!selectedSubject && !!selectedSection && !!schoolId,
   });
+
+  const assignment = assignments.length > 0 ? assignments[0] : null;
+  const assignmentIds = assignments.map((a: any) => a.id);
 
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
