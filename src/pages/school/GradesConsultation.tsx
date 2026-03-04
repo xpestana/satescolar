@@ -306,14 +306,16 @@ export default function GradesConsultation() {
                 <TableRow>
                   <TableHead className="sticky left-0 bg-background z-10 min-w-[220px]">Nombre del Alumno</TableHead>
                   <TableHead className="min-w-[100px]">Cédula</TableHead>
-                  {planItems.map((pi: any) => (
+                  {planItems.length > 0 ? planItems.map((pi: any) => (
                     <TableHead key={pi.id} className="min-w-[150px] text-center">
                       <div>{pi.description}</div>
                       {pi.percentage != null && (
                         <span className="text-xs text-muted-foreground">{pi.percentage}%</span>
                       )}
                     </TableHead>
-                  ))}
+                  )) : (
+                    <TableHead className="text-center">Estado</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
