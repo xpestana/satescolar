@@ -12,6 +12,9 @@ export default {
         "2xl": "1400px",
       },
     },
+    fontFamily: {
+      sans: ["Quicksand", "ui-sans-serif", "system-ui", "sans-serif"],
+    },
     fontSize: {
         sm: ["0.875rem", { lineHeight: "1.25rem" }],
       },
