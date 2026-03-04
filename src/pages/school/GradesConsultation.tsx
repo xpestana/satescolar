@@ -90,39 +90,42 @@ export default function GradesConsultation() {
     enabled: !!schoolId,
   });
 
-  // Find the assignment for the selected filters
-  const { data: assignment, isLoading: assignmentLoading } = useQuery({
+  // Find the assignment(s) for the selected filters
+  const { data: assignments = [], isLoading: assignmentLoading } = useQuery({
     queryKey: ["assignment-lookup", effectiveYear, selectedSubject, selectedSection],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("subject_teacher_assignments")
         .select("id, section:section_id(id, grade_level)")
         .eq("school_year_id", effectiveYear)
         .eq("subject_id", selectedSubject)
         .eq("section_id", selectedSection)
-        .eq("school_id", schoolId!)
-        .maybeSingle();
-      return data as any;
+        .eq("school_id", schoolId!);
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!effectiveYear && !!selectedSubject && !!selectedSection && !!schoolId,
   });
 
+  const assignment = assignments.length > 0 ? assignments[0] : null;
+  const assignmentIds = assignments.map((a: any) => a.id);
+
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
 
-  // Plan items for the momento
+  // Plan items for the momento (across all assignments for this subject+section)
   const { data: planItems = [], isLoading: planLoading } = useQuery({
-    queryKey: ["consult-plan-items", assignment?.id, selectedMomento],
+    queryKey: ["consult-plan-items", assignmentIds, selectedMomento],
     queryFn: async () => {
       const { data } = await supabase
         .from("evaluation_plan_items")
         .select("*")
-        .eq("assignment_id", assignment!.id)
+        .in("assignment_id", assignmentIds)
         .eq("momento", selectedMomento)
         .order("display_order", { ascending: true });
       return data || [];
     },
-    enabled: !!assignment?.id,
+    enabled: assignmentIds.length > 0,
   });
 
   // Enrolled students
@@ -151,15 +154,15 @@ export default function GradesConsultation() {
 
   // Grades
   const { data: grades = [], isLoading: gradesLoading } = useQuery({
-    queryKey: ["consult-grades", assignment?.id],
+    queryKey: ["consult-grades", assignmentIds],
     queryFn: async () => {
       const { data } = await supabase
         .from("student_grades")
         .select("student_id, evaluation_plan_item_id, grade_value")
-        .eq("assignment_id", assignment!.id);
+        .in("assignment_id", assignmentIds);
       return data || [];
     },
-    enabled: !!assignment?.id,
+    enabled: assignmentIds.length > 0,
   });
 
   const gradesMap = useMemo(() => {
