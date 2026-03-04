@@ -39,7 +39,9 @@ export default function GradesConsultation() {
   const [selectedMomento, setSelectedMomento] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [gradeModal, setGradeModal] = useState<{ studentName: string; itemName: string; value: string } | null>(null);
-
+  const [openYear, setOpenYear] = useState(false);
+  const [openSubject, setOpenSubject] = useState(false);
+  const [openSection, setOpenSection] = useState(false);
   // School years
   const { data: schoolYears = [] } = useQuery({
     queryKey: ["school-years", schoolId],
