@@ -274,12 +274,13 @@ export default function GradesConsultation() {
         <div className="text-center py-12 border rounded-md bg-muted/20">
           <p className="text-muted-foreground">No se encontró asignación para los filtros seleccionados.</p>
         </div>
-      ) : planItems.length === 0 ? (
-        <div className="text-center py-12 border rounded-md bg-muted/20">
-          <p className="text-muted-foreground">No hay plan de evaluación definido para el Momento {selectedMomento}.</p>
-        </div>
       ) : (
         <>
+          {planItems.length === 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 mb-4">
+              <p className="text-sm text-amber-700 dark:text-amber-400">El docente no ha definido un plan de evaluación para el Momento {selectedMomento}.</p>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">{sectionLabel}</span>
@@ -305,20 +306,22 @@ export default function GradesConsultation() {
                 <TableRow>
                   <TableHead className="sticky left-0 bg-background z-10 min-w-[220px]">Nombre del Alumno</TableHead>
                   <TableHead className="min-w-[100px]">Cédula</TableHead>
-                  {planItems.map((pi: any) => (
+                  {planItems.length > 0 ? planItems.map((pi: any) => (
                     <TableHead key={pi.id} className="min-w-[150px] text-center">
                       <div>{pi.description}</div>
                       {pi.percentage != null && (
                         <span className="text-xs text-muted-foreground">{pi.percentage}%</span>
                       )}
                     </TableHead>
-                  ))}
+                  )) : (
+                    <TableHead className="text-center">Estado</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredStudents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={2 + planItems.length} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={2 + Math.max(planItems.length, 1)} className="text-center text-muted-foreground py-8">
                       No se encontraron estudiantes.
                     </TableCell>
                   </TableRow>
@@ -327,7 +330,7 @@ export default function GradesConsultation() {
                     <TableRow key={s.student_id}>
                       <TableCell className="sticky left-0 bg-background z-10 font-medium">{s.student_name}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
-                      {planItems.map((pi: any) => {
+                      {planItems.length > 0 ? planItems.map((pi: any) => {
                         const val = gradesMap[`${s.student_id}-${pi.id}`];
                         return (
                           <TableCell key={pi.id} className="text-center">
@@ -350,7 +353,11 @@ export default function GradesConsultation() {
                             )}
                           </TableCell>
                         );
-                      })}
+                      }) : (
+                        <TableCell className="text-center">
+                          <span className="text-sm text-muted-foreground italic">El docente no ha registrado notas</span>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}
