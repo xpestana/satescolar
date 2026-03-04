@@ -199,7 +199,7 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          "fixed right-0 top-0 z-40 flex h-screen w-72 flex-col transition-transform duration-300 ease-in-out",
+          "fixed right-0 top-0 z-40 flex h-screen w-80 flex-col transition-transform duration-300 ease-in-out",
           collapsed && !hovering && "translate-x-full"
         )}
         onMouseEnter={handleMouseEnter}

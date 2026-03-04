@@ -41,7 +41,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <AppSidebar />
       <main
         className="min-h-screen pt-16 p-6 transition-[margin] duration-300 ease-in-out"
-        style={{ marginRight: collapsed ? 0 : "18rem" }}
+        style={{ marginRight: collapsed ? 0 : "20rem" }}
       >
         {children}
       </main>
