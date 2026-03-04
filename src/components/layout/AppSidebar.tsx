@@ -262,7 +262,7 @@ export function AppSidebar() {
                         )}
                       >
                         <Icon className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate text-[13px]">{item.label}</span>
+                        <span className="text-[13px] leading-tight line-clamp-2">{item.label}</span>
                       </Link>
                     );
                   })}
