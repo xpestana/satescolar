@@ -274,12 +274,13 @@ export default function GradesConsultation() {
         <div className="text-center py-12 border rounded-md bg-muted/20">
           <p className="text-muted-foreground">No se encontró asignación para los filtros seleccionados.</p>
         </div>
-      ) : planItems.length === 0 ? (
-        <div className="text-center py-12 border rounded-md bg-muted/20">
-          <p className="text-muted-foreground">No hay plan de evaluación definido para el Momento {selectedMomento}.</p>
-        </div>
       ) : (
         <>
+          {planItems.length === 0 && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 p-3 mb-4">
+              <p className="text-sm text-amber-700 dark:text-amber-400">El docente no ha definido un plan de evaluación para el Momento {selectedMomento}.</p>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">{sectionLabel}</span>
