@@ -113,19 +113,19 @@ export default function GradesConsultation() {
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
 
-  // Plan items for the momento
+  // Plan items for the momento (across all assignments for this subject+section)
   const { data: planItems = [], isLoading: planLoading } = useQuery({
-    queryKey: ["consult-plan-items", assignment?.id, selectedMomento],
+    queryKey: ["consult-plan-items", assignmentIds, selectedMomento],
     queryFn: async () => {
       const { data } = await supabase
         .from("evaluation_plan_items")
         .select("*")
-        .eq("assignment_id", assignment!.id)
+        .in("assignment_id", assignmentIds)
         .eq("momento", selectedMomento)
         .order("display_order", { ascending: true });
       return data || [];
     },
-    enabled: !!assignment?.id,
+    enabled: assignmentIds.length > 0,
   });
 
   // Enrolled students
