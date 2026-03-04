@@ -111,7 +111,7 @@ const navSections: NavSection[] = [
       { label: "Formularios", href: "/school/configuraciones/formularios", icon: FileText, requiredRole: "school" },
       { label: "Planillas", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school" },
       { label: "Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school" },
-      { label: "Utilidades", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school" },
+      { label: "Carnet", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school" },
     ],
   },
   // Representative
