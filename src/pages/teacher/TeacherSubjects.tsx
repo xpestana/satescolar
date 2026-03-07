@@ -130,16 +130,17 @@ export default function TeacherSubjects() {
   
   const shouldUsePercentage = (a: AssignmentWithDetails) => {
     if (!percentageEnabled) return false;
-    if (a.subject?.subject_type === "gcrp") return a.subject?.evaluation_type === "numeric";
+    if (a.subject?.subject_type === "gcrp") return true;
     return isSecondary(a);
   };
 
   const getPlanLabel = (a: AssignmentWithDetails) => {
-    if (a.subject?.subject_type === "gcrp") {
-      return a.subject?.evaluation_type === "numeric" ? "Plan de Evaluación" : "Plan de Clases";
-    }
+    if (a.subject?.subject_type === "gcrp") return "Plan de Evaluación";
     return isSecondary(a) ? "Plan de Evaluación" : "Plan de Clases";
   };
+
+  const getEvaluationLabel = (a: AssignmentWithDetails) =>
+    a.subject?.subject_type === "gcrp" ? "Numérica" : a.subject?.evaluation_type === "literal" ? "Literal" : "Numérica";
   const loading = teacherLoading || assignmentsLoading;
 
   // Group by school year
@@ -213,7 +214,7 @@ export default function TeacherSubjects() {
                                   {a.subject?.subject_type === "gcrp" ? "GCRP" : "Regular"}
                                 </Badge>
                                 <Badge variant="outline" className="text-xs">
-                                  {a.subject?.evaluation_type === "literal" ? "Literal" : "Numérica"}
+                                  {getEvaluationLabel(a)}
                                 </Badge>
                               </div>
                             </div>
