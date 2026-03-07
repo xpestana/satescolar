@@ -77,11 +77,12 @@ export default function TeacherGrades() {
     enabled: !!assignmentId,
   });
 
+  const isGcrp = assignment?.subject?.subject_type === "gcrp";
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
   const sectionLabel = assignment?.section
     ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${assignment.section.name}`
-    : "";
+    : isGcrp ? "GCRP — Estudiantes individuales" : "";
 
   // Fetch evaluation plan items for the current momento
   const { data: planItems = [], isLoading: planLoading } = useQuery({
@@ -99,34 +100,38 @@ export default function TeacherGrades() {
     enabled: !!assignmentId,
   });
 
-  // Fetch enrolled students for the section + school year
+  // Fetch enrolled students - regular: from enrollments, GCRP: from gcrp_assignment_students
   const { data: students = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ["enrolled-students", assignment?.section?.id, assignment?.school_year?.id],
+    queryKey: ["enrolled-students", assignmentId, isGcrp, assignment?.section?.id, assignment?.school_year?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("enrollments")
-        .select(`
-          student_id,
-          student:student_id(id, document_id, form_data)
-        `)
-        .eq("section_id", assignment!.section!.id)
-        .eq("school_year_id", assignment!.school_year!.id)
-        .eq("school_id", assignment!.school_id);
-      if (error) throw error;
+      let rows: any[] = [];
+      if (isGcrp) {
+        const { data, error } = await supabase
+          .from("gcrp_assignment_students" as any)
+          .select("student_id, student:student_id(id, document_id, form_data)")
+          .eq("assignment_id", assignmentId!);
+        if (error) throw error;
+        rows = data || [];
+      } else {
+        const { data, error } = await supabase
+          .from("enrollments")
+          .select("student_id, student:student_id(id, document_id, form_data)")
+          .eq("section_id", assignment!.section!.id)
+          .eq("school_year_id", assignment!.school_year!.id)
+          .eq("school_id", assignment!.school_id);
+        if (error) throw error;
+        rows = data || [];
+      }
 
-      return (data || []).map((e: any) => {
+      return rows.map((e: any) => {
         const fd = e.student?.form_data as Record<string, any> | null;
         const firstName = fd?.nombre || fd?.primer_nombre || "";
         const lastName = fd?.apellido || fd?.primer_apellido || "";
         const fullName = `${firstName} ${lastName}`.trim() || "Sin nombre";
-        return {
-          student_id: e.student_id,
-          student_name: fullName,
-          document_id: e.student?.document_id,
-        } as StudentRow;
+        return { student_id: e.student_id, student_name: fullName, document_id: e.student?.document_id } as StudentRow;
       }).sort((a: StudentRow, b: StudentRow) => a.student_name.localeCompare(b.student_name));
     },
-    enabled: !!assignment?.section?.id && !!assignment?.school_year?.id,
+    enabled: isGcrp ? !!assignmentId : (!!assignment?.section?.id && !!assignment?.school_year?.id),
   });
 
   // Fetch existing grades

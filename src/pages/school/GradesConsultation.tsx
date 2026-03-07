@@ -66,7 +66,7 @@ export default function GradesConsultation() {
     queryFn: async () => {
       const { data } = await supabase
         .from("school_subjects")
-        .select("id, name")
+        .select("id, name, subject_type")
         .eq("school_id", schoolId!)
         .eq("is_suspended", false)
         .order("name");
@@ -94,21 +94,31 @@ export default function GradesConsultation() {
   const { data: assignments = [], isLoading: assignmentLoading } = useQuery({
     queryKey: ["assignment-lookup", effectiveYear, selectedSubject, selectedSection],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("subject_teacher_assignments")
-        .select("id, section:section_id(id, grade_level)")
+        .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
         .eq("school_year_id", effectiveYear)
         .eq("subject_id", selectedSubject)
-        .eq("section_id", selectedSection)
         .eq("school_id", schoolId!);
+
+      // For regular subjects filter by section, for GCRP section_id is null
+      const selectedSubjectData = subjects.find(s => s.id === selectedSubject);
+      if (selectedSubjectData && (selectedSubjectData as any).subject_type !== "gcrp") {
+        query = query.eq("section_id", selectedSection);
+      } else {
+        query = query.is("section_id", null);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveYear && !!selectedSubject && !!selectedSection && !!schoolId,
+    enabled: !!effectiveYear && !!selectedSubject && !!schoolId && (!!selectedSection || !!(subjects.find(s => s.id === selectedSubject) && (subjects.find(s => s.id === selectedSubject) as any).subject_type === "gcrp")),
   });
 
   const assignment = assignments.length > 0 ? assignments[0] : null;
   const assignmentIds = assignments.map((a: any) => a.id);
+  const isGcrpQuery = assignment?.subject?.subject_type === "gcrp";
 
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
@@ -128,17 +138,27 @@ export default function GradesConsultation() {
     enabled: assignmentIds.length > 0,
   });
 
-  // Enrolled students
+  // Students: regular from enrollments, GCRP from gcrp_assignment_students
   const { data: students = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ["consult-students", selectedSection, effectiveYear, schoolId],
+    queryKey: ["consult-students", selectedSection, effectiveYear, schoolId, isGcrpQuery, assignmentIds],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("enrollments")
-        .select("student_id, student:student_id(id, document_id, form_data)")
-        .eq("section_id", selectedSection)
-        .eq("school_year_id", effectiveYear)
-        .eq("school_id", schoolId!);
-      return (data || []).map((e: any) => {
+      let rows: any[] = [];
+      if (isGcrpQuery && assignmentIds.length > 0) {
+        const { data } = await supabase
+          .from("gcrp_assignment_students" as any)
+          .select("student_id, student:student_id(id, document_id, form_data)")
+          .in("assignment_id", assignmentIds);
+        rows = data || [];
+      } else {
+        const { data } = await supabase
+          .from("enrollments")
+          .select("student_id, student:student_id(id, document_id, form_data)")
+          .eq("section_id", selectedSection)
+          .eq("school_year_id", effectiveYear)
+          .eq("school_id", schoolId!);
+        rows = data || [];
+      }
+      return rows.map((e: any) => {
         const fd = e.student?.form_data as Record<string, any> | null;
         const firstName = fd?.nombre || fd?.primer_nombre || "";
         const lastName = fd?.apellido || fd?.primer_apellido || "";
@@ -149,7 +169,7 @@ export default function GradesConsultation() {
         };
       }).sort((a: any, b: any) => a.student_name.localeCompare(b.student_name));
     },
-    enabled: !!selectedSection && !!effectiveYear && !!schoolId,
+    enabled: isGcrpQuery ? assignmentIds.length > 0 : (!!selectedSection && !!effectiveYear && !!schoolId),
   });
 
   // Grades
@@ -182,7 +202,8 @@ export default function GradesConsultation() {
     );
   }, [students, searchTerm]);
 
-  const filtersComplete = !!effectiveYear && !!selectedSubject && !!selectedSection;
+  const selectedSubjectIsGcrp = subjects.find(s => s.id === selectedSubject)?.subject_type === "gcrp";
+  const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp || !!selectedSection);
   const loading = assignmentLoading || planLoading || studentsLoading || gradesLoading;
 
   const selectedSectionData = sections.find((s) => s.id === selectedSection);

@@ -140,7 +140,7 @@ export default function TeacherSubjects() {
   const getSectionLabel = (a: AssignmentWithDetails) =>
     a.section
       ? `${GRADE_LABELS[a.section.grade_level] || a.section.grade_level} - Sección ${a.section.name}`
-      : "Sin sección";
+      : a.subject?.subject_type === "gcrp" ? "GCRP — Estudiantes individuales" : "Sin sección";
 
   return (
     <DashboardLayout>

@@ -612,6 +612,52 @@ export type Database = {
           },
         ]
       }
+      gcrp_assignment_students: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          id: string
+          school_id: string
+          student_id: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          id?: string
+          school_id: string
+          student_id: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          id?: string
+          school_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gcrp_assignment_students_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gcrp_assignment_students_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gcrp_assignment_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grades_config: {
         Row: {
           created_at: string
@@ -1205,7 +1251,7 @@ export type Database = {
           is_suspended: boolean
           school_id: string
           school_year_id: string
-          section_id: string
+          section_id: string | null
           subject_id: string
           teacher_id: string
           updated_at: string
@@ -1216,7 +1262,7 @@ export type Database = {
           is_suspended?: boolean
           school_id: string
           school_year_id: string
-          section_id: string
+          section_id?: string | null
           subject_id: string
           teacher_id: string
           updated_at?: string
@@ -1227,7 +1273,7 @@ export type Database = {
           is_suspended?: boolean
           school_id?: string
           school_year_id?: string
-          section_id?: string
+          section_id?: string | null
           subject_id?: string
           teacher_id?: string
           updated_at?: string
