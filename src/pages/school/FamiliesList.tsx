@@ -483,6 +483,19 @@ export default function FamiliesList() {
                             </TooltipTrigger>
                             <TooltipContent>Cambiar contraseña</TooltipContent>
                           </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => { setResendFamily(family); setResendDialogOpen(true); }}
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Reenviar correo de bienvenida</TooltipContent>
+                          </Tooltip>
                           {!family.hasMembers && (
                             <Tooltip>
                               <TooltipTrigger asChild>
