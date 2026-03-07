@@ -161,10 +161,23 @@ export default function SubjectAssignments() {
     queryFn: async () => {
       const { data, error } = await supabase.from("gcrp_assignment_students" as any).select("student_id, student:student_id(id, document_id, form_data)").eq("assignment_id", viewGcrpAssignmentId!);
       if (error) throw error;
+      const studentIds = ((data || []) as any[]).map((r: any) => r.student_id);
+      // Fetch enrollments to get section/grade info
+      let enrollmentMap: Record<string, { grade_level: string; section_name: string }> = {};
+      if (studentIds.length > 0) {
+        const { data: enrollData } = await supabase.from("enrollments").select("student_id, section:section_id(name, grade_level)").in("student_id", studentIds).eq("school_id", schoolId!);
+        (enrollData || []).forEach((e: any) => {
+          if (!enrollmentMap[e.student_id] && e.section) {
+            enrollmentMap[e.student_id] = { grade_level: e.section.grade_level, section_name: e.section.name };
+          }
+        });
+      }
       return ((data || []) as any[]).map((r: any) => ({
         student_id: r.student_id,
         student_name: getStudentName(r.student?.form_data),
         document_id: r.student?.document_id,
+        grade_label: enrollmentMap[r.student_id] ? (GRADE_LABELS[enrollmentMap[r.student_id].grade_level] || enrollmentMap[r.student_id].grade_level) : null,
+        section_name: enrollmentMap[r.student_id]?.section_name || null,
       })).sort((a: any, b: any) => a.student_name.localeCompare(b.student_name));
     },
     enabled: !!viewGcrpAssignmentId,
