@@ -635,6 +635,26 @@ export default function FamiliesList() {
           familyName={getFamilyName(passwordFamily)}
         />
       )}
+
+      <AlertDialog open={resendDialogOpen} onOpenChange={setResendDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Reenviar correo de bienvenida?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se generará una <strong>nueva contraseña</strong> para la familia <strong>{resendFamily ? getFamilyName(resendFamily) : ""}</strong> ({resendFamily?.email}) y se enviará un correo con las nuevas credenciales de acceso. La contraseña anterior dejará de funcionar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resendEmailMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => resendFamily && resendEmailMutation.mutate(resendFamily.id)}
+              disabled={resendEmailMutation.isPending}
+            >
+              {resendEmailMutation.isPending ? "Enviando..." : "Enviar correo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
