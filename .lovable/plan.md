@@ -1,22 +1,61 @@
 
 
-## Separar Asignación GCRP de Regular — COMPLETADO
+## Plan: Email de bienvenida para familias y docentes
 
-### Cambios realizados:
+### Resumen
+Agregar envío automático de email de bienvenida al crear una familia (`create-family`) y al crear un docente (`create-teacher`). Ambos usan SMTP (denominailer) directo desde la edge function, "fire and forget".
 
-1. **Datos GCRP limpiados**: Se eliminaron todos los `student_grades`, `evaluation_plan_items` y `subject_teacher_assignments` vinculados a materias GCRP.
+### Cambios
 
-2. **Migración SQL ejecutada**:
-   - `section_id` en `subject_teacher_assignments` ahora es nullable (para GCRP)
-   - Nueva tabla `gcrp_assignment_students` con RLS para school users, teachers y admins
+**1. Modificar `supabase/functions/create-family/index.ts`**
 
-3. **SubjectAssignments.tsx**: Flujo separado Regular vs GCRP
-   - Regular: Docente → Nivel/Grado → Sección (sin cambios)
-   - GCRP: Docente → Buscar estudiantes por nivel/sección → Seleccionar individuales o todos → Crear asignación sin section_id + registros en `gcrp_assignment_students`
-   - Tabla muestra "X estudiantes" para GCRP con modal de visualización
+Después de crear exitosamente la familia (solo para usuarios nuevos, no existentes):
+- Consultar la tabla `schools` para obtener `name` y `logo_url` usando `roleData.school_id`
+- Construir HTML del email con:
+  - Header: logo del colegio (si existe) + nombre del colegio
+  - Body: mensaje de bienvenida como representante, credenciales (email + contraseña generada), botón "Ingresar a la Plataforma" → `https://satescolar.lovable.app`
+  - Footer: "SAT ESCOLAR — satescolar.com"
+- Enviar vía SMTP usando los secrets ya configurados (SMTP_HOST, SMTP_USER, etc.)
+- Fire and forget: si falla el email, se loguea pero no bloquea la respuesta
 
-4. **TeacherGrades.tsx**: Obtiene estudiantes desde `gcrp_assignment_students` cuando la asignación es GCRP
+**2. Modificar `supabase/functions/create-teacher/index.ts`**
 
-5. **GradesConsultation.tsx**: Misma lógica condicional para GCRP vs Regular
+Mismo patrón, después de crear exitosamente el docente (solo usuarios nuevos):
+- Consultar `schools` para `name` y `logo_url`
+- HTML similar pero con mensaje orientado a docentes: "Ha sido registrado como docente en [Colegio]..."
+- Mismas credenciales (email + contraseña = número de documento)
+- Mismo botón CTA y footer SAT ESCOLAR
 
-6. **TeacherSubjects.tsx**: Muestra "GCRP — Estudiantes individuales" cuando section es null
+### Template HTML (compartido, parametrizado)
+
+```text
+┌─────────────────────────────┐
+│      [Logo del Colegio]     │
+│     Nombre del Colegio      │
+├─────────────────────────────┤
+│                             │
+│  ¡Bienvenido/a!             │
+│                             │
+│  Ha sido registrado como    │
+│  [representante/docente]    │
+│  en [Nombre Colegio]        │
+│  a través de SAT Escolar.   │
+│                             │
+│  Sus credenciales:          │
+│  Usuario: email@...         │
+│  Contraseña: xxxxxx         │
+│                             │
+│  [Ingresar a la Plataforma] │
+│                             │
+├─────────────────────────────┤
+│  SAT ESCOLAR                │
+│  satescolar.com             │
+└─────────────────────────────┘
+```
+
+### Archivos a modificar
+- `supabase/functions/create-family/index.ts` — agregar import denomailer, fetch school data, construir HTML, enviar email
+- `supabase/functions/create-teacher/index.ts` — mismo patrón con mensaje de docente
+
+No se requieren cambios en frontend ni base de datos.
+
