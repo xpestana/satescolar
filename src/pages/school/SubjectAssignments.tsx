@@ -75,10 +75,6 @@ export default function SubjectAssignments() {
   // View GCRP students modal
   const [viewGcrpAssignmentId, setViewGcrpAssignmentId] = useState<string | null>(null);
 
-  const selectedSubject = useMemo(() => {
-    return subjects_data.find((s: Subject) => s.id === formSubjectId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formSubjectId]);
 
   // Fetch school years
   const { data: schoolYears = [] } = useQuery({
