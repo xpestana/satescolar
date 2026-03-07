@@ -94,17 +94,26 @@ export default function GradesConsultation() {
   const { data: assignments = [], isLoading: assignmentLoading } = useQuery({
     queryKey: ["assignment-lookup", effectiveYear, selectedSubject, selectedSection],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("subject_teacher_assignments")
-        .select("id, section:section_id(id, grade_level)")
+        .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
         .eq("school_year_id", effectiveYear)
         .eq("subject_id", selectedSubject)
-        .eq("section_id", selectedSection)
         .eq("school_id", schoolId!);
+
+      // For regular subjects filter by section, for GCRP section_id is null
+      const selectedSubjectData = subjects.find(s => s.id === selectedSubject);
+      if (selectedSubjectData && (selectedSubjectData as any).subject_type !== "gcrp") {
+        query = query.eq("section_id", selectedSection);
+      } else {
+        query = query.is("section_id", null);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveYear && !!selectedSubject && !!selectedSection && !!schoolId,
+    enabled: !!effectiveYear && !!selectedSubject && !!schoolId && (!!selectedSection || !!(subjects.find(s => s.id === selectedSubject) && (subjects.find(s => s.id === selectedSubject) as any).subject_type === "gcrp")),
   });
 
   const assignment = assignments.length > 0 ? assignments[0] : null;
