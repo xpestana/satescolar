@@ -66,7 +66,7 @@ export default function GradesConsultation() {
     queryFn: async () => {
       const { data } = await supabase
         .from("school_subjects")
-        .select("id, name")
+        .select("id, name, subject_type")
         .eq("school_id", schoolId!)
         .eq("is_suspended", false)
         .order("name");
