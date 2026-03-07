@@ -79,7 +79,7 @@ export default function TeacherGrades() {
 
   const isGcrp = assignment?.subject?.subject_type === "gcrp";
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
-  const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
+  const isNumeric = assignment?.subject?.evaluation_type === "numeric";
   const sectionLabel = assignment?.section
     ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${assignment.section.name}`
     : isGcrp ? "GCRP — Estudiantes individuales" : "";

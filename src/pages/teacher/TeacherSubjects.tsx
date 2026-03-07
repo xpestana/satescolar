@@ -127,6 +127,19 @@ export default function TeacherSubjects() {
 
   const isSecondary = (a: AssignmentWithDetails) =>
     a.section ? SECONDARY_GRADES.has(a.section.grade_level) : false;
+  
+  const shouldUsePercentage = (a: AssignmentWithDetails) => {
+    if (!percentageEnabled) return false;
+    if (a.subject?.subject_type === "gcrp") return a.subject?.evaluation_type === "numeric";
+    return isSecondary(a);
+  };
+
+  const getPlanLabel = (a: AssignmentWithDetails) => {
+    if (a.subject?.subject_type === "gcrp") {
+      return a.subject?.evaluation_type === "numeric" ? "Plan de Evaluación" : "Plan de Clases";
+    }
+    return isSecondary(a) ? "Plan de Evaluación" : "Plan de Clases";
+  };
   const loading = teacherLoading || assignmentsLoading;
 
   // Group by school year
@@ -208,7 +221,7 @@ export default function TeacherSubjects() {
                           </div>
                           {(() => {
                             const hasPlan = assignmentsWithPlan.has(a.id);
-                            const planLabel = isSecondary(a) ? "Plan de Evaluación" : "Plan de Clases";
+                            const planLabel = getPlanLabel(a);
                             return (
                               <div className="flex flex-col gap-2 mt-3">
                                 <Button
@@ -257,8 +270,8 @@ export default function TeacherSubjects() {
           schoolId={selectedAssignment.school_id}
           subjectName={selectedAssignment.subject?.name || ""}
           sectionLabel={getSectionLabel(selectedAssignment)}
-          usePercentage={percentageEnabled && isSecondary(selectedAssignment)}
-          planLabel={isSecondary(selectedAssignment) ? "Plan de Evaluación" : "Plan de Clases"}
+          usePercentage={shouldUsePercentage(selectedAssignment)}
+          planLabel={getPlanLabel(selectedAssignment)}
           momento={currentMomento}
         />
       )}
