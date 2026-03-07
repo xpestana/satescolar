@@ -118,6 +118,7 @@ export default function GradesConsultation() {
 
   const assignment = assignments.length > 0 ? assignments[0] : null;
   const assignmentIds = assignments.map((a: any) => a.id);
+  const isGcrpQuery = assignment?.subject?.subject_type === "gcrp";
 
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
@@ -137,17 +138,27 @@ export default function GradesConsultation() {
     enabled: assignmentIds.length > 0,
   });
 
-  // Enrolled students
+  // Students: regular from enrollments, GCRP from gcrp_assignment_students
   const { data: students = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ["consult-students", selectedSection, effectiveYear, schoolId],
+    queryKey: ["consult-students", selectedSection, effectiveYear, schoolId, isGcrpQuery, assignmentIds],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("enrollments")
-        .select("student_id, student:student_id(id, document_id, form_data)")
-        .eq("section_id", selectedSection)
-        .eq("school_year_id", effectiveYear)
-        .eq("school_id", schoolId!);
-      return (data || []).map((e: any) => {
+      let rows: any[] = [];
+      if (isGcrpQuery && assignmentIds.length > 0) {
+        const { data } = await supabase
+          .from("gcrp_assignment_students" as any)
+          .select("student_id, student:student_id(id, document_id, form_data)")
+          .in("assignment_id", assignmentIds);
+        rows = data || [];
+      } else {
+        const { data } = await supabase
+          .from("enrollments")
+          .select("student_id, student:student_id(id, document_id, form_data)")
+          .eq("section_id", selectedSection)
+          .eq("school_year_id", effectiveYear)
+          .eq("school_id", schoolId!);
+        rows = data || [];
+      }
+      return rows.map((e: any) => {
         const fd = e.student?.form_data as Record<string, any> | null;
         const firstName = fd?.nombre || fd?.primer_nombre || "";
         const lastName = fd?.apellido || fd?.primer_apellido || "";
@@ -158,7 +169,7 @@ export default function GradesConsultation() {
         };
       }).sort((a: any, b: any) => a.student_name.localeCompare(b.student_name));
     },
-    enabled: !!selectedSection && !!effectiveYear && !!schoolId,
+    enabled: isGcrpQuery ? assignmentIds.length > 0 : (!!selectedSection && !!effectiveYear && !!schoolId),
   });
 
   // Grades
