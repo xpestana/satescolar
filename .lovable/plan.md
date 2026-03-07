@@ -1,66 +1,22 @@
 
 
-## Agregar Sección y Grado a la Asignación de Áreas
+## Separar Asignación GCRP de Regular — COMPLETADO
 
-Actualmente cada asignación solo vincula Area + Docente + Ano Escolar. Falta indicar en que seccion (y su grado/ano) se imparte. Este cambio agrega ese campo tanto en la base de datos como en ambas interfaces (colegio y docente).
+### Cambios realizados:
 
----
+1. **Datos GCRP limpiados**: Se eliminaron todos los `student_grades`, `evaluation_plan_items` y `subject_teacher_assignments` vinculados a materias GCRP.
 
-### 1. Migración de base de datos
+2. **Migración SQL ejecutada**:
+   - `section_id` en `subject_teacher_assignments` ahora es nullable (para GCRP)
+   - Nueva tabla `gcrp_assignment_students` con RLS para school users, teachers y admins
 
-Agregar columna `section_id` a la tabla `subject_teacher_assignments`:
+3. **SubjectAssignments.tsx**: Flujo separado Regular vs GCRP
+   - Regular: Docente → Nivel/Grado → Sección (sin cambios)
+   - GCRP: Docente → Buscar estudiantes por nivel/sección → Seleccionar individuales o todos → Crear asignación sin section_id + registros en `gcrp_assignment_students`
+   - Tabla muestra "X estudiantes" para GCRP con modal de visualización
 
-- Nueva columna `section_id UUID NOT NULL` con referencia a `sections(id)` y `ON DELETE CASCADE`
-- Eliminar la restriccion unica actual `(subject_id, teacher_id, school_year_id)` y reemplazarla por `(subject_id, teacher_id, school_year_id, section_id)` -- ya que un mismo docente puede dar la misma materia en diferentes secciones
-- Agregar politica RLS para que los docentes puedan ver las secciones de su colegio
+4. **TeacherGrades.tsx**: Obtiene estudiantes desde `gcrp_assignment_students` cuando la asignación es GCRP
 
-### 2. Actualizar pagina de Asignacion de Areas (colegio)
+5. **GradesConsultation.tsx**: Misma lógica condicional para GCRP vs Regular
 
-**Archivo:** `src/pages/school/SubjectAssignments.tsx`
-
-- Agregar fetch de secciones del colegio (`sections` table)
-- Agregar un tercer Select en el dialogo de "Nueva Asignacion" para elegir la seccion (mostrando grado + nombre, ej: "1er Ano - A")
-- Incluir `section_id` en el insert de la mutacion
-- Actualizar la tabla de asignaciones para mostrar una columna "Seccion / Grado" con el nombre de la seccion y su grado
-- Actualizar la interface `Assignment` para incluir `section_id`
-- Actualizar la restriccion unique en la validacion de error 23505
-
-### 3. Actualizar vista del docente (Mis Materias)
-
-**Archivo:** `src/pages/teacher/TeacherSubjects.tsx`
-
-- Incluir la relacion `section:section_id(id, name, grade_level)` en el query de asignaciones
-- Mostrar en cada tarjeta de materia la seccion y grado correspondiente (ej: "1er Ano - Seccion A")
-- Actualizar la interface `AssignmentWithDetails` para incluir los datos de seccion
-
----
-
-### Detalles tecnicos
-
-**Migracion SQL:**
-```sql
-ALTER TABLE public.subject_teacher_assignments
-  ADD COLUMN section_id UUID NOT NULL REFERENCES public.sections(id) ON DELETE CASCADE;
-
--- Reemplazar constraint unica
-ALTER TABLE public.subject_teacher_assignments
-  DROP CONSTRAINT IF EXISTS subject_teacher_year_unique;
-
-ALTER TABLE public.subject_teacher_assignments
-  ADD CONSTRAINT subject_teacher_year_section_unique
-  UNIQUE (subject_id, teacher_id, school_year_id, section_id);
-
--- RLS: docentes pueden ver secciones de su colegio
-CREATE POLICY "Teachers can view school sections"
-  ON public.sections FOR SELECT
-  USING (EXISTS (
-    SELECT 1 FROM teachers t
-    WHERE t.user_id = auth.uid() AND t.school_id = sections.school_id
-  ));
-```
-
-**Archivos a modificar:**
-- Nueva migracion SQL
-- `src/pages/school/SubjectAssignments.tsx` -- agregar selector de seccion y columna en tabla
-- `src/pages/teacher/TeacherSubjects.tsx` -- mostrar seccion/grado en cada tarjeta
-
+6. **TeacherSubjects.tsx**: Muestra "GCRP — Estudiantes individuales" cuando section es null
