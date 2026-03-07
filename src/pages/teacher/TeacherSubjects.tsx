@@ -127,6 +127,19 @@ export default function TeacherSubjects() {
 
   const isSecondary = (a: AssignmentWithDetails) =>
     a.section ? SECONDARY_GRADES.has(a.section.grade_level) : false;
+  
+  const shouldUsePercentage = (a: AssignmentWithDetails) => {
+    if (!percentageEnabled) return false;
+    if (a.subject?.subject_type === "gcrp") return a.subject?.evaluation_type === "numeric";
+    return isSecondary(a);
+  };
+
+  const getPlanLabel = (a: AssignmentWithDetails) => {
+    if (a.subject?.subject_type === "gcrp") {
+      return a.subject?.evaluation_type === "numeric" ? "Plan de Evaluación" : "Plan de Clases";
+    }
+    return isSecondary(a) ? "Plan de Evaluación" : "Plan de Clases";
+  };
   const loading = teacherLoading || assignmentsLoading;
 
   // Group by school year
