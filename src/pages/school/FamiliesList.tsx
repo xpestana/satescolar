@@ -32,7 +32,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Eye, Users, UserPlus, Info, Trash2, GraduationCap, UserCheck, KeyRound, Search, ChevronDown, X, UsersRound } from "lucide-react";
+import { Eye, Users, UserPlus, Info, Trash2, GraduationCap, UserCheck, KeyRound, Search, ChevronDown, X, UsersRound, Mail } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -82,6 +82,8 @@ export default function FamiliesList() {
   const [passwordFamily, setPasswordFamily] = useState<FamilyWithEmail | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [filters, setFilters] = useState<SearchFilters>({ name: "", email: "", status: "all" });
+  const [resendDialogOpen, setResendDialogOpen] = useState(false);
+  const [resendFamily, setResendFamily] = useState<FamilyWithEmail | null>(null);
 
   // Global counters - independent of search/pagination
   const { data: globalCounts } = useQuery({
@@ -273,6 +275,33 @@ export default function FamiliesList() {
     setViewModalOpen(true);
   };
 
+  // Resend welcome email mutation
+  const resendEmailMutation = useMutation({
+    mutationFn: async (familyId: string) => {
+      const { data, error } = await supabase.functions.invoke("resend-welcome-email", {
+        body: { family_id: familyId, target_type: "family" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Correo enviado",
+        description: data.message,
+      });
+      setResendDialogOpen(false);
+      setResendFamily(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "No se pudo reenviar el correo",
+      });
+    },
+  });
+
   const totalPages = Math.ceil((familiesData?.count || 0) / ITEMS_PER_PAGE);
 
   if (schoolLoading) {
@@ -454,6 +483,19 @@ export default function FamiliesList() {
                             </TooltipTrigger>
                             <TooltipContent>Cambiar contraseña</TooltipContent>
                           </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => { setResendFamily(family); setResendDialogOpen(true); }}
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Reenviar correo de bienvenida</TooltipContent>
+                          </Tooltip>
                           {!family.hasMembers && (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -593,6 +635,26 @@ export default function FamiliesList() {
           familyName={getFamilyName(passwordFamily)}
         />
       )}
+
+      <AlertDialog open={resendDialogOpen} onOpenChange={setResendDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Reenviar correo de bienvenida?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se generará una <strong>nueva contraseña</strong> para la familia <strong>{resendFamily ? getFamilyName(resendFamily) : ""}</strong> ({resendFamily?.email}) y se enviará un correo con las nuevas credenciales de acceso. La contraseña anterior dejará de funcionar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={resendEmailMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => resendFamily && resendEmailMutation.mutate(resendFamily.id)}
+              disabled={resendEmailMutation.isPending}
+            >
+              {resendEmailMutation.isPending ? "Enviando..." : "Enviar correo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
