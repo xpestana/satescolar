@@ -615,9 +615,14 @@ export default function SubjectAssignments() {
             {viewGcrpStudents.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Sin estudiantes asignados.</p>
             ) : viewGcrpStudents.map((s: any) => (
-              <div key={s.student_id} className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-muted/40 text-sm">
-                <span>{s.student_name}</span>
-                <span className="text-xs text-muted-foreground">{s.document_id || ""}</span>
+              <div key={s.student_id} className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-muted/40 text-sm gap-2">
+                <span className="font-medium">{s.student_name}</span>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                  {s.grade_label && s.section_name && (
+                    <span>{s.grade_label} - {s.section_name}</span>
+                  )}
+                  {s.document_id && <span>{s.document_id}</span>}
+                </div>
               </div>
             ))}
           </div>
