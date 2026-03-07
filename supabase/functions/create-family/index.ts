@@ -92,9 +92,6 @@ async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
       to: [to],
       subject: `Bienvenido a ${schoolName} - SAT Escolar`,
       html,
-      headers: {
-        "From": `${fromName} <${fromEmail}>`,
-      },
     });
     await client.close();
     console.log(`Welcome email sent to ${to}`);
