@@ -221,7 +221,7 @@ export default function TeacherSubjects() {
                           </div>
                           {(() => {
                             const hasPlan = assignmentsWithPlan.has(a.id);
-                            const planLabel = isSecondary(a) ? "Plan de Evaluación" : "Plan de Clases";
+                            const planLabel = getPlanLabel(a);
                             return (
                               <div className="flex flex-col gap-2 mt-3">
                                 <Button
@@ -270,8 +270,8 @@ export default function TeacherSubjects() {
           schoolId={selectedAssignment.school_id}
           subjectName={selectedAssignment.subject?.name || ""}
           sectionLabel={getSectionLabel(selectedAssignment)}
-          usePercentage={percentageEnabled && isSecondary(selectedAssignment)}
-          planLabel={isSecondary(selectedAssignment) ? "Plan de Evaluación" : "Plan de Clases"}
+          usePercentage={shouldUsePercentage(selectedAssignment)}
+          planLabel={getPlanLabel(selectedAssignment)}
           momento={currentMomento}
         />
       )}
