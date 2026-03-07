@@ -79,7 +79,7 @@ export default function TeacherGrades() {
 
   const isGcrp = assignment?.subject?.subject_type === "gcrp";
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
-  const isNumeric = assignment?.subject?.evaluation_type === "numeric";
+  const isNumeric = isGcrp || (gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false);
   const sectionLabel = assignment?.section
     ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${assignment.section.name}`
     : isGcrp ? "GCRP — Estudiantes individuales" : "";
@@ -135,7 +135,7 @@ export default function TeacherGrades() {
   });
 
   // Fetch existing grades
-  const { data: existingGrades = [], isLoading: gradesLoading } = useQuery({
+  const { data: existingGradesData, isLoading: gradesLoading } = useQuery({
     queryKey: ["student-grades", assignmentId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -150,12 +150,14 @@ export default function TeacherGrades() {
 
   // Populate local state from existing grades
   useEffect(() => {
+    if (!existingGradesData) return;
+
     const map: Record<string, string> = {};
-    existingGrades.forEach((g) => {
+    existingGradesData.forEach((g) => {
       map[`${g.student_id}-${g.evaluation_plan_item_id}`] = g.grade_value || "";
     });
     setGrades(map);
-  }, [existingGrades]);
+  }, [existingGradesData]);
 
   const gradeKey = (studentId: string, planItemId: string) => `${studentId}-${planItemId}`;
 
