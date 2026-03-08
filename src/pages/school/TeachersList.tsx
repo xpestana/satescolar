@@ -699,6 +699,26 @@ export default function TeachersList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Resend email confirmation dialog */}
+      <Dialog open={resendDialog.open} onOpenChange={(open) => !open && setResendDialog({ open: false, teacherId: "", teacherName: "" })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reenviar Correo de Bienvenida</DialogTitle>
+            <DialogDescription>
+              ¿Desea reenviar el correo de bienvenida a <strong>{resendDialog.teacherName}</strong>? Se generará una nueva contraseña y la anterior será invalidada.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResendDialog({ open: false, teacherId: "", teacherName: "" })}>
+              Cancelar
+            </Button>
+            <Button onClick={() => resendEmailMutation.mutate(resendDialog.teacherId)} disabled={resendEmailMutation.isPending}>
+              {resendEmailMutation.isPending ? "Enviando..." : "Reenviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
