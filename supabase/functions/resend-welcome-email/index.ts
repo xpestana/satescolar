@@ -198,8 +198,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate new password and update
-    const newPassword = generateRandomPassword();
+    // For teachers: use document_id (without prefix) as password; for families: generate random
+    let newPassword: string;
+    if (target_type === "teacher" && teacherDocumentId) {
+      const rawDoc = teacherDocumentId.includes("-")
+        ? teacherDocumentId.split("-").slice(1).join("-")
+        : teacherDocumentId;
+      newPassword = rawDoc;
+    } else {
+      newPassword = generateRandomPassword();
+    }
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       targetUserId,
       { password: newPassword }
