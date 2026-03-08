@@ -92,30 +92,53 @@ export default function GradesConsultation() {
     enabled: !!schoolId,
   });
 
-  // Find the assignment(s) for the selected filters
-  const { data: assignments = [], isLoading: assignmentLoading } = useQuery({
-    queryKey: ["assignment-lookup", effectiveYear, selectedSubject, selectedSection],
+  // For GCRP: fetch all assignments with teacher info so user can pick one
+  const { data: gcrpAssignments = [] } = useQuery({
+    queryKey: ["gcrp-assignments-lookup", effectiveYear, selectedSubject, schoolId],
     queryFn: async () => {
-      let query = supabase
+      const { data } = await supabase
         .from("subject_teacher_assignments")
-        .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
+        .select("id, teacher:teacher_id(id, form_data, document_id)")
         .eq("school_year_id", effectiveYear)
         .eq("subject_id", selectedSubject)
-        .eq("school_id", schoolId!);
-
-      // For regular subjects filter by section, for GCRP section_id is null
-      const selectedSubjectData = subjects.find(s => s.id === selectedSubject);
-      if (selectedSubjectData && (selectedSubjectData as any).subject_type !== "gcrp") {
-        query = query.eq("section_id", selectedSection);
-      } else {
-        query = query.is("section_id", null);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+        .eq("school_id", schoolId!)
+        .eq("is_suspended", false)
+        .is("section_id", null);
+      return (data || []).map((a: any) => {
+        const fd = a.teacher?.form_data as Record<string, any> | null;
+        const name = `${fd?.nombre || fd?.primer_nombre || ""} ${fd?.apellido || fd?.primer_apellido || ""}`.trim() || "Sin nombre";
+        return { id: a.id, teacherName: name, teacherDoc: a.teacher?.document_id };
+      });
     },
-    enabled: !!effectiveYear && !!selectedSubject && !!schoolId && (!!selectedSection || !!(subjects.find(s => s.id === selectedSubject) && (subjects.find(s => s.id === selectedSubject) as any).subject_type === "gcrp")),
+    enabled: !!effectiveYear && !!selectedSubject && !!schoolId && selectedSubjectIsGcrp,
+  });
+
+  // Find the assignment(s) for the selected filters
+  const { data: assignments = [], isLoading: assignmentLoading } = useQuery({
+    queryKey: ["assignment-lookup", effectiveYear, selectedSubject, selectedSection, selectedGcrpAssignment],
+    queryFn: async () => {
+      if (selectedSubjectIsGcrp) {
+        // For GCRP, use the selected assignment only
+        if (!selectedGcrpAssignment) return [];
+        const { data, error } = await supabase
+          .from("subject_teacher_assignments")
+          .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
+          .eq("id", selectedGcrpAssignment);
+        if (error) throw error;
+        return data || [];
+      } else {
+        const { data, error } = await supabase
+          .from("subject_teacher_assignments")
+          .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
+          .eq("school_year_id", effectiveYear)
+          .eq("subject_id", selectedSubject)
+          .eq("school_id", schoolId!)
+          .eq("section_id", selectedSection);
+        if (error) throw error;
+        return data || [];
+      }
+    },
+    enabled: !!effectiveYear && !!selectedSubject && !!schoolId && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection),
   });
 
   const assignment = assignments.length > 0 ? assignments[0] : null;
@@ -123,7 +146,7 @@ export default function GradesConsultation() {
   const isGcrpQuery = assignment?.subject?.subject_type === "gcrp";
 
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
-  const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
+  const isNumeric = isGcrpQuery || (gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false);
 
   // Plan items for the momento (across all assignments for this subject+section)
   const { data: planItems = [], isLoading: planLoading } = useQuery({
