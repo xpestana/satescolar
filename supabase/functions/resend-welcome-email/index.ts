@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const platformUrl = Deno.env.get("APP_URL")?.trim() || "https://app.satescolar.com";
+    const loginUrl = "https://app.satescolar.com/login";
 
     // Build and send email
     const html = buildWelcomeEmailHtml(
