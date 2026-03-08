@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
       targetEmail,
       newPassword,
       role,
-      platformUrl
+      loginUrl
     );
 
     const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
