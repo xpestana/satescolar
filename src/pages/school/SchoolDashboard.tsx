@@ -1,67 +1,112 @@
-import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useSchoolId } from "@/hooks/useSchoolId";
+import { useSchoolData } from "@/hooks/useSchoolData";
+import { useQuery } from "@tanstack/react-query";
 
 export default function SchoolDashboard() {
-  const { user } = useAuth();
-  const [metrics, setMetrics] = useState({
-    enrolledStudents: 0,
-    totalStudents: 0,
-    activeTeachers: 0,
-    totalTeachers: 0,
-    families: 0,
-    subjects: 0,
+  const { schoolId } = useSchoolId();
+  const { school } = useSchoolData();
+
+  // Get active school year
+  const { data: activeSchoolYear } = useQuery({
+    queryKey: ["active-school-year", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("school_years")
+        .select("id")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!schoolId,
   });
-  const [schoolName, setSchoolName] = useState<string>("");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchSchoolData = async () => {
-      if (!user) return;
+  // Enrolled students (in active school year)
+  const { data: enrolledStudents = 0, isLoading: l1 } = useQuery({
+    queryKey: ["metric-enrolled", schoolId, activeSchoolYear?.id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("enrollments")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId!)
+        .eq("school_year_id", activeSchoolYear!.id);
+      return count ?? 0;
+    },
+    enabled: !!schoolId && !!activeSchoolYear?.id,
+  });
 
-      try {
-        // Get the school assigned to this user
-        const { data: userRole } = await supabase
-          .from("user_roles")
-          .select("school_id")
-          .eq("user_id", user.id)
-          .maybeSingle();
+  // Total students in system (via student_schools)
+  const { data: totalStudents = 0, isLoading: l2 } = useQuery({
+    queryKey: ["metric-total-students", schoolId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("student_schools")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId!);
+      return count ?? 0;
+    },
+    enabled: !!schoolId,
+  });
 
-        if (userRole?.school_id) {
-          // Fetch school name
-          const { data: school } = await supabase
-            .from("schools")
-            .select("name")
-            .eq("id", userRole.school_id)
-            .maybeSingle();
+  // Active teachers (not suspended)
+  const { data: activeTeachers = 0, isLoading: l3 } = useQuery({
+    queryKey: ["metric-active-teachers", schoolId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("teachers")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId!)
+        .eq("is_suspended", false);
+      return count ?? 0;
+    },
+    enabled: !!schoolId,
+  });
 
-          if (school) {
-            setSchoolName(school.name);
-          }
+  // Total teachers
+  const { data: totalTeachers = 0, isLoading: l4 } = useQuery({
+    queryKey: ["metric-total-teachers", schoolId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("teachers")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId!);
+      return count ?? 0;
+    },
+    enabled: !!schoolId,
+  });
 
-          // TODO: Fetch real metrics when tables are created
-          // For now, all metrics are 0
-          setMetrics({
-            enrolledStudents: 0,
-            totalStudents: 0,
-            activeTeachers: 0,
-            totalTeachers: 0,
-            families: 0,
-            subjects: 0,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching school data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Families
+  const { data: familiesCount = 0, isLoading: l5 } = useQuery({
+    queryKey: ["metric-families", schoolId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("family_schools")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId!);
+      return count ?? 0;
+    },
+    enabled: !!schoolId,
+  });
 
-    fetchSchoolData();
-  }, [user]);
+  // Subjects (not suspended)
+  const { data: subjectsCount = 0, isLoading: l6 } = useQuery({
+    queryKey: ["metric-subjects", schoolId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("school_subjects")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId!)
+        .eq("is_suspended", false);
+      return count ?? 0;
+    },
+    enabled: !!schoolId,
+  });
+
+  const loading = l1 || l2 || l3 || l4 || l5 || l6;
 
   return (
     <DashboardLayout>
@@ -71,8 +116,8 @@ export default function SchoolDashboard() {
           <h1 className="text-2xl font-bold text-foreground">
             Información General del Registro
           </h1>
-          {schoolName && (
-            <p className="text-muted-foreground mt-1">{schoolName}</p>
+        {school?.name && (
+            <p className="text-muted-foreground mt-1">{school.name}</p>
           )}
         </div>
 
@@ -80,26 +125,26 @@ export default function SchoolDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Estudiantes Inscritos"
-            value={loading ? "..." : metrics.enrolledStudents}
+            value={loading ? "..." : enrolledStudents}
             icon={<GraduationCap className="h-10 w-10" />}
             variant="blue"
           />
           <MetricCard
             title="Docentes Activos"
-            subtitle={`${metrics.totalTeachers} registrados`}
-            value={loading ? "..." : metrics.activeTeachers}
+            subtitle={`${totalTeachers} registrados`}
+            value={loading ? "..." : activeTeachers}
             icon={<UserCheck className="h-10 w-10" />}
             variant="cyan"
           />
           <MetricCard
             title="Familias"
-            value={loading ? "..." : metrics.families}
+            value={loading ? "..." : familiesCount}
             icon={<UsersRound className="h-10 w-10" />}
             variant="orange"
           />
           <MetricCard
             title="Materias"
-            value={loading ? "..." : metrics.subjects}
+            value={loading ? "..." : subjectsCount}
             icon={<BookOpen className="h-10 w-10" />}
             variant="purple"
           />
@@ -109,13 +154,13 @@ export default function SchoolDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <MetricCard
             title="Alumnos en el Sistema"
-            value={loading ? "..." : metrics.totalStudents}
+            value={loading ? "..." : totalStudents}
             icon={<Users className="h-10 w-10" />}
             variant="green"
           />
           <MetricCard
             title="Docentes Registrados"
-            value={loading ? "..." : metrics.totalTeachers}
+            value={loading ? "..." : totalTeachers}
             icon={<UserPlus className="h-10 w-10" />}
             variant="pink"
           />
