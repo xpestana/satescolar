@@ -624,6 +624,14 @@ export default function TeachersList() {
                                   </TooltipTrigger>
                                   <TooltipContent>Carnet</TooltipContent>
                                 </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenResendDialog(record)}>
+                                      <Mail className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Reenviar correo</TooltipContent>
+                                </Tooltip>
                               </div>
                             </TooltipProvider>
                           </TableCell>
