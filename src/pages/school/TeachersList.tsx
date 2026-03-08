@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown,
-  Eye, Edit, IdCard, Ban, CheckCircle, Plus, KeyRound, RefreshCw,
+  Eye, Edit, IdCard, Ban, CheckCircle, Plus, KeyRound, RefreshCw, Mail,
 } from "lucide-react";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
