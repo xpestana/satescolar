@@ -391,7 +391,11 @@ export default function TeachersList() {
   const handleOpenPasswordModal = (record: any) => {
     const fd = (record.form_data ?? {}) as Record<string, any>;
     const name = [fd.primer_nombre, fd.primer_apellido].filter(Boolean).join(" ") || "Docente";
-    setNewPassword("");
+    // Default password: raw document number (without prefix)
+    const rawDoc = record.document_id
+      ? (record.document_id.includes("-") ? record.document_id.split("-").slice(1).join("-") : record.document_id)
+      : "";
+    setNewPassword(rawDoc);
     setPasswordModal({ open: true, teacherId: record.id, teacherName: name });
   };
 
