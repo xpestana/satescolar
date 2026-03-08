@@ -96,6 +96,11 @@ export default function TeachersList() {
   });
   const [newPassword, setNewPassword] = useState("");
 
+  // Resend email confirmation dialog
+  const [resendDialog, setResendDialog] = useState<{ open: boolean; teacherId: string; teacherName: string }>({
+    open: false, teacherId: "", teacherName: "",
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor)
