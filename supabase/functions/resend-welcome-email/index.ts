@@ -221,6 +221,8 @@ Deno.serve(async (req) => {
       );
     }
 
+    const platformUrl = Deno.env.get("APP_URL")?.trim() || "https://app.satescolar.com";
+
     // Build and send email
     const html = buildWelcomeEmailHtml(
       schoolData.name,
@@ -228,7 +230,7 @@ Deno.serve(async (req) => {
       targetEmail,
       newPassword,
       role,
-      "https://satescolar.lovable.app"
+      platformUrl
     );
 
     const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
