@@ -309,12 +309,37 @@ export default function GradesConsultation() {
         </div>
 
         <div>
-          <label className="text-sm font-medium text-foreground mb-1.5 block">Sección</label>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">
+            {selectedSubjectIsGcrp ? "Docente" : "Sección"}
+          </label>
           {selectedSubjectIsGcrp ? (
-            <Button variant="outline" disabled className="w-full justify-between font-normal opacity-60">
-              No aplica (GCRP)
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
+            <Popover open={openGcrpTeacher} onOpenChange={setOpenGcrpTeacher}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={openGcrpTeacher} className="w-full justify-between font-normal">
+                  {selectedGcrpAssignment
+                    ? gcrpAssignments.find(a => a.id === selectedGcrpAssignment)?.teacherName || "Seleccione docente"
+                    : "Seleccione docente"}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar docente..." />
+                  <CommandList>
+                    <CommandEmpty>No se encontró.</CommandEmpty>
+                    <CommandGroup>
+                      {gcrpAssignments.map((a) => (
+                        <CommandItem key={a.id} value={a.teacherName} onSelect={() => { setSelectedGcrpAssignment(a.id); setOpenGcrpTeacher(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", selectedGcrpAssignment === a.id ? "opacity-100" : "opacity-0")} />
+                          {a.teacherName}
+                          {a.teacherDoc && <span className="ml-1 text-muted-foreground text-xs">({a.teacherDoc})</span>}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           ) : (
             <Popover open={openSection} onOpenChange={setOpenSection}>
               <PopoverTrigger asChild>
