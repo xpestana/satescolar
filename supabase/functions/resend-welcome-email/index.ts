@@ -19,7 +19,7 @@ function buildWelcomeEmailHtml(
   userEmail: string,
   password: string,
   role: "representante" | "docente",
-  platformUrl: string
+  loginUrl: string
 ): string {
   const logoBlock = schoolLogoUrl
     ? `<img src="${schoolLogoUrl}" alt="${schoolName}" style="max-height:80px;max-width:200px;margin-bottom:12px;" />`
