@@ -269,7 +269,10 @@ export default function GradesConsultation() {
                     {subjects.map((s) => (
                       <CommandItem key={s.id} value={s.name} onSelect={() => { setSelectedSubject(s.id); setOpenSubject(false); }}>
                         <Check className={cn("mr-2 h-4 w-4", selectedSubject === s.id ? "opacity-100" : "opacity-0")} />
-                        {s.name}
+                        <span className="flex-1">{s.name}</span>
+                        {s.subject_type === "gcrp" && (
+                          <Badge variant="default" className="ml-2 text-[10px] px-1.5 py-0">GCRP</Badge>
+                        )}
                       </CommandItem>
                     ))}
                   </CommandGroup>
