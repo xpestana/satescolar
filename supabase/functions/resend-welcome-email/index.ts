@@ -131,11 +131,13 @@ Deno.serve(async (req) => {
     let targetEmail: string;
     let role: "representante" | "docente";
 
+    let teacherDocumentId: string | null = null;
+
     if (target_type === "teacher") {
-      // Get teacher data
+      // Get teacher data including document_id
       const { data: teacher, error: teacherError } = await supabaseAdmin
         .from("teachers")
-        .select("user_id, email")
+        .select("user_id, email, document_id")
         .eq("id", family_id)
         .eq("school_id", roleData.school_id)
         .single();
@@ -149,6 +151,7 @@ Deno.serve(async (req) => {
 
       targetUserId = teacher.user_id;
       targetEmail = teacher.email || "";
+      teacherDocumentId = teacher.document_id || null;
       role = "docente";
     } else {
       // Get family data
@@ -195,8 +198,16 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate new password and update
-    const newPassword = generateRandomPassword();
+    // For teachers: use document_id (without prefix) as password; for families: generate random
+    let newPassword: string;
+    if (target_type === "teacher" && teacherDocumentId) {
+      const rawDoc = teacherDocumentId.includes("-")
+        ? teacherDocumentId.split("-").slice(1).join("-")
+        : teacherDocumentId;
+      newPassword = rawDoc;
+    } else {
+      newPassword = generateRandomPassword();
+    }
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       targetUserId,
       { password: newPassword }
