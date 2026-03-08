@@ -92,6 +92,8 @@ export default function GradesConsultation() {
     enabled: !!schoolId,
   });
 
+  const selectedSubjectIsGcrp = subjects.find(s => s.id === selectedSubject)?.subject_type === "gcrp";
+
   // For GCRP: fetch all assignments with teacher info so user can pick one
   const { data: gcrpAssignments = [] } = useQuery({
     queryKey: ["gcrp-assignments-lookup", effectiveYear, selectedSubject, schoolId],
