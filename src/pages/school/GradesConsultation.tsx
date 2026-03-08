@@ -284,30 +284,37 @@ export default function GradesConsultation() {
 
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">Sección</label>
-          <Popover open={openSection} onOpenChange={setOpenSection}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={openSection} className="w-full justify-between font-normal">
-                {selectedSection ? `${GRADE_LABELS[sections.find(s => s.id === selectedSection)?.grade_level || ""] || ""} - ${sections.find(s => s.id === selectedSection)?.name || ""}` : "Seleccione sección"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-              <Command>
-                <CommandInput placeholder="Buscar sección..." />
-                <CommandList>
-                  <CommandEmpty>No se encontró.</CommandEmpty>
-                  <CommandGroup>
-                    {sections.map((s) => (
-                      <CommandItem key={s.id} value={`${GRADE_LABELS[s.grade_level] || s.grade_level} ${s.name}`} onSelect={() => { setSelectedSection(s.id); setOpenSection(false); }}>
-                        <Check className={cn("mr-2 h-4 w-4", selectedSection === s.id ? "opacity-100" : "opacity-0")} />
-                        {GRADE_LABELS[s.grade_level] || s.grade_level} - {s.name}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          {selectedSubjectIsGcrp ? (
+            <Button variant="outline" disabled className="w-full justify-between font-normal opacity-60">
+              No aplica (GCRP)
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          ) : (
+            <Popover open={openSection} onOpenChange={setOpenSection}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={openSection} className="w-full justify-between font-normal">
+                  {selectedSection ? `${GRADE_LABELS[sections.find(s => s.id === selectedSection)?.grade_level || ""] || ""} - ${sections.find(s => s.id === selectedSection)?.name || ""}` : "Seleccione sección"}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar sección..." />
+                  <CommandList>
+                    <CommandEmpty>No se encontró.</CommandEmpty>
+                    <CommandGroup>
+                      {sections.map((s) => (
+                        <CommandItem key={s.id} value={`${GRADE_LABELS[s.grade_level] || s.grade_level} ${s.name}`} onSelect={() => { setSelectedSection(s.id); setOpenSection(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", selectedSection === s.id ? "opacity-100" : "opacity-0")} />
+                          {GRADE_LABELS[s.grade_level] || s.grade_level} - {s.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         <div>
