@@ -116,8 +116,8 @@ export default function SchoolDashboard() {
           <h1 className="text-2xl font-bold text-foreground">
             Información General del Registro
           </h1>
-          {schoolName && (
-            <p className="text-muted-foreground mt-1">{schoolName}</p>
+        {school?.name && (
+            <p className="text-muted-foreground mt-1">{school.name}</p>
           )}
         </div>
 
@@ -125,26 +125,26 @@ export default function SchoolDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Estudiantes Inscritos"
-            value={loading ? "..." : metrics.enrolledStudents}
+            value={loading ? "..." : enrolledStudents}
             icon={<GraduationCap className="h-10 w-10" />}
             variant="blue"
           />
           <MetricCard
             title="Docentes Activos"
-            subtitle={`${metrics.totalTeachers} registrados`}
-            value={loading ? "..." : metrics.activeTeachers}
+            subtitle={`${totalTeachers} registrados`}
+            value={loading ? "..." : activeTeachers}
             icon={<UserCheck className="h-10 w-10" />}
             variant="cyan"
           />
           <MetricCard
             title="Familias"
-            value={loading ? "..." : metrics.families}
+            value={loading ? "..." : familiesCount}
             icon={<UsersRound className="h-10 w-10" />}
             variant="orange"
           />
           <MetricCard
             title="Materias"
-            value={loading ? "..." : metrics.subjects}
+            value={loading ? "..." : subjectsCount}
             icon={<BookOpen className="h-10 w-10" />}
             variant="purple"
           />
@@ -154,13 +154,13 @@ export default function SchoolDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <MetricCard
             title="Alumnos en el Sistema"
-            value={loading ? "..." : metrics.totalStudents}
+            value={loading ? "..." : totalStudents}
             icon={<Users className="h-10 w-10" />}
             variant="green"
           />
           <MetricCard
             title="Docentes Registrados"
-            value={loading ? "..." : metrics.totalTeachers}
+            value={loading ? "..." : totalTeachers}
             icon={<UserPlus className="h-10 w-10" />}
             variant="pink"
           />
