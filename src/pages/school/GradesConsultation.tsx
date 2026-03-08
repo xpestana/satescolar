@@ -393,7 +393,11 @@ export default function GradesConsultation() {
       {!filtersComplete ? (
         <div className="text-center py-12 border rounded-md bg-muted/20">
           <Search className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-          <p className="text-muted-foreground">Seleccione año escolar, área y sección para consultar las notas.</p>
+          <p className="text-muted-foreground">
+            {selectedSubjectIsGcrp
+              ? "Seleccione año escolar, área y docente para consultar las notas."
+              : "Seleccione año escolar, área y sección para consultar las notas."}
+          </p>
         </div>
       ) : loading ? (
         <div className="flex items-center justify-center py-12">
