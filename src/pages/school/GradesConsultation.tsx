@@ -36,12 +36,14 @@ export default function GradesConsultation() {
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("");
   const [selectedSection, setSelectedSection] = useState<string>("");
+  const [selectedGcrpAssignment, setSelectedGcrpAssignment] = useState<string>("");
   const [selectedMomento, setSelectedMomento] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [gradeModal, setGradeModal] = useState<{ studentName: string; itemName: string; value: string } | null>(null);
   const [openYear, setOpenYear] = useState(false);
   const [openSubject, setOpenSubject] = useState(false);
   const [openSection, setOpenSection] = useState(false);
+  const [openGcrpTeacher, setOpenGcrpTeacher] = useState(false);
   // School years
   const { data: schoolYears = [] } = useQuery({
     queryKey: ["school-years", schoolId],
@@ -90,30 +92,55 @@ export default function GradesConsultation() {
     enabled: !!schoolId,
   });
 
-  // Find the assignment(s) for the selected filters
-  const { data: assignments = [], isLoading: assignmentLoading } = useQuery({
-    queryKey: ["assignment-lookup", effectiveYear, selectedSubject, selectedSection],
+  const selectedSubjectIsGcrp = subjects.find(s => s.id === selectedSubject)?.subject_type === "gcrp";
+
+  // For GCRP: fetch all assignments with teacher info so user can pick one
+  const { data: gcrpAssignments = [] } = useQuery({
+    queryKey: ["gcrp-assignments-lookup", effectiveYear, selectedSubject, schoolId],
     queryFn: async () => {
-      let query = supabase
+      const { data } = await supabase
         .from("subject_teacher_assignments")
-        .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
+        .select("id, teacher:teacher_id(id, form_data, document_id)")
         .eq("school_year_id", effectiveYear)
         .eq("subject_id", selectedSubject)
-        .eq("school_id", schoolId!);
-
-      // For regular subjects filter by section, for GCRP section_id is null
-      const selectedSubjectData = subjects.find(s => s.id === selectedSubject);
-      if (selectedSubjectData && (selectedSubjectData as any).subject_type !== "gcrp") {
-        query = query.eq("section_id", selectedSection);
-      } else {
-        query = query.is("section_id", null);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+        .eq("school_id", schoolId!)
+        .eq("is_suspended", false)
+        .is("section_id", null);
+      return (data || []).map((a: any) => {
+        const fd = a.teacher?.form_data as Record<string, any> | null;
+        const name = `${fd?.nombre || fd?.primer_nombre || ""} ${fd?.apellido || fd?.primer_apellido || ""}`.trim() || "Sin nombre";
+        return { id: a.id, teacherName: name, teacherDoc: a.teacher?.document_id };
+      });
     },
-    enabled: !!effectiveYear && !!selectedSubject && !!schoolId && (!!selectedSection || !!(subjects.find(s => s.id === selectedSubject) && (subjects.find(s => s.id === selectedSubject) as any).subject_type === "gcrp")),
+    enabled: !!effectiveYear && !!selectedSubject && !!schoolId && selectedSubjectIsGcrp,
+  });
+
+  // Find the assignment(s) for the selected filters
+  const { data: assignments = [], isLoading: assignmentLoading } = useQuery({
+    queryKey: ["assignment-lookup", effectiveYear, selectedSubject, selectedSection, selectedGcrpAssignment],
+    queryFn: async () => {
+      if (selectedSubjectIsGcrp) {
+        // For GCRP, use the selected assignment only
+        if (!selectedGcrpAssignment) return [];
+        const { data, error } = await supabase
+          .from("subject_teacher_assignments")
+          .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
+          .eq("id", selectedGcrpAssignment);
+        if (error) throw error;
+        return data || [];
+      } else {
+        const { data, error } = await supabase
+          .from("subject_teacher_assignments")
+          .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
+          .eq("school_year_id", effectiveYear)
+          .eq("subject_id", selectedSubject)
+          .eq("school_id", schoolId!)
+          .eq("section_id", selectedSection);
+        if (error) throw error;
+        return data || [];
+      }
+    },
+    enabled: !!effectiveYear && !!selectedSubject && !!schoolId && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection),
   });
 
   const assignment = assignments.length > 0 ? assignments[0] : null;
@@ -121,7 +148,7 @@ export default function GradesConsultation() {
   const isGcrpQuery = assignment?.subject?.subject_type === "gcrp";
 
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
-  const isNumeric = gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false;
+  const isNumeric = isGcrpQuery || (gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false);
 
   // Plan items for the momento (across all assignments for this subject+section)
   const { data: planItems = [], isLoading: planLoading } = useQuery({
@@ -202,14 +229,15 @@ export default function GradesConsultation() {
     );
   }, [students, searchTerm]);
 
-  const selectedSubjectIsGcrp = subjects.find(s => s.id === selectedSubject)?.subject_type === "gcrp";
-  const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp || !!selectedSection);
+  const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection);
   const loading = assignmentLoading || planLoading || studentsLoading || gradesLoading;
 
   const selectedSectionData = sections.find((s) => s.id === selectedSection);
-  const sectionLabel = selectedSectionData
-    ? `${GRADE_LABELS[selectedSectionData.grade_level] || selectedSectionData.grade_level} - Sección ${selectedSectionData.name}`
-    : "";
+  const sectionLabel = selectedSubjectIsGcrp
+    ? `GCRP — ${gcrpAssignments.find(a => a.id === selectedGcrpAssignment)?.teacherName || "Docente"}`
+    : selectedSectionData
+      ? `${GRADE_LABELS[selectedSectionData.grade_level] || selectedSectionData.grade_level} - Sección ${selectedSectionData.name}`
+      : "";
 
   return (
     <DashboardLayout>
@@ -267,7 +295,7 @@ export default function GradesConsultation() {
                   <CommandEmpty>No se encontró.</CommandEmpty>
                   <CommandGroup>
                     {subjects.map((s) => (
-                      <CommandItem key={s.id} value={s.name} onSelect={() => { setSelectedSubject(s.id); if (s.subject_type === "gcrp") setSelectedSection(""); setOpenSubject(false); }}>
+                      <CommandItem key={s.id} value={s.name} onSelect={() => { setSelectedSubject(s.id); if (s.subject_type === "gcrp") { setSelectedSection(""); setSelectedGcrpAssignment(""); } else { setSelectedGcrpAssignment(""); } setOpenSubject(false); }}>
                         <Check className={cn("mr-2 h-4 w-4", selectedSubject === s.id ? "opacity-100" : "opacity-0")} />
                         <span className="flex-1">{s.name}</span>
                         {s.subject_type === "gcrp" && (
@@ -283,12 +311,37 @@ export default function GradesConsultation() {
         </div>
 
         <div>
-          <label className="text-sm font-medium text-foreground mb-1.5 block">Sección</label>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">
+            {selectedSubjectIsGcrp ? "Docente" : "Sección"}
+          </label>
           {selectedSubjectIsGcrp ? (
-            <Button variant="outline" disabled className="w-full justify-between font-normal opacity-60">
-              No aplica (GCRP)
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
+            <Popover open={openGcrpTeacher} onOpenChange={setOpenGcrpTeacher}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={openGcrpTeacher} className="w-full justify-between font-normal">
+                  {selectedGcrpAssignment
+                    ? gcrpAssignments.find(a => a.id === selectedGcrpAssignment)?.teacherName || "Seleccione docente"
+                    : "Seleccione docente"}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                <Command>
+                  <CommandInput placeholder="Buscar docente..." />
+                  <CommandList>
+                    <CommandEmpty>No se encontró.</CommandEmpty>
+                    <CommandGroup>
+                      {gcrpAssignments.map((a) => (
+                        <CommandItem key={a.id} value={a.teacherName} onSelect={() => { setSelectedGcrpAssignment(a.id); setOpenGcrpTeacher(false); }}>
+                          <Check className={cn("mr-2 h-4 w-4", selectedGcrpAssignment === a.id ? "opacity-100" : "opacity-0")} />
+                          {a.teacherName}
+                          {a.teacherDoc && <span className="ml-1 text-muted-foreground text-xs">({a.teacherDoc})</span>}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           ) : (
             <Popover open={openSection} onOpenChange={setOpenSection}>
               <PopoverTrigger asChild>
@@ -340,7 +393,11 @@ export default function GradesConsultation() {
       {!filtersComplete ? (
         <div className="text-center py-12 border rounded-md bg-muted/20">
           <Search className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-          <p className="text-muted-foreground">Seleccione año escolar, área y sección para consultar las notas.</p>
+          <p className="text-muted-foreground">
+            {selectedSubjectIsGcrp
+              ? "Seleccione año escolar, área y docente para consultar las notas."
+              : "Seleccione año escolar, área y sección para consultar las notas."}
+          </p>
         </div>
       ) : loading ? (
         <div className="flex items-center justify-center py-12">
