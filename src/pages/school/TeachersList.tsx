@@ -427,6 +427,32 @@ export default function TeachersList() {
     passwordMutation.mutate({ teacherId: passwordModal.teacherId, password: newPassword });
   };
 
+  // Resend welcome email
+  const resendEmailMutation = useMutation({
+    mutationFn: async (teacherId: string) => {
+      const response = await supabase.functions.invoke("resend-welcome-email", {
+        body: { family_id: teacherId, target_type: "teacher" },
+      });
+      if (response.error) throw new Error(response.error.message);
+      const result = response.data;
+      if (result?.error) throw new Error(result.error);
+      return result;
+    },
+    onSuccess: () => {
+      toast.success("Correo de bienvenida reenviado exitosamente");
+      setResendDialog({ open: false, teacherId: "", teacherName: "" });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Error al reenviar el correo");
+    },
+  });
+
+  const handleOpenResendDialog = (record: any) => {
+    const fd = (record.form_data ?? {}) as Record<string, any>;
+    const name = [fd.primer_nombre, fd.primer_apellido].filter(Boolean).join(" ") || "Docente";
+    setResendDialog({ open: true, teacherId: record.id, teacherName: name });
+  };
+
   const isLoading = schoolLoading || teachersLoading;
 
   const teacherColumns = useMemo<ColumnDef[]>(() => {
