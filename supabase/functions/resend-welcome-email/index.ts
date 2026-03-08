@@ -260,6 +260,11 @@ Deno.serve(async (req) => {
       from: `${fromName} <${fromEmail}>`,
       to: [targetEmail],
       subject: `Bienvenido a ${schoolData.name} - SAT Escolar`,
+      headers: {
+        "X-Mailin-track": "0",
+        "X-Mailgun-Track-Clicks": "no",
+        "X-SMTPAPI": '{"filters":{"clicktrack":{"settings":{"enable":0}}}}',
+      },
       html,
     });
     await client.close();
