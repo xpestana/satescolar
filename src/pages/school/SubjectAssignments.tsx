@@ -224,32 +224,64 @@ export default function SubjectAssignments() {
     onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
   });
 
-  // Create GCRP assignment
+  // Create GCRP assignment (or add to existing one)
   const createGcrpMutation = useMutation({
     mutationFn: async () => {
       if (!formSubjectId || !formTeacherId) throw new Error("Selecciona área y docente");
       if (gcrpSelectedStudents.size === 0) throw new Error("Selecciona al menos un estudiante");
 
-      // Create assignment without section_id
-      const { data: newAssignment, error } = await supabase.from("subject_teacher_assignments" as any).insert({
-        school_id: schoolId, subject_id: formSubjectId, teacher_id: formTeacherId,
-        school_year_id: selectedYearId, section_id: null,
-      } as any).select("id").single();
-      if (error) throw error;
+      // Check if an assignment already exists for this teacher+subject+year (GCRP = no section)
+      const { data: existingAssignment } = await supabase
+        .from("subject_teacher_assignments" as any)
+        .select("id")
+        .eq("school_id", schoolId!)
+        .eq("subject_id", formSubjectId)
+        .eq("teacher_id", formTeacherId)
+        .eq("school_year_id", selectedYearId)
+        .is("section_id", null)
+        .maybeSingle();
 
-      // Insert students
-      const studentRows = Array.from(gcrpSelectedStudents.values()).map(s => ({
-        assignment_id: (newAssignment as any).id,
-        student_id: s.student_id,
-        school_id: schoolId,
-      }));
-      const { error: insertError } = await supabase.from("gcrp_assignment_students" as any).insert(studentRows as any);
-      if (insertError) throw insertError;
+      let assignmentId: string;
+
+      if (existingAssignment) {
+        assignmentId = (existingAssignment as any).id;
+        // Get existing student IDs to avoid duplicates
+        const { data: existingStudents } = await supabase
+          .from("gcrp_assignment_students" as any)
+          .select("student_id")
+          .eq("assignment_id", assignmentId);
+        const existingIds = new Set(((existingStudents || []) as any[]).map((s: any) => s.student_id));
+        const newStudents = Array.from(gcrpSelectedStudents.values()).filter(s => !existingIds.has(s.student_id));
+        if (newStudents.length === 0) throw new Error("Todos los estudiantes seleccionados ya están asignados a este docente");
+        const studentRows = newStudents.map(s => ({
+          assignment_id: assignmentId,
+          student_id: s.student_id,
+          school_id: schoolId,
+        }));
+        const { error: insertError } = await supabase.from("gcrp_assignment_students" as any).insert(studentRows as any);
+        if (insertError) throw insertError;
+      } else {
+        // Create new assignment without section_id
+        const { data: newAssignment, error } = await supabase.from("subject_teacher_assignments" as any).insert({
+          school_id: schoolId, subject_id: formSubjectId, teacher_id: formTeacherId,
+          school_year_id: selectedYearId, section_id: null,
+        } as any).select("id").single();
+        if (error) throw error;
+        assignmentId = (newAssignment as any).id;
+
+        const studentRows = Array.from(gcrpSelectedStudents.values()).map(s => ({
+          assignment_id: assignmentId,
+          student_id: s.student_id,
+          school_id: schoolId,
+        }));
+        const { error: insertError } = await supabase.from("gcrp_assignment_students" as any).insert(studentRows as any);
+        if (insertError) throw insertError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["subject-teacher-assignments", schoolId, selectedYearId] });
       queryClient.invalidateQueries({ queryKey: ["gcrp-counts"] });
-      toast({ title: "Asignación GCRP creada", description: `Área asignada con ${gcrpSelectedStudents.size} estudiantes` });
+      toast({ title: "Asignación GCRP actualizada", description: `Estudiantes asignados correctamente` });
       closeDialog();
     },
     onError: (err: any) => toast({ variant: "destructive", title: "Error", description: err.message }),
