@@ -233,9 +233,11 @@ export default function GradesConsultation() {
   const loading = assignmentLoading || planLoading || studentsLoading || gradesLoading;
 
   const selectedSectionData = sections.find((s) => s.id === selectedSection);
-  const sectionLabel = selectedSectionData
-    ? `${GRADE_LABELS[selectedSectionData.grade_level] || selectedSectionData.grade_level} - Sección ${selectedSectionData.name}`
-    : "";
+  const sectionLabel = selectedSubjectIsGcrp
+    ? `GCRP — ${gcrpAssignments.find(a => a.id === selectedGcrpAssignment)?.teacherName || "Docente"}`
+    : selectedSectionData
+      ? `${GRADE_LABELS[selectedSectionData.grade_level] || selectedSectionData.grade_level} - Sección ${selectedSectionData.name}`
+      : "";
 
   return (
     <DashboardLayout>
