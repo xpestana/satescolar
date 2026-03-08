@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown,
-  Eye, Edit, IdCard, Ban, CheckCircle, Plus, KeyRound, RefreshCw,
+  Eye, Edit, IdCard, Ban, CheckCircle, Plus, KeyRound, RefreshCw, Mail,
 } from "lucide-react";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
@@ -95,6 +95,11 @@ export default function TeachersList() {
     open: false, teacherId: "", teacherName: "",
   });
   const [newPassword, setNewPassword] = useState("");
+
+  // Resend email confirmation dialog
+  const [resendDialog, setResendDialog] = useState<{ open: boolean; teacherId: string; teacherName: string }>({
+    open: false, teacherId: "", teacherName: "",
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -386,7 +391,11 @@ export default function TeachersList() {
   const handleOpenPasswordModal = (record: any) => {
     const fd = (record.form_data ?? {}) as Record<string, any>;
     const name = [fd.primer_nombre, fd.primer_apellido].filter(Boolean).join(" ") || "Docente";
-    setNewPassword("");
+    // Default password: raw document number (without prefix)
+    const rawDoc = record.document_id
+      ? (record.document_id.includes("-") ? record.document_id.split("-").slice(1).join("-") : record.document_id)
+      : "";
+    setNewPassword(rawDoc);
     setPasswordModal({ open: true, teacherId: record.id, teacherName: name });
   };
 
@@ -416,6 +425,32 @@ export default function TeachersList() {
       return;
     }
     passwordMutation.mutate({ teacherId: passwordModal.teacherId, password: newPassword });
+  };
+
+  // Resend welcome email
+  const resendEmailMutation = useMutation({
+    mutationFn: async (teacherId: string) => {
+      const response = await supabase.functions.invoke("resend-welcome-email", {
+        body: { family_id: teacherId, target_type: "teacher" },
+      });
+      if (response.error) throw new Error(response.error.message);
+      const result = response.data;
+      if (result?.error) throw new Error(result.error);
+      return result;
+    },
+    onSuccess: () => {
+      toast.success("Correo de bienvenida reenviado exitosamente");
+      setResendDialog({ open: false, teacherId: "", teacherName: "" });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Error al reenviar el correo");
+    },
+  });
+
+  const handleOpenResendDialog = (record: any) => {
+    const fd = (record.form_data ?? {}) as Record<string, any>;
+    const name = [fd.primer_nombre, fd.primer_apellido].filter(Boolean).join(" ") || "Docente";
+    setResendDialog({ open: true, teacherId: record.id, teacherName: name });
   };
 
   const isLoading = schoolLoading || teachersLoading;
@@ -589,6 +624,14 @@ export default function TeachersList() {
                                   </TooltipTrigger>
                                   <TooltipContent>Carnet</TooltipContent>
                                 </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenResendDialog(record)}>
+                                      <Mail className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Reenviar correo</TooltipContent>
+                                </Tooltip>
                               </div>
                             </TooltipProvider>
                           </TableCell>
@@ -652,6 +695,26 @@ export default function TeachersList() {
             </Button>
             <Button onClick={handleSavePassword} disabled={passwordMutation.isPending}>
               {passwordMutation.isPending ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resend email confirmation dialog */}
+      <Dialog open={resendDialog.open} onOpenChange={(open) => !open && setResendDialog({ open: false, teacherId: "", teacherName: "" })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reenviar Correo de Bienvenida</DialogTitle>
+            <DialogDescription>
+              ¿Desea reenviar el correo de bienvenida a <strong>{resendDialog.teacherName}</strong>? Se generará una nueva contraseña y la anterior será invalidada.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResendDialog({ open: false, teacherId: "", teacherName: "" })}>
+              Cancelar
+            </Button>
+            <Button onClick={() => resendEmailMutation.mutate(resendDialog.teacherId)} disabled={resendEmailMutation.isPending}>
+              {resendEmailMutation.isPending ? "Enviando..." : "Reenviar"}
             </Button>
           </DialogFooter>
         </DialogContent>
