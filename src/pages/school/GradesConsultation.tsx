@@ -229,8 +229,7 @@ export default function GradesConsultation() {
     );
   }, [students, searchTerm]);
 
-  const selectedSubjectIsGcrp = subjects.find(s => s.id === selectedSubject)?.subject_type === "gcrp";
-  const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp || !!selectedSection);
+  const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection);
   const loading = assignmentLoading || planLoading || studentsLoading || gradesLoading;
 
   const selectedSectionData = sections.find((s) => s.id === selectedSection);
