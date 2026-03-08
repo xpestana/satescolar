@@ -293,7 +293,7 @@ export default function GradesConsultation() {
                   <CommandEmpty>No se encontró.</CommandEmpty>
                   <CommandGroup>
                     {subjects.map((s) => (
-                      <CommandItem key={s.id} value={s.name} onSelect={() => { setSelectedSubject(s.id); if (s.subject_type === "gcrp") setSelectedSection(""); setOpenSubject(false); }}>
+                      <CommandItem key={s.id} value={s.name} onSelect={() => { setSelectedSubject(s.id); if (s.subject_type === "gcrp") { setSelectedSection(""); setSelectedGcrpAssignment(""); } else { setSelectedGcrpAssignment(""); } setOpenSubject(false); }}>
                         <Check className={cn("mr-2 h-4 w-4", selectedSubject === s.id ? "opacity-100" : "opacity-0")} />
                         <span className="flex-1">{s.name}</span>
                         {s.subject_type === "gcrp" && (
