@@ -505,6 +505,61 @@ export type Database = {
           },
         ]
       }
+      final_grades: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          grade_value: string | null
+          id: string
+          momento: number
+          school_id: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          grade_value?: string | null
+          id?: string
+          momento?: number
+          school_id: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          grade_value?: string | null
+          id?: string
+          momento?: number
+          school_id?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "final_grades_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "final_grades_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "final_grades_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_field_groups: {
         Row: {
           created_at: string
