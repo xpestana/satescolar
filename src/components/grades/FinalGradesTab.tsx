@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Loader2, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Loader2, Check, Save } from "lucide-react";
 import { toast } from "sonner";
 
 const NUMERIC_GRADES = new Set([
@@ -37,6 +38,9 @@ export default function FinalGradesTab({
   const [editedGrades, setEditedGrades] = useState<Record<string, string>>({});
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
+  const [savingAll, setSavingAll] = useState(false);
+  // Track what's actually in DB: key -> grade_value
+  const [dbValues, setDbValues] = useState<Record<string, string>>({});
 
   const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection);
 
@@ -146,7 +150,7 @@ export default function FinalGradesTab({
     enabled: assignmentIds.length > 0,
   });
 
-  // Build grades map: studentId-planItemId -> grade_value
+  // Build grades map
   const gradesMap = useMemo(() => {
     const map: Record<string, string> = {};
     allGrades.forEach((g: any) => {
@@ -183,43 +187,43 @@ export default function FinalGradesTab({
     if (gradeValues.length === 0) return "";
 
     if (hasPercentages) {
-      // Weighted sum: grade * percentage / 100
       let total = 0;
       for (const gv of gradeValues) {
         total += gv.value * ((gv.percentage || 0) / 100);
       }
       return total.toFixed(2);
     } else {
-      // Average
       const sum = gradeValues.reduce((acc, gv) => acc + gv.value, 0);
       return (sum / gradeValues.length).toFixed(2);
     }
   }, [planByMomento, gradesMap]);
 
-  // Initialize edited grades from existing final grades or calculated values
+  // Initialize edited grades AND dbValues from existing final grades or calculated values
   useEffect(() => {
     if (!students.length || assignmentIds.length === 0) return;
 
-    const map: Record<string, string> = {};
+    const edited: Record<string, string> = {};
+    const db: Record<string, string> = {};
     const assignmentId = assignmentIds[0];
 
     for (const s of students) {
       for (const m of [1, 2, 3]) {
         const key = `${s.student_id}-${m}`;
-        // Check if there's a saved final grade
         const existing = existingFinalGrades.find(
           (fg: any) => fg.student_id === s.student_id && fg.momento === m && fg.assignment_id === assignmentId
         );
         if (existing && existing.grade_value != null) {
-          map[key] = existing.grade_value;
+          edited[key] = existing.grade_value;
+          db[key] = existing.grade_value;
         } else {
-          // Calculate from teacher grades
           const calc = calculateDefinitive(s.student_id, m);
-          map[key] = calc;
+          edited[key] = calc;
+          // Not in DB yet
         }
       }
     }
-    setEditedGrades(map);
+    setEditedGrades(edited);
+    setDbValues(db);
   }, [students, existingFinalGrades, calculateDefinitive, assignmentIds]);
 
   const handleGradeChange = (studentId: string, momento: number, value: string) => {
@@ -230,15 +234,39 @@ export default function FinalGradesTab({
     setEditedGrades(prev => ({ ...prev, [`${studentId}-${momento}`]: value }));
   };
 
+  // Check if a key is dirty (differs from DB)
+  const isDirty = useCallback((key: string): boolean => {
+    const current = (editedGrades[key] || "").trim();
+    const saved = (dbValues[key] || "").trim();
+    if (current === "" && saved === "") return false;
+    return current !== saved;
+  }, [editedGrades, dbValues]);
+
+  // Count dirty per momento
+  const dirtyCountByMomento = useMemo(() => {
+    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0 };
+    for (const s of students) {
+      for (const m of [1, 2, 3]) {
+        if (isDirty(`${s.student_id}-${m}`)) counts[m]++;
+      }
+    }
+    return counts;
+  }, [students, isDirty]);
+
+  const totalDirty = dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
+
   const saveGrade = useCallback(async (studentId: string, momento: number) => {
     if (assignmentIds.length === 0) return;
     const key = `${studentId}-${momento}`;
-    const val = editedGrades[key];
+    const val = (editedGrades[key] || "").trim();
     const assignmentId = assignmentIds[0];
+
+    // Skip if not dirty
+    if (!isDirty(key)) return;
 
     setSavingKeys(prev => new Set(prev).add(key));
     try {
-      if (val && val.trim() !== "") {
+      if (val !== "") {
         await supabase
           .from("final_grades" as any)
           .upsert({
@@ -246,9 +274,10 @@ export default function FinalGradesTab({
             assignment_id: assignmentId,
             school_id: schoolId,
             momento,
-            grade_value: val.trim(),
+            grade_value: val,
             updated_at: new Date().toISOString(),
           } as any, { onConflict: "student_id,assignment_id,momento" });
+        setDbValues(prev => ({ ...prev, [key]: val }));
       } else {
         await supabase
           .from("final_grades" as any)
@@ -256,6 +285,7 @@ export default function FinalGradesTab({
           .eq("student_id", studentId)
           .eq("assignment_id", assignmentId)
           .eq("momento", momento);
+        setDbValues(prev => { const n = { ...prev }; delete n[key]; return n; });
       }
       setSavedKeys(prev => {
         const next = new Set(prev).add(key);
@@ -267,7 +297,73 @@ export default function FinalGradesTab({
     } finally {
       setSavingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
-  }, [assignmentIds, editedGrades, schoolId]);
+  }, [assignmentIds, editedGrades, schoolId, isDirty]);
+
+  const saveAll = useCallback(async () => {
+    if (assignmentIds.length === 0 || totalDirty === 0) return;
+    const assignmentId = assignmentIds[0];
+    setSavingAll(true);
+
+    try {
+      const upserts: any[] = [];
+      const deletes: { studentId: string; momento: number }[] = [];
+
+      for (const s of students) {
+        for (const m of [1, 2, 3]) {
+          const key = `${s.student_id}-${m}`;
+          if (!isDirty(key)) continue;
+          const val = (editedGrades[key] || "").trim();
+          if (val !== "") {
+            upserts.push({
+              student_id: s.student_id,
+              assignment_id: assignmentId,
+              school_id: schoolId,
+              momento: m,
+              grade_value: val,
+              updated_at: new Date().toISOString(),
+            });
+          } else if (dbValues[key]) {
+            deletes.push({ studentId: s.student_id, momento: m });
+          }
+        }
+      }
+
+      // Batch upsert
+      if (upserts.length > 0) {
+        await supabase
+          .from("final_grades" as any)
+          .upsert(upserts as any, { onConflict: "student_id,assignment_id,momento" });
+      }
+
+      // Delete individually (no batch delete with multiple conditions)
+      for (const d of deletes) {
+        await supabase
+          .from("final_grades" as any)
+          .delete()
+          .eq("student_id", d.studentId)
+          .eq("assignment_id", assignmentId)
+          .eq("momento", d.momento);
+      }
+
+      // Update dbValues
+      setDbValues(prev => {
+        const next = { ...prev };
+        for (const u of upserts) {
+          next[`${u.student_id}-${u.momento}`] = u.grade_value;
+        }
+        for (const d of deletes) {
+          delete next[`${d.studentId}-${d.momento}`];
+        }
+        return next;
+      });
+
+      toast.success(`${upserts.length + deletes.length} notas guardadas correctamente`);
+    } catch {
+      toast.error("Error al guardar notas");
+    } finally {
+      setSavingAll(false);
+    }
+  }, [assignmentIds, students, editedGrades, dbValues, schoolId, isDirty, totalDirty]);
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return students;
@@ -309,7 +405,6 @@ export default function FinalGradesTab({
     );
   }
 
-  // Check which momentos have plan items
   const momentosWithPlan = [1, 2, 3].map(m => ({
     momento: m,
     hasPlan: (planByMomento[m] || []).length > 0,
@@ -329,6 +424,15 @@ export default function FinalGradesTab({
               <Loader2 className="h-4 w-4 animate-spin" /> Guardando...
             </div>
           )}
+          <Button
+            size="sm"
+            onClick={saveAll}
+            disabled={totalDirty === 0 || savingAll}
+            className="gap-1.5"
+          >
+            {savingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Guardar Todos {totalDirty > 0 && `(${totalDirty})`}
+          </Button>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -358,6 +462,11 @@ export default function FinalGradesTab({
                   {!hasPlan && (
                     <span className="text-[10px] text-muted-foreground">Sin plan</span>
                   )}
+                  {dirtyCountByMomento[momento] > 0 && (
+                    <div className="text-[10px] text-orange-500 font-medium">
+                      ({dirtyCountByMomento[momento]} sin guardar)
+                    </div>
+                  )}
                 </TableHead>
               ))}
             </TableRow>
@@ -378,6 +487,7 @@ export default function FinalGradesTab({
                     const key = `${s.student_id}-${m}`;
                     const isSaving = savingKeys.has(key);
                     const isSaved = savedKeys.has(key);
+                    const dirty = isDirty(key);
                     const value = editedGrades[key] || "";
                     return (
                       <TableCell key={m} className="text-center p-1.5">
@@ -389,9 +499,12 @@ export default function FinalGradesTab({
                             value={value}
                             onChange={(e) => handleGradeChange(s.student_id, m, e.target.value)}
                             onBlur={() => saveGrade(s.student_id, m)}
-                            className="h-8 w-20 mx-auto text-center text-sm"
+                            className={`h-8 w-20 mx-auto text-center text-sm ${dirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
                             placeholder="—"
                           />
+                          {dirty && !isSaving && !isSaved && (
+                            <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-400" />
+                          )}
                           {isSaving && (
                             <Loader2 className="absolute top-1.5 right-1 h-3 w-3 animate-spin text-muted-foreground" />
                           )}
