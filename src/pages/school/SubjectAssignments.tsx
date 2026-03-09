@@ -562,7 +562,21 @@ export default function SubjectAssignments() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {unassignedSubjects.map((s: Subject) => (
-                  <Badge key={s.id} variant="outline" className="text-xs py-1 px-2.5 border-amber-300 text-amber-700 bg-amber-50">
+                  <Badge
+                    key={s.id}
+                    variant="outline"
+                    className="text-xs py-1 px-2.5 border-amber-300 text-amber-700 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors"
+                    onClick={() => {
+                      setFormSubjectId(s.id);
+                      setFormTeacherId("");
+                      setFormGradeLevel("");
+                      setFormSectionId("");
+                      setGcrpSelectedStudents(new Map());
+                      setGcrpBrowseGrade("");
+                      setGcrpBrowseSection("");
+                      setDialogOpen(true);
+                    }}
+                  >
                     {s.name}
                     <span className="ml-1 opacity-60">({s.subject_type === "gcrp" ? "GCRP" : "Regular"})</span>
                   </Badge>
