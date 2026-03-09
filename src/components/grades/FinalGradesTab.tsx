@@ -45,6 +45,7 @@ export default function FinalGradesTab({
   const [adjustments, setAdjustments] = useState<Record<string, number>>({});
   const [dbAdjustments, setDbAdjustments] = useState<Record<string, number>>({});
   const [savingAdjKeys, setSavingAdjKeys] = useState<Set<string>>(new Set());
+  const [initialized, setInitialized] = useState(false);
   
   // Refs to always have latest values in callbacks
   const editedGradesRef = useRef(editedGrades);
