@@ -570,9 +570,8 @@ export default function FinalGradesTab({
                             )}
                             <div className="relative inline-block">
                               <Input
-                                type={isNumeric ? "number" : "text"}
-                                min={isNumeric ? 0 : undefined}
-                                max={isNumeric ? 20 : undefined}
+                                type="text"
+                                inputMode={isNumeric ? "decimal" : "text"}
                                 value={value}
                                 onChange={(e) => handleGradeChange(s.student_id, m, e.target.value)}
                                 onBlur={() => saveGrade(s.student_id, m)}
