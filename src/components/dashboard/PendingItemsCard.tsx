@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 interface Props {
   schoolId: string | null;
@@ -14,6 +15,7 @@ interface PendingItem {
   label: string;
   count: number;
   type: "warning" | "info";
+  link?: string;
 }
 
 export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
@@ -46,6 +48,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
             label: "Alumnos registrados sin inscripción en el año activo",
             count: notEnrolled,
             type: "warning",
+            link: "/inscripciones",
           });
         }
       }
@@ -74,6 +77,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
             label: "Docentes activos sin áreas asignadas en el año activo",
             count: unassigned,
             type: "warning",
+            link: "/asignacion-materias",
           });
         }
       }
@@ -104,6 +108,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
             label: "Áreas curriculares sin docente asignado",
             count: unassignedSubjects,
             type: "info",
+            link: "/asignacion-materias",
           });
         }
       }
@@ -114,6 +119,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
           label: "No hay un año escolar activo configurado",
           count: 1,
           type: "warning",
+          link: "/anos-secciones",
         });
       }
 
@@ -149,25 +155,38 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
           </div>
         ) : (
           <ul className="space-y-2">
-            {items.map((item, i) => (
-              <li
-                key={i}
-                className={cn(
-                  "flex items-start gap-2.5 rounded-lg p-3 text-sm",
-                  item.type === "warning"
-                    ? "bg-amber-50 text-amber-800"
-                    : "bg-blue-50 text-blue-800"
-                )}
-              >
-                {item.type === "warning" ? (
-                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
-                ) : (
-                  <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
-                )}
-                <span className="flex-1">{item.label}</span>
-                <span className="font-semibold tabular-nums">{item.count}</span>
-              </li>
-            ))}
+            {items.map((item, i) => {
+              const content = (
+                <div
+                  className={cn(
+                    "flex items-start gap-2.5 rounded-lg p-3 text-sm transition-colors",
+                    item.type === "warning"
+                      ? "bg-amber-50 text-amber-800"
+                      : "bg-blue-50 text-blue-800",
+                    item.link && "hover:opacity-80 cursor-pointer"
+                  )}
+                >
+                  {item.type === "warning" ? (
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
+                  ) : (
+                    <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
+                  )}
+                  <span className="flex-1">{item.label}</span>
+                  <span className="font-semibold tabular-nums">{item.count}</span>
+                  {item.link && <ArrowRight className="h-4 w-4 shrink-0 mt-0.5 opacity-60" />}
+                </div>
+              );
+
+              return (
+                <li key={i}>
+                  {item.link ? (
+                    <Link to={item.link}>{content}</Link>
+                  ) : (
+                    content
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>
