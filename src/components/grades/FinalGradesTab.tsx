@@ -217,7 +217,7 @@ export default function FinalGradesTab({
     const assignmentId = assignmentIds[0];
 
     for (const s of students) {
-      for (const m of [1, 2, 3]) {
+      for (const m of [1, 2, 3, 0]) {
         const key = `${s.student_id}-${m}`;
         const existing = existingFinalGrades.find(
           (fg: any) => fg.student_id === s.student_id && fg.momento === m && fg.assignment_id === assignmentId
@@ -228,6 +228,18 @@ export default function FinalGradesTab({
           const adjVal = existing.adjustment_points ?? 0;
           adj[key] = Number(adjVal);
           dbAdj[key] = Number(adjVal);
+        } else if (m === 0) {
+          // Annual average: avg of momentos 1-3, treating empty as 0
+          const vals = [1, 2, 3].map(mo => {
+            const k = `${s.student_id}-${mo}`;
+            const ex = existingFinalGrades.find(
+              (fg: any) => fg.student_id === s.student_id && fg.momento === mo && fg.assignment_id === assignmentId
+            );
+            if (ex && ex.grade_value != null) return Number(ex.grade_value) || 0;
+            const calc = calculateDefinitive(s.student_id, mo);
+            return calc ? Number(calc) || 0 : 0;
+          });
+          edited[key] = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
         } else {
           const calc = calculateDefinitive(s.student_id, m);
           edited[key] = calc;
