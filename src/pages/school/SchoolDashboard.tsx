@@ -213,6 +213,19 @@ export default function SchoolDashboard() {
           />
         </div>
 
+        {/* Charts Row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <EnrollmentBySectionChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+          <GrowthByYearChart schoolId={schoolId} />
+        </div>
+
+        {/* Charts Row 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <GradeLevelDistributionChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+          <EnrollmentTypeChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+          <TeacherWorkloadChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+        </div>
+
         {/* Welcome Card */}
         <div className="bg-card rounded-lg p-6 shadow-sm border">
           <h2 className="text-lg font-semibold text-foreground mb-4">
