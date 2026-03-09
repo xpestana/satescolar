@@ -252,6 +252,15 @@ export default function FinalGradesTab({
     const key = `${studentId}-${momento}`;
     const val = (editedGrades[key] || "").trim();
     const assignmentId = assignmentIds[0];
+    
+    // Validate numeric on save
+    if (isNumeric && val !== "") {
+      const num = Number(val);
+      if (isNaN(num) || num < 0 || num > 20) {
+        toast.error("La nota debe ser un número entre 0 y 20");
+        return;
+      }
+    }
     if (!isDirty(key)) return;
 
     setSavingKeys(prev => new Set(prev).add(key));
