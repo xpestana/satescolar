@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -45,6 +45,14 @@ export default function FinalGradesTab({
   const [adjustments, setAdjustments] = useState<Record<string, number>>({});
   const [dbAdjustments, setDbAdjustments] = useState<Record<string, number>>({});
   const [savingAdjKeys, setSavingAdjKeys] = useState<Set<string>>(new Set());
+  
+  // Refs to always have latest values in callbacks
+  const editedGradesRef = useRef(editedGrades);
+  editedGradesRef.current = editedGrades;
+  const dbValuesRef = useRef(dbValues);
+  dbValuesRef.current = dbValues;
+  const adjustmentsRef = useRef(adjustments);
+  adjustmentsRef.current = adjustments;
 
   const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection);
 
@@ -250,7 +258,8 @@ export default function FinalGradesTab({
   const saveGrade = useCallback(async (studentId: string, momento: number) => {
     if (assignmentIds.length === 0) return;
     const key = `${studentId}-${momento}`;
-    const val = (editedGrades[key] || "").trim();
+    const val = (editedGradesRef.current[key] || "").trim();
+    const savedVal = (dbValuesRef.current[key] || "").trim();
     const assignmentId = assignmentIds[0];
     
     // Validate numeric on save
@@ -261,12 +270,14 @@ export default function FinalGradesTab({
         return;
       }
     }
-    if (!isDirty(key)) return;
+    
+    // Check dirty using refs
+    if (val === savedVal) return;
 
     setSavingKeys(prev => new Set(prev).add(key));
     try {
       if (val !== "") {
-        const adjVal = adjustments[key] || 0;
+        const adjVal = adjustmentsRef.current[key] || 0;
         await supabase
           .from("final_grades" as any)
           .upsert({
@@ -301,7 +312,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
-  }, [assignmentIds, editedGrades, schoolId, isDirty, adjustments]);
+  }, [assignmentIds, schoolId, isNumeric]);
 
   // Adjust point: only works on saved grades
   const adjustPoint = useCallback(async (studentId: string, momento: number, delta: number) => {
