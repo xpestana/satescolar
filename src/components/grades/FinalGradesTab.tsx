@@ -224,10 +224,7 @@ export default function FinalGradesTab({
   }, [students, existingFinalGrades, calculateDefinitive, assignmentIds]);
 
   const handleGradeChange = (studentId: string, momento: number, value: string) => {
-    if (isNumeric && value !== "") {
-      const num = Number(value);
-      if (isNaN(num) || num < 0 || num > 20) return;
-    }
+    // Allow free typing, validate on blur/save
     setEditedGrades(prev => ({ ...prev, [`${studentId}-${momento}`]: value }));
   };
 
