@@ -217,7 +217,7 @@ export default function FinalGradesTab({
     const assignmentId = assignmentIds[0];
 
     for (const s of students) {
-      for (const m of [1, 2, 3]) {
+      for (const m of [1, 2, 3, 0]) {
         const key = `${s.student_id}-${m}`;
         const existing = existingFinalGrades.find(
           (fg: any) => fg.student_id === s.student_id && fg.momento === m && fg.assignment_id === assignmentId
@@ -228,6 +228,18 @@ export default function FinalGradesTab({
           const adjVal = existing.adjustment_points ?? 0;
           adj[key] = Number(adjVal);
           dbAdj[key] = Number(adjVal);
+        } else if (m === 0) {
+          // Annual average: avg of momentos 1-3, treating empty as 0
+          const vals = [1, 2, 3].map(mo => {
+            const k = `${s.student_id}-${mo}`;
+            const ex = existingFinalGrades.find(
+              (fg: any) => fg.student_id === s.student_id && fg.momento === mo && fg.assignment_id === assignmentId
+            );
+            if (ex && ex.grade_value != null) return Number(ex.grade_value) || 0;
+            const calc = calculateDefinitive(s.student_id, mo);
+            return calc ? Number(calc) || 0 : 0;
+          });
+          edited[key] = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
         } else {
           const calc = calculateDefinitive(s.student_id, m);
           edited[key] = calc;
@@ -254,16 +266,16 @@ export default function FinalGradesTab({
   }, [editedGrades, dbValues]);
 
   const dirtyCountByMomento = useMemo(() => {
-    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0 };
+    const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
     for (const s of students) {
-      for (const m of [1, 2, 3]) {
+      for (const m of [0, 1, 2, 3]) {
         if (isDirty(`${s.student_id}-${m}`)) counts[m]++;
       }
     }
     return counts;
   }, [students, isDirty]);
 
-  const totalDirty = dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
+  const totalDirty = dirtyCountByMomento[0] + dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
 
   const saveGrade = useCallback(async (studentId: string, momento: number) => {
     if (assignmentIds.length === 0) return;
@@ -374,7 +386,7 @@ export default function FinalGradesTab({
       const upserts: any[] = [];
       const deletes: { studentId: string; momento: number }[] = [];
       for (const s of students) {
-        for (const m of [1, 2, 3]) {
+        for (const m of [1, 2, 3, 0]) {
           const key = `${s.student_id}-${m}`;
           if (!isDirty(key)) continue;
           const val = (editedGrades[key] || "").trim();
@@ -549,12 +561,21 @@ export default function FinalGradesTab({
                     )}
                   </TableHead>
                 ))}
+                <TableHead className="min-w-[180px] text-center bg-muted/30">
+                  <div className="font-semibold">Definitiva Final</div>
+                  <span className="text-[10px] text-muted-foreground">Promedio 3 momentos</span>
+                  {dirtyCountByMomento[0] > 0 && (
+                    <div className="text-[10px] text-orange-500 font-medium">
+                      ({dirtyCountByMomento[0]} sin guardar)
+                    </div>
+                  )}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredStudents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     No se encontraron estudiantes.
                   </TableCell>
                 </TableRow>
@@ -638,6 +659,83 @@ export default function FinalGradesTab({
                         </TableCell>
                       );
                     })}
+                    {/* Definitiva Final cell */}
+                    {(() => {
+                      const m = 0;
+                      const key = `${s.student_id}-${m}`;
+                      const isSaving = savingKeys.has(key);
+                      const isSaved = savedKeys.has(key);
+                      const isSavingAdj = savingAdjKeys.has(key);
+                      const dirty = isDirty(key);
+                      const value = editedGrades[key] || "";
+                      const isSavedInDb = !!dbValues[key];
+                      const adj = adjustments[key] || 0;
+                      const gradeNum = Number(value);
+                      const canAdd = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum < 20;
+                      const canSubtract = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum > 0;
+
+                      return (
+                        <TableCell className="text-center p-1.5 bg-muted/10">
+                          <div className="flex items-center justify-center gap-1">
+                            {isNumeric && (
+                              <button
+                                type="button"
+                                onClick={() => adjustPoint(s.student_id, m, -1)}
+                                disabled={!canSubtract || isSavingAdj}
+                                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                            )}
+                            <div className="relative inline-block">
+                              <Input
+                                type="text"
+                                inputMode={isNumeric ? "decimal" : "text"}
+                                value={value}
+                                onChange={(e) => handleGradeChange(s.student_id, m, e.target.value)}
+                                onBlur={() => saveGrade(s.student_id, m)}
+                                className={`h-8 w-20 mx-auto text-center text-sm font-semibold ${dirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
+                                placeholder="—"
+                              />
+                              {dirty && !isSaving && !isSaved && (
+                                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-400" />
+                              )}
+                              {(isSaving || isSavingAdj) && (
+                                <Loader2 className="absolute top-1.5 right-1 h-3 w-3 animate-spin text-muted-foreground" />
+                              )}
+                              {isSaved && !isSaving && (
+                                <Check className="absolute top-1.5 right-1 h-3 w-3 text-green-500" />
+                              )}
+                            </div>
+                            {isNumeric && (
+                              <button
+                                type="button"
+                                onClick={() => adjustPoint(s.student_id, m, 1)}
+                                disabled={!canAdd || isSavingAdj}
+                                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            )}
+                            {adj !== 0 && (
+                              <span className={`text-[10px] font-semibold min-w-[28px] ${adj > 0 ? "text-green-600" : "text-destructive"}`}>
+                                {adj > 0 ? `+${adj}` : adj}
+                              </span>
+                            )}
+                            {isNumeric && isSavedInDb && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-[200px] text-xs">
+                                  <p>Use +/- para ajustar la nota final. Ajuste acumulado: {adj > 0 ? `+${adj}` : String(adj)} pts.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </TableCell>
+                      );
+                    })()}
                   </TableRow>
                 ))
               )}
