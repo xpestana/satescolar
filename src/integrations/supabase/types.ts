@@ -507,34 +507,46 @@ export type Database = {
       }
       final_grades: {
         Row: {
+          absence_count: number
           adjustment_points: number
           assignment_id: string
+          attendance_count: number
           created_at: string
+          final_status: string | null
           grade_value: string | null
           id: string
           momento: number
+          observation: string | null
           school_id: string
           student_id: string
           updated_at: string
         }
         Insert: {
+          absence_count?: number
           adjustment_points?: number
           assignment_id: string
+          attendance_count?: number
           created_at?: string
+          final_status?: string | null
           grade_value?: string | null
           id?: string
           momento?: number
+          observation?: string | null
           school_id: string
           student_id: string
           updated_at?: string
         }
         Update: {
+          absence_count?: number
           adjustment_points?: number
           assignment_id?: string
+          attendance_count?: number
           created_at?: string
+          final_status?: string | null
           grade_value?: string | null
           id?: string
           momento?: number
+          observation?: string | null
           school_id?: string
           student_id?: string
           updated_at?: string
