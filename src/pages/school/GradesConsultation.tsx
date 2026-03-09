@@ -35,6 +35,7 @@ const NUMERIC_GRADES = new Set([
 
 export default function GradesConsultation() {
   const { schoolId } = useSchoolId();
+  const [activeTab, setActiveTab] = useState("consulta");
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("");
   const [selectedSection, setSelectedSection] = useState<string>("");
