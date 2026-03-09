@@ -45,6 +45,14 @@ export default function FinalGradesTab({
   const [adjustments, setAdjustments] = useState<Record<string, number>>({});
   const [dbAdjustments, setDbAdjustments] = useState<Record<string, number>>({});
   const [savingAdjKeys, setSavingAdjKeys] = useState<Set<string>>(new Set());
+  
+  // Refs to always have latest values in callbacks
+  const editedGradesRef = useRef(editedGrades);
+  editedGradesRef.current = editedGrades;
+  const dbValuesRef = useRef(dbValues);
+  dbValuesRef.current = dbValues;
+  const adjustmentsRef = useRef(adjustments);
+  adjustmentsRef.current = adjustments;
 
   const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection);
 
