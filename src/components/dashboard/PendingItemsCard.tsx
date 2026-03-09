@@ -15,6 +15,7 @@ interface PendingItem {
   label: string;
   count: number;
   type: "warning" | "info";
+  link?: string;
 }
 
 export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
