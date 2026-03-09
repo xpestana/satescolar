@@ -48,6 +48,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
             label: "Alumnos registrados sin inscripción en el año activo",
             count: notEnrolled,
             type: "warning",
+            link: "/inscripciones",
           });
         }
       }
