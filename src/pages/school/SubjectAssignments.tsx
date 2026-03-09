@@ -157,6 +157,26 @@ export default function SubjectAssignments() {
     return map;
   }, [gcrpCounts]);
 
+  // Fetch GCRP student names for search
+  const { data: gcrpStudentNames = {} } = useQuery({
+    queryKey: ["gcrp-student-names", gcrpAssignmentIds],
+    queryFn: async () => {
+      if (gcrpAssignmentIds.length === 0) return {};
+      const { data } = await supabase
+        .from("gcrp_assignment_students" as any)
+        .select("assignment_id, student:student_id(form_data)")
+        .in("assignment_id", gcrpAssignmentIds);
+      const map: Record<string, string[]> = {};
+      ((data || []) as any[]).forEach((r: any) => {
+        const name = getStudentName(r.student?.form_data);
+        if (!map[r.assignment_id]) map[r.assignment_id] = [];
+        map[r.assignment_id].push(name.toLowerCase());
+      });
+      return map;
+    },
+    enabled: gcrpAssignmentIds.length > 0,
+  });
+
   // View GCRP students
   const { data: viewGcrpStudents = [] } = useQuery({
     queryKey: ["gcrp-students-view", viewGcrpAssignmentId],
