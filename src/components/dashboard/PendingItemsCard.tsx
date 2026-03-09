@@ -77,7 +77,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
             label: "Docentes activos sin áreas asignadas en el año activo",
             count: unassigned,
             type: "warning",
-            link: "/asignacion-materias",
+            link: "/registros/asignacion-areas",
           });
         }
       }
@@ -108,7 +108,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
             label: "Áreas curriculares sin docente asignado",
             count: unassignedSubjects,
             type: "info",
-            link: "/asignacion-materias",
+            link: "/registros/asignacion-areas",
           });
         }
       }
