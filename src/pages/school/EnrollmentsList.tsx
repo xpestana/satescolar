@@ -327,7 +327,7 @@ export default function EnrollmentsList() {
 
       const familyMap = new Map(families?.map(f => [f.id, `${f.father_last_name || ""} ${f.mother_last_name || ""}`.trim() || "Sin apellido"]) || []);
 
-      let enrollmentMap = new Map<string, { section: string; type: string }>();
+      let enrollmentMap = new Map<string, { section: string; type: string; gradeLevel: string; year: string }>();
       if (resolvedYear?.id) {
         const { data: enrollments } = await supabase
           .from("enrollments")
@@ -337,7 +337,12 @@ export default function EnrollmentsList() {
 
         enrollments?.forEach(e => {
           const section = sections.find(s => s.id === e.section_id);
-          enrollmentMap.set(e.student_id, { section: section?.name || "", type: e.enrollment_type || "" });
+          enrollmentMap.set(e.student_id, {
+            section: section?.name || "",
+            type: e.enrollment_type || "",
+            gradeLevel: section?.grade_level || "",
+            year: resolvedYear?.year_range || "",
+          });
         });
       }
 
@@ -351,6 +356,8 @@ export default function EnrollmentsList() {
         isEnrolled: enrollmentMap.has(s.id),
         enrollmentSection: enrollmentMap.get(s.id)?.section,
         enrollmentType: enrollmentMap.get(s.id)?.type,
+        enrollmentGradeLevel: enrollmentMap.get(s.id)?.gradeLevel,
+        enrollmentYear: enrollmentMap.get(s.id)?.year,
       })) as StudentWithEnrollment[];
     },
     enabled: !!schoolId && sections.length >= 0,
