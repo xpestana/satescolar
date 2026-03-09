@@ -67,6 +67,7 @@ export default function SubjectAssignments() {
   const [formGradeLevel, setFormGradeLevel] = useState("");
   const [formSectionId, setFormSectionId] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // GCRP-specific state
   const [gcrpSelectedStudents, setGcrpSelectedStudents] = useState<Map<string, { student_id: string; student_name: string; document_id: string | null }>>(new Map());
