@@ -224,10 +224,7 @@ export default function FinalGradesTab({
   }, [students, existingFinalGrades, calculateDefinitive, assignmentIds]);
 
   const handleGradeChange = (studentId: string, momento: number, value: string) => {
-    if (isNumeric && value !== "") {
-      const num = Number(value);
-      if (isNaN(num) || num < 0 || num > 20) return;
-    }
+    // Allow free typing, validate on blur/save
     setEditedGrades(prev => ({ ...prev, [`${studentId}-${momento}`]: value }));
   };
 
@@ -255,6 +252,15 @@ export default function FinalGradesTab({
     const key = `${studentId}-${momento}`;
     const val = (editedGrades[key] || "").trim();
     const assignmentId = assignmentIds[0];
+    
+    // Validate numeric on save
+    if (isNumeric && val !== "") {
+      const num = Number(val);
+      if (isNaN(num) || num < 0 || num > 20) {
+        toast.error("La nota debe ser un número entre 0 y 20");
+        return;
+      }
+    }
     if (!isDirty(key)) return;
 
     setSavingKeys(prev => new Set(prev).add(key));
@@ -564,9 +570,8 @@ export default function FinalGradesTab({
                             )}
                             <div className="relative inline-block">
                               <Input
-                                type={isNumeric ? "number" : "text"}
-                                min={isNumeric ? 0 : undefined}
-                                max={isNumeric ? 20 : undefined}
+                                type="text"
+                                inputMode={isNumeric ? "decimal" : "text"}
                                 value={value}
                                 onChange={(e) => handleGradeChange(s.student_id, m, e.target.value)}
                                 onBlur={() => saveGrade(s.student_id, m)}
