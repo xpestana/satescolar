@@ -119,6 +119,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
           label: "No hay un año escolar activo configurado",
           count: 1,
           type: "warning",
+          link: "/anos-secciones",
         });
       }
 
