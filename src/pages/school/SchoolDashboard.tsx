@@ -1,5 +1,10 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { EnrollmentBySectionChart } from "@/components/dashboard/EnrollmentBySectionChart";
+import { GrowthByYearChart } from "@/components/dashboard/GrowthByYearChart";
+import { GradeLevelDistributionChart } from "@/components/dashboard/GradeLevelDistributionChart";
+import { TeacherWorkloadChart } from "@/components/dashboard/TeacherWorkloadChart";
+import { EnrollmentTypeChart } from "@/components/dashboard/EnrollmentTypeChart";
 import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -206,6 +211,19 @@ export default function SchoolDashboard() {
             icon={<ClipboardList className="h-10 w-10" />}
             variant="cyan"
           />
+        </div>
+
+        {/* Charts Row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <EnrollmentBySectionChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+          <GrowthByYearChart schoolId={schoolId} />
+        </div>
+
+        {/* Charts Row 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <GradeLevelDistributionChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+          <EnrollmentTypeChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+          <TeacherWorkloadChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
         </div>
 
         {/* Welcome Card */}
