@@ -75,6 +75,8 @@ export default function FinalGradesTab({
   adjustmentsRef.current = adjustments;
   const extraFieldsRef = useRef(extraFields);
   extraFieldsRef.current = extraFields;
+  const dbExtraFieldsRef = useRef(dbExtraFields);
+  dbExtraFieldsRef.current = dbExtraFields;
 
   const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection);
 
