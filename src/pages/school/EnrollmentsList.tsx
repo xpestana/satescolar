@@ -36,6 +36,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+const GRADE_LEVEL_LABELS: Record<string, string> = {
+  pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial", primaria: "Primaria",
+  media_general: "Media General", media_tecnica: "Media Técnica",
+  i_nivel: "I Nivel", ii_nivel: "II Nivel", iii_nivel: "III Nivel",
+  "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
+  "4_grado": "4to Grado", "5_grado": "5to Grado", "6_grado": "6to Grado",
+  "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
+  "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
+};
+
 interface StudentWithEnrollment {
   id: string;
   document_id: string | null;
@@ -46,6 +56,8 @@ interface StudentWithEnrollment {
   isEnrolled: boolean;
   enrollmentSection?: string;
   enrollmentType?: string;
+  enrollmentGradeLevel?: string;
+  enrollmentYear?: string;
 }
 
 // Sortable column header component
@@ -315,7 +327,7 @@ export default function EnrollmentsList() {
 
       const familyMap = new Map(families?.map(f => [f.id, `${f.father_last_name || ""} ${f.mother_last_name || ""}`.trim() || "Sin apellido"]) || []);
 
-      let enrollmentMap = new Map<string, { section: string; type: string }>();
+      let enrollmentMap = new Map<string, { section: string; type: string; gradeLevel: string; year: string }>();
       if (resolvedYear?.id) {
         const { data: enrollments } = await supabase
           .from("enrollments")
@@ -325,7 +337,12 @@ export default function EnrollmentsList() {
 
         enrollments?.forEach(e => {
           const section = sections.find(s => s.id === e.section_id);
-          enrollmentMap.set(e.student_id, { section: section?.name || "", type: e.enrollment_type || "" });
+          enrollmentMap.set(e.student_id, {
+            section: section?.name || "",
+            type: e.enrollment_type || "",
+            gradeLevel: section?.grade_level || "",
+            year: resolvedYear?.year_range || "",
+          });
         });
       }
 
@@ -339,6 +356,8 @@ export default function EnrollmentsList() {
         isEnrolled: enrollmentMap.has(s.id),
         enrollmentSection: enrollmentMap.get(s.id)?.section,
         enrollmentType: enrollmentMap.get(s.id)?.type,
+        enrollmentGradeLevel: enrollmentMap.get(s.id)?.gradeLevel,
+        enrollmentYear: enrollmentMap.get(s.id)?.year,
       })) as StudentWithEnrollment[];
     },
     enabled: !!schoolId && sections.length >= 0,
@@ -467,7 +486,7 @@ export default function EnrollmentsList() {
 
     const rows = filtered.map(s => {
       const row: Record<string, string> = {
-        estado: s.isEnrolled ? `Inscrito - Sección ${s.enrollmentSection}` : "Pendiente",
+        estado: s.isEnrolled ? `Inscrito - ${GRADE_LEVEL_LABELS[s.enrollmentGradeLevel || ""] || s.enrollmentGradeLevel} / ${s.enrollmentSection}` : "Pendiente",
         nombre: getStudentName(s.form_data),
         cedula: s.document_id || "—",
         familia: s.familyName,
@@ -863,7 +882,9 @@ export default function EnrollmentsList() {
                       <TableCell className="text-center">
                         {student.isEnrolled ? (
                           <div className="flex flex-col items-center gap-0.5">
-                            <Badge className="bg-green-100 text-green-800">Inscrito - Sección {student.enrollmentSection}</Badge>
+                            <Badge className="bg-green-100 text-green-800">
+                              Inscrito - {GRADE_LEVEL_LABELS[student.enrollmentGradeLevel || ""] || student.enrollmentGradeLevel} / {student.enrollmentSection}
+                            </Badge>
                             {student.enrollmentType && (
                               <span className="text-[10px] text-muted-foreground">{student.enrollmentType}</span>
                             )}
