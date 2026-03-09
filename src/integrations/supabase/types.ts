@@ -507,6 +507,7 @@ export type Database = {
       }
       final_grades: {
         Row: {
+          adjustment_points: number
           assignment_id: string
           created_at: string
           grade_value: string | null
@@ -517,6 +518,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          adjustment_points?: number
           assignment_id: string
           created_at?: string
           grade_value?: string | null
@@ -527,6 +529,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          adjustment_points?: number
           assignment_id?: string
           created_at?: string
           grade_value?: string | null
