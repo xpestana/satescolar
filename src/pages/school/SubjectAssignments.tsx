@@ -15,7 +15,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, LinkIcon, BanIcon, PlayCircle, Users } from "lucide-react";
+import { Plus, Trash2, Loader2, LinkIcon, BanIcon, PlayCircle, Users, Search, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
