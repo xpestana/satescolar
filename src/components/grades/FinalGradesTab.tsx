@@ -268,7 +268,14 @@ export default function FinalGradesTab({
             return calc ? Number(calc) || 0 : 0;
           });
           edited[key] = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
-          extra[key] = { ...DEFAULT_EXTRA };
+          // Sum attendance/absence from 3 momentos
+          let totalAtt = 0, totalAbs = 0;
+          for (const mo of [1, 2, 3]) {
+            const moKey = `${s.student_id}-${mo}`;
+            totalAtt += extra[moKey]?.attendance_count || 0;
+            totalAbs += extra[moKey]?.absence_count || 0;
+          }
+          extra[key] = { ...DEFAULT_EXTRA, attendance_count: totalAtt, absence_count: totalAbs };
           dbExtra[key] = { ...DEFAULT_EXTRA };
         } else {
           edited[key] = calculateDefinitive(s.student_id, m);
