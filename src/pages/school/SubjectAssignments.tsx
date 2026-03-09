@@ -15,7 +15,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, LinkIcon, BanIcon, PlayCircle, Users } from "lucide-react";
+import { Plus, Trash2, Loader2, LinkIcon, BanIcon, PlayCircle, Users, Search, AlertCircle } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -66,6 +67,7 @@ export default function SubjectAssignments() {
   const [formGradeLevel, setFormGradeLevel] = useState("");
   const [formSectionId, setFormSectionId] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // GCRP-specific state
   const [gcrpSelectedStudents, setGcrpSelectedStudents] = useState<Map<string, { student_id: string; student_name: string; document_id: string | null }>>(new Map());
@@ -154,6 +156,26 @@ export default function SubjectAssignments() {
     });
     return map;
   }, [gcrpCounts]);
+
+  // Fetch GCRP student names for search
+  const { data: gcrpStudentNames = {} } = useQuery({
+    queryKey: ["gcrp-student-names", gcrpAssignmentIds],
+    queryFn: async () => {
+      if (gcrpAssignmentIds.length === 0) return {};
+      const { data } = await supabase
+        .from("gcrp_assignment_students" as any)
+        .select("assignment_id, student:student_id(form_data)")
+        .in("assignment_id", gcrpAssignmentIds);
+      const map: Record<string, string[]> = {};
+      ((data || []) as any[]).forEach((r: any) => {
+        const name = getStudentName(r.student?.form_data);
+        if (!map[r.assignment_id]) map[r.assignment_id] = [];
+        map[r.assignment_id].push(name.toLowerCase());
+      });
+      return map;
+    },
+    enabled: gcrpAssignmentIds.length > 0,
+  });
 
   // View GCRP students
   const { data: viewGcrpStudents = [] } = useQuery({
@@ -349,13 +371,33 @@ export default function SubjectAssignments() {
   }, [assignments, subjects_data, teachers, sections, gcrpCountMap]);
 
   const groupedBySubject = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const filtered = q
+      ? enrichedAssignments.filter((a) => {
+          if (a.subjectName.toLowerCase().includes(q)) return true;
+          if (a.teacherName.toLowerCase().includes(q)) return true;
+          if (a.sectionLabel?.toLowerCase().includes(q)) return true;
+          // Search in GCRP student names
+          const studentNames = gcrpStudentNames[a.id];
+          if (studentNames?.some((name: string) => name.includes(q))) return true;
+          return false;
+        })
+      : enrichedAssignments;
+
     const map = new Map<string, typeof enrichedAssignments>();
-    for (const a of enrichedAssignments) {
+    for (const a of filtered) {
       if (!map.has(a.subject_id)) map.set(a.subject_id, []);
       map.get(a.subject_id)!.push(a);
     }
     return Array.from(map.entries()).sort((a, b) => a[1][0].subjectName.localeCompare(b[1][0].subjectName));
-  }, [enrichedAssignments]);
+  }, [enrichedAssignments, searchQuery, gcrpStudentNames]);
+
+  // Subjects without any assignment in selected year
+  const unassignedSubjects = useMemo(() => {
+    if (!selectedYearId || assignments.length === 0 && subjects_data.length === 0) return subjects_data;
+    const assignedSubjectIds = new Set(assignments.map((a) => a.subject_id));
+    return subjects_data.filter((s: Subject) => !assignedSubjectIds.has(s.id));
+  }, [subjects_data, assignments, selectedYearId]);
 
   const selectedYear = schoolYears.find((y) => y.id === selectedYearId);
 
@@ -418,6 +460,19 @@ export default function SubjectAssignments() {
           </Button>
         </div>
 
+        {/* Search bar */}
+        {selectedYearId && enrichedAssignments.length > 0 && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por área, docente, sección o estudiante..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        )}
+
         {!selectedYearId ? (
           <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">Selecciona un año escolar para ver las asignaciones</p></CardContent></Card>
         ) : assignmentsLoading ? (
@@ -427,6 +482,13 @@ export default function SubjectAssignments() {
             <CardContent className="py-12 text-center">
               <LinkIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No hay asignaciones para {selectedYear?.year_range}</p>
+            </CardContent>
+          </Card>
+        ) : groupedBySubject.length === 0 && searchQuery ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No se encontraron resultados para "{searchQuery}"</p>
             </CardContent>
           </Card>
         ) : (
@@ -483,6 +545,28 @@ export default function SubjectAssignments() {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Unassigned subjects */}
+        {selectedYearId && !assignmentsLoading && unassignedSubjects.length > 0 && (
+          <Card className="border-dashed">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-semibold text-foreground">
+                  Áreas sin docente asignado ({unassignedSubjects.length})
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {unassignedSubjects.map((s: Subject) => (
+                  <Badge key={s.id} variant="outline" className="text-xs py-1 px-2.5 border-amber-300 text-amber-700 bg-amber-50">
+                    {s.name}
+                    <span className="ml-1 opacity-60">({s.subject_type === "gcrp" ? "GCRP" : "Regular"})</span>
+                  </Badge>
+                ))}
               </div>
             </CardContent>
           </Card>
