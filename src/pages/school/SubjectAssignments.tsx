@@ -371,13 +371,33 @@ export default function SubjectAssignments() {
   }, [assignments, subjects_data, teachers, sections, gcrpCountMap]);
 
   const groupedBySubject = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    const filtered = q
+      ? enrichedAssignments.filter((a) => {
+          if (a.subjectName.toLowerCase().includes(q)) return true;
+          if (a.teacherName.toLowerCase().includes(q)) return true;
+          if (a.sectionLabel?.toLowerCase().includes(q)) return true;
+          // Search in GCRP student names
+          const studentNames = gcrpStudentNames[a.id];
+          if (studentNames?.some((name: string) => name.includes(q))) return true;
+          return false;
+        })
+      : enrichedAssignments;
+
     const map = new Map<string, typeof enrichedAssignments>();
-    for (const a of enrichedAssignments) {
+    for (const a of filtered) {
       if (!map.has(a.subject_id)) map.set(a.subject_id, []);
       map.get(a.subject_id)!.push(a);
     }
     return Array.from(map.entries()).sort((a, b) => a[1][0].subjectName.localeCompare(b[1][0].subjectName));
-  }, [enrichedAssignments]);
+  }, [enrichedAssignments, searchQuery, gcrpStudentNames]);
+
+  // Subjects without any assignment in selected year
+  const unassignedSubjects = useMemo(() => {
+    if (!selectedYearId || assignments.length === 0 && subjects_data.length === 0) return subjects_data;
+    const assignedSubjectIds = new Set(assignments.map((a) => a.subject_id));
+    return subjects_data.filter((s: Subject) => !assignedSubjectIds.has(s.id));
+  }, [subjects_data, assignments, selectedYearId]);
 
   const selectedYear = schoolYears.find((y) => y.id === selectedYearId);
 
