@@ -152,14 +152,19 @@ export default function SchoolDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div>
+        {/* Welcome Banner */}
+        <div className="bg-card rounded-lg p-5 shadow-sm border border-border/60">
           <h1 className="text-2xl font-bold text-foreground">
-            Información General del Registro
+            Panel de Control Institucional
           </h1>
-        {school?.name && (
-            <p className="text-muted-foreground mt-1">{school.name}</p>
+          {school?.name && (
+            <p className="text-primary font-medium mt-0.5">{school.name}</p>
           )}
+          <p className="text-sm text-muted-foreground mt-2">
+            Este panel centraliza los indicadores clave de su institución educativa. Consulte las métricas de inscripción,
+            personal docente y distribución académica. Utilice el menú lateral para acceder a la gestión de familias,
+            inscripciones, configuración curricular y demás módulos administrativos.
+          </p>
         </div>
 
         {/* Metrics Grid - First Row */}
@@ -226,17 +231,6 @@ export default function SchoolDashboard() {
           <TeacherWorkloadChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
         </div>
 
-        {/* Welcome Card */}
-        <div className="bg-card rounded-lg p-6 shadow-sm border">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Bienvenido al Panel Escolar
-          </h2>
-          <p className="text-muted-foreground">
-            Desde aquí puedes gestionar todos los aspectos de tu institución educativa.
-            Utiliza el menú de navegación para acceder a las diferentes secciones como
-            Familias, Pagos y Ajustes del colegio.
-          </p>
-        </div>
       </div>
     </DashboardLayout>
   );
