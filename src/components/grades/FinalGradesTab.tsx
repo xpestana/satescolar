@@ -266,16 +266,16 @@ export default function FinalGradesTab({
   }, [editedGrades, dbValues]);
 
   const dirtyCountByMomento = useMemo(() => {
-    const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0 };
+    const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
     for (const s of students) {
-      for (const m of [1, 2, 3]) {
+      for (const m of [0, 1, 2, 3]) {
         if (isDirty(`${s.student_id}-${m}`)) counts[m]++;
       }
     }
     return counts;
   }, [students, isDirty]);
 
-  const totalDirty = dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
+  const totalDirty = dirtyCountByMomento[0] + dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
 
   const saveGrade = useCallback(async (studentId: string, momento: number) => {
     if (assignmentIds.length === 0) return;
