@@ -127,7 +127,22 @@ export default function SchoolDashboard() {
     enabled: !!schoolId,
   });
 
-  const loading = l1 || l2 || l3 || l4 || l5 || l6;
+  // Assigned subjects in active school year
+  const { data: assignedSubjects = 0, isLoading: l7 } = useQuery({
+    queryKey: ["metric-assigned-subjects", schoolId, activeSchoolYear?.id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("subject_teacher_assignments")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId!)
+        .eq("school_year_id", activeSchoolYear!.id)
+        .eq("is_suspended", false);
+      return count ?? 0;
+    },
+    enabled: !!schoolId && !!activeSchoolYear?.id,
+  });
+
+  const loading = l1 || l2 || l3 || l4 || l5 || l6 || l7;
 
   return (
     <DashboardLayout>
