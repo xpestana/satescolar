@@ -36,6 +36,16 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+const GRADE_LEVEL_LABELS: Record<string, string> = {
+  pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial", primaria: "Primaria",
+  media_general: "Media General", media_tecnica: "Media Técnica",
+  i_nivel: "I Nivel", ii_nivel: "II Nivel", iii_nivel: "III Nivel",
+  "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
+  "4_grado": "4to Grado", "5_grado": "5to Grado", "6_grado": "6to Grado",
+  "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
+  "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
+};
+
 interface StudentWithEnrollment {
   id: string;
   document_id: string | null;
@@ -46,6 +56,8 @@ interface StudentWithEnrollment {
   isEnrolled: boolean;
   enrollmentSection?: string;
   enrollmentType?: string;
+  enrollmentGradeLevel?: string;
+  enrollmentYear?: string;
 }
 
 // Sortable column header component
