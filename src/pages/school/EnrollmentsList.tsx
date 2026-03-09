@@ -890,7 +890,7 @@ export default function EnrollmentsList() {
                             )}
                           </div>
                         ) : (
-                          <Badge variant="outline" className="text-orange-600 border-orange-300 text-[10px] px-2 py-1">Pendiente</Badge>
+                          <Badge variant="outline" className="text-orange-600 border-orange-300 text-[10px]">Pendiente</Badge>
                         )}
                       </TableCell>
                     )}
