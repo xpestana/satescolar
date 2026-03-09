@@ -1,5 +1,10 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
+import { EnrollmentBySectionChart } from "@/components/dashboard/EnrollmentBySectionChart";
+import { GrowthByYearChart } from "@/components/dashboard/GrowthByYearChart";
+import { GradeLevelDistributionChart } from "@/components/dashboard/GradeLevelDistributionChart";
+import { TeacherWorkloadChart } from "@/components/dashboard/TeacherWorkloadChart";
+import { EnrollmentTypeChart } from "@/components/dashboard/EnrollmentTypeChart";
 import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
