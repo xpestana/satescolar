@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
-import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus } from "lucide-react";
+import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
