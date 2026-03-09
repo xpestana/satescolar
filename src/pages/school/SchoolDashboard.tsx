@@ -219,6 +219,9 @@ export default function SchoolDashboard() {
           />
         </div>
 
+        {/* Pending Items */}
+        <PendingItemsCard schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+
         {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <EnrollmentBySectionChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
