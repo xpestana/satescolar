@@ -354,7 +354,7 @@ export default function FinalGradesTab({
     }
 
     // Check if grade or extra fields changed
-    const dbEf = dbExtraFields[key] || DEFAULT_EXTRA;
+    const dbEf = dbExtraFieldsRef.current[key] || DEFAULT_EXTRA;
     const gradeChanged = val !== savedVal;
     const extraChanged = ef.observation !== dbEf.observation || ef.attendance_count !== dbEf.attendance_count || ef.absence_count !== dbEf.absence_count || ef.final_status !== dbEf.final_status;
     if (!gradeChanged && !extraChanged) return;
