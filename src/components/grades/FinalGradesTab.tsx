@@ -659,6 +659,83 @@ export default function FinalGradesTab({
                         </TableCell>
                       );
                     })}
+                    {/* Definitiva Final cell */}
+                    {(() => {
+                      const m = 0;
+                      const key = `${s.student_id}-${m}`;
+                      const isSaving = savingKeys.has(key);
+                      const isSaved = savedKeys.has(key);
+                      const isSavingAdj = savingAdjKeys.has(key);
+                      const dirty = isDirty(key);
+                      const value = editedGrades[key] || "";
+                      const isSavedInDb = !!dbValues[key];
+                      const adj = adjustments[key] || 0;
+                      const gradeNum = Number(value);
+                      const canAdd = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum < 20;
+                      const canSubtract = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum > 0;
+
+                      return (
+                        <TableCell className="text-center p-1.5 bg-muted/10">
+                          <div className="flex items-center justify-center gap-1">
+                            {isNumeric && (
+                              <button
+                                type="button"
+                                onClick={() => adjustPoint(s.student_id, m, -1)}
+                                disabled={!canSubtract || isSavingAdj}
+                                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                            )}
+                            <div className="relative inline-block">
+                              <Input
+                                type="text"
+                                inputMode={isNumeric ? "decimal" : "text"}
+                                value={value}
+                                onChange={(e) => handleGradeChange(s.student_id, m, e.target.value)}
+                                onBlur={() => saveGrade(s.student_id, m)}
+                                className={`h-8 w-20 mx-auto text-center text-sm font-semibold ${dirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
+                                placeholder="—"
+                              />
+                              {dirty && !isSaving && !isSaved && (
+                                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-400" />
+                              )}
+                              {(isSaving || isSavingAdj) && (
+                                <Loader2 className="absolute top-1.5 right-1 h-3 w-3 animate-spin text-muted-foreground" />
+                              )}
+                              {isSaved && !isSaving && (
+                                <Check className="absolute top-1.5 right-1 h-3 w-3 text-green-500" />
+                              )}
+                            </div>
+                            {isNumeric && (
+                              <button
+                                type="button"
+                                onClick={() => adjustPoint(s.student_id, m, 1)}
+                                disabled={!canAdd || isSavingAdj}
+                                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            )}
+                            {adj !== 0 && (
+                              <span className={`text-[10px] font-semibold min-w-[28px] ${adj > 0 ? "text-green-600" : "text-destructive"}`}>
+                                {adj > 0 ? `+${adj}` : adj}
+                              </span>
+                            )}
+                            {isNumeric && isSavedInDb && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-[200px] text-xs">
+                                  <p>Use +/- para ajustar la nota final. Ajuste acumulado: {adj > 0 ? `+${adj}` : String(adj)} pts.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </TableCell>
+                      );
+                    })()}
                   </TableRow>
                 ))
               )}
