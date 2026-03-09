@@ -624,7 +624,6 @@ export default function FinalGradesTab({
                                 </TooltipContent>
                               </Tooltip>
                             )}
-                            )}
                           </div>
                         </TableCell>
                       );
