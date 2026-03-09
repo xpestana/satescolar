@@ -882,15 +882,15 @@ export default function EnrollmentsList() {
                       <TableCell className="text-center">
                         {student.isEnrolled ? (
                           <div className="flex flex-col items-center gap-0.5">
-                            <Badge className="bg-green-100 text-green-800">
+                            <Badge className="bg-green-100 text-green-800 text-[10px] leading-tight px-2 py-1">
                               Inscrito - {GRADE_LEVEL_LABELS[student.enrollmentGradeLevel || ""] || student.enrollmentGradeLevel} / {student.enrollmentSection}
                             </Badge>
                             {student.enrollmentType && (
-                              <span className="text-[10px] text-muted-foreground">{student.enrollmentType}</span>
+                              <span className="text-[9px] text-muted-foreground">{student.enrollmentType}</span>
                             )}
                           </div>
                         ) : (
-                          <Badge variant="outline" className="text-orange-600 border-orange-300">Pendiente</Badge>
+                          <Badge variant="outline" className="text-orange-600 border-orange-300 text-[10px] px-2 py-1">Pendiente</Badge>
                         )}
                       </TableCell>
                     )}
