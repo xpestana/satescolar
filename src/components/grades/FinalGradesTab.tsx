@@ -386,7 +386,7 @@ export default function FinalGradesTab({
       const upserts: any[] = [];
       const deletes: { studentId: string; momento: number }[] = [];
       for (const s of students) {
-        for (const m of [1, 2, 3]) {
+        for (const m of [1, 2, 3, 0]) {
           const key = `${s.student_id}-${m}`;
           if (!isDirty(key)) continue;
           const val = (editedGrades[key] || "").trim();
