@@ -393,6 +393,13 @@ export default function GradesConsultation() {
         </div>
       </div>
 
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList>
+          <TabsTrigger value="consulta">Consulta de Notas</TabsTrigger>
+          <TabsTrigger value="finales">Notas Finales y Boletas</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="consulta">
       {!filtersComplete ? (
         <div className="text-center py-12 border rounded-md bg-muted/20">
           <Search className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
@@ -502,6 +509,21 @@ export default function GradesConsultation() {
           </div>
         </>
       )}
+        </TabsContent>
+
+        <TabsContent value="finales">
+          <FinalGradesTab
+            schoolId={schoolId!}
+            effectiveYear={effectiveYear}
+            selectedSubject={selectedSubject}
+            selectedSection={selectedSection}
+            selectedGcrpAssignment={selectedGcrpAssignment}
+            selectedSubjectIsGcrp={selectedSubjectIsGcrp}
+            sections={sections}
+            gcrpAssignments={gcrpAssignments}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Modal for qualitative grade detail */}
       <Dialog open={!!gradeModal} onOpenChange={() => setGradeModal(null)}>
