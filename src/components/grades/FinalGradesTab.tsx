@@ -199,9 +199,17 @@ export default function FinalGradesTab({
     }
   }, [planByMomento, gradesMap]);
 
-  // Initialize edited grades, dbValues, and adjustments
+  // Reset initialized when filters change
   useEffect(() => {
+    setInitialized(false);
+  }, [assignmentIds.join(","), students.length]);
+
+  // Initialize edited grades, dbValues, and adjustments — only once per data load
+  useEffect(() => {
+    if (initialized) return;
     if (!students.length || assignmentIds.length === 0) return;
+    if (finalGradesLoading || gradesLoading || planLoading) return;
+
     const edited: Record<string, string> = {};
     const db: Record<string, string> = {};
     const adj: Record<string, number> = {};
@@ -230,7 +238,8 @@ export default function FinalGradesTab({
     setDbValues(db);
     setAdjustments(adj);
     setDbAdjustments(dbAdj);
-  }, [students, existingFinalGrades, calculateDefinitive, assignmentIds]);
+    setInitialized(true);
+  }, [initialized, students, existingFinalGrades, calculateDefinitive, assignmentIds, finalGradesLoading, gradesLoading, planLoading]);
 
   const handleGradeChange = (studentId: string, momento: number, value: string) => {
     // Allow free typing, validate on blur/save
