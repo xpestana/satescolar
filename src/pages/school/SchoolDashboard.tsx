@@ -187,7 +187,7 @@ export default function SchoolDashboard() {
         </div>
 
         {/* Second Row - Additional metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <MetricCard
             title="Alumnos en el Sistema"
             value={loading ? "..." : totalStudents}
@@ -199,6 +199,12 @@ export default function SchoolDashboard() {
             value={loading ? "..." : totalTeachers}
             icon={<UserPlus className="h-10 w-10" />}
             variant="pink"
+          />
+          <MetricCard
+            title="Áreas Asignadas"
+            value={loading ? "..." : assignedSubjects}
+            icon={<ClipboardList className="h-10 w-10" />}
+            variant="cyan"
           />
         </div>
 
