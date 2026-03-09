@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MetricCard } from "@/components/dashboard/MetricCard";
-import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus } from "lucide-react";
+import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
@@ -127,7 +127,22 @@ export default function SchoolDashboard() {
     enabled: !!schoolId,
   });
 
-  const loading = l1 || l2 || l3 || l4 || l5 || l6;
+  // Assigned subjects in active school year
+  const { data: assignedSubjects = 0, isLoading: l7 } = useQuery({
+    queryKey: ["metric-assigned-subjects", schoolId, activeSchoolYear?.id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("subject_teacher_assignments")
+        .select("*", { count: "exact", head: true })
+        .eq("school_id", schoolId!)
+        .eq("school_year_id", activeSchoolYear!.id)
+        .eq("is_suspended", false);
+      return count ?? 0;
+    },
+    enabled: !!schoolId && !!activeSchoolYear?.id,
+  });
+
+  const loading = l1 || l2 || l3 || l4 || l5 || l6 || l7;
 
   return (
     <DashboardLayout>
@@ -172,7 +187,7 @@ export default function SchoolDashboard() {
         </div>
 
         {/* Second Row - Additional metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <MetricCard
             title="Alumnos en el Sistema"
             value={loading ? "..." : totalStudents}
@@ -184,6 +199,12 @@ export default function SchoolDashboard() {
             value={loading ? "..." : totalTeachers}
             icon={<UserPlus className="h-10 w-10" />}
             variant="pink"
+          />
+          <MetricCard
+            title="Áreas Asignadas"
+            value={loading ? "..." : assignedSubjects}
+            icon={<ClipboardList className="h-10 w-10" />}
+            variant="cyan"
           />
         </div>
 
