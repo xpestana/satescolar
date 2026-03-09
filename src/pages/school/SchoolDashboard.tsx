@@ -79,15 +79,36 @@ export default function SchoolDashboard() {
     enabled: !!schoolId,
   });
 
-  // Families
+  // Families (only those whose user has the 'representative' role)
   const { data: familiesCount = 0, isLoading: l5 } = useQuery({
     queryKey: ["metric-families", schoolId],
     queryFn: async () => {
-      const { count } = await supabase
+      // Get family_ids linked to this school
+      const { data: fsRows } = await supabase
         .from("family_schools")
-        .select("*", { count: "exact", head: true })
+        .select("family_id")
         .eq("school_id", schoolId!);
-      return count ?? 0;
+      if (!fsRows || fsRows.length === 0) return 0;
+
+      const familyIds = fsRows.map((r) => r.family_id);
+
+      // Get user_ids for those families
+      const { data: families } = await supabase
+        .from("families")
+        .select("user_id")
+        .in("id", familyIds);
+      if (!families || families.length === 0) return 0;
+
+      const userIds = families.map((f) => f.user_id);
+
+      // Filter only users with 'representative' role
+      const { data: repRoles } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "representative")
+        .in("user_id", userIds);
+
+      return repRoles?.length ?? 0;
     },
     enabled: !!schoolId,
   });
