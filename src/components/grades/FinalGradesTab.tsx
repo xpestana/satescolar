@@ -631,7 +631,7 @@ export default function FinalGradesTab({
           {/* Status */}
           <div>
             <label className="text-[10px] text-muted-foreground">Estado</label>
-            <Select value={ef.final_status} onValueChange={(v) => { handleExtraChange(key, "final_status", v); }}>
+            <Select value={ef.final_status} onValueChange={(v) => { handleExtraChange(key, "final_status", v); setTimeout(() => saveGrade(s.student_id, m), 50); }}>
               <SelectTrigger className="h-7 text-xs">
                 <SelectValue placeholder="Seleccionar..." />
               </SelectTrigger>
