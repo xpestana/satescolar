@@ -392,7 +392,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
-  }, [assignmentIds, schoolId, isNumeric, dbExtraFields]);
+  }, [assignmentIds, schoolId, isNumeric]);
 
   const adjustPoint = useCallback(async (studentId: string, momento: number, delta: number) => {
     if (assignmentIds.length === 0) return;
