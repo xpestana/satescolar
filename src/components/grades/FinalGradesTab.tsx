@@ -268,7 +268,14 @@ export default function FinalGradesTab({
             return calc ? Number(calc) || 0 : 0;
           });
           edited[key] = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
-          extra[key] = { ...DEFAULT_EXTRA };
+          // Sum attendance/absence from 3 momentos
+          let totalAtt = 0, totalAbs = 0;
+          for (const mo of [1, 2, 3]) {
+            const moKey = `${s.student_id}-${mo}`;
+            totalAtt += extra[moKey]?.attendance_count || 0;
+            totalAbs += extra[moKey]?.absence_count || 0;
+          }
+          extra[key] = { ...DEFAULT_EXTRA, attendance_count: totalAtt, absence_count: totalAbs };
           dbExtra[key] = { ...DEFAULT_EXTRA };
         } else {
           edited[key] = calculateDefinitive(s.student_id, m);
@@ -596,18 +603,43 @@ export default function FinalGradesTab({
           </div>
 
           {/* Observation */}
-          <Textarea
-            value={ef.observation}
-            onChange={(e) => handleExtraChange(key, "observation", e.target.value)}
-            onBlur={() => saveGrade(s.student_id, m)}
-            placeholder="Observación..."
-            className="h-16 text-xs resize-none"
-          />
+          <div>
+            <div className="flex items-center gap-1 mb-0.5">
+              <label className="text-[10px] text-muted-foreground">Observación</label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[200px] text-xs">
+                  <p>Observación opcional sobre el desempeño del estudiante en este {isFinal ? "año escolar" : "momento"}.</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Textarea
+              value={ef.observation}
+              onChange={(e) => handleExtraChange(key, "observation", e.target.value)}
+              onBlur={() => saveGrade(s.student_id, m)}
+              placeholder="Observación..."
+              className="h-16 text-xs resize-none"
+            />
+          </div>
 
           {/* Attendance & Absences */}
           <div className="grid grid-cols-2 gap-1.5">
             <div>
-              <label className="text-[10px] text-muted-foreground">Asistencias</label>
+              <div className="flex items-center gap-1 mb-0.5">
+                <label className="text-[10px] text-muted-foreground">Asistencias</label>
+                {isFinal && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[200px] text-xs">
+                      <p>Inicializado como la suma de asistencias de los 3 momentos. Puede modificarlo libremente.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
               <Input
                 type="number"
                 min={0}
@@ -618,7 +650,19 @@ export default function FinalGradesTab({
               />
             </div>
             <div>
-              <label className="text-[10px] text-muted-foreground">Inasistencias</label>
+              <div className="flex items-center gap-1 mb-0.5">
+                <label className="text-[10px] text-muted-foreground">Inasistencias</label>
+                {isFinal && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[200px] text-xs">
+                      <p>Inicializado como la suma de inasistencias de los 3 momentos. Puede modificarlo libremente.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
               <Input
                 type="number"
                 min={0}
@@ -630,18 +674,30 @@ export default function FinalGradesTab({
             </div>
           </div>
 
-          {/* Status */}
-          <div>
-            <label className="text-[10px] text-muted-foreground">Estado</label>
-            <Select value={ef.final_status} onValueChange={(v) => { handleExtraChange(key, "final_status", v); setTimeout(() => saveGrade(s.student_id, m), 50); }}>
-              <SelectTrigger className="h-7 text-xs">
-                <SelectValue placeholder="Seleccionar..." />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Status - only for final (m===0) */}
+          {isFinal && (
+            <div>
+              <div className="flex items-center gap-1 mb-0.5">
+                <label className="text-[10px] text-muted-foreground">Estado</label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[200px] text-xs">
+                    <p>Estado final del estudiante al cierre del año escolar: Aprobado, No Aprobado, No Cursante o PP.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Select value={ef.final_status} onValueChange={(v) => { handleExtraChange(key, "final_status", v); setTimeout(() => saveGrade(s.student_id, m), 50); }}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </TableCell>
     );
