@@ -561,6 +561,29 @@ export default function FinalGradesTab({
                     )}
                   </TableHead>
                 ))}
+                <TableHead className="min-w-[180px] text-center bg-muted/30">
+                  <div className="font-semibold">Definitiva Final</div>
+                  <span className="text-[10px] text-muted-foreground">Promedio 3 momentos</span>
+                  {dirtyCountByMomento[0] > 0 && (
+                    <div className="text-[10px] text-orange-500 font-medium">
+                      ({dirtyCountByMomento[0]} sin guardar)
+                    </div>
+                  )}
+                </TableHead>
+                      <span className="text-[10px] text-muted-foreground">
+                        {hasPercentages ? "Ponderado" : "Promedio"}
+                      </span>
+                    )}
+                    {!hasPlan && (
+                      <span className="text-[10px] text-muted-foreground">Sin plan</span>
+                    )}
+                    {dirtyCountByMomento[momento] > 0 && (
+                      <div className="text-[10px] text-orange-500 font-medium">
+                        ({dirtyCountByMomento[momento]} sin guardar)
+                      </div>
+                    )}
+                  </TableHead>
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
