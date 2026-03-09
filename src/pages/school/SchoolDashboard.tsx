@@ -5,6 +5,7 @@ import { GrowthByYearChart } from "@/components/dashboard/GrowthByYearChart";
 import { GradeLevelDistributionChart } from "@/components/dashboard/GradeLevelDistributionChart";
 import { TeacherWorkloadChart } from "@/components/dashboard/TeacherWorkloadChart";
 import { EnrollmentTypeChart } from "@/components/dashboard/EnrollmentTypeChart";
+import { PendingItemsCard } from "@/components/dashboard/PendingItemsCard";
 import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -217,6 +218,9 @@ export default function SchoolDashboard() {
             variant="cyan"
           />
         </div>
+
+        {/* Pending Items */}
+        <PendingItemsCard schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
 
         {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
