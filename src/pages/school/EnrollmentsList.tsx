@@ -299,7 +299,7 @@ export default function EnrollmentsList() {
 
   // Fetch active students with enrollment status
   const { data: students = [], isLoading } = useQuery({
-    queryKey: ["enrollment-students", schoolId, resolvedYear?.id],
+    queryKey: ["enrollment-students", schoolId, resolvedYear?.id, sections],
     queryFn: async () => {
       if (!schoolId) return [];
 
@@ -331,16 +331,15 @@ export default function EnrollmentsList() {
       if (resolvedYear?.id) {
         const { data: enrollments } = await supabase
           .from("enrollments")
-          .select("student_id, section_id, enrollment_type")
+          .select("student_id, section_id, enrollment_type, sections(name, grade_level)")
           .eq("school_year_id", resolvedYear.id)
           .eq("school_id", schoolId);
 
-        enrollments?.forEach(e => {
-          const section = sections.find(s => s.id === e.section_id);
+        enrollments?.forEach((e: any) => {
           enrollmentMap.set(e.student_id, {
-            section: section?.name || "",
+            section: e.sections?.name || "",
             type: e.enrollment_type || "",
-            gradeLevel: section?.grade_level || "",
+            gradeLevel: e.sections?.grade_level || "",
             year: resolvedYear?.year_range || "",
           });
         });
