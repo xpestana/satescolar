@@ -486,7 +486,7 @@ export default function EnrollmentsList() {
 
     const rows = filtered.map(s => {
       const row: Record<string, string> = {
-        estado: s.isEnrolled ? `Inscrito - Sección ${s.enrollmentSection}` : "Pendiente",
+        estado: s.isEnrolled ? `Inscrito - ${GRADE_LEVEL_LABELS[s.enrollmentGradeLevel || ""] || s.enrollmentGradeLevel} / ${s.enrollmentSection}` : "Pendiente",
         nombre: getStudentName(s.form_data),
         cedula: s.document_id || "—",
         familia: s.familyName,
