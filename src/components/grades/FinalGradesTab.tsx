@@ -614,6 +614,17 @@ export default function FinalGradesTab({
                                 {adj > 0 ? `+${adj}` : adj}
                               </span>
                             )}
+                            {isNumeric && isSavedInDb && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-[200px] text-xs">
+                                  Use +/- para ajustar la nota en 1 punto. El ajuste acumulado ({adj > 0 ? `+${adj}` : adj} pts) se reflejará en la boleta.
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            )}
                           </div>
                         </TableCell>
                       );
