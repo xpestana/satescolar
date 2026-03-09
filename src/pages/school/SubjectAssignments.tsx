@@ -460,6 +460,19 @@ export default function SubjectAssignments() {
           </Button>
         </div>
 
+        {/* Search bar */}
+        {selectedYearId && enrichedAssignments.length > 0 && (
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por área, docente, sección o estudiante..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        )}
+
         {!selectedYearId ? (
           <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">Selecciona un año escolar para ver las asignaciones</p></CardContent></Card>
         ) : assignmentsLoading ? (
@@ -469,6 +482,13 @@ export default function SubjectAssignments() {
             <CardContent className="py-12 text-center">
               <LinkIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No hay asignaciones para {selectedYear?.year_range}</p>
+            </CardContent>
+          </Card>
+        ) : groupedBySubject.length === 0 && searchQuery ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No se encontraron resultados para "{searchQuery}"</p>
             </CardContent>
           </Card>
         ) : (
@@ -525,6 +545,28 @@ export default function SubjectAssignments() {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Unassigned subjects */}
+        {selectedYearId && !assignmentsLoading && unassignedSubjects.length > 0 && (
+          <Card className="border-dashed">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-semibold text-foreground">
+                  Áreas sin docente asignado ({unassignedSubjects.length})
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {unassignedSubjects.map((s: Subject) => (
+                  <Badge key={s.id} variant="outline" className="text-xs py-1 px-2.5 border-amber-300 text-amber-700 bg-amber-50">
+                    {s.name}
+                    <span className="ml-1 opacity-60">({s.subject_type === "gcrp" ? "GCRP" : "Regular"})</span>
+                  </Badge>
+                ))}
               </div>
             </CardContent>
           </Card>
