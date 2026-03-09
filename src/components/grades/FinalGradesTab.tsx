@@ -5,6 +5,8 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, Loader2, Check, Save, Plus, Minus, Info } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +15,22 @@ const NUMERIC_GRADES = new Set([
   "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
   "media_tecnica", "6_ano",
 ]);
+
+const STATUS_OPTIONS = [
+  { value: "aprobado", label: "Aprobado" },
+  { value: "no_aprobado", label: "No Aprobado" },
+  { value: "no_cursante", label: "No Cursante" },
+  { value: "pp", label: "PP" },
+];
+
+interface ExtraFields {
+  observation: string;
+  attendance_count: number;
+  absence_count: number;
+  final_status: string;
+}
+
+const DEFAULT_EXTRA: ExtraFields = { observation: "", attendance_count: 0, absence_count: 0, final_status: "" };
 
 interface FinalGradesTabProps {
   schoolId: string;
@@ -41,19 +59,24 @@ export default function FinalGradesTab({
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
   const [savingAll, setSavingAll] = useState(false);
   const [dbValues, setDbValues] = useState<Record<string, string>>({});
-  // Adjustment points: key -> number
   const [adjustments, setAdjustments] = useState<Record<string, number>>({});
   const [dbAdjustments, setDbAdjustments] = useState<Record<string, number>>({});
   const [savingAdjKeys, setSavingAdjKeys] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
-  
-  // Refs to always have latest values in callbacks
+  // Extra fields per student-momento
+  const [extraFields, setExtraFields] = useState<Record<string, ExtraFields>>({});
+  const [dbExtraFields, setDbExtraFields] = useState<Record<string, ExtraFields>>({});
+
   const editedGradesRef = useRef(editedGrades);
   editedGradesRef.current = editedGrades;
   const dbValuesRef = useRef(dbValues);
   dbValuesRef.current = dbValues;
   const adjustmentsRef = useRef(adjustments);
   adjustmentsRef.current = adjustments;
+  const extraFieldsRef = useRef(extraFields);
+  extraFieldsRef.current = extraFields;
+  const dbExtraFieldsRef = useRef(dbExtraFields);
+  dbExtraFieldsRef.current = dbExtraFields;
 
   const filtersComplete = !!effectiveYear && !!selectedSubject && (selectedSubjectIsGcrp ? !!selectedGcrpAssignment : !!selectedSection);
 
@@ -199,21 +222,20 @@ export default function FinalGradesTab({
     }
   }, [planByMomento, gradesMap]);
 
-  // Reset initialized when filters change
   useEffect(() => {
     setInitialized(false);
   }, [assignmentIds.join(","), students.length]);
 
-  // Initialize edited grades, dbValues, and adjustments — only once per data load
   useEffect(() => {
-    if (initialized) return;
-    if (!students.length || assignmentIds.length === 0) return;
+    if (initialized || !students.length || assignmentIds.length === 0) return;
     if (finalGradesLoading || gradesLoading || planLoading) return;
 
     const edited: Record<string, string> = {};
     const db: Record<string, string> = {};
     const adj: Record<string, number> = {};
     const dbAdj: Record<string, number> = {};
+    const extra: Record<string, ExtraFields> = {};
+    const dbExtra: Record<string, ExtraFields> = {};
     const assignmentId = assignmentIds[0];
 
     for (const s of students) {
@@ -225,11 +247,17 @@ export default function FinalGradesTab({
         if (existing && existing.grade_value != null) {
           edited[key] = existing.grade_value;
           db[key] = existing.grade_value;
-          const adjVal = existing.adjustment_points ?? 0;
-          adj[key] = Number(adjVal);
-          dbAdj[key] = Number(adjVal);
+          adj[key] = Number(existing.adjustment_points ?? 0);
+          dbAdj[key] = Number(existing.adjustment_points ?? 0);
+          const ef: ExtraFields = {
+            observation: existing.observation || "",
+            attendance_count: existing.attendance_count ?? 0,
+            absence_count: existing.absence_count ?? 0,
+            final_status: existing.final_status || "",
+          };
+          extra[key] = { ...ef };
+          dbExtra[key] = { ...ef };
         } else if (m === 0) {
-          // Annual average: avg of momentos 1-3, treating empty as 0
           const vals = [1, 2, 3].map(mo => {
             const k = `${s.student_id}-${mo}`;
             const ex = existingFinalGrades.find(
@@ -240,9 +268,12 @@ export default function FinalGradesTab({
             return calc ? Number(calc) || 0 : 0;
           });
           edited[key] = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
+          extra[key] = { ...DEFAULT_EXTRA };
+          dbExtra[key] = { ...DEFAULT_EXTRA };
         } else {
-          const calc = calculateDefinitive(s.student_id, m);
-          edited[key] = calc;
+          edited[key] = calculateDefinitive(s.student_id, m);
+          extra[key] = { ...DEFAULT_EXTRA };
+          dbExtra[key] = { ...DEFAULT_EXTRA };
         }
       }
     }
@@ -250,12 +281,17 @@ export default function FinalGradesTab({
     setDbValues(db);
     setAdjustments(adj);
     setDbAdjustments(dbAdj);
+    setExtraFields(extra);
+    setDbExtraFields(dbExtra);
     setInitialized(true);
   }, [initialized, students, existingFinalGrades, calculateDefinitive, assignmentIds, finalGradesLoading, gradesLoading, planLoading]);
 
   const handleGradeChange = (studentId: string, momento: number, value: string) => {
-    // Allow free typing, validate on blur/save
     setEditedGrades(prev => ({ ...prev, [`${studentId}-${momento}`]: value }));
+  };
+
+  const handleExtraChange = (key: string, field: keyof ExtraFields, value: string | number) => {
+    setExtraFields(prev => ({ ...prev, [key]: { ...(prev[key] || DEFAULT_EXTRA), [field]: value } }));
   };
 
   const isDirty = useCallback((key: string): boolean => {
@@ -265,26 +301,50 @@ export default function FinalGradesTab({
     return current !== saved;
   }, [editedGrades, dbValues]);
 
+  const isExtraDirty = useCallback((key: string): boolean => {
+    const cur = extraFields[key] || DEFAULT_EXTRA;
+    const db = dbExtraFields[key] || DEFAULT_EXTRA;
+    return cur.observation !== db.observation ||
+      cur.attendance_count !== db.attendance_count ||
+      cur.absence_count !== db.absence_count ||
+      cur.final_status !== db.final_status;
+  }, [extraFields, dbExtraFields]);
+
+  const isAnyDirty = useCallback((key: string): boolean => isDirty(key) || isExtraDirty(key), [isDirty, isExtraDirty]);
+
   const dirtyCountByMomento = useMemo(() => {
     const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
     for (const s of students) {
       for (const m of [0, 1, 2, 3]) {
-        if (isDirty(`${s.student_id}-${m}`)) counts[m]++;
+        if (isAnyDirty(`${s.student_id}-${m}`)) counts[m]++;
       }
     }
     return counts;
-  }, [students, isDirty]);
+  }, [students, isAnyDirty]);
 
   const totalDirty = dirtyCountByMomento[0] + dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
+
+  const buildUpsertPayload = (studentId: string, momento: number, gradeValue: string, adjVal: number, ef: ExtraFields) => ({
+    student_id: studentId,
+    assignment_id: assignmentIds[0],
+    school_id: schoolId,
+    momento,
+    grade_value: gradeValue,
+    adjustment_points: adjVal,
+    observation: ef.observation || null,
+    attendance_count: ef.attendance_count,
+    absence_count: ef.absence_count,
+    final_status: ef.final_status || null,
+    updated_at: new Date().toISOString(),
+  });
 
   const saveGrade = useCallback(async (studentId: string, momento: number) => {
     if (assignmentIds.length === 0) return;
     const key = `${studentId}-${momento}`;
     const val = (editedGradesRef.current[key] || "").trim();
     const savedVal = (dbValuesRef.current[key] || "").trim();
-    const assignmentId = assignmentIds[0];
-    
-    // Validate numeric on save
+    const ef = extraFieldsRef.current[key] || DEFAULT_EXTRA;
+
     if (isNumeric && val !== "") {
       const num = Number(val);
       if (isNaN(num) || num < 0 || num > 20) {
@@ -292,37 +352,35 @@ export default function FinalGradesTab({
         return;
       }
     }
-    
-    // Check dirty using refs
-    if (val === savedVal) return;
+
+    // Check if grade or extra fields changed
+    const dbEf = dbExtraFieldsRef.current[key] || DEFAULT_EXTRA;
+    const gradeChanged = val !== savedVal;
+    const extraChanged = ef.observation !== dbEf.observation || ef.attendance_count !== dbEf.attendance_count || ef.absence_count !== dbEf.absence_count || ef.final_status !== dbEf.final_status;
+    if (!gradeChanged && !extraChanged) return;
 
     setSavingKeys(prev => new Set(prev).add(key));
     try {
-      if (val !== "") {
+      if (val !== "" || extraChanged) {
         const adjVal = adjustmentsRef.current[key] || 0;
+        const payload = buildUpsertPayload(studentId, momento, val || savedVal, adjVal, ef);
         await supabase
           .from("final_grades" as any)
-          .upsert({
-            student_id: studentId,
-            assignment_id: assignmentId,
-            school_id: schoolId,
-            momento,
-            grade_value: val,
-            adjustment_points: adjVal,
-            updated_at: new Date().toISOString(),
-          } as any, { onConflict: "student_id,assignment_id,momento" });
-        setDbValues(prev => ({ ...prev, [key]: val }));
+          .upsert(payload as any, { onConflict: "student_id,assignment_id,momento" });
+        if (val) setDbValues(prev => ({ ...prev, [key]: val }));
         setDbAdjustments(prev => ({ ...prev, [key]: adjVal }));
-      } else {
+        setDbExtraFields(prev => ({ ...prev, [key]: { ...ef } }));
+      } else if (val === "" && savedVal !== "") {
         await supabase
           .from("final_grades" as any)
           .delete()
           .eq("student_id", studentId)
-          .eq("assignment_id", assignmentId)
+          .eq("assignment_id", assignmentIds[0])
           .eq("momento", momento);
         setDbValues(prev => { const n = { ...prev }; delete n[key]; return n; });
         setDbAdjustments(prev => { const n = { ...prev }; delete n[key]; return n; });
         setAdjustments(prev => { const n = { ...prev }; delete n[key]; return n; });
+        setDbExtraFields(prev => ({ ...prev, [key]: { ...DEFAULT_EXTRA } }));
       }
       setSavedKeys(prev => {
         const next = new Set(prev).add(key);
@@ -336,13 +394,11 @@ export default function FinalGradesTab({
     }
   }, [assignmentIds, schoolId, isNumeric]);
 
-  // Adjust point: only works on saved grades
   const adjustPoint = useCallback(async (studentId: string, momento: number, delta: number) => {
     if (assignmentIds.length === 0) return;
     const key = `${studentId}-${momento}`;
     const currentGrade = (editedGrades[key] || "").trim();
-    if (!currentGrade || !dbValues[key]) return; // Must be saved first
-
+    if (!currentGrade || !dbValues[key]) return;
     const gradeNum = Number(currentGrade);
     if (isNaN(gradeNum)) return;
 
@@ -352,20 +408,14 @@ export default function FinalGradesTab({
     const currentAdj = adjustments[key] || 0;
     const newAdj = currentAdj + delta;
     const newGradeStr = Number.isInteger(newGrade) ? String(newGrade) : newGrade.toFixed(2);
+    const ef = extraFields[key] || DEFAULT_EXTRA;
 
     setSavingAdjKeys(prev => new Set(prev).add(key));
     try {
+      const payload = buildUpsertPayload(studentId, momento, newGradeStr, newAdj, ef);
       await supabase
         .from("final_grades" as any)
-        .upsert({
-          student_id: studentId,
-          assignment_id: assignmentIds[0],
-          school_id: schoolId,
-          momento,
-          grade_value: newGradeStr,
-          adjustment_points: newAdj,
-          updated_at: new Date().toISOString(),
-        } as any, { onConflict: "student_id,assignment_id,momento" });
+        .upsert(payload as any, { onConflict: "student_id,assignment_id,momento" });
 
       setEditedGrades(prev => ({ ...prev, [key]: newGradeStr }));
       setDbValues(prev => ({ ...prev, [key]: newGradeStr }));
@@ -376,7 +426,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingAdjKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
-  }, [assignmentIds, editedGrades, dbValues, adjustments, schoolId]);
+  }, [assignmentIds, editedGrades, dbValues, adjustments, extraFields, schoolId]);
 
   const saveAll = useCallback(async () => {
     if (assignmentIds.length === 0 || totalDirty === 0) return;
@@ -388,20 +438,11 @@ export default function FinalGradesTab({
       for (const s of students) {
         for (const m of [1, 2, 3, 0]) {
           const key = `${s.student_id}-${m}`;
-          if (!isDirty(key)) continue;
+          if (!isAnyDirty(key)) continue;
           const val = (editedGrades[key] || "").trim();
-          if (val !== "") {
-            upserts.push({
-              student_id: s.student_id,
-              assignment_id: assignmentId,
-              school_id: schoolId,
-              momento: m,
-              grade_value: val,
-              adjustment_points: adjustments[key] || 0,
-              updated_at: new Date().toISOString(),
-            });
-          } else if (dbValues[key]) {
-            deletes.push({ studentId: s.student_id, momento: m });
+          const ef = extraFields[key] || DEFAULT_EXTRA;
+          if (val !== "" || dbValues[key]) {
+            upserts.push(buildUpsertPayload(s.student_id, m, val || dbValues[key] || "", adjustments[key] || 0, ef));
           }
         }
       }
@@ -410,41 +451,25 @@ export default function FinalGradesTab({
           .from("final_grades" as any)
           .upsert(upserts as any, { onConflict: "student_id,assignment_id,momento" });
       }
-      for (const d of deletes) {
-        await supabase
-          .from("final_grades" as any)
-          .delete()
-          .eq("student_id", d.studentId)
-          .eq("assignment_id", assignmentId)
-          .eq("momento", d.momento);
+      const newDb = { ...dbValues };
+      const newDbAdj = { ...dbAdjustments };
+      const newDbExtra = { ...dbExtraFields };
+      for (const u of upserts) {
+        const k = `${u.student_id}-${u.momento}`;
+        newDb[k] = u.grade_value;
+        newDbAdj[k] = u.adjustment_points;
+        newDbExtra[k] = { observation: u.observation || "", attendance_count: u.attendance_count, absence_count: u.absence_count, final_status: u.final_status || "" };
       }
-      setDbValues(prev => {
-        const next = { ...prev };
-        for (const u of upserts) {
-          next[`${u.student_id}-${u.momento}`] = u.grade_value;
-        }
-        for (const d of deletes) {
-          delete next[`${d.studentId}-${d.momento}`];
-        }
-        return next;
-      });
-      setDbAdjustments(prev => {
-        const next = { ...prev };
-        for (const u of upserts) {
-          next[`${u.student_id}-${u.momento}`] = u.adjustment_points;
-        }
-        for (const d of deletes) {
-          delete next[`${d.studentId}-${d.momento}`];
-        }
-        return next;
-      });
-      toast.success(`${upserts.length + deletes.length} notas guardadas correctamente`);
+      setDbValues(newDb);
+      setDbAdjustments(newDbAdj);
+      setDbExtraFields(newDbExtra);
+      toast.success(`${upserts.length} registros guardados correctamente`);
     } catch {
       toast.error("Error al guardar notas");
     } finally {
       setSavingAll(false);
     }
-  }, [assignmentIds, students, editedGrades, dbValues, adjustments, schoolId, isDirty, totalDirty]);
+  }, [assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, isAnyDirty, totalDirty]);
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return students;
@@ -492,6 +517,136 @@ export default function FinalGradesTab({
     hasPercentages: (planByMomento[m] || []).some((pi: any) => pi.percentage != null && pi.percentage > 0),
   }));
 
+  // Render a grade cell with extra fields
+  const renderGradeCell = (s: any, m: number, isFinal = false) => {
+    const key = `${s.student_id}-${m}`;
+    const isSaving = savingKeys.has(key);
+    const isSaved = savedKeys.has(key);
+    const isSavingAdj = savingAdjKeys.has(key);
+    const dirty = isDirty(key);
+    const extraDirty = isExtraDirty(key);
+    const value = editedGrades[key] || "";
+    const isSavedInDb = !!dbValues[key];
+    const adj = adjustments[key] || 0;
+    const ef = extraFields[key] || DEFAULT_EXTRA;
+    const gradeNum = Number(value);
+    const canAdd = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum < 20;
+    const canSubtract = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum > 0;
+
+    return (
+      <TableCell key={m} className={`p-2 align-top ${isFinal ? "bg-muted/10" : ""}`}>
+        <div className="space-y-2 min-w-[160px]">
+          {/* Grade row */}
+          <div className="flex items-center justify-center gap-1">
+            {isNumeric && (
+              <button
+                type="button"
+                onClick={() => adjustPoint(s.student_id, m, -1)}
+                disabled={!canSubtract || isSavingAdj}
+                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <Minus className="h-3 w-3" />
+              </button>
+            )}
+            <div className="relative inline-block">
+              <Input
+                type="text"
+                inputMode={isNumeric ? "decimal" : "text"}
+                value={value}
+                onChange={(e) => handleGradeChange(s.student_id, m, e.target.value)}
+                onBlur={() => saveGrade(s.student_id, m)}
+                className={`h-8 w-20 mx-auto text-center text-sm ${isFinal ? "font-semibold" : ""} ${dirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
+                placeholder="—"
+              />
+              {(dirty || extraDirty) && !isSaving && !isSaved && (
+                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-400" />
+              )}
+              {(isSaving || isSavingAdj) && (
+                <Loader2 className="absolute top-1.5 right-1 h-3 w-3 animate-spin text-muted-foreground" />
+              )}
+              {isSaved && !isSaving && (
+                <Check className="absolute top-1.5 right-1 h-3 w-3 text-green-500" />
+              )}
+            </div>
+            {isNumeric && (
+              <button
+                type="button"
+                onClick={() => adjustPoint(s.student_id, m, 1)}
+                disabled={!canAdd || isSavingAdj}
+                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            )}
+            {adj !== 0 && (
+              <span className={`text-[10px] font-semibold min-w-[28px] ${adj > 0 ? "text-green-600" : "text-destructive"}`}>
+                {adj > 0 ? `+${adj}` : adj}
+              </span>
+            )}
+            {isNumeric && isSavedInDb && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[200px] text-xs">
+                  <p>Use +/- para ajustar la nota. Ajuste acumulado: {adj > 0 ? `+${adj}` : String(adj)} pts.</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+
+          {/* Observation */}
+          <Textarea
+            value={ef.observation}
+            onChange={(e) => handleExtraChange(key, "observation", e.target.value)}
+            onBlur={() => saveGrade(s.student_id, m)}
+            placeholder="Observación..."
+            className="h-16 text-xs resize-none"
+          />
+
+          {/* Attendance & Absences */}
+          <div className="grid grid-cols-2 gap-1.5">
+            <div>
+              <label className="text-[10px] text-muted-foreground">Asistencias</label>
+              <Input
+                type="number"
+                min={0}
+                value={ef.attendance_count}
+                onChange={(e) => handleExtraChange(key, "attendance_count", Math.max(0, parseInt(e.target.value) || 0))}
+                onBlur={() => saveGrade(s.student_id, m)}
+                className="h-7 text-xs text-center"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">Inasistencias</label>
+              <Input
+                type="number"
+                min={0}
+                value={ef.absence_count}
+                onChange={(e) => handleExtraChange(key, "absence_count", Math.max(0, parseInt(e.target.value) || 0))}
+                onBlur={() => saveGrade(s.student_id, m)}
+                className="h-7 text-xs text-center"
+              />
+            </div>
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="text-[10px] text-muted-foreground">Estado</label>
+            <Select value={ef.final_status} onValueChange={(v) => { handleExtraChange(key, "final_status", v); setTimeout(() => saveGrade(s.student_id, m), 50); }}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue placeholder="Seleccionar..." />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </TableCell>
+    );
+  };
+
   return (
     <TooltipProvider>
       <>
@@ -521,7 +676,7 @@ export default function FinalGradesTab({
                   <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs text-xs">
-                  <p>Después de guardar una nota, puede ajustar +1 o -1 punto usando los botones al lado del campo. El ajuste acumulado se registra y quedará reflejado en la boleta del estudiante. La nota no puede exceder 20 ni ser menor a 0.</p>
+                  <p>Después de guardar, puede ajustar +1 o -1 punto. El ajuste se registra para la boleta. La nota no puede exceder 20 ni ser menor a 0.</p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -544,7 +699,7 @@ export default function FinalGradesTab({
                 <TableHead className="sticky left-0 bg-background z-10 min-w-[220px]">Nombre del Alumno</TableHead>
                 <TableHead className="min-w-[100px]">Cédula</TableHead>
                 {momentosWithPlan.map(({ momento, hasPlan, hasPercentages }) => (
-                  <TableHead key={momento} className="min-w-[180px] text-center">
+                  <TableHead key={momento} className="min-w-[200px] text-center">
                     <div>Momento {momento}</div>
                     {hasPlan && (
                       <span className="text-[10px] text-muted-foreground">
@@ -561,7 +716,7 @@ export default function FinalGradesTab({
                     )}
                   </TableHead>
                 ))}
-                <TableHead className="min-w-[180px] text-center bg-muted/30">
+                <TableHead className="min-w-[200px] text-center bg-muted/30">
                   <div className="font-semibold">Definitiva Final</div>
                   <span className="text-[10px] text-muted-foreground">Promedio 3 momentos</span>
                   {dirtyCountByMomento[0] > 0 && (
@@ -581,161 +736,11 @@ export default function FinalGradesTab({
                 </TableRow>
               ) : (
                 filteredStudents.map((s: any) => (
-                  <TableRow key={s.student_id}>
-                    <TableCell className="sticky left-0 bg-background z-10 font-medium">{s.student_name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
-                    {[1, 2, 3].map((m) => {
-                      const key = `${s.student_id}-${m}`;
-                      const isSaving = savingKeys.has(key);
-                      const isSaved = savedKeys.has(key);
-                      const isSavingAdj = savingAdjKeys.has(key);
-                      const dirty = isDirty(key);
-                      const value = editedGrades[key] || "";
-                      const isSavedInDb = !!dbValues[key];
-                      const adj = adjustments[key] || 0;
-                      const gradeNum = Number(value);
-                      const canAdd = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum < 20;
-                      const canSubtract = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum > 0;
-
-                      return (
-                        <TableCell key={m} className="text-center p-1.5">
-                          <div className="flex items-center justify-center gap-1">
-                            {isNumeric && (
-                              <button
-                                type="button"
-                                onClick={() => adjustPoint(s.student_id, m, -1)}
-                                disabled={!canSubtract || isSavingAdj}
-                                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              >
-                                <Minus className="h-3 w-3" />
-                              </button>
-                            )}
-                            <div className="relative inline-block">
-                              <Input
-                                type="text"
-                                inputMode={isNumeric ? "decimal" : "text"}
-                                value={value}
-                                onChange={(e) => handleGradeChange(s.student_id, m, e.target.value)}
-                                onBlur={() => saveGrade(s.student_id, m)}
-                                className={`h-8 w-20 mx-auto text-center text-sm ${dirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
-                                placeholder="—"
-                              />
-                              {dirty && !isSaving && !isSaved && (
-                                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-400" />
-                              )}
-                              {(isSaving || isSavingAdj) && (
-                                <Loader2 className="absolute top-1.5 right-1 h-3 w-3 animate-spin text-muted-foreground" />
-                              )}
-                              {isSaved && !isSaving && (
-                                <Check className="absolute top-1.5 right-1 h-3 w-3 text-green-500" />
-                              )}
-                            </div>
-                            {isNumeric && (
-                              <button
-                                type="button"
-                                onClick={() => adjustPoint(s.student_id, m, 1)}
-                                disabled={!canAdd || isSavingAdj}
-                                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            )}
-                            {adj !== 0 && (
-                              <span className={`text-[10px] font-semibold min-w-[28px] ${adj > 0 ? "text-green-600" : "text-destructive"}`}>
-                                {adj > 0 ? `+${adj}` : adj}
-                              </span>
-                            )}
-                            {isNumeric && isSavedInDb && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-[200px] text-xs">
-                                  <p>Use +/- para ajustar la nota en 1 punto. El ajuste acumulado ({adj > 0 ? `+${adj}` : String(adj)} pts) se reflejará en la boleta.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        </TableCell>
-                      );
-                    })}
-                    {/* Definitiva Final cell */}
-                    {(() => {
-                      const m = 0;
-                      const key = `${s.student_id}-${m}`;
-                      const isSaving = savingKeys.has(key);
-                      const isSaved = savedKeys.has(key);
-                      const isSavingAdj = savingAdjKeys.has(key);
-                      const dirty = isDirty(key);
-                      const value = editedGrades[key] || "";
-                      const isSavedInDb = !!dbValues[key];
-                      const adj = adjustments[key] || 0;
-                      const gradeNum = Number(value);
-                      const canAdd = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum < 20;
-                      const canSubtract = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum > 0;
-
-                      return (
-                        <TableCell className="text-center p-1.5 bg-muted/10">
-                          <div className="flex items-center justify-center gap-1">
-                            {isNumeric && (
-                              <button
-                                type="button"
-                                onClick={() => adjustPoint(s.student_id, m, -1)}
-                                disabled={!canSubtract || isSavingAdj}
-                                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              >
-                                <Minus className="h-3 w-3" />
-                              </button>
-                            )}
-                            <div className="relative inline-block">
-                              <Input
-                                type="text"
-                                inputMode={isNumeric ? "decimal" : "text"}
-                                value={value}
-                                onChange={(e) => handleGradeChange(s.student_id, m, e.target.value)}
-                                onBlur={() => saveGrade(s.student_id, m)}
-                                className={`h-8 w-20 mx-auto text-center text-sm font-semibold ${dirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
-                                placeholder="—"
-                              />
-                              {dirty && !isSaving && !isSaved && (
-                                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-400" />
-                              )}
-                              {(isSaving || isSavingAdj) && (
-                                <Loader2 className="absolute top-1.5 right-1 h-3 w-3 animate-spin text-muted-foreground" />
-                              )}
-                              {isSaved && !isSaving && (
-                                <Check className="absolute top-1.5 right-1 h-3 w-3 text-green-500" />
-                              )}
-                            </div>
-                            {isNumeric && (
-                              <button
-                                type="button"
-                                onClick={() => adjustPoint(s.student_id, m, 1)}
-                                disabled={!canAdd || isSavingAdj}
-                                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </button>
-                            )}
-                            {adj !== 0 && (
-                              <span className={`text-[10px] font-semibold min-w-[28px] ${adj > 0 ? "text-green-600" : "text-destructive"}`}>
-                                {adj > 0 ? `+${adj}` : adj}
-                              </span>
-                            )}
-                            {isNumeric && isSavedInDb && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-[200px] text-xs">
-                                  <p>Use +/- para ajustar la nota final. Ajuste acumulado: {adj > 0 ? `+${adj}` : String(adj)} pts.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        </TableCell>
-                      );
-                    })()}
+                  <TableRow key={s.student_id} className="align-top">
+                    <TableCell className="sticky left-0 bg-background z-10 font-medium pt-3">{s.student_name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground pt-3">{s.document_id || "—"}</TableCell>
+                    {[1, 2, 3].map((m) => renderGradeCell(s, m))}
+                    {renderGradeCell(s, 0, true)}
                   </TableRow>
                 ))
               )}
