@@ -231,17 +231,6 @@ export default function SchoolDashboard() {
           <TeacherWorkloadChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
         </div>
 
-        {/* Welcome Card */}
-        <div className="bg-card rounded-lg p-6 shadow-sm border">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
-            Bienvenido al Panel Escolar
-          </h2>
-          <p className="text-muted-foreground">
-            Desde aquí puedes gestionar todos los aspectos de tu institución educativa.
-            Utiliza el menú de navegación para acceder a las diferentes secciones como
-            Familias, Pagos y Ajustes del colegio.
-          </p>
-        </div>
       </div>
     </DashboardLayout>
   );
