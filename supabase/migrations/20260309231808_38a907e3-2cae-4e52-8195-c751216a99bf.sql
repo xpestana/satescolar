@@ -1,0 +1,1 @@
+ALTER TABLE public.final_grades ADD COLUMN adjustment_points numeric DEFAULT 0 NOT NULL;
