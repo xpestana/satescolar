@@ -27,6 +27,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schoolId: string;
+  showIndicators?: boolean;
 }
 
 interface Component {
