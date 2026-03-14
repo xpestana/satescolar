@@ -45,7 +45,7 @@ interface Indicator {
   display_order: number;
 }
 
-export function PreschoolIndicatorsModal({ open, onOpenChange, schoolId }: Props) {
+export function PreschoolIndicatorsModal({ open, onOpenChange, schoolId, showIndicators = true }: Props) {
   const queryClient = useQueryClient();
   const [selectedLevel, setSelectedLevel] = useState("prematernal");
   const [selectedMomento, setSelectedMomento] = useState("1");
