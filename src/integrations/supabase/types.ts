@@ -867,6 +867,7 @@ export type Database = {
       }
       primary_grade_indicators: {
         Row: {
+          area_id: string | null
           area_name: string
           created_at: string
           description: string
@@ -877,6 +878,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          area_id?: string | null
           area_name: string
           created_at?: string
           description?: string
@@ -887,6 +889,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          area_id?: string | null
           area_name?: string
           created_at?: string
           description?: string
@@ -897,6 +900,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "primary_grade_indicators_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "primary_indicator_areas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "primary_grade_indicators_school_id_fkey"
             columns: ["school_id"]
@@ -937,6 +947,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "primary_grading_scales_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_indicator_areas: {
+        Row: {
+          created_at: string
+          display_order: number
+          grade_level: string
+          id: string
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          grade_level: string
+          id?: string
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          grade_level?: string
+          id?: string
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_indicator_areas_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
