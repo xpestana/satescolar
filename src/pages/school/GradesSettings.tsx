@@ -404,6 +404,7 @@ export default function GradesSettings() {
             open={preschoolIndicatorsOpen}
             onOpenChange={setPreschoolIndicatorsOpen}
             schoolId={schoolId}
+            showIndicators={preschoolReportType === "indicators"}
           />
         </>
       )}
