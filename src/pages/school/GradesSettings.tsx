@@ -216,8 +216,8 @@ export default function GradesSettings() {
               </RadioGroup>
             </div>
 
-            {/* Components button */}
-            {preschoolReportType === "indicators" && schoolId && (
+            {/* Components button - always visible */}
+            {schoolId && (
               <Button
                 variant="outline"
                 size="sm"
@@ -404,6 +404,7 @@ export default function GradesSettings() {
             open={preschoolIndicatorsOpen}
             onOpenChange={setPreschoolIndicatorsOpen}
             schoolId={schoolId}
+            showIndicators={preschoolReportType === "indicators"}
           />
         </>
       )}
