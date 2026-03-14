@@ -189,8 +189,8 @@ export default function GradesSettings() {
               </Button>
             )}
 
-            {/* Scales */}
-            <div className="space-y-2 pt-2 border-t">
+            {/* Scales - only for indicators */}
+            {reportType === "indicators" && <div className="space-y-2 pt-2 border-t">
               <Label className="text-sm font-medium">Escalas de calificación</Label>
 
               {scales.map((s) => (
