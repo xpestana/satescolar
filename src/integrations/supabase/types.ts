@@ -1611,6 +1611,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      populate_default_primary_indicators: {
+        Args: { p_school_id: string }
+        Returns: undefined
+      }
       user_has_school_access_to_family: {
         Args: { _family_id: string; _user_id: string }
         Returns: boolean
