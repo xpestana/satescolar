@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Baby, BookOpen, GraduationCap, Plus, Trash2, Settings2 } from "lucide-react";
 import { PrimaryIndicatorsModal } from "@/components/grades/PrimaryIndicatorsModal";
+import { PreschoolIndicatorsModal } from "@/components/grades/PreschoolIndicatorsModal";
 
 interface Scale {
   id: string;
@@ -25,8 +26,11 @@ export default function GradesSettings() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
   const queryClient = useQueryClient();
   const [indicatorsOpen, setIndicatorsOpen] = useState(false);
+  const [preschoolIndicatorsOpen, setPreschoolIndicatorsOpen] = useState(false);
   const [newAbbr, setNewAbbr] = useState("");
   const [newScaleDesc, setNewScaleDesc] = useState("");
+  const [newPreAbbr, setNewPreAbbr] = useState("");
+  const [newPreScaleDesc, setNewPreScaleDesc] = useState("");
 
   // Grades config
   const { data: config, isLoading } = useQuery({
@@ -44,13 +48,29 @@ export default function GradesSettings() {
     enabled: !!schoolId,
   });
 
-  // Scales
+  // Primary Scales
   const { data: scales = [] } = useQuery({
     queryKey: ["primary-scales", schoolId],
     queryFn: async () => {
       if (!schoolId) return [];
       const { data, error } = await supabase
         .from("primary_grading_scales")
+        .select("*")
+        .eq("school_id", schoolId)
+        .order("display_order");
+      if (error) throw error;
+      return data as Scale[];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Preschool Scales
+  const { data: preschoolScales = [] } = useQuery({
+    queryKey: ["preschool-scales", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase
+        .from("preschool_grading_scales")
         .select("*")
         .eq("school_id", schoolId)
         .order("display_order");
@@ -116,6 +136,39 @@ export default function GradesSettings() {
     onError: () => toast.error("Error al eliminar"),
   });
 
+  const addPreschoolScale = useMutation({
+    mutationFn: async () => {
+      if (!schoolId) throw new Error("No school");
+      const maxOrder = preschoolScales.length > 0 ? Math.max(...preschoolScales.map((s) => s.display_order)) + 1 : 0;
+      const { error } = await supabase.from("preschool_grading_scales").insert({
+        school_id: schoolId,
+        abbreviation: newPreAbbr.trim(),
+        description: newPreScaleDesc.trim(),
+        display_order: maxOrder,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["preschool-scales", schoolId] });
+      setNewPreAbbr("");
+      setNewPreScaleDesc("");
+      toast.success("Escala agregada");
+    },
+    onError: () => toast.error("Error al agregar escala"),
+  });
+
+  const deletePreschoolScale = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("preschool_grading_scales").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["preschool-scales", schoolId] });
+      toast.success("Escala eliminada");
+    },
+    onError: () => toast.error("Error al eliminar"),
+  });
+
   if (schoolLoading || isLoading) {
     return (
       <DashboardLayout>
@@ -128,6 +181,7 @@ export default function GradesSettings() {
 
   const usePercentage = config?.use_percentage_plan ?? false;
   const reportType = (config as any)?.primary_report_type ?? "descriptive";
+  const preschoolReportType = (config as any)?.preschool_report_type ?? "descriptive";
 
   return (
     <DashboardLayout>
@@ -141,10 +195,83 @@ export default function GradesSettings() {
               <Baby className="h-5 w-5 text-primary" />
               <CardTitle className="text-base">Preescolar</CardTitle>
             </div>
-            <p className="text-xs text-muted-foreground">Maternal, Inicial (I, II, III nivel)</p>
+            <p className="text-xs text-muted-foreground">Prematernal, 1er Nivel, 2do Nivel, 3er Nivel</p>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground italic">Sin opciones configurables por ahora.</p>
+          <CardContent className="space-y-4">
+            {/* Report type */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Tipo de boleta</Label>
+              <RadioGroup
+                value={preschoolReportType}
+                onValueChange={(val) => upsertConfig.mutate({ preschool_report_type: val })}
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="descriptive" id="pre-descriptive" />
+                  <Label htmlFor="pre-descriptive" className="font-normal text-sm">Descriptivo con componentes</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="indicators" id="pre-indicators" />
+                  <Label htmlFor="pre-indicators" className="font-normal text-sm">Indicadores por componentes</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Components button */}
+            {preschoolReportType === "indicators" && schoolId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setPreschoolIndicatorsOpen(true)}
+              >
+                <Settings2 className="h-4 w-4 mr-1" />
+                Gestionar Componentes
+              </Button>
+            )}
+
+            {/* Preschool Scales - only for indicators */}
+            {preschoolReportType === "indicators" && (
+              <div className="space-y-2 pt-2 border-t">
+                <Label className="text-sm font-medium">Escalas de calificación</Label>
+
+                {preschoolScales.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2 text-sm">
+                    <span className="font-semibold min-w-[40px]">{s.abbreviation}</span>
+                    <span className="flex-1 text-muted-foreground truncate">{s.description}</span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                      onClick={() => deletePreschoolScale.mutate(s.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Sigla"
+                    value={newPreAbbr}
+                    onChange={(e) => setNewPreAbbr(e.target.value)}
+                    className="w-20"
+                  />
+                  <Input
+                    placeholder="Descripción"
+                    value={newPreScaleDesc}
+                    onChange={(e) => setNewPreScaleDesc(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    size="icon"
+                    onClick={() => addPreschoolScale.mutate()}
+                    disabled={!newPreAbbr.trim() || !newPreScaleDesc.trim() || addPreschoolScale.isPending}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -267,11 +394,18 @@ export default function GradesSettings() {
       </div>
 
       {schoolId && (
-        <PrimaryIndicatorsModal
-          open={indicatorsOpen}
-          onOpenChange={setIndicatorsOpen}
-          schoolId={schoolId}
-        />
+        <>
+          <PrimaryIndicatorsModal
+            open={indicatorsOpen}
+            onOpenChange={setIndicatorsOpen}
+            schoolId={schoolId}
+          />
+          <PreschoolIndicatorsModal
+            open={preschoolIndicatorsOpen}
+            onOpenChange={setPreschoolIndicatorsOpen}
+            schoolId={schoolId}
+          />
+        </>
       )}
     </DashboardLayout>
   );

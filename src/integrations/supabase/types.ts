@@ -732,6 +732,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          preschool_report_type: string
           primary_report_type: string
           school_id: string
           updated_at: string
@@ -740,6 +741,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          preschool_report_type?: string
           primary_report_type?: string
           school_id: string
           updated_at?: string
@@ -748,6 +750,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          preschool_report_type?: string
           primary_report_type?: string
           school_id?: string
           updated_at?: string
@@ -860,6 +863,130 @@ export type Database = {
             foreignKeyName: "planilla_general_config_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      preschool_component_indicators: {
+        Row: {
+          component_id: string
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          component_id: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          component_id?: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preschool_component_indicators_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "preschool_indicator_components"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "preschool_component_indicators_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      preschool_grading_scales: {
+        Row: {
+          abbreviation: string
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          abbreviation: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          abbreviation?: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preschool_grading_scales_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      preschool_indicator_components: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          level: string
+          momento: string
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          level: string
+          momento: string
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          level?: string
+          momento?: string
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "preschool_indicator_components_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
