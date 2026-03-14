@@ -318,93 +318,95 @@ export function PreschoolIndicatorsModal({ open, onOpenChange, schoolId, showInd
                         )}
                       </div>
 
-                      {/* Indicators list */}
-                      <CollapsibleContent>
-                        <div className="p-3 space-y-2 border-t">
-                          {compIndicators.length === 0 && (
-                            <p className="text-xs text-muted-foreground italic">Sin indicadores aún.</p>
-                          )}
+                      {/* Indicators list - only when showIndicators */}
+                      {showIndicators && (
+                        <CollapsibleContent>
+                          <div className="p-3 space-y-2 border-t">
+                            {compIndicators.length === 0 && (
+                              <p className="text-xs text-muted-foreground italic">Sin indicadores aún.</p>
+                            )}
 
-                          {compIndicators.map((ind) => (
-                            <div key={ind.id} className="flex items-start gap-2 pl-2">
-                              {editingIndicatorId === ind.id ? (
-                                <div className="flex-1 flex gap-2">
-                                  <Textarea
-                                    value={editIndicatorDesc}
-                                    onChange={(e) => setEditIndicatorDesc(e.target.value)}
-                                    rows={2}
-                                    className="text-sm"
-                                  />
-                                  <div className="flex flex-col gap-1 shrink-0">
+                            {compIndicators.map((ind) => (
+                              <div key={ind.id} className="flex items-start gap-2 pl-2">
+                                {editingIndicatorId === ind.id ? (
+                                  <div className="flex-1 flex gap-2">
+                                    <Textarea
+                                      value={editIndicatorDesc}
+                                      onChange={(e) => setEditIndicatorDesc(e.target.value)}
+                                      rows={2}
+                                      className="text-sm"
+                                    />
+                                    <div className="flex flex-col gap-1 shrink-0">
+                                      <Button
+                                        size="icon"
+                                        className="h-7 w-7"
+                                        onClick={() => updateIndicator.mutate({ id: ind.id, description: editIndicatorDesc })}
+                                        disabled={!editIndicatorDesc.trim() || updateIndicator.isPending}
+                                      >
+                                        <Check className="h-3 w-3" />
+                                      </Button>
+                                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingIndicatorId(null)}>
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <span className="text-xs text-muted-foreground mt-0.5">•</span>
+                                    <p className="flex-1 text-sm">{ind.description}</p>
                                     <Button
                                       size="icon"
-                                      className="h-7 w-7"
-                                      onClick={() => updateIndicator.mutate({ id: ind.id, description: editIndicatorDesc })}
-                                      disabled={!editIndicatorDesc.trim() || updateIndicator.isPending}
+                                      variant="ghost"
+                                      className="h-6 w-6 shrink-0"
+                                      onClick={() => {
+                                        setEditingIndicatorId(ind.id);
+                                        setEditIndicatorDesc(ind.description);
+                                      }}
                                     >
-                                      <Check className="h-3 w-3" />
+                                      <Pencil className="h-3 w-3" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingIndicatorId(null)}>
-                                      <X className="h-3 w-3" />
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                                      onClick={() => deleteIndicator.mutate(ind.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
                                     </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <>
-                                  <span className="text-xs text-muted-foreground mt-0.5">•</span>
-                                  <p className="flex-1 text-sm">{ind.description}</p>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6 shrink-0"
-                                    onClick={() => {
-                                      setEditingIndicatorId(ind.id);
-                                      setEditIndicatorDesc(ind.description);
-                                    }}
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
-                                    onClick={() => deleteIndicator.mutate(ind.id)}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </>
-                              )}
-                            </div>
-                          ))}
+                                  </>
+                                )}
+                              </div>
+                            ))}
 
-                          {/* Add indicator input */}
-                          <div className="flex gap-2 pt-1">
-                            <Input
-                              placeholder="Nuevo indicador..."
-                              value={newIndicatorText[comp.id] || ""}
-                              onChange={(e) =>
-                                setNewIndicatorText((prev) => ({ ...prev, [comp.id]: e.target.value }))
-                              }
-                              className="text-sm h-8"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" && (newIndicatorText[comp.id] || "").trim()) {
-                                  addIndicator.mutate({ componentId: comp.id, description: newIndicatorText[comp.id] });
+                            {/* Add indicator input */}
+                            <div className="flex gap-2 pt-1">
+                              <Input
+                                placeholder="Nuevo indicador..."
+                                value={newIndicatorText[comp.id] || ""}
+                                onChange={(e) =>
+                                  setNewIndicatorText((prev) => ({ ...prev, [comp.id]: e.target.value }))
                                 }
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-8 shrink-0"
-                              onClick={() => addIndicator.mutate({ componentId: comp.id, description: newIndicatorText[comp.id] || "" })}
-                              disabled={!(newIndicatorText[comp.id] || "").trim() || addIndicator.isPending}
-                            >
-                              <Plus className="h-3 w-3 mr-1" />
-                              Agregar
-                            </Button>
+                                className="text-sm h-8"
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && (newIndicatorText[comp.id] || "").trim()) {
+                                    addIndicator.mutate({ componentId: comp.id, description: newIndicatorText[comp.id] });
+                                  }
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 shrink-0"
+                                onClick={() => addIndicator.mutate({ componentId: comp.id, description: newIndicatorText[comp.id] || "" })}
+                                disabled={!(newIndicatorText[comp.id] || "").trim() || addIndicator.isPending}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Agregar
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      </CollapsibleContent>
+                        </CollapsibleContent>
+                      )}
                     </div>
                   </Collapsible>
                 );
