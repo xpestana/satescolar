@@ -292,9 +292,11 @@ export function PreschoolIndicatorsModal({ open, onOpenChange, schoolId, showInd
                             </CollapsibleTrigger>
                           )}
                             <span className="flex-1 text-sm font-medium">{comp.name}</span>
-                            <span className="text-xs text-muted-foreground mr-1">
-                              {compIndicators.length} indicador{compIndicators.length !== 1 ? "es" : ""}
-                            </span>
+                            {showIndicators && (
+                              <span className="text-xs text-muted-foreground mr-1">
+                                {compIndicators.length} indicador{compIndicators.length !== 1 ? "es" : ""}
+                              </span>
+                            )}
                             <Button
                               size="icon"
                               variant="ghost"
