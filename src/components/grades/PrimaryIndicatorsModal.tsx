@@ -6,8 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Plus, Trash2, Pencil, Check, X, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const GRADES = [
   { value: "1", label: "1er Grado" },
@@ -24,8 +25,16 @@ interface Props {
   schoolId: string;
 }
 
+interface Area {
+  id: string;
+  grade_level: string;
+  name: string;
+  display_order: number;
+}
+
 interface Indicator {
   id: string;
+  area_id: string | null;
   grade_level: string;
   area_name: string;
   description: string;
@@ -36,15 +45,32 @@ export function PrimaryIndicatorsModal({ open, onOpenChange, schoolId }: Props) 
   const queryClient = useQueryClient();
   const [selectedGrade, setSelectedGrade] = useState("1");
   const [newAreaName, setNewAreaName] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editArea, setEditArea] = useState("");
-  const [editDesc, setEditDesc] = useState("");
+  const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
+  const [editAreaName, setEditAreaName] = useState("");
+  const [newIndicatorText, setNewIndicatorText] = useState<Record<string, string>>({});
+  const [editingIndicatorId, setEditingIndicatorId] = useState<string | null>(null);
+  const [editIndicatorDesc, setEditIndicatorDesc] = useState("");
+  const [openAreas, setOpenAreas] = useState<Set<string>>(new Set());
 
-  const queryKey = ["primary-indicators", schoolId];
+  const areasKey = ["primary-indicator-areas", schoolId];
+  const indicatorsKey = ["primary-indicators", schoolId];
 
-  const { data: indicators = [], isLoading } = useQuery({
-    queryKey,
+  const { data: areas = [], isLoading: areasLoading } = useQuery({
+    queryKey: areasKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("primary_indicator_areas")
+        .select("*")
+        .eq("school_id", schoolId)
+        .order("display_order");
+      if (error) throw error;
+      return data as Area[];
+    },
+    enabled: open && !!schoolId,
+  });
+
+  const { data: indicators = [], isLoading: indicatorsLoading } = useQuery({
+    queryKey: indicatorsKey,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("primary_grade_indicators")
@@ -57,74 +83,121 @@ export function PrimaryIndicatorsModal({ open, onOpenChange, schoolId }: Props) 
     enabled: open && !!schoolId,
   });
 
-  const filtered = indicators.filter((i) => i.grade_level === selectedGrade);
+  const filteredAreas = areas.filter((a) => a.grade_level === selectedGrade);
+  const getIndicatorsForArea = (areaId: string) =>
+    indicators.filter((i) => i.area_id === areaId);
 
-  const addMutation = useMutation({
+  const toggleArea = (areaId: string) => {
+    setOpenAreas((prev) => {
+      const next = new Set(prev);
+      if (next.has(areaId)) next.delete(areaId);
+      else next.add(areaId);
+      return next;
+    });
+  };
+
+  // --- Area mutations ---
+  const addArea = useMutation({
     mutationFn: async () => {
-      const maxOrder = filtered.length > 0 ? Math.max(...filtered.map((i) => i.display_order)) + 1 : 0;
-      const { error } = await supabase.from("primary_grade_indicators").insert({
+      const maxOrder = filteredAreas.length > 0 ? Math.max(...filteredAreas.map((a) => a.display_order)) + 1 : 0;
+      const { error } = await supabase.from("primary_indicator_areas").insert({
         school_id: schoolId,
         grade_level: selectedGrade,
-        area_name: newAreaName.trim(),
-        description: newDescription.trim(),
+        name: newAreaName.trim(),
         display_order: maxOrder,
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: areasKey });
       setNewAreaName("");
-      setNewDescription("");
-      toast.success("Indicador agregado");
+      toast.success("Área agregada");
     },
-    onError: () => toast.error("Error al agregar"),
+    onError: () => toast.error("Error al agregar área"),
   });
 
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, area_name, description }: { id: string; area_name: string; description: string }) => {
+  const updateArea = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
       const { error } = await supabase
-        .from("primary_grade_indicators")
-        .update({ area_name, description, updated_at: new Date().toISOString() })
+        .from("primary_indicator_areas")
+        .update({ name, updated_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
-      setEditingId(null);
+      queryClient.invalidateQueries({ queryKey: areasKey });
+      setEditingAreaId(null);
+      toast.success("Área actualizada");
+    },
+    onError: () => toast.error("Error al actualizar"),
+  });
+
+  const deleteArea = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("primary_indicator_areas").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: areasKey });
+      queryClient.invalidateQueries({ queryKey: indicatorsKey });
+      toast.success("Área eliminada");
+    },
+    onError: () => toast.error("Error al eliminar"),
+  });
+
+  // --- Indicator mutations ---
+  const addIndicator = useMutation({
+    mutationFn: async ({ areaId, description }: { areaId: string; description: string }) => {
+      const areaIndicators = getIndicatorsForArea(areaId);
+      const maxOrder = areaIndicators.length > 0 ? Math.max(...areaIndicators.map((i) => i.display_order)) + 1 : 0;
+      const area = areas.find((a) => a.id === areaId);
+      const { error } = await supabase.from("primary_grade_indicators").insert({
+        school_id: schoolId,
+        grade_level: selectedGrade,
+        area_id: areaId,
+        area_name: area?.name ?? "",
+        description: description.trim(),
+        display_order: maxOrder,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, { areaId }) => {
+      queryClient.invalidateQueries({ queryKey: indicatorsKey });
+      setNewIndicatorText((prev) => ({ ...prev, [areaId]: "" }));
+      toast.success("Indicador agregado");
+    },
+    onError: () => toast.error("Error al agregar indicador"),
+  });
+
+  const updateIndicator = useMutation({
+    mutationFn: async ({ id, description }: { id: string; description: string }) => {
+      const { error } = await supabase
+        .from("primary_grade_indicators")
+        .update({ description, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: indicatorsKey });
+      setEditingIndicatorId(null);
       toast.success("Indicador actualizado");
     },
     onError: () => toast.error("Error al actualizar"),
   });
 
-  const deleteMutation = useMutation({
+  const deleteIndicator = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("primary_grade_indicators").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: indicatorsKey });
       toast.success("Indicador eliminado");
     },
     onError: () => toast.error("Error al eliminar"),
   });
 
-  const reorderMutation = useMutation({
-    mutationFn: async ({ id, direction }: { id: string; direction: "up" | "down" }) => {
-      const idx = filtered.findIndex((i) => i.id === id);
-      if (idx < 0) return;
-      const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-      if (swapIdx < 0 || swapIdx >= filtered.length) return;
-
-      const a = filtered[idx];
-      const b = filtered[swapIdx];
-
-      await Promise.all([
-        supabase.from("primary_grade_indicators").update({ display_order: b.display_order }).eq("id", a.id),
-        supabase.from("primary_grade_indicators").update({ display_order: a.display_order }).eq("id", b.id),
-      ]);
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
-  });
+  const isLoading = areasLoading || indicatorsLoading;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -153,115 +226,186 @@ export function PrimaryIndicatorsModal({ open, onOpenChange, schoolId }: Props) 
             </div>
           ) : (
             <div className="space-y-2">
-              {filtered.length === 0 && (
+              {filteredAreas.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  No hay indicadores para este grado. Agrega uno abajo.
+                  No hay áreas para este grado. Agrega una abajo.
                 </p>
               )}
-              {filtered.map((ind, idx) => (
-                <div key={ind.id} className="flex items-start gap-2 rounded-lg border p-3">
-                  {editingId === ind.id ? (
-                    <div className="flex-1 space-y-2">
-                      <Input
-                        value={editArea}
-                        onChange={(e) => setEditArea(e.target.value)}
-                        placeholder="Nombre del área"
-                      />
-                      <Textarea
-                        value={editDesc}
-                        onChange={(e) => setEditDesc(e.target.value)}
-                        placeholder="Descripción"
-                        rows={2}
-                      />
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            updateMutation.mutate({ id: ind.id, area_name: editArea, description: editDesc })
-                          }
-                          disabled={!editArea.trim() || updateMutation.isPending}
-                        >
-                          <Check className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                          <X className="h-3 w-3" />
-                        </Button>
+
+              {filteredAreas.map((area) => {
+                const areaIndicators = getIndicatorsForArea(area.id);
+                const isOpen = openAreas.has(area.id);
+
+                return (
+                  <Collapsible key={area.id} open={isOpen} onOpenChange={() => toggleArea(area.id)}>
+                    <div className="rounded-lg border">
+                      {/* Area header */}
+                      <div className="flex items-center gap-2 p-3 bg-muted/50">
+                        {editingAreaId === area.id ? (
+                          <div className="flex-1 flex items-center gap-2">
+                            <Input
+                              value={editAreaName}
+                              onChange={(e) => setEditAreaName(e.target.value)}
+                              className="h-8"
+                              autoFocus
+                            />
+                            <Button
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={() => updateArea.mutate({ id: area.id, name: editAreaName })}
+                              disabled={!editAreaName.trim() || updateArea.isPending}
+                            >
+                              <Check className="h-3 w-3" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditingAreaId(null)}>
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                                {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              </Button>
+                            </CollapsibleTrigger>
+                            <span className="flex-1 text-sm font-medium">{area.name}</span>
+                            <span className="text-xs text-muted-foreground mr-1">
+                              {areaIndicators.length} indicador{areaIndicators.length !== 1 ? "es" : ""}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0"
+                              onClick={() => {
+                                setEditingAreaId(area.id);
+                                setEditAreaName(area.name);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 shrink-0 text-destructive hover:text-destructive"
+                              onClick={() => deleteArea.mutate(area.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
                       </div>
+
+                      {/* Indicators list */}
+                      <CollapsibleContent>
+                        <div className="p-3 space-y-2 border-t">
+                          {areaIndicators.length === 0 && (
+                            <p className="text-xs text-muted-foreground italic">Sin indicadores aún.</p>
+                          )}
+
+                          {areaIndicators.map((ind) => (
+                            <div key={ind.id} className="flex items-start gap-2 pl-2">
+                              {editingIndicatorId === ind.id ? (
+                                <div className="flex-1 flex gap-2">
+                                  <Textarea
+                                    value={editIndicatorDesc}
+                                    onChange={(e) => setEditIndicatorDesc(e.target.value)}
+                                    rows={2}
+                                    className="text-sm"
+                                  />
+                                  <div className="flex flex-col gap-1 shrink-0">
+                                    <Button
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => updateIndicator.mutate({ id: ind.id, description: editIndicatorDesc })}
+                                      disabled={!editIndicatorDesc.trim() || updateIndicator.isPending}
+                                    >
+                                      <Check className="h-3 w-3" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditingIndicatorId(null)}>
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <span className="text-xs text-muted-foreground mt-0.5">•</span>
+                                  <p className="flex-1 text-sm">{ind.description}</p>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 shrink-0"
+                                    onClick={() => {
+                                      setEditingIndicatorId(ind.id);
+                                      setEditIndicatorDesc(ind.description);
+                                    }}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                                    onClick={() => deleteIndicator.mutate(ind.id)}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+
+                          {/* Add indicator input */}
+                          <div className="flex gap-2 pt-1">
+                            <Input
+                              placeholder="Nuevo indicador..."
+                              value={newIndicatorText[area.id] || ""}
+                              onChange={(e) =>
+                                setNewIndicatorText((prev) => ({ ...prev, [area.id]: e.target.value }))
+                              }
+                              className="text-sm h-8"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && (newIndicatorText[area.id] || "").trim()) {
+                                  addIndicator.mutate({ areaId: area.id, description: newIndicatorText[area.id] });
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 shrink-0"
+                              onClick={() => addIndicator.mutate({ areaId: area.id, description: newIndicatorText[area.id] || "" })}
+                              disabled={!(newIndicatorText[area.id] || "").trim() || addIndicator.isPending}
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Agregar
+                            </Button>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
                     </div>
-                  ) : (
-                    <>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{ind.area_name}</p>
-                        <p className="text-xs text-muted-foreground">{ind.description}</p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          disabled={idx === 0}
-                          onClick={() => reorderMutation.mutate({ id: ind.id, direction: "up" })}
-                        >
-                          <ArrowUp className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          disabled={idx === filtered.length - 1}
-                          onClick={() => reorderMutation.mutate({ id: ind.id, direction: "down" })}
-                        >
-                          <ArrowDown className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            setEditingId(ind.id);
-                            setEditArea(ind.area_name);
-                            setEditDesc(ind.description);
-                          }}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => deleteMutation.mutate(ind.id)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                  </Collapsible>
+                );
+              })}
             </div>
           )}
 
-          {/* Add new indicator */}
-          <div className="rounded-lg border border-dashed p-3 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Agregar indicador</p>
+          {/* Add new area */}
+          <div className="flex gap-2 pt-2 border-t">
             <Input
-              placeholder="Nombre del área"
+              placeholder="Nombre del área (ej: Lenguaje, Matemática...)"
               value={newAreaName}
               onChange={(e) => setNewAreaName(e.target.value)}
-            />
-            <Textarea
-              placeholder="Descripción del indicador"
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              rows={2}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newAreaName.trim()) addArea.mutate();
+              }}
             />
             <Button
-              size="sm"
-              onClick={() => addMutation.mutate()}
-              disabled={!newAreaName.trim() || addMutation.isPending}
+              onClick={() => addArea.mutate()}
+              disabled={!newAreaName.trim() || addArea.isPending}
+              className="shrink-0"
             >
-              <Plus className="h-3 w-3 mr-1" />
-              Agregar
+              <Plus className="h-4 w-4 mr-1" />
+              Área
             </Button>
           </div>
         </div>
