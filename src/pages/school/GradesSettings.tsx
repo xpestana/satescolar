@@ -216,8 +216,8 @@ export default function GradesSettings() {
               </RadioGroup>
             </div>
 
-            {/* Components button */}
-            {preschoolReportType === "indicators" && schoolId && (
+            {/* Components button - always visible */}
+            {schoolId && (
               <Button
                 variant="outline"
                 size="sm"
