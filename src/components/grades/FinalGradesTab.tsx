@@ -800,7 +800,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingAll(false);
     }
-  }, [isPrimary, assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, isAnyDirty, totalDirty, literals, dbLiterals]);
+  }, [isPrimary, isPreschool, assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, isAnyDirty, totalDirty, literals, dbLiterals]);
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return students;
