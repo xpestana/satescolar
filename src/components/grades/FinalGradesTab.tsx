@@ -726,7 +726,8 @@ export default function FinalGradesTab({
     if (assignmentIds.length === 0 || totalDirty === 0) return;
     setSavingAll(true);
     try {
-      if (isPrimary) {
+      if (isPrimary || isPreschool) {
+        const tableName = isPrimary ? "primary_final_reports" : "preschool_final_reports";
         // Save all dirty primary reports
         const upserts: any[] = [];
         for (const s of students) {
