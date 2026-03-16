@@ -146,10 +146,11 @@ export default function FinalGradesTab({
         .maybeSingle();
       return data;
     },
-    enabled: !!schoolId && isPrimary,
+    enabled: !!schoolId && (isPrimary || isPreschool),
   });
 
   const primaryReportType = (gradesConfig?.primary_report_type || "descriptive") as "descriptive" | "indicators";
+  const preschoolReportType = (gradesConfig?.preschool_report_type || "descriptive") as "descriptive" | "indicators";
 
   // Fetch existing primary_final_reports for literals
   const { data: primaryReports = [], isLoading: primaryReportsLoading } = useQuery({
