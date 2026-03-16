@@ -1365,11 +1365,15 @@ export default function FinalGradesTab({
                     <TableCell className="text-sm text-muted-foreground pt-3">{s.document_id || "—"}</TableCell>
                     {isPrimary
                       ? [1, 2, 3].map((m) => renderPrimaryGradeCell(s, m))
-                      : [1, 2, 3].map((m) => renderGradeCell(s, m))
+                      : isPreschool
+                        ? [1, 2, 3].map((m) => renderPreschoolGradeCell(s, m))
+                        : [1, 2, 3].map((m) => renderGradeCell(s, m))
                     }
                     {isPrimary
                       ? renderPrimaryGradeCell(s, 0, true)
-                      : renderGradeCell(s, 0, true)
+                      : isPreschool
+                        ? renderPreschoolGradeCell(s, 0, true)
+                        : renderGradeCell(s, 0, true)
                     }
                   </TableRow>
                 ))
