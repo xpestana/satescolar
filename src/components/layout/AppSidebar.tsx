@@ -93,7 +93,7 @@ const navSections: NavSection[] = [
     title: "Notas",
     requiredRole: "school",
     items: [
-      { label: "Consulta de Notas", href: "/notas/consulta", icon: Search, requiredRole: "school" },
+      { label: "Consulta de Notas y Boletas", href: "/notas/consulta", icon: Search, requiredRole: "school" },
     ],
   },
   {
