@@ -438,6 +438,24 @@ export default function GradesSettings() {
                 disabled={upsertConfig.isPending}
               />
             </div>
+
+            {/* Template selector */}
+            <div className="space-y-2 pt-3">
+              <Label className="text-sm font-medium">Plantilla de boleta</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {secondaryTemplates.map((t) => (
+                  <TemplatePreview
+                    key={t.id}
+                    templateId={t.id}
+                    level="secondary"
+                    name={t.name}
+                    description={t.description}
+                    selected={secondaryTemplate === t.id}
+                    onClick={() => upsertConfig.mutate({ secondary_template: t.id })}
+                  />
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
