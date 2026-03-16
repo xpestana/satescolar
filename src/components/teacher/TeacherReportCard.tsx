@@ -249,6 +249,8 @@ export function TeacherReportCard({
   const hasReport = (studentId: string) =>
     reports.some((r: any) => r.student_id === studentId);
 
+  if (!isPrimary && !isPreschool) return null;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-6">
