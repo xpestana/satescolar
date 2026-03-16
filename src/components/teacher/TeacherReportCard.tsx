@@ -59,9 +59,6 @@ export function TeacherReportCard({
   const queryClient = useQueryClient();
   const isPrimary = PRIMARY_GRADES.has(gradeLevel);
   const isPreschool = PRESCHOOL_GRADES.has(gradeLevel);
-
-  if (!isPrimary && !isPreschool) return null;
-
   const tableName = isPrimary ? "primary_final_reports" : "preschool_final_reports";
 
   const [literals, setLiterals] = useState<Record<string, string>>({});
