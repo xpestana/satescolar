@@ -325,7 +325,7 @@ export default function TeacherGrades() {
       )}
 
       {/* Report Card for primary/preschool */}
-      {!loading && assignment && students.length > 0 && planItems.length > 0 && (
+      {!loading && assignment && students.length > 0 && (
         <TeacherReportCard
           assignmentId={assignmentId!}
           schoolId={assignment.school_id}
