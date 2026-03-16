@@ -23,6 +23,10 @@ const PRIMARY_GRADES = new Set([
   "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado",
 ]);
 
+const PRESCHOOL_GRADES = new Set([
+  "pre_maternal", "maternal", "i_nivel", "ii_nivel", "iii_nivel",
+]);
+
 const STATUS_OPTIONS = [
   { value: "aprobado", label: "Aprobado" },
   { value: "no_aprobado", label: "No Aprobado" },
