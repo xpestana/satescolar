@@ -395,8 +395,9 @@ export default function GradesConsultation() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList>
-          <TabsTrigger value="consulta">Consulta de Notas</TabsTrigger>
-          <TabsTrigger value="finales">Notas Finales y Boletas</TabsTrigger>
+          <TabsTrigger value="consulta">Consulta de Notas del Docente</TabsTrigger>
+          <TabsTrigger value="finales">Notas Finales y Construcción de Boletas</TabsTrigger>
+          <TabsTrigger value="descarga">Descarga de Boletas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="consulta">
