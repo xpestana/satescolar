@@ -268,8 +268,8 @@ export default function PrimaryFinalReportModal({
           </div>
         ) : (
           <ScrollArea className="flex-1 max-h-[calc(95vh-160px)]">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
-              {/* Left panel: Teacher grades */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pr-4">
+              {/* Column 1: Teacher grades */}
               <div className="border rounded-md overflow-hidden flex flex-col">
                 <div className="px-3 py-2 bg-muted/30 border-b">
                   <h3 className="text-sm font-semibold">Notas del Docente</h3>
@@ -284,7 +284,7 @@ export default function PrimaryFinalReportModal({
                   </TabsList>
                   {[1, 2, 3].map((m) => (
                     <TabsContent key={m} value={String(m)} className="flex-1 px-3 pb-3">
-                      <ScrollArea className="h-[300px]">
+                      <ScrollArea className="h-[400px]">
                         {teacherGradesByMomento[m]?.length === 0 ? (
                           <p className="text-sm text-muted-foreground py-4 text-center">
                             Sin evaluaciones en este momento
@@ -305,7 +305,7 @@ export default function PrimaryFinalReportModal({
                 </Tabs>
               </div>
 
-              {/* Right panel: Indicators or Descriptive */}
+              {/* Column 2: Indicators or Descriptive */}
               <div className="border rounded-md overflow-hidden flex flex-col">
                 <div className="px-3 py-2 bg-muted/30 border-b">
                   <h3 className="text-sm font-semibold">
@@ -318,10 +318,10 @@ export default function PrimaryFinalReportModal({
                       value={descriptiveReport}
                       onChange={setDescriptiveReport}
                       placeholder="Redacte el informe descriptivo del estudiante..."
-                      minHeight={280}
+                      minHeight={380}
                     />
                   ) : (
-                    <ScrollArea className="h-[320px]">
+                    <ScrollArea className="h-[400px]">
                       <div className="space-y-4 pr-2">
                         {areas.map((area: any) => (
                           <div key={area.id}>
@@ -365,76 +365,67 @@ export default function PrimaryFinalReportModal({
                 </div>
               </div>
 
-              {/* Bottom section: Observaciones y datos del momento (full width) */}
-              <div className="lg:col-span-2 border rounded-md overflow-hidden">
+              {/* Column 3: Observaciones del Momento */}
+              <div className="border rounded-md overflow-hidden flex flex-col">
                 <div className="px-3 py-2 bg-muted/30 border-b">
                   <h3 className="text-sm font-semibold">Observaciones del Momento</h3>
                 </div>
-                <div className="p-4 space-y-4">
-                  {/* Row 1: Literal + Inasistencias + Proyecto */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Literal (A-E)</Label>
-                      <Input
-                        value={literal}
-                        onChange={(e) => handleLiteralChange(e.target.value)}
-                        placeholder="A"
-                        maxLength={1}
-                        className="h-9 text-center font-semibold uppercase"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Inasistencias</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={absenceCount}
-                        onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="h-9"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Nombre del Proyecto</Label>
-                      <Input
-                        value={projectName}
-                        onChange={(e) => setProjectName(e.target.value)}
-                        placeholder="Nombre del proyecto del momento..."
-                        className="h-9"
-                      />
-                    </div>
+                <div className="p-3 space-y-3 flex-1">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Literal (A-E)</Label>
+                    <Input
+                      value={literal}
+                      onChange={(e) => handleLiteralChange(e.target.value)}
+                      placeholder="A"
+                      maxLength={1}
+                      className="h-9 text-center font-semibold uppercase"
+                    />
                   </div>
-
-                  {/* Row 2: Teacher info (read-only) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs flex items-center gap-1">
-                        <User className="h-3 w-3" /> Docente
-                      </Label>
-                      <Input
-                        value={teacherInfo?.name || "—"}
-                        readOnly
-                        className="h-9 bg-muted/50 cursor-default"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Cédula del Docente</Label>
-                      <Input
-                        value={teacherInfo?.documentId || "—"}
-                        readOnly
-                        className="h-9 bg-muted/50 cursor-default"
-                      />
-                    </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Inasistencias</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={absenceCount}
+                      onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="h-9"
+                    />
                   </div>
-
-                  {/* Row 3: Observaciones WYSIWYG */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Nombre del Proyecto</Label>
+                    <Input
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      placeholder="Nombre del proyecto..."
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1">
+                      <User className="h-3 w-3" /> Docente
+                    </Label>
+                    <Input
+                      value={teacherInfo?.name || "—"}
+                      readOnly
+                      className="h-9 bg-muted/50 cursor-default"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Cédula del Docente</Label>
+                    <Input
+                      value={teacherInfo?.documentId || "—"}
+                      readOnly
+                      className="h-9 bg-muted/50 cursor-default"
+                    />
+                  </div>
                   {reportType === "indicators" && (
                     <div className="space-y-1.5">
                       <Label className="text-xs">Observación Descriptiva</Label>
                       <RichTextEditor
                         value={descriptiveReport}
                         onChange={setDescriptiveReport}
-                        placeholder="Observación adicional del estudiante..."
-                        minHeight={150}
+                        placeholder="Observación adicional..."
+                        minHeight={120}
                       />
                     </div>
                   )}
