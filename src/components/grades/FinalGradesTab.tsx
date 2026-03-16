@@ -1399,6 +1399,24 @@ export default function FinalGradesTab({
             }}
           />
         )}
+
+        {/* Preschool Report Modal */}
+        {isPreschool && reportModalStudent && gradeLevel && (
+          <PreschoolFinalReportModal
+            open={reportModalOpen}
+            onClose={() => { setReportModalOpen(false); setReportModalStudent(null); }}
+            studentId={reportModalStudent.id}
+            studentName={reportModalStudent.name}
+            assignmentId={assignmentIds[0]}
+            schoolId={schoolId}
+            momento={reportModalMomento}
+            gradeLevel={gradeLevel}
+            reportType={preschoolReportType}
+            onSaved={() => {
+              queryClient.invalidateQueries({ queryKey: ["preschool-final-reports-all"] });
+            }}
+          />
+        )}
       </>
     </TooltipProvider>
   );
