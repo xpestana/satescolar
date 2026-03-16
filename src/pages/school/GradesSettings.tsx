@@ -304,6 +304,7 @@ export default function GradesSettings() {
               </div>
             </div>
           </CardContent>
+        </Card>
 
         {/* Primaria */}
         <Card>
