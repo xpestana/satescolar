@@ -750,7 +750,7 @@ export default function FinalGradesTab({
         }
         if (upserts.length > 0) {
           await supabase
-            .from("primary_final_reports" as any)
+            .from(tableName as any)
             .upsert(upserts as any, { onConflict: "student_id,assignment_id,momento" });
         }
         const newDbLits = { ...dbLiterals };
