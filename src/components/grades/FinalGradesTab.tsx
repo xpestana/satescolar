@@ -59,6 +59,7 @@ export default function FinalGradesTab({
   sections,
   gcrpAssignments,
 }: FinalGradesTabProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [editedGrades, setEditedGrades] = useState<Record<string, string>>({});
