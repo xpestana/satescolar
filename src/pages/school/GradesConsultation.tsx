@@ -245,10 +245,10 @@ export default function GradesConsultation() {
   return (
     <DashboardLayout>
       <PageHeader
-        title="Consulta de Notas"
+        title="Consulta de Notas y Boletas"
         breadcrumbs={[
           { label: "Inicio", href: "/school/dashboard" },
-          { label: "Consulta de Notas" },
+          { label: "Consulta de Notas y Boletas" },
         ]}
       />
 
