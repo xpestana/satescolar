@@ -56,6 +56,7 @@ export function TeacherReportCard({
   gradeLevel,
   momento,
   students,
+  sectionLabel,
 }: TeacherReportCardProps) {
   const queryClient = useQueryClient();
   const isPrimary = PRIMARY_GRADES.has(gradeLevel);
