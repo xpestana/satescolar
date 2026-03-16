@@ -165,6 +165,19 @@ export default function FinalGradesTab({
     enabled: isPrimary && assignmentIds.length > 0,
   });
 
+  // Fetch existing preschool_final_reports for literals
+  const { data: preschoolReports = [], isLoading: preschoolReportsLoading } = useQuery({
+    queryKey: ["preschool-final-reports-all", assignmentIds],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("preschool_final_reports" as any)
+        .select("*")
+        .in("assignment_id", assignmentIds);
+      return (data as any[]) || [];
+    },
+    enabled: isPreschool && assignmentIds.length > 0,
+  });
+
   const { data: students = [], isLoading: studentsLoading } = useQuery({
     queryKey: ["final-students", selectedSection, effectiveYear, schoolId, isGcrpQuery, assignmentIds],
     queryFn: async () => {
