@@ -266,8 +266,8 @@ export function TeacherReportCard({
       <div className="mt-6 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-semibold text-foreground">
-              {isPrimary ? "Boleta de Primaria" : "Boleta de Preescolar"}
+           <h3 className="text-base font-semibold text-foreground">
+              Boleta {sectionLabel ? `— ${sectionLabel}` : (isPrimary ? "de Primaria" : "de Preescolar")}
             </h3>
             <Badge variant="secondary" className="text-xs">Momento {momento}</Badge>
           </div>
