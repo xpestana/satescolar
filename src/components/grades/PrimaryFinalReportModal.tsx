@@ -267,15 +267,14 @@ export default function PrimaryFinalReportModal({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <ScrollArea className="flex-1 max-h-[calc(95vh-160px)]">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pr-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
               {/* Column 1: Teacher grades */}
-              <div className="border rounded-md overflow-hidden flex flex-col">
-                <div className="px-3 py-2 bg-muted/30 border-b">
+              <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
+                <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
                   <h3 className="text-sm font-semibold">Notas del Docente</h3>
                 </div>
-                <Tabs value={activeTeacherTab} onValueChange={setActiveTeacherTab} className="flex-1 flex flex-col">
-                  <TabsList className="mx-2 mt-2">
+                <Tabs value={activeTeacherTab} onValueChange={setActiveTeacherTab} className="flex-1 flex flex-col min-h-0">
+                  <TabsList className="mx-2 mt-2 shrink-0">
                     {[1, 2, 3].map((m) => (
                       <TabsTrigger key={m} value={String(m)} className="text-xs">
                         Momento {m}
@@ -283,8 +282,8 @@ export default function PrimaryFinalReportModal({
                     ))}
                   </TabsList>
                   {[1, 2, 3].map((m) => (
-                    <TabsContent key={m} value={String(m)} className="flex-1 px-3 pb-3">
-                      <ScrollArea className="h-[400px]">
+                    <TabsContent key={m} value={String(m)} className="flex-1 px-3 pb-3 min-h-0">
+                      <ScrollArea className="h-full">
                         {teacherGradesByMomento[m]?.length === 0 ? (
                           <p className="text-sm text-muted-foreground py-4 text-center">
                             Sin evaluaciones en este momento
@@ -306,13 +305,13 @@ export default function PrimaryFinalReportModal({
               </div>
 
               {/* Column 2: Indicators or Descriptive */}
-              <div className="border rounded-md overflow-hidden flex flex-col">
-                <div className="px-3 py-2 bg-muted/30 border-b">
+              <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
+                <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
                   <h3 className="text-sm font-semibold">
                     {reportType === "descriptive" ? "Informe Descriptivo" : "Indicadores"}
                   </h3>
                 </div>
-                <div className="flex-1 p-3">
+                <div className="flex-1 p-3 min-h-0">
                   {reportType === "descriptive" ? (
                     <RichTextEditor
                       value={descriptiveReport}
@@ -321,7 +320,7 @@ export default function PrimaryFinalReportModal({
                       minHeight={380}
                     />
                   ) : (
-                    <ScrollArea className="h-[400px]">
+                    <ScrollArea className="h-full">
                       <div className="space-y-4 pr-2">
                         {areas.map((area: any) => (
                           <div key={area.id}>
@@ -366,73 +365,74 @@ export default function PrimaryFinalReportModal({
               </div>
 
               {/* Column 3: Observaciones del Momento */}
-              <div className="border rounded-md overflow-hidden flex flex-col">
-                <div className="px-3 py-2 bg-muted/30 border-b">
+              <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
+                <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
                   <h3 className="text-sm font-semibold">Observaciones del Momento</h3>
                 </div>
-                <div className="p-3 space-y-3 flex-1">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Literal (A-E)</Label>
-                    <Input
-                      value={literal}
-                      onChange={(e) => handleLiteralChange(e.target.value)}
-                      placeholder="A"
-                      maxLength={1}
-                      className="h-9 text-center font-semibold uppercase"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Inasistencias</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={absenceCount}
-                      onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Nombre del Proyecto</Label>
-                    <Input
-                      value={projectName}
-                      onChange={(e) => setProjectName(e.target.value)}
-                      placeholder="Nombre del proyecto..."
-                      className="h-9"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs flex items-center gap-1">
-                      <User className="h-3 w-3" /> Docente
-                    </Label>
-                    <Input
-                      value={teacherInfo?.name || "—"}
-                      readOnly
-                      className="h-9 bg-muted/50 cursor-default"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Cédula del Docente</Label>
-                    <Input
-                      value={teacherInfo?.documentId || "—"}
-                      readOnly
-                      className="h-9 bg-muted/50 cursor-default"
-                    />
-                  </div>
-                  {reportType === "indicators" && (
+                <ScrollArea className="flex-1">
+                  <div className="p-3 space-y-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs">Observación Descriptiva</Label>
-                      <RichTextEditor
-                        value={descriptiveReport}
-                        onChange={setDescriptiveReport}
-                        placeholder="Observación adicional..."
-                        minHeight={120}
+                      <Label className="text-xs">Literal (A-E)</Label>
+                      <Input
+                        value={literal}
+                        onChange={(e) => handleLiteralChange(e.target.value)}
+                        placeholder="A"
+                        maxLength={1}
+                        className="h-9 text-center font-semibold uppercase"
                       />
                     </div>
-                  )}
-                </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Inasistencias</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={absenceCount}
+                        onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Nombre del Proyecto</Label>
+                      <Input
+                        value={projectName}
+                        onChange={(e) => setProjectName(e.target.value)}
+                        placeholder="Nombre del proyecto..."
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs flex items-center gap-1">
+                        <User className="h-3 w-3" /> Docente
+                      </Label>
+                      <Input
+                        value={teacherInfo?.name || "—"}
+                        readOnly
+                        className="h-9 bg-muted/50 cursor-default"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Cédula del Docente</Label>
+                      <Input
+                        value={teacherInfo?.documentId || "—"}
+                        readOnly
+                        className="h-9 bg-muted/50 cursor-default"
+                      />
+                    </div>
+                    {reportType === "indicators" && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Observación Descriptiva</Label>
+                        <RichTextEditor
+                          value={descriptiveReport}
+                          onChange={setDescriptiveReport}
+                          placeholder="Observación adicional..."
+                          minHeight={120}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
             </div>
-          </ScrollArea>
         )}
 
         <DialogFooter>
