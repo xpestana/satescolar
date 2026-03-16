@@ -47,6 +47,7 @@ interface TeacherReportCardProps {
   gradeLevel: string;
   momento: number;
   students: StudentRow[];
+  sectionLabel?: string;
 }
 
 export function TeacherReportCard({
