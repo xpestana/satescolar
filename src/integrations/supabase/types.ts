@@ -733,8 +733,11 @@ export type Database = {
           created_at: string
           id: string
           preschool_report_type: string
+          preschool_template: string
           primary_report_type: string
+          primary_template: string
           school_id: string
+          secondary_template: string
           updated_at: string
           use_percentage_plan: boolean
         }
@@ -742,8 +745,11 @@ export type Database = {
           created_at?: string
           id?: string
           preschool_report_type?: string
+          preschool_template?: string
           primary_report_type?: string
+          primary_template?: string
           school_id: string
+          secondary_template?: string
           updated_at?: string
           use_percentage_plan?: boolean
         }
@@ -751,8 +757,11 @@ export type Database = {
           created_at?: string
           id?: string
           preschool_report_type?: string
+          preschool_template?: string
           primary_report_type?: string
+          primary_template?: string
           school_id?: string
+          secondary_template?: string
           updated_at?: string
           use_percentage_plan?: boolean
         }

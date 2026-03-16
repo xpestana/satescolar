@@ -1,45 +1,22 @@
 
 
-## Plan: Selector de plantillas de boletas por nivel
+## Separar Asignación GCRP de Regular — COMPLETADO
 
-### Objetivo
-Agregar a cada card de nivel en "Ajustes de Notas" un selector de plantilla de boleta. Las plantillas se definen como un catálogo hardcoded (por ahora) y se filtran según el tipo de boleta configurado. La selección se persiste en `grades_config`.
+### Cambios realizados:
 
-### 1. Migración de base de datos
-Agregar 3 columnas a `grades_config`:
-- `preschool_template` (text, default `'classic'`)
-- `primary_template` (text, default `'classic'`)
-- `secondary_template` (text, default `'classic'`)
+1. **Datos GCRP limpiados**: Se eliminaron todos los `student_grades`, `evaluation_plan_items` y `subject_teacher_assignments` vinculados a materias GCRP.
 
-### 2. Catálogo de plantillas (hardcoded en el componente)
-Definir un arreglo de plantillas por nivel, cada una con: `id`, `name`, `description`, `compatibleTypes` (para filtrar por tipo de boleta), y una miniatura visual básica (componente React simple que simule el layout de la boleta).
+2. **Migración SQL ejecutada**:
+   - `section_id` en `subject_teacher_assignments` ahora es nullable (para GCRP)
+   - Nueva tabla `gcrp_assignment_students` con RLS para school users, teachers y admins
 
-**Preescolar** (filtrado por `descriptive` / `indicators`):
-- `classic` - Boleta Clásica (compatible con ambos tipos)
-- `colorful` - Boleta Colorida (compatible con ambos tipos)
-- `minimal` - Boleta Minimalista (compatible con ambos tipos)
+3. **SubjectAssignments.tsx**: Flujo separado Regular vs GCRP
+   - Regular: Docente → Nivel/Grado → Sección (sin cambios)
+   - GCRP: Docente → Buscar estudiantes por nivel/sección → Seleccionar individuales o todos → Crear asignación sin section_id + registros en `gcrp_assignment_students`
+   - Tabla muestra "X estudiantes" para GCRP con modal de visualización
 
-**Primaria** (filtrado por `descriptive` / `indicators`):
-- `classic` - Boleta Clásica
-- `detailed` - Boleta Detallada
-- `compact` - Boleta Compacta
+4. **TeacherGrades.tsx**: Obtiene estudiantes desde `gcrp_assignment_students` cuando la asignación es GCRP
 
-**Secundaria** (sin filtro de tipo):
-- `classic` - Boleta Clásica
-- `formal` - Boleta Formal
-- `modern` - Boleta Moderna
+5. **GradesConsultation.tsx**: Misma lógica condicional para GCRP vs Regular
 
-### 3. UI en GradesSettings
-Debajo de las configuraciones actuales de cada card, agregar una sección "Plantilla de boleta" con:
-- Cards pequeñas en grid (2 columnas) mostrando una miniatura/preview estilizada de cada plantilla
-- Borde resaltado en la plantilla seleccionada
-- Click para seleccionar, se guarda automáticamente vía `upsertConfig`
-
-### 4. Componente de preview de plantilla
-Crear `src/components/grades/TemplatePreview.tsx` -- un componente que renderiza una miniatura abstracta (rectángulos y líneas simulando el layout) con colores distintos por template, para dar una idea visual del diseño.
-
-### Archivos a modificar/crear
-- **Migración SQL**: agregar 3 columnas a `grades_config`
-- **`src/components/grades/TemplatePreview.tsx`**: nuevo componente con las miniaturas
-- **`src/pages/school/GradesSettings.tsx`**: agregar sección de selección de plantilla en cada card
-
+6. **TeacherSubjects.tsx**: Muestra "GCRP — Estudiantes individuales" cuando section es null
