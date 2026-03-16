@@ -1053,7 +1053,7 @@ export default function FinalGradesTab({
               </Tooltip>
             )}
           </div>
-          <div className="relative w-64">
+          <div className="flex items-center gap-2">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar estudiante..."
