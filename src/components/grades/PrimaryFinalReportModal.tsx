@@ -267,7 +267,7 @@ export default function PrimaryFinalReportModal({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <ScrollArea className="flex-1 max-h-[calc(90vh-160px)]">
+          <ScrollArea className="flex-1 max-h-[calc(95vh-160px)]">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
               {/* Left panel: Teacher grades */}
               <div className="border rounded-md overflow-hidden flex flex-col">
