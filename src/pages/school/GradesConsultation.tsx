@@ -526,9 +526,75 @@ export default function GradesConsultation() {
         </TabsContent>
 
         <TabsContent value="descarga">
-          <div className="text-center py-12 border rounded-md bg-muted/20">
-            <p className="text-muted-foreground">Próximamente: descarga de boletas en PDF.</p>
-          </div>
+          {!effectiveYear || !selectedSection ? (
+            <div className="text-center py-12 border rounded-md bg-muted/20">
+              <Search className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">Seleccione año escolar y sección para ver los estudiantes.</p>
+            </div>
+          ) : studentsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{sectionLabel}</span>
+                  <Badge variant="outline">{filteredStudents.length} estudiantes</Badge>
+                </div>
+                <div className="relative w-64">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar estudiante..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[50px] text-center">#</TableHead>
+                      <TableHead className="min-w-[220px]">Nombre del Alumno</TableHead>
+                      <TableHead className="min-w-[100px]">Cédula</TableHead>
+                      <TableHead className="min-w-[150px] text-center">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredStudents.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          No se encontraron estudiantes.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredStudents.map((s: any, idx: number) => (
+                        <TableRow key={s.student_id}>
+                          <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
+                          <TableCell className="font-medium">{s.student_name}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 gap-1.5 text-xs"
+                              onClick={() => { /* TODO: descargar boleta */ }}
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              Descargar Boleta
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </TabsContent>
       </Tabs>
 
