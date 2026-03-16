@@ -389,6 +389,24 @@ export default function GradesSettings() {
               </div>
             </div>}
 
+            {/* Template selector */}
+            <div className="space-y-2 pt-2 border-t">
+              <Label className="text-sm font-medium">Plantilla de boleta</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {filteredPrimaryTemplates.map((t) => (
+                  <TemplatePreview
+                    key={t.id}
+                    templateId={t.id}
+                    level="primary"
+                    name={t.name}
+                    description={t.description}
+                    selected={primaryTemplate === t.id}
+                    onClick={() => upsertConfig.mutate({ primary_template: t.id })}
+                  />
+                ))}
+              </div>
+            </div>
+
           </CardContent>
         </Card>
 
