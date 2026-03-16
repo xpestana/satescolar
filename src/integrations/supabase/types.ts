@@ -992,6 +992,145 @@ export type Database = {
           },
         ]
       }
+      primary_final_indicator_grades: {
+        Row: {
+          assignment_id: string
+          created_at: string | null
+          id: string
+          indicator_id: string
+          momento: number
+          scale_id: string | null
+          school_id: string
+          student_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string | null
+          id?: string
+          indicator_id: string
+          momento: number
+          scale_id?: string | null
+          school_id: string
+          student_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string | null
+          id?: string
+          indicator_id?: string
+          momento?: number
+          scale_id?: string | null
+          school_id?: string
+          student_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_final_indicator_grades_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_final_indicator_grades_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "primary_grade_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_final_indicator_grades_scale_id_fkey"
+            columns: ["scale_id"]
+            isOneToOne: false
+            referencedRelation: "primary_grading_scales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_final_indicator_grades_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_final_indicator_grades_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      primary_final_reports: {
+        Row: {
+          absence_count: number | null
+          assignment_id: string
+          attendance_count: number | null
+          created_at: string | null
+          descriptive_report: string | null
+          final_status: string | null
+          id: string
+          literal: string | null
+          momento: number
+          school_id: string
+          student_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          absence_count?: number | null
+          assignment_id: string
+          attendance_count?: number | null
+          created_at?: string | null
+          descriptive_report?: string | null
+          final_status?: string | null
+          id?: string
+          literal?: string | null
+          momento?: number
+          school_id: string
+          student_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          absence_count?: number | null
+          assignment_id?: string
+          attendance_count?: number | null
+          created_at?: string | null
+          descriptive_report?: string | null
+          final_status?: string | null
+          id?: string
+          literal?: string | null
+          momento?: number
+          school_id?: string
+          student_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "primary_final_reports_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_final_reports_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "primary_final_reports_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       primary_grade_indicators: {
         Row: {
           area_id: string | null
