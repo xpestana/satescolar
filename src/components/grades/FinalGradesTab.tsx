@@ -582,7 +582,7 @@ export default function FinalGradesTab({
     }
   }, [assignmentIds, literals, dbLiterals, extraFields, dbExtraFields, schoolId]);
 
-
+  const isDirty = useCallback((key: string): boolean => {
     const current = (editedGrades[key] || "").trim();
     const saved = (dbValues[key] || "").trim();
     if (current === "" && saved === "") return false;
