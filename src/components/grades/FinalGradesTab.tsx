@@ -1260,8 +1260,8 @@ export default function FinalGradesTab({
       <>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
-            <Badge variant={isPrimary ? "secondary" : isNumeric ? "default" : "secondary"}>
-              {isPrimary ? `Primaria — ${primaryReportType === "descriptive" ? "Descriptivo" : "Por Indicadores"}` : isNumeric ? "Numérica (1-20)" : "Cualitativa"}
+            <Badge variant={isQualitative ? "secondary" : isNumeric ? "default" : "secondary"}>
+              {isPrimary ? `Primaria — ${primaryReportType === "descriptive" ? "Descriptivo" : "Por Indicadores"}` : isPreschool ? `Preescolar — ${preschoolReportType === "descriptive" ? "Descriptivo" : "Por Indicadores"}` : isNumeric ? "Numérica (1-20)" : "Cualitativa"}
             </Badge>
             <Badge variant="outline">{filteredStudents.length} estudiantes</Badge>
             {(savingKeys.size > 0 || savingLiteralKeys.size > 0) && (
