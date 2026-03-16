@@ -184,6 +184,17 @@ export default function GradesSettings() {
   const usePercentage = config?.use_percentage_plan ?? false;
   const reportType = (config as any)?.primary_report_type ?? "descriptive";
   const preschoolReportType = (config as any)?.preschool_report_type ?? "descriptive";
+  const preschoolTemplate = (config as any)?.preschool_template ?? "classic";
+  const primaryTemplate = (config as any)?.primary_template ?? "classic";
+  const secondaryTemplate = (config as any)?.secondary_template ?? "classic";
+
+  const filteredPreschoolTemplates = preschoolTemplates.filter(
+    (t) => t.compatibleTypes.includes(preschoolReportType) || t.compatibleTypes.includes("all")
+  );
+  const filteredPrimaryTemplates = primaryTemplates.filter(
+    (t) => t.compatibleTypes.includes(reportType) || t.compatibleTypes.includes("all")
+  );
+
 
   return (
     <DashboardLayout>
