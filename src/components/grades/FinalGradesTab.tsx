@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText } from "lucide-react";
+import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText, Settings } from "lucide-react";
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "./PrimaryFinalReportModal";
 
@@ -58,6 +59,7 @@ export default function FinalGradesTab({
   sections,
   gcrpAssignments,
 }: FinalGradesTabProps) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [editedGrades, setEditedGrades] = useState<Record<string, string>>({});
@@ -1051,14 +1053,25 @@ export default function FinalGradesTab({
               </Tooltip>
             )}
           </div>
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar estudiante..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9"
-            />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate("/notas/ajustes")}
+            >
+              <Settings className="h-4 w-4" />
+              Ajustes
+            </Button>
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar estudiante..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
           </div>
         </div>
 
