@@ -332,6 +332,7 @@ export default function TeacherGrades() {
           gradeLevel={gradeLevel || ""}
           momento={momento}
           students={students}
+          sectionLabel={sectionLabel}
         />
       )}
     </DashboardLayout>
