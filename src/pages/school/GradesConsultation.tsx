@@ -245,10 +245,10 @@ export default function GradesConsultation() {
   return (
     <DashboardLayout>
       <PageHeader
-        title="Consulta de Notas"
+        title="Consulta de Notas y Boletas"
         breadcrumbs={[
           { label: "Inicio", href: "/school/dashboard" },
-          { label: "Consulta de Notas" },
+          { label: "Consulta de Notas y Boletas" },
         ]}
       />
 
@@ -395,8 +395,9 @@ export default function GradesConsultation() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
         <TabsList>
-          <TabsTrigger value="consulta">Consulta de Notas</TabsTrigger>
-          <TabsTrigger value="finales">Notas Finales y Boletas</TabsTrigger>
+          <TabsTrigger value="consulta">Consulta de Notas del Docente</TabsTrigger>
+          <TabsTrigger value="finales">Notas Finales y Construcción de Boletas</TabsTrigger>
+          <TabsTrigger value="descarga">Descarga de Boletas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="consulta">
@@ -522,6 +523,12 @@ export default function GradesConsultation() {
             sections={sections}
             gcrpAssignments={gcrpAssignments}
           />
+        </TabsContent>
+
+        <TabsContent value="descarga">
+          <div className="text-center py-12 border rounded-md bg-muted/20">
+            <p className="text-muted-foreground">Próximamente: descarga de boletas en PDF.</p>
+          </div>
         </TabsContent>
       </Tabs>
 
