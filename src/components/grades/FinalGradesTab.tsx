@@ -535,7 +535,54 @@ export default function FinalGradesTab({
     }
   }, [assignmentIds, literals, dbLiterals, extraFields, dbExtraFields, schoolId]);
 
-  const isDirty = useCallback((key: string): boolean => {
+  const savePreschoolReport = useCallback(async (studentId: string, momento: number) => {
+    if (assignmentIds.length === 0) return;
+    const key = `${studentId}-${momento}`;
+    const literal = literals[key] || "";
+    const dbLiteral = dbLiterals[key] || "";
+    const ef = extraFields[key] || DEFAULT_EXTRA;
+    const dbEf = dbExtraFields[key] || DEFAULT_EXTRA;
+
+    const changed = literal !== dbLiteral ||
+      ef.attendance_count !== dbEf.attendance_count ||
+      ef.absence_count !== dbEf.absence_count ||
+      ef.final_status !== dbEf.final_status;
+
+    if (!changed) return;
+
+    setSavingLiteralKeys(prev => new Set(prev).add(key));
+    try {
+      const payload = {
+        student_id: studentId,
+        assignment_id: assignmentIds[0],
+        school_id: schoolId,
+        momento,
+        literal,
+        attendance_count: ef.attendance_count,
+        absence_count: ef.absence_count,
+        final_status: ef.final_status || null,
+        updated_at: new Date().toISOString(),
+      };
+      await supabase
+        .from("preschool_final_reports" as any)
+        .upsert(payload as any, { onConflict: "student_id,assignment_id,momento" });
+
+      setDbLiterals(prev => ({ ...prev, [key]: literal }));
+      setDbExtraFields(prev => ({ ...prev, [key]: { ...ef } }));
+
+      setSavedKeys(prev => {
+        const next = new Set(prev).add(key);
+        setTimeout(() => setSavedKeys(p => { const n = new Set(p); n.delete(key); return n; }), 1500);
+        return next;
+      });
+    } catch {
+      toast.error("Error al guardar");
+    } finally {
+      setSavingLiteralKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  }, [assignmentIds, literals, dbLiterals, extraFields, dbExtraFields, schoolId]);
+
+
     const current = (editedGrades[key] || "").trim();
     const saved = (dbValues[key] || "").trim();
     if (current === "" && saved === "") return false;
