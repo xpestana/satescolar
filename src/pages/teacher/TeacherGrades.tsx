@@ -323,6 +323,17 @@ export default function TeacherGrades() {
           </Table>
         </div>
       )}
+
+      {/* Report Card for primary/preschool */}
+      {!loading && assignment && students.length > 0 && planItems.length > 0 && (
+        <TeacherReportCard
+          assignmentId={assignmentId!}
+          schoolId={assignment.school_id}
+          gradeLevel={gradeLevel || ""}
+          momento={momento}
+          students={students}
+        />
+      )}
     </DashboardLayout>
   );
 }
