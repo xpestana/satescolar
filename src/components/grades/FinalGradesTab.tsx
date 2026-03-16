@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText, Settings } from "lucide-react";
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "./PrimaryFinalReportModal";
+import PreschoolFinalReportModal from "./PreschoolFinalReportModal";
 
 const NUMERIC_GRADES = new Set([
   "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
