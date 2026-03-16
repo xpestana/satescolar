@@ -1,22 +1,26 @@
 
 
-## Separar Asignación GCRP de Regular — COMPLETADO
+## Plan: Enriquecer el modal de informe primaria con campos adicionales
 
-### Cambios realizados:
+### Contexto
+El `PrimaryFinalReportModal` actual tiene indicadores + observación descriptiva, pero le faltan campos que aparecen en la referencia: **literal del momento**, **inasistencias**, **nombre del proyecto**, y **nombre/cédula del docente**. Estos campos deben aparecer tanto en modo descriptivo como en modo indicadores.
 
-1. **Datos GCRP limpiados**: Se eliminaron todos los `student_grades`, `evaluation_plan_items` y `subject_teacher_assignments` vinculados a materias GCRP.
+### Cambios en BD
+Agregar columna `project_name` a `primary_final_reports` — los demás campos (literal, absence_count, descriptive_report) ya existen. El nombre/cédula del docente se obtiene del `assignment → teacher`.
 
-2. **Migración SQL ejecutada**:
-   - `section_id` en `subject_teacher_assignments` ahora es nullable (para GCRP)
-   - Nueva tabla `gcrp_assignment_students` con RLS para school users, teachers y admins
+### Cambios en `PrimaryFinalReportModal`
+1. **Fetch teacher info** desde `subject_teacher_assignments` → `teachers` (nombre y cédula del docente asignado) — campos read-only
+2. **Agregar estados** para `literal` (A-E, auto-uppercase) y `projectName`
+3. **Inicializar** desde `existingReport` los campos literal, absence_count, project_name
+4. **Renderizar debajo de los indicadores/descripción** una sección "Observaciones y Literal" con:
+   - Campo Literal (input A-E, auto-uppercase)
+   - Editor WYSIWYG (RichTextEditor) para observaciones descriptivas
+   - Input numérico de inasistencias
+   - Input texto para nombre del proyecto del momento
+   - Campos read-only: nombre y cédula del docente
+5. **Guardar** todos los campos en el payload de upsert a `primary_final_reports`
 
-3. **SubjectAssignments.tsx**: Flujo separado Regular vs GCRP
-   - Regular: Docente → Nivel/Grado → Sección (sin cambios)
-   - GCRP: Docente → Buscar estudiantes por nivel/sección → Seleccionar individuales o todos → Crear asignación sin section_id + registros en `gcrp_assignment_students`
-   - Tabla muestra "X estudiantes" para GCRP con modal de visualización
+### Archivos a modificar
+- **1 migración SQL**: `ALTER TABLE primary_final_reports ADD COLUMN project_name text DEFAULT '';`
+- **`PrimaryFinalReportModal.tsx`**: Agregar query del teacher, estados para literal/absences/project_name, sección de campos adicionales, actualizar handleSave
 
-4. **TeacherGrades.tsx**: Obtiene estudiantes desde `gcrp_assignment_students` cuando la asignación es GCRP
-
-5. **GradesConsultation.tsx**: Misma lógica condicional para GCRP vs Regular
-
-6. **TeacherSubjects.tsx**: Muestra "GCRP — Estudiantes individuales" cuando section es null
