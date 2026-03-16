@@ -1,0 +1,1 @@
+ALTER TABLE public.primary_final_reports ADD COLUMN IF NOT EXISTS project_name text DEFAULT '';

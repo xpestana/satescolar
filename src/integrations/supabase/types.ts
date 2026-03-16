@@ -1075,6 +1075,7 @@ export type Database = {
           id: string
           literal: string | null
           momento: number
+          project_name: string | null
           school_id: string
           student_id: string
           updated_at: string | null
@@ -1089,6 +1090,7 @@ export type Database = {
           id?: string
           literal?: string | null
           momento?: number
+          project_name?: string | null
           school_id: string
           student_id: string
           updated_at?: string | null
@@ -1103,6 +1105,7 @@ export type Database = {
           id?: string
           literal?: string | null
           momento?: number
+          project_name?: string | null
           school_id?: string
           student_id?: string
           updated_at?: string | null
