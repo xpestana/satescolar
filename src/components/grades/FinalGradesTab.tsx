@@ -810,7 +810,7 @@ export default function FinalGradesTab({
     );
   }, [students, searchTerm]);
 
-  const loading = assignmentLoading || studentsLoading || planLoading || gradesLoading || finalGradesLoading || (isPrimary && primaryReportsLoading);
+  const loading = assignmentLoading || studentsLoading || planLoading || gradesLoading || finalGradesLoading || (isPrimary && primaryReportsLoading) || (isPreschool && preschoolReportsLoading);
 
   if (!filtersComplete) {
     return (
