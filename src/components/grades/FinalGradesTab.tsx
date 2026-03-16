@@ -132,6 +132,8 @@ export default function FinalGradesTab({
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = isGcrpQuery || (gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false);
   const isPrimary = gradeLevel ? PRIMARY_GRADES.has(gradeLevel) : false;
+  const isPreschool = gradeLevel ? PRESCHOOL_GRADES.has(gradeLevel) : false;
+  const isQualitative = isPrimary || isPreschool;
 
   // Fetch grades_config for primary report type
   const { data: gradesConfig } = useQuery({
