@@ -603,9 +603,9 @@ export default function FinalGradesTab({
   }, [extraFields, dbExtraFields]);
 
   const isAnyDirty = useCallback((key: string): boolean => {
-    if (isPrimary) return isLiteralDirty(key) || isExtraDirty(key);
+    if (isPrimary || isPreschool) return isLiteralDirty(key) || isExtraDirty(key);
     return isDirty(key) || isExtraDirty(key);
-  }, [isPrimary, isDirty, isLiteralDirty, isExtraDirty]);
+  }, [isPrimary, isPreschool, isDirty, isLiteralDirty, isExtraDirty]);
 
   const dirtyCountByMomento = useMemo(() => {
     const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
