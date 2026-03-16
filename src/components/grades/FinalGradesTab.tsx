@@ -964,6 +964,118 @@ export default function FinalGradesTab({
     );
   };
 
+  // Render preschool grade cell (same layout as primary but saves to preschool tables)
+  const renderPreschoolGradeCell = (s: any, m: number, isFinal = false) => {
+    const key = `${s.student_id}-${m}`;
+    const isSaving = savingLiteralKeys.has(key);
+    const isSaved = savedKeys.has(key);
+    const literalDirty = isLiteralDirty(key);
+    const extraDirty = isExtraDirty(key);
+    const ef = extraFields[key] || DEFAULT_EXTRA;
+    const literalVal = literals[key] || "";
+
+    const hasReport = preschoolReports.some(
+      (pr: any) => pr.student_id === s.student_id && pr.momento === m && pr.assignment_id === assignmentIds[0]
+    );
+
+    return (
+      <TableCell key={m} className={`p-2 align-top ${isFinal ? "bg-muted/10" : ""}`}>
+        <div className="space-y-2 min-w-[160px]">
+          <div className="flex items-center justify-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => {
+                    setReportModalStudent({ id: s.student_id, name: s.student_name });
+                    setReportModalMomento(m);
+                    setReportModalOpen(true);
+                  }}
+                >
+                  <FileText className={`h-4 w-4 ${hasReport ? "text-primary" : ""}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="text-xs">
+                <p>Redactar Informe</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <div className="relative inline-block">
+              <Input
+                type="text"
+                maxLength={1}
+                value={literalVal}
+                onChange={(e) => handleLiteralChange(s.student_id, m, e.target.value)}
+                onBlur={() => savePreschoolReport(s.student_id, m)}
+                className={`h-8 w-12 text-center text-sm font-semibold uppercase ${literalDirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
+                placeholder="—"
+              />
+              {(literalDirty || extraDirty) && !isSaving && !isSaved && (
+                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-400" />
+              )}
+              {isSaving && (
+                <Loader2 className="absolute top-1.5 right-0.5 h-3 w-3 animate-spin text-muted-foreground" />
+              )}
+              {isSaved && !isSaving && (
+                <Check className="absolute top-1.5 right-0.5 h-3 w-3 text-green-500" />
+              )}
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[200px] text-xs">
+                <p>Literal de A a E. Se convierte automáticamente a mayúscula.</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <div>
+              <label className="text-[10px] text-muted-foreground">Asistencias</label>
+              <Input
+                type="number"
+                min={0}
+                value={ef.attendance_count}
+                onChange={(e) => handleExtraChange(key, "attendance_count", Math.max(0, parseInt(e.target.value) || 0))}
+                onBlur={() => savePreschoolReport(s.student_id, m)}
+                className="h-7 text-xs text-center"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground">Inasistencias</label>
+              <Input
+                type="number"
+                min={0}
+                value={ef.absence_count}
+                onChange={(e) => handleExtraChange(key, "absence_count", Math.max(0, parseInt(e.target.value) || 0))}
+                onBlur={() => savePreschoolReport(s.student_id, m)}
+                className="h-7 text-xs text-center"
+              />
+            </div>
+          </div>
+
+          {isFinal && (
+            <div>
+              <label className="text-[10px] text-muted-foreground">Estado</label>
+              <Select value={ef.final_status} onValueChange={(v) => { handleExtraChange(key, "final_status", v); setTimeout(() => savePreschoolReport(s.student_id, m), 50); }}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Seleccionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+      </TableCell>
+    );
+  };
+
   // Render a normal grade cell with extra fields
   const renderGradeCell = (s: any, m: number, isFinal = false) => {
     const key = `${s.student_id}-${m}`;
