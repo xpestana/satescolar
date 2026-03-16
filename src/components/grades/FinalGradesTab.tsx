@@ -1058,7 +1058,7 @@ export default function FinalGradesTab({
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => navigate("/notas/ajustes")}
+              onClick={() => navigate("/school/configuraciones/ajustes-notas")}
             >
               <Settings className="h-4 w-4" />
               Ajustes
