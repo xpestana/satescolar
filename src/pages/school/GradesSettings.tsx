@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import { Loader2, Baby, BookOpen, GraduationCap, Plus, Trash2, Settings2 } from "lucide-react";
 import { PrimaryIndicatorsModal } from "@/components/grades/PrimaryIndicatorsModal";
 import { PreschoolIndicatorsModal } from "@/components/grades/PreschoolIndicatorsModal";
+import { TemplatePreview } from "@/components/grades/TemplatePreview";
+import { preschoolTemplates, primaryTemplates, secondaryTemplates } from "@/lib/report-templates";
 
 interface Scale {
   id: string;
