@@ -352,8 +352,63 @@ export default function FinalGradesTab({
     }
   }, [isPrimary, students, primaryReports, assignmentIds, primaryReportsLoading]);
 
+  // Initialize preschool literals from preschoolReports
   useEffect(() => {
-    if (isPrimary) return; // Skip normal init for primary
+    if (!isPreschool || !students.length || assignmentIds.length === 0) return;
+    if (preschoolReportsLoading) return;
+    const lits: Record<string, string> = {};
+    const dbLits: Record<string, string> = {};
+    const extra: Record<string, ExtraFields> = {};
+    const dbExtra: Record<string, ExtraFields> = {};
+    const assignmentId = assignmentIds[0];
+
+    for (const s of students) {
+      for (const m of [1, 2, 3, 0]) {
+        const key = `${s.student_id}-${m}`;
+        const existing = preschoolReports.find(
+          (pr: any) => pr.student_id === s.student_id && pr.momento === m && pr.assignment_id === assignmentId
+        );
+        if (existing) {
+          lits[key] = (existing as any).literal || "";
+          dbLits[key] = (existing as any).literal || "";
+          const ef: ExtraFields = {
+            observation: "",
+            attendance_count: (existing as any).attendance_count ?? 0,
+            absence_count: (existing as any).absence_count ?? 0,
+            final_status: (existing as any).final_status || "",
+          };
+          extra[key] = { ...ef };
+          dbExtra[key] = { ...ef };
+        } else {
+          lits[key] = "";
+          dbLits[key] = "";
+          if (m === 0) {
+            let totalAtt = 0, totalAbs = 0;
+            for (const mo of [1, 2, 3]) {
+              const moEx = preschoolReports.find(
+                (pr: any) => pr.student_id === s.student_id && pr.momento === mo && pr.assignment_id === assignmentId
+              );
+              if (moEx) {
+                totalAtt += (moEx as any).attendance_count ?? 0;
+                totalAbs += (moEx as any).absence_count ?? 0;
+              }
+            }
+            extra[key] = { ...DEFAULT_EXTRA, attendance_count: totalAtt, absence_count: totalAbs };
+          } else {
+            extra[key] = { ...DEFAULT_EXTRA };
+          }
+          dbExtra[key] = { ...DEFAULT_EXTRA };
+        }
+      }
+    }
+    setLiterals(lits);
+    setDbLiterals(dbLits);
+    setExtraFields(extra);
+    setDbExtraFields(dbExtra);
+  }, [isPreschool, students, preschoolReports, assignmentIds, preschoolReportsLoading]);
+
+  useEffect(() => {
+    if (isPrimary || isPreschool) return; // Skip normal init for qualitative
     if (initialized || !students.length || assignmentIds.length === 0) return;
     if (finalGradesLoading || gradesLoading || planLoading) return;
 
