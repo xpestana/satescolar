@@ -524,6 +524,12 @@ export default function GradesConsultation() {
             gcrpAssignments={gcrpAssignments}
           />
         </TabsContent>
+
+        <TabsContent value="descarga">
+          <div className="text-center py-12 border rounded-md bg-muted/20">
+            <p className="text-muted-foreground">Próximamente: descarga de boletas en PDF.</p>
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Modal for qualitative grade detail */}
