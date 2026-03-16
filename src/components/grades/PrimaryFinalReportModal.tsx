@@ -118,15 +118,18 @@ export default function PrimaryFinalReportModal({
     enabled: open,
   });
 
+  // Map grade_level enum to DB format (e.g. "1_grado" -> "1")
+  const dbGradeLevel = gradeLevel.replace("_grado", "");
+
   // Load indicators and scales for indicators mode
   const { data: areas = [] } = useQuery({
-    queryKey: ["primary-areas", schoolId, gradeLevel],
+    queryKey: ["primary-areas", schoolId, dbGradeLevel],
     queryFn: async () => {
       const { data } = await supabase
         .from("primary_indicator_areas")
         .select("*, indicators:primary_grade_indicators(id, description, display_order)")
         .eq("school_id", schoolId)
-        .eq("grade_level", gradeLevel)
+        .eq("grade_level", dbGradeLevel)
         .order("display_order");
       return data || [];
     },
