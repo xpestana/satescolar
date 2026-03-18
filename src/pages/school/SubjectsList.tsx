@@ -81,6 +81,7 @@ export default function SubjectsList() {
           .from("school_subjects" as any)
           .update({
             name: form.name.trim(),
+            abbreviation: form.abbreviation.trim(),
             subject_type: form.subject_type,
             show_in_report_card: form.show_in_report_card,
             show_in_planilla: form.show_in_planilla,
