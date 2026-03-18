@@ -80,6 +80,7 @@ const navSections: NavSection[] = [
     requiredRole: "school",
     items: [
       { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school" },
+      { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school" },
     ],
   },
   {
