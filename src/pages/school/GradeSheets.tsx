@@ -411,99 +411,127 @@ export default function GradeSheets() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <PageHeader title="Sábana de Notas" breadcrumbs={[{ label: "Planillas" }, { label: "Sábana de Notas" }]} />
+        <PageHeader title="Planillas" breadcrumbs={[{ label: "Utilidades" }, { label: "Planillas" }]} />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="h-5 w-5" />
-              Filtros
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-4 items-end">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Año Escolar</label>
-                <Select value={selectedYearId} onValueChange={setSelectedYearId}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Seleccionar año" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {schoolYears?.map(y => (
-                      <SelectItem key={y.id} value={y.id}>
-                        {y.year_range} {y.is_active ? "(Activo)" : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        <Tabs defaultValue="sabana" className="w-full">
+          <TabsList>
+            <TabsTrigger value="sabana">Sábana de Notas</TabsTrigger>
+            <TabsTrigger value="boletin" disabled>Boletín Informativo</TabsTrigger>
+            <TabsTrigger value="resumen" disabled>Resumen Académico</TabsTrigger>
+          </TabsList>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Momento</label>
-                <Select value={selectedMomento} onValueChange={setSelectedMomento}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Momento 1</SelectItem>
-                    <SelectItem value="2">Momento 2</SelectItem>
-                    <SelectItem value="3">Momento 3</SelectItem>
-                    <SelectItem value="definitiva">Definitiva Anual</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {sectionsData && sectionsData.length > 0 && (
-                <Button
-                  onClick={handleDownloadAll}
-                  disabled={downloading === "all"}
-                  className="ml-auto"
-                >
-                  {downloading === "all" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
-                  Descargar Todas
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {sectionsLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : !sectionsData?.length ? (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              No hay secciones de secundaria con alumnos inscritos para el año escolar seleccionado.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {sectionsData.map(section => (
-              <Card key={section.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-sm">
-                      {GRADE_LABELS[section.grade_level] || section.grade_level} - {section.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Users className="h-3 w-3" />
-                      {section.studentCount} estudiantes
-                    </p>
+          <TabsContent value="sabana" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <FileText className="h-5 w-5" />
+                  Filtros
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Año Escolar</label>
+                    <Select value={selectedYearId} onValueChange={setSelectedYearId}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Seleccionar año" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {schoolYears?.map(y => (
+                          <SelectItem key={y.id} value={y.id}>
+                            {y.year_range} {y.is_active ? "(Activo)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDownloadSection(section)}
-                    disabled={downloading === section.id}
-                  >
-                    {downloading === section.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                  </Button>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium">Momento</label>
+                    <Select value={selectedMomento} onValueChange={setSelectedMomento}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">Momento 1</SelectItem>
+                        <SelectItem value="2">Momento 2</SelectItem>
+                        <SelectItem value="3">Momento 3</SelectItem>
+                        <SelectItem value="definitiva">Definitiva Anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {sectionsData && sectionsData.length > 0 && (
+                    <Button
+                      onClick={handleDownloadAll}
+                      disabled={downloading === "all"}
+                      className="ml-auto"
+                    >
+                      {downloading === "all" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Download className="h-4 w-4 mr-2" />}
+                      Descargar Todas
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {sectionsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : !sectionsData?.length ? (
+              <Card>
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  No hay secciones de secundaria con alumnos inscritos para el año escolar seleccionado.
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {sectionsData.map(section => (
+                  <Card key={section.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-sm">
+                          {GRADE_LABELS[section.grade_level] || section.grade_level} - {section.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Users className="h-3 w-3" />
+                          {section.studentCount} estudiantes
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownloadSection(section)}
+                        disabled={downloading === section.id}
+                      >
+                        {downloading === section.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="boletin" className="mt-4">
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
+                <Construction className="h-8 w-8" />
+                <p>Próximamente: Boletín Informativo</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="resumen" className="mt-4">
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
+                <Construction className="h-8 w-8" />
+                <p>Próximamente: Resumen Académico</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
