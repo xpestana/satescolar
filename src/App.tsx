@@ -134,7 +134,7 @@ const App = () => (
               } 
             />
             <Route 
-              path="/planillas/sabana-notas" 
+              path="/planillas" 
               element={
                 <ProtectedRoute requiredRole="school">
                   <GradeSheets />
