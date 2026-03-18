@@ -410,7 +410,7 @@ export default function GradeSheets() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <PageHeader title="Sábana de Notas" subtitle="Descarga las planillas de notas definitivas por sección para secundaria" />
+        <PageHeader title="Sábana de Notas" breadcrumbs={[{ label: "Planillas" }, { label: "Sábana de Notas" }]} />
 
         <Card>
           <CardHeader>
