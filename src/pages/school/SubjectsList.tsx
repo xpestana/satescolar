@@ -32,6 +32,7 @@ interface Subject {
 
 interface SubjectForm {
   name: string;
+  abbreviation: string;
   subject_type: "regular" | "gcrp";
   show_in_report_card: boolean;
   show_in_planilla: boolean;
@@ -40,6 +41,7 @@ interface SubjectForm {
 
 const defaultForm: SubjectForm = {
   name: "",
+  abbreviation: "",
   subject_type: "regular",
   show_in_report_card: true,
   show_in_planilla: true,
