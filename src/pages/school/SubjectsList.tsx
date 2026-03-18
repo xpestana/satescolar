@@ -302,6 +302,18 @@ export default function SubjectsList() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="subject-abbreviation">Sigla *</Label>
+              <Input
+                id="subject-abbreviation"
+                placeholder="Ej: MAT, CAST, EDU.FIS..."
+                value={form.abbreviation}
+                onChange={(e) => setForm({ ...form, abbreviation: e.target.value.toUpperCase() })}
+                maxLength={20}
+              />
+              <p className="text-xs text-muted-foreground">Abreviatura que aparecerá en las planillas (sábanas de notas)</p>
+            </div>
+
+            <div className="space-y-2">
               <Label>Tipo de Área</Label>
               <Select value={form.subject_type} onValueChange={(v) => setForm({ ...form, subject_type: v as "regular" | "gcrp" })}>
                 <SelectTrigger>
