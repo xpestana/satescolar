@@ -97,6 +97,13 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "Planillas",
+    requiredRole: "school",
+    items: [
+      { label: "Sábana de Notas", href: "/planillas/sabana-notas", icon: FileText, requiredRole: "school" },
+    ],
+  },
+  {
     title: "Administrativo",
     requiredRole: "school",
     items: [
