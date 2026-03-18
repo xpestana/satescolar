@@ -147,6 +147,7 @@ export default function SubjectsList() {
     setEditingId(subject.id);
     setForm({
       name: subject.name,
+      abbreviation: (subject as any).abbreviation || "",
       subject_type: subject.subject_type as "regular" | "gcrp",
       show_in_report_card: subject.show_in_report_card,
       show_in_planilla: subject.show_in_planilla,
