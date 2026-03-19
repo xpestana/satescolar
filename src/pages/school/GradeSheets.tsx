@@ -292,6 +292,15 @@ export default function GradeSheets() {
     const margin = 10;
     let y = 12;
 
+    // Print date/time
+    const now = new Date();
+    const printDate = now.toLocaleDateString("es-VE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const printTime = now.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
+    doc.setFontSize(6);
+    doc.setFont("Arial", "normal");
+    doc.setTextColor(130, 130, 130);
+    doc.text(`Impreso: ${printDate} ${printTime}`, pageWidth - margin, 7, { align: "right" });
+
     // Header
     doc.setFontSize(10);
     doc.setFont("Arial", "bold");
