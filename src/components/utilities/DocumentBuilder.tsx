@@ -567,8 +567,11 @@ export function DocumentBuilder() {
                           <Badge
                             key={sn.key}
                             variant="outline"
-                            className="cursor-pointer hover:bg-primary/10 hover:border-primary text-[10px] px-1.5 py-0.5 transition-colors"
-                            onClick={() => insertSnippet(sn.key)}
+                            className="cursor-pointer hover:bg-primary/10 hover:border-primary text-[10px] px-1.5 py-0.5 transition-colors select-none"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              insertSnippet(sn.key);
+                            }}
                           >
                             {sn.label}
                           </Badge>
