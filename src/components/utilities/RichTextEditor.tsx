@@ -58,6 +58,7 @@ export function RichTextEditor({
 
   const handleInput = useCallback(() => {
     if (editorRef.current) {
+      isInternalChangeRef.current = true;
       onChange(editorRef.current.innerHTML);
     }
   }, [onChange]);
