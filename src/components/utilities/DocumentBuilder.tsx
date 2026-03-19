@@ -103,7 +103,28 @@ export function DocumentBuilder() {
   const { schoolId } = useSchoolId();
   const { school } = useSchoolData();
   const queryClient = useQueryClient();
-  const editorRef = useRef<HTMLDivElement>(null);
+  const savedSelectionRef = useRef<Range | null>(null);
+
+  // Save selection whenever the editor's selection changes
+  const saveSelection = useCallback(() => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
+      if (editor && editor.contains(range.commonAncestorContainer)) {
+        savedSelectionRef.current = range.cloneRange();
+      }
+    }
+  }, []);
+
+  // Attach listeners to track selection in editor
+  const editorCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      node.addEventListener("keyup", saveSelection);
+      node.addEventListener("mouseup", saveSelection);
+      node.addEventListener("focus", saveSelection);
+    }
+  }, [saveSelection]);
 
   const [content, setContent] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
@@ -293,9 +314,23 @@ export function DocumentBuilder() {
 
   // ── Handlers ────────────────────────────────────────────────────
   const insertSnippet = useCallback((key: string) => {
+    const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
+    if (!editor) return;
+    editor.focus();
+
+    // Restore saved selection if available
+    const sel = window.getSelection();
+    if (sel && savedSelectionRef.current) {
+      sel.removeAllRanges();
+      sel.addRange(savedSelectionRef.current);
+    }
+
     const snippet = `<span class="snippet" style="background:#dbeafe;padding:1px 4px;border-radius:3px;font-weight:600;color:#1e40af;">{{${key}}}</span>&nbsp;`;
     document.execCommand("insertHTML", false, snippet);
-  }, []);
+
+    // Update saved selection after insert
+    setTimeout(saveSelection, 0);
+  }, [saveSelection]);
 
   const loadTemplate = useCallback((id: string) => {
     setSelectedTemplateId(id);
@@ -532,8 +567,11 @@ export function DocumentBuilder() {
                           <Badge
                             key={sn.key}
                             variant="outline"
-                            className="cursor-pointer hover:bg-primary/10 hover:border-primary text-[10px] px-1.5 py-0.5 transition-colors"
-                            onClick={() => insertSnippet(sn.key)}
+                            className="cursor-pointer hover:bg-primary/10 hover:border-primary text-[10px] px-1.5 py-0.5 transition-colors select-none"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              insertSnippet(sn.key);
+                            }}
                           >
                             {sn.label}
                           </Badge>
