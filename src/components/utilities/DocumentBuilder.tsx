@@ -308,7 +308,7 @@ export function DocumentBuilder() {
     const infoParts: string[] = [];
     if (hc.show_phone !== false && s.phone) infoParts.push(`Tel: ${s.phone}`);
     if (hc.show_rif !== false && s.rif) infoParts.push(`Rif: ${s.rif}`);
-    if (infoParts.length) centerParts.push(`<div style="font-size:9px;color:#666;">${infoParts.join(" - ")}</div>`);
+    if (infoParts.length) centerParts.push(`<div style="font-size:8px;color:#666;">${infoParts.join(" - ")}</div>`);
 
     return `
       <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:8px;">
