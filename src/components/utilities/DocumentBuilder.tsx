@@ -103,7 +103,28 @@ export function DocumentBuilder() {
   const { schoolId } = useSchoolId();
   const { school } = useSchoolData();
   const queryClient = useQueryClient();
-  const editorRef = useRef<HTMLDivElement>(null);
+  const savedSelectionRef = useRef<Range | null>(null);
+
+  // Save selection whenever the editor's selection changes
+  const saveSelection = useCallback(() => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
+      if (editor && editor.contains(range.commonAncestorContainer)) {
+        savedSelectionRef.current = range.cloneRange();
+      }
+    }
+  }, []);
+
+  // Attach listeners to track selection in editor
+  const editorCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      node.addEventListener("keyup", saveSelection);
+      node.addEventListener("mouseup", saveSelection);
+      node.addEventListener("focus", saveSelection);
+    }
+  }, [saveSelection]);
 
   const [content, setContent] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
