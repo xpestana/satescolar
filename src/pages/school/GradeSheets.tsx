@@ -436,7 +436,7 @@ export default function GradeSheets() {
       },
       didDrawPage: () => {
         const pageH = doc.internal.pageSize.getHeight();
-        doc.setFontSize(6);
+        doc.setFontSize(8);
         doc.setTextColor(130);
         doc.text(
           `* Indica ajuste de nota   |   Generado: ${new Date().toLocaleDateString("es-VE")}`,
