@@ -2,7 +2,6 @@ import { ReactNode, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppSidebar } from "./AppSidebar";
 import { TopBar } from "./TopBar";
-import { InstallPWAPrompt } from "./InstallPWAPrompt";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebarState } from "@/hooks/useSidebarState";
 
@@ -46,7 +45,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       >
         {children}
       </main>
-      <InstallPWAPrompt />
     </div>
   );
 }
