@@ -461,10 +461,10 @@ export default function GradeSheets() {
       const year = schoolYears?.find(y => y.id === selectedYearId);
       generatePdf(doc, section.name, section.grade_level, year?.year_range || "", data, false);
 
-      const pdfBlob = doc.output("blob");
-      const url = URL.createObjectURL(pdfBlob);
-      window.open(url, "_blank");
-      toast.success("PDF generado exitosamente");
+      const momentoLabel = selectedMomento === "definitiva" ? "Definitiva" : `Momento_${selectedMomento}`;
+      const schoolName = (school?.name || "Colegio").replace(/\s+/g, "_");
+      doc.save(`Sabana_de_Notas_${schoolName}_${GRADE_LABELS[section.grade_level]}_Seccion_${section.name}_${momentoLabel}_${year?.year_range || ""}.pdf`);
+      toast.success("PDF descargado exitosamente");
     } catch (err) {
       console.error(err);
       toast.error("Error al generar el PDF");
