@@ -46,6 +46,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       >
         {children}
       </main>
+      <InstallPWAPrompt />
     </div>
   );
 }
