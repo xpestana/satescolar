@@ -130,19 +130,20 @@ export default function GradeSheets() {
 
     // Get final grades
     let allGrades: any[] = [];
-    if (selectedMomento === "definitiva") {
-      // Get all 3 momentos
-      const { data } = await supabase
-        .from("final_grades").select("*")
-        .eq("school_id", schoolId).in("assignment_id", assignmentIds)
-        .in("student_id", studentIds).in("momento", [1, 2, 3]);
-      allGrades = data || [];
-    } else {
-      const { data } = await supabase
-        .from("final_grades").select("*")
-        .eq("school_id", schoolId).in("assignment_id", assignmentIds)
-        .in("student_id", studentIds).eq("momento", parseInt(selectedMomento));
-      allGrades = data || [];
+    if (assignmentIds.length > 0) {
+      if (selectedMomento === "definitiva") {
+        const { data } = await supabase
+          .from("final_grades").select("*")
+          .eq("school_id", schoolId).in("assignment_id", assignmentIds)
+          .in("student_id", studentIds).in("momento", [1, 2, 3]);
+        allGrades = data || [];
+      } else {
+        const { data } = await supabase
+          .from("final_grades").select("*")
+          .eq("school_id", schoolId).in("assignment_id", assignmentIds)
+          .in("student_id", studentIds).eq("momento", parseInt(selectedMomento));
+        allGrades = data || [];
+      }
     }
 
     // Build student rows
@@ -162,7 +163,6 @@ export default function GradeSheets() {
       validAssignments.forEach(assignment => {
         const subjectId = assignment.subject_id;
         if (selectedMomento === "definitiva") {
-          // Average of 3 momentos
           const momentGrades = [1, 2, 3].map(m => {
             const g = allGrades.find(g => g.student_id === student.id && g.assignment_id === assignment.id && g.momento === m);
             return g ? parseFloat(g.grade_value || "0") + (g.adjustment_points || 0) : null;
@@ -211,7 +211,6 @@ export default function GradeSheets() {
     // Calculate positions by average (descending)
     const ranked = [...rows].filter(r => r.average !== null).sort((a, b) => (b.average || 0) - (a.average || 0));
     ranked.forEach((r, i) => { r.position = i + 1; });
-    // Assign position back
     rows.forEach(r => {
       const found = ranked.find(rk => rk.studentId === r.studentId);
       if (found) r.position = found.position;
