@@ -301,12 +301,12 @@ export default function GradeSheets() {
     const momentoLabel = selectedMomento === "definitiva"
       ? "NOTAS DEFINITIVAS"
       : `NOTAS DEL MOMENTO ${selectedMomento}`;
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.text(momentoLabel, pageWidth / 2, y, { align: "center" });
     y += 5;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(10);
     doc.text(`${GRADE_LABELS[gradeLevel] || gradeLevel} - Sección: ${sectionName}    |    Año Escolar: ${yearRange}`, pageWidth / 2, y, { align: "center" });
     y += 7;
 
