@@ -514,6 +514,7 @@ export default function GradesConsultation() {
 
         <TabsContent value="finales">
           <FinalGradesTab
+            key={`${selectedSubject}-${selectedSection}-${selectedGcrpAssignment}-${effectiveYear}`}
             schoolId={schoolId!}
             effectiveYear={effectiveYear}
             selectedSubject={selectedSubject}
