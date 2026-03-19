@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Loader2, Download, FileText, Users, Construction } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { addArialFont } from "@/lib/pdf-fonts";
 
 const SECONDARY_GRADES = ["1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano"] as const;
 
