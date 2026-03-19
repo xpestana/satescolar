@@ -687,14 +687,14 @@ export function DocumentBuilder() {
             <DialogTitle>Previsualización del Documento</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh]">
-            <div ref={pdfContentRef} className="p-8 bg-white border rounded-md text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", lineHeight: 1.6, fontSize: "12px" }}>
+            <div ref={pdfContentRef} className="p-8 bg-white border rounded-md text-black" style={{ fontFamily: "Arial, Helvetica, sans-serif", lineHeight: 1.6, fontSize: "13.3px" }}>
               {/* Header from planilla config */}
               <div dangerouslySetInnerHTML={{ __html: headerHtml }} />
 
               {/* Content with resolved snippets */}
               <div
-                className="prose prose-sm max-w-none"
-                style={{ color: "#000" }}
+                className="max-w-none"
+                style={{ color: "#000", fontFamily: "Arial, Helvetica, sans-serif", fontSize: "13.3px", lineHeight: 1.6 }}
                 dangerouslySetInnerHTML={{ __html: resolveSnippets(content, snippetData) }}
               />
 
