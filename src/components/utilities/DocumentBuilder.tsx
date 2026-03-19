@@ -125,6 +125,8 @@ export function DocumentBuilder() {
   const [showPreview, setShowPreview] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [docSignatureLines, setDocSignatureLines] = useState<string[]>(["Firma del Representante", "Firma del Director(a)"]);
+  const [newSignatureLine, setNewSignatureLine] = useState("");
 
   // ── Queries ─────────────────────────────────────────────────────
   const { data: templates } = useQuery({
