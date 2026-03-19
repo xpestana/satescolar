@@ -76,23 +76,13 @@ export default function GradeSheets() {
         .in("grade_level", [...SECONDARY_GRADES]);
       if (!sections?.length) return [];
 
-      // Get enrollments for each section in this year (paginated to avoid 1000 row limit)
-      let allEnrollments: { section_id: string; student_id: string }[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      while (true) {
-        const { data: page } = await supabase
-          .from("enrollments").select("section_id, student_id")
-          .eq("school_id", schoolId).eq("school_year_id", selectedYearId)
-          .range(from, from + pageSize - 1);
-        if (!page || page.length === 0) break;
-        allEnrollments = allEnrollments.concat(page);
-        if (page.length < pageSize) break;
-        from += pageSize;
-      }
+      // Get enrollments for each section in this year
+      const { data: enrollments } = await supabase
+        .from("enrollments").select("section_id, student_id")
+        .eq("school_id", schoolId).eq("school_year_id", selectedYearId);
 
       const enrollmentsBySection = new Map<string, string[]>();
-      allEnrollments.forEach(e => {
+      enrollments?.forEach(e => {
         const arr = enrollmentsBySection.get(e.section_id) || [];
         arr.push(e.student_id);
         enrollmentsBySection.set(e.section_id, arr);
@@ -118,17 +108,11 @@ export default function GradeSheets() {
   async function fetchSectionData(sectionId: string, studentIds: string[]) {
     if (!schoolId || !selectedYearId) return null;
 
-    // Get students in batches to avoid .in() limits
-    let allStudents: any[] = [];
-    const batchSize = 500;
-    for (let i = 0; i < studentIds.length; i += batchSize) {
-      const batch = studentIds.slice(i, i + batchSize);
-      const { data } = await supabase
-        .from("students").select("id, document_id, form_data")
-        .in("id", batch);
-      if (data) allStudents = allStudents.concat(data);
-    }
-    if (!allStudents.length) return null;
+    // Get students
+    const { data: students } = await supabase
+      .from("students").select("id, document_id, form_data")
+      .in("id", studentIds);
+    if (!students?.length) return null;
 
     // Get assignments for this section
     const { data: assignments } = await supabase
@@ -146,27 +130,25 @@ export default function GradeSheets() {
 
     const assignmentIds = validAssignments.map(a => a.id);
 
-    // Get final grades in batches
+    // Get final grades
     let allGrades: any[] = [];
-    for (let i = 0; i < studentIds.length; i += batchSize) {
-      const studentBatch = studentIds.slice(i, i + batchSize);
-      if (selectedMomento === "definitiva") {
-        const { data } = await supabase
-          .from("final_grades").select("*")
-          .eq("school_id", schoolId).in("assignment_id", assignmentIds)
-          .in("student_id", studentBatch).in("momento", [1, 2, 3]);
-        if (data) allGrades = allGrades.concat(data);
-      } else {
-        const { data } = await supabase
-          .from("final_grades").select("*")
-          .eq("school_id", schoolId).in("assignment_id", assignmentIds)
-          .in("student_id", studentBatch).eq("momento", parseInt(selectedMomento));
-        if (data) allGrades = allGrades.concat(data);
-      }
+    if (selectedMomento === "definitiva") {
+      // Get all 3 momentos
+      const { data } = await supabase
+        .from("final_grades").select("*")
+        .eq("school_id", schoolId).in("assignment_id", assignmentIds)
+        .in("student_id", studentIds).in("momento", [1, 2, 3]);
+      allGrades = data || [];
+    } else {
+      const { data } = await supabase
+        .from("final_grades").select("*")
+        .eq("school_id", schoolId).in("assignment_id", assignmentIds)
+        .in("student_id", studentIds).eq("momento", parseInt(selectedMomento));
+      allGrades = data || [];
     }
 
     // Build student rows
-    const rows: StudentRow[] = allStudents.map(student => {
+    const rows: StudentRow[] = students.map(student => {
       const fd = (student.form_data || {}) as any;
       const apellido1 = fd.primer_apellido || "";
       const apellido2 = fd.segundo_apellido || "";
