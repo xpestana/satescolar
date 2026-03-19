@@ -395,7 +395,7 @@ export function DocumentBuilder() {
       sel.removeAllRanges();
       sel.addRange(savedSelectionRef.current);
     }
-    const snippet = `<span class="snippet" style="background:#dbeafe;padding:1px 4px;border-radius:3px;font-weight:600;color:#1e40af;">{{${key}}}</span>&nbsp;`;
+    const snippet = `{{${key}}} `;
     document.execCommand("insertHTML", false, snippet);
     setTimeout(saveSelection, 0);
   }, [saveSelection]);
