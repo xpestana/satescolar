@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -19,6 +19,8 @@ import {
   LinkIcon,
   Menu,
   PanelRightClose,
+  Download,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -28,6 +30,11 @@ import { useSidebarState } from "@/hooks/useSidebarState";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
 
 interface NavItem {
   label: string;
@@ -154,6 +161,32 @@ export function AppSidebar() {
   const { school } = useSchoolData();
   const { familyName } = useRepresentativeFamily();
 
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(
+    typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches
+  );
+
+  useEffect(() => {
+    if (isInstalled) return;
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", () => setIsInstalled(true));
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, [isInstalled]);
+
+  const handleInstall = useCallback(async () => {
+    if (!deferredPrompt) return;
+    await deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") setIsInstalled(true);
+    setDeferredPrompt(null);
+  }, [deferredPrompt]);
+
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -271,6 +304,45 @@ export function AppSidebar() {
               </div>
             );
           })}
+
+          {/* Install App Section */}
+          {!isInstalled && (
+            <>
+              <div className="border-t border-border my-3" />
+              <div className="rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Smartphone className="h-4 w-4 text-primary" />
+                  </div>
+                  <p className="text-xs font-semibold text-foreground">Instalar App</p>
+                </div>
+                {deferredPrompt ? (
+                  <button
+                    onClick={handleInstall}
+                    className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Descargar SAT Escolar
+                  </button>
+                ) : (
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      Accede rápido desde tu dispositivo:
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      <strong>Android:</strong> Menú ⋮ → Instalar app
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      <strong>iPhone:</strong> Compartir → Agregar a inicio
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      <strong>PC:</strong> Ícono de instalar en la barra
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </nav>
 
         {/* User Card */}
