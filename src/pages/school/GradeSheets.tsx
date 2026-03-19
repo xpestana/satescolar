@@ -27,6 +27,8 @@ interface StudentRow {
   documentId: string;
   fullName: string;
   grades: Record<string, { value: number | null; adjustment: number }>;
+  /** Per-momento detail for definitiva mode */
+  momentoDetail: Record<string, { m1: number | null; m2: number | null; m3: number | null; adj1: number; adj2: number; adj3: number; avg: number | null }>;
   average: number | null;
   position: number;
   failedCount: number;
