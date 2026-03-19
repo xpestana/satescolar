@@ -278,23 +278,23 @@ export function DocumentBuilder() {
   const headerHtml = useMemo(() => {
     const hc = planillaConfig?.header_config || {};
     const s = schoolFull;
-    if (!s) return `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:16px;">${school?.name || ""}</div>`;
+    if (!s) return `<div style="text-align:center;font-weight:bold;font-size:11px;margin-bottom:8px;">${school?.name || ""}</div>`;
 
     const parts: string[] = [];
     
     // Logo + School name + codes
     let logoHtml = "";
     if (hc.show_logo !== false && s.logo_url) {
-      logoHtml = `<img src="${s.logo_url}" style="width:50px;height:50px;object-fit:contain;" crossorigin="anonymous" />`;
+      logoHtml = `<img src="${s.logo_url}" style="width:40px;height:40px;object-fit:contain;" crossorigin="anonymous" />`;
     }
 
     let centerParts: string[] = [];
-    if (hc.show_name !== false) centerParts.push(`<div style="font-weight:bold;font-size:14px;">${s.name}</div>`);
+    if (hc.show_name !== false) centerParts.push(`<div style="font-weight:bold;font-size:11px;">${s.name}</div>`);
     
     const codeParts: string[] = [];
     if (hc.show_dea_code !== false && s.dea_code) codeParts.push(`Código DEA: ${s.dea_code}`);
     if (hc.show_statistical_code !== false && s.statistical_code) codeParts.push(`Código Estadístico: ${s.statistical_code}`);
-    if (codeParts.length) centerParts.push(`<div style="font-size:9px;color:#666;">${codeParts.join(" - ")}</div>`);
+    if (codeParts.length) centerParts.push(`<div style="font-size:8px;color:#666;">${codeParts.join(" - ")}</div>`);
 
     if (hc.show_address !== false && s.address) {
       const addrParts = [s.address];
@@ -302,13 +302,13 @@ export function DocumentBuilder() {
       if (s.geo.municipality) addrParts.push(`municipio ${s.geo.municipality}`);
       if (s.geo.city) addrParts.push(s.geo.city);
       if (s.geo.state) addrParts.push(s.geo.state);
-      centerParts.push(`<div style="font-size:9px;color:#666;">${addrParts.join(", ")}</div>`);
+      centerParts.push(`<div style="font-size:8px;color:#666;">${addrParts.join(", ")}</div>`);
     }
 
     const infoParts: string[] = [];
     if (hc.show_phone !== false && s.phone) infoParts.push(`Tel: ${s.phone}`);
     if (hc.show_rif !== false && s.rif) infoParts.push(`Rif: ${s.rif}`);
-    if (infoParts.length) centerParts.push(`<div style="font-size:9px;color:#666;">${infoParts.join(" - ")}</div>`);
+    if (infoParts.length) centerParts.push(`<div style="font-size:8px;color:#666;">${infoParts.join(" - ")}</div>`);
 
     return `
       <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:8px;">
@@ -336,7 +336,7 @@ export function DocumentBuilder() {
     if (fc.show_rif !== false && s?.rif) parts.push(`Rif: ${s.rif}`);
 
     return `
-      <div style="text-align:center;font-size:8px;color:#888;border-top:1px solid #ddd;padding-top:8px;margin-top:8px;">
+      <div style="text-align:center;font-size:7px;color:#888;border-top:1px solid #ddd;padding-top:6px;margin-top:6px;">
         ${parts.length ? `<div>${parts.join(" ")}</div>` : ""}
       </div>
     `;
@@ -427,56 +427,77 @@ export function DocumentBuilder() {
     setGenerating(true);
     try {
       const resolved = resolveSnippets(content, snippetData);
+      const baseStyle = "position:absolute;left:-9999px;top:0;width:680px;background:#fff;font-family:Arial,Helvetica,sans-serif;color:#000;";
 
-      // Create offscreen container for html2canvas
-      const container = document.createElement("div");
-      container.style.cssText = "position:absolute;left:-9999px;top:0;width:680px;background:#fff;padding:40px;font-family:Arial,Helvetica,sans-serif;color:#000;line-height:1.6;font-size:13.3px;";
-      
-      container.innerHTML = `
-        <style>* { font-family: Arial, Helvetica, sans-serif !important; font-size: inherit !important; }</style>
-        ${headerHtml}
-        <div style="min-height:500px;font-size:13.3px;">${resolved}</div>
-        ${signaturesHtml}
-        ${footerHtml}
-      `;
-      document.body.appendChild(container);
+      // Helper to render an HTML block to canvas
+      const renderBlock = async (html: string, width = 680) => {
+        const el = document.createElement("div");
+        el.style.cssText = `${baseStyle}width:${width}px;padding:0 40px;`;
+        el.innerHTML = `<style>* { font-family: Arial, Helvetica, sans-serif !important; }</style>${html}`;
+        document.body.appendChild(el);
+        const imgs = el.querySelectorAll("img");
+        await Promise.all(Array.from(imgs).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })));
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, logging: false, backgroundColor: "#ffffff" });
+        document.body.removeChild(el);
+        return canvas;
+      };
 
-      // Wait for images to load
-      const images = container.querySelectorAll("img");
-      await Promise.all(Array.from(images).map(img =>
-        img.complete ? Promise.resolve() : new Promise(resolve => { img.onload = resolve; img.onerror = resolve; })
-      ));
+      // Render header, body+signatures, footer separately
+      const [headerCanvas, bodyCanvas, footerCanvas] = await Promise.all([
+        renderBlock(headerHtml),
+        renderBlock(`<div style="font-size:13.3px;line-height:1.6;">${resolved}</div>${signaturesHtml}`),
+        renderBlock(footerHtml),
+      ]);
 
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      });
-      document.body.removeChild(container);
-
-      // Create PDF from canvas
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const margin = 10;
       const usableW = pageW - margin * 2;
+
+      // Convert canvas px to mm at usableW scale
+      const toMM = (canvas: HTMLCanvasElement) => (canvas.height * usableW) / canvas.width;
+
+      const headerH = toMM(headerCanvas);
+      const footerH = toMM(footerCanvas);
+      const bodyTotalH = toMM(bodyCanvas);
       
-      const imgData = canvas.toDataURL("image/png");
-      const imgW = usableW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      
-      let heightLeft = imgH;
-      let position = margin;
-      
-      pdf.addImage(imgData, "PNG", margin, position, imgW, imgH);
-      heightLeft -= (pageH - margin * 2);
-      
-      while (heightLeft > 0) {
-        pdf.addPage();
-        position = margin - (imgH - heightLeft);
-        pdf.addImage(imgData, "PNG", margin, position, imgW, imgH);
-        heightLeft -= (pageH - margin * 2);
+      const headerImg = headerCanvas.toDataURL("image/png");
+      const footerImg = footerCanvas.toDataURL("image/png");
+      const bodyImg = bodyCanvas.toDataURL("image/png");
+
+      // Available content height per page
+      const contentAreaH = pageH - margin * 2 - headerH - footerH;
+      const footerY = pageH - margin - footerH;
+
+      let bodyOffset = 0; // how much of the body we've placed (in mm)
+      let pageNum = 0;
+
+      while (bodyOffset < bodyTotalH) {
+        if (pageNum > 0) pdf.addPage();
+        pageNum++;
+
+        // Draw header
+        pdf.addImage(headerImg, "PNG", margin, margin, usableW, headerH);
+
+        // Draw body slice - we position the full body image and clip via page boundaries
+        const bodyY = margin + headerH;
+        // The body image y-position: shift up by bodyOffset
+        const bodyImgY = bodyY - bodyOffset;
+        
+        // Use clipping to only show the part that fits
+        pdf.saveGraphicsState();
+        // @ts-ignore - jsPDF rect clip
+        pdf.rect(margin, bodyY, usableW, contentAreaH, null);
+        // @ts-ignore
+        pdf.clip();
+        pdf.addImage(bodyImg, "PNG", margin, bodyImgY, usableW, bodyTotalH);
+        pdf.restoreGraphicsState();
+
+        // Draw footer at bottom
+        pdf.addImage(footerImg, "PNG", margin, footerY, usableW, footerH);
+
+        bodyOffset += contentAreaH;
       }
 
       const studentName = snippetData.nombre_completo || "documento";
