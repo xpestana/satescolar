@@ -10,7 +10,7 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, Users, Construction, Info, Hammer } from "lucide-react";
+import { Loader2, Download, FileText, Users, Info, Hammer } from "lucide-react";
 import { DocumentBuilder } from "@/components/utilities/DocumentBuilder";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -716,9 +716,9 @@ export default function GradeSheets() {
             <TabsTrigger value="constructor" className="gap-1.5">
               <Hammer className="h-3.5 w-3.5" /> Constructor
             </TabsTrigger>
-            <TabsTrigger value="sabana">Sábana de Notas</TabsTrigger>
-            <TabsTrigger value="boletin" disabled>Boletín Informativo</TabsTrigger>
-            <TabsTrigger value="resumen" disabled>Resumen Académico</TabsTrigger>
+            <TabsTrigger value="sabana" className="gap-1.5">
+              <FileText className="h-3.5 w-3.5" /> Sábana de Notas
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="constructor" className="mt-4">
@@ -832,23 +832,6 @@ export default function GradeSheets() {
             )}
           </TabsContent>
 
-          <TabsContent value="boletin" className="mt-4">
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <Construction className="h-8 w-8" />
-                <p>Próximamente: Boletín Informativo</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="resumen" className="mt-4">
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <Construction className="h-8 w-8" />
-                <p>Próximamente: Resumen Académico</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
