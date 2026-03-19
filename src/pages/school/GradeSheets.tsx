@@ -117,7 +117,7 @@ export default function GradeSheets() {
     // Get assignments for this section
     const { data: assignments } = await supabase
       .from("subject_teacher_assignments")
-      .select("id, subject_id, school_subjects(id, name, display_order, show_in_planilla)")
+      .select("id, subject_id, school_subjects(id, name, abbreviation, display_order, show_in_planilla)")
       .eq("school_id", schoolId).eq("school_year_id", selectedYearId)
       .eq("section_id", sectionId).eq("is_suspended", false);
 
