@@ -285,7 +285,7 @@ export function DocumentBuilder() {
     // Logo + School name + codes
     let logoHtml = "";
     if (hc.show_logo !== false && s.logo_url) {
-      logoHtml = `<img src="${s.logo_url}" style="width:50px;height:50px;object-fit:contain;" crossorigin="anonymous" />`;
+      logoHtml = `<img src="${s.logo_url}" style="width:40px;height:40px;object-fit:contain;" crossorigin="anonymous" />`;
     }
 
     let centerParts: string[] = [];
