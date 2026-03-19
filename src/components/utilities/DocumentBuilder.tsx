@@ -634,6 +634,30 @@ export function DocumentBuilder() {
           </div>
 
           <RichTextEditor value={content} onChange={setContent} placeholder="Escribe el contenido de tu planilla aquí... Usa las variables del panel izquierdo para insertar datos automáticos." minHeight={400} />
+
+          {/* Signature lines config */}
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm">Líneas de Firma (obligatorio)</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0 space-y-2">
+              {docSignatureLines.map((sig, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input value={sig} onChange={(e) => setDocSignatureLines(prev => prev.map((s, i) => i === idx ? e.target.value : s))} className="text-sm flex-1" />
+                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive h-8 w-8" onClick={() => setDocSignatureLines(prev => prev.filter((_, i) => i !== idx))}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Input value={newSignatureLine} onChange={(e) => setNewSignatureLine(e.target.value)} placeholder="Ej: Firma del Secretario" className="text-sm flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = newSignatureLine.trim(); if (v) { setDocSignatureLines(prev => [...prev, v]); setNewSignatureLine(""); } } }} />
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { const v = newSignatureLine.trim(); if (v) { setDocSignatureLines(prev => [...prev, v]); setNewSignatureLine(""); } }}>
+                  <Plus className="h-3 w-3 mr-1" /> Agregar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
