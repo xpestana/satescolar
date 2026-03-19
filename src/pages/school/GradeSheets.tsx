@@ -320,6 +320,7 @@ export default function GradeSheets() {
       // No subjects assigned - show student list with message
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
+      doc.setTextColor(180, 50, 50);
       doc.text("No hay materias asignadas para esta sección", pageWidth / 2, y, { align: "center" });
       y += 6;
       doc.setTextColor(0);
