@@ -227,9 +227,7 @@ export function DocumentBuilder() {
     return students.find((ss) => (ss.students as any).id === selectedStudentId);
   }, [selectedStudentId, students]);
 
-  const signatureLines: string[] = useMemo(() => {
-    return planillaConfig?.signature_lines || ["Firma del Representante", "Firma del Director(a)"];
-  }, [planillaConfig]);
+  const signatureLines: string[] = docSignatureLines;
 
   const snippetData = useMemo((): Record<string, string> => {
     const d: Record<string, string> = {
