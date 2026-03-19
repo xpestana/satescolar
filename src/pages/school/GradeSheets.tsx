@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Loader2, Download, FileText, Users, Construction } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { addArialFont } from "@/lib/pdf-fonts";
 
 const SECONDARY_GRADES = ["1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano"] as const;
 
@@ -293,7 +294,7 @@ export default function GradeSheets() {
 
     // Header
     doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Arial", "bold");
     doc.setTextColor(0);
     doc.text(school?.name?.toUpperCase() || "COLEGIO", pageWidth / 2, y, { align: "center" });
     y += 5;
@@ -305,7 +306,7 @@ export default function GradeSheets() {
     doc.text(momentoLabel, pageWidth / 2, y, { align: "center" });
     y += 5;
 
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Arial", "normal");
     doc.setFontSize(10);
     doc.text(`${GRADE_LABELS[gradeLevel] || gradeLevel} - Sección: ${sectionName}    |    Año Escolar: ${yearRange}`, pageWidth / 2, y, { align: "center" });
     y += 7;
@@ -319,7 +320,7 @@ export default function GradeSheets() {
     if (subjects.length === 0) {
       // No subjects assigned - show student list with message
       doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
+      doc.setFont("Arial", "normal");
       doc.setTextColor(180, 50, 50);
       doc.text("No hay materias asignadas para esta sección", pageWidth / 2, y, { align: "center" });
       y += 6;
@@ -337,7 +338,7 @@ export default function GradeSheets() {
         body,
         startY: y,
         margin: { left: margin, right: margin },
-        styles: { fontSize: 10, font: "helvetica", cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
+        styles: { fontSize: 10, font: "Arial", cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
         headStyles: { fillColor: [41, 128, 185], fontSize: 10, halign: "center" },
         bodyStyles: { halign: "center" },
         columnStyles: {
@@ -408,7 +409,7 @@ export default function GradeSheets() {
       body,
       startY: y,
       margin: { left: margin, right: margin },
-      styles: { fontSize: 10, font: "helvetica", cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
+      styles: { fontSize: 10, font: "Arial", cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
       headStyles: { fillColor: [41, 128, 185], fontSize: 10, halign: "center" },
       bodyStyles: { halign: "center" },
       columnStyles: {
@@ -456,6 +457,7 @@ export default function GradeSheets() {
       }
 
       const doc = new jsPDF({ orientation: "landscape", format: "a4" });
+      await addArialFont(doc);
       const year = schoolYears?.find(y => y.id === selectedYearId);
       generatePdf(doc, section.name, section.grade_level, year?.year_range || "", data, false);
 
@@ -476,6 +478,7 @@ export default function GradeSheets() {
     setDownloading("all");
     try {
       const doc = new jsPDF({ orientation: "landscape", format: "a4" });
+      await addArialFont(doc);
       const year = schoolYears?.find(y => y.id === selectedYearId);
       let first = true;
 
