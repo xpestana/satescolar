@@ -832,23 +832,6 @@ export default function GradeSheets() {
             )}
           </TabsContent>
 
-          <TabsContent value="boletin" className="mt-4">
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <Construction className="h-8 w-8" />
-                <p>Próximamente: Boletín Informativo</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="resumen" className="mt-4">
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground flex flex-col items-center gap-2">
-                <Construction className="h-8 w-8" />
-                <p>Próximamente: Resumen Académico</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
