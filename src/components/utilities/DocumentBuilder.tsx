@@ -125,6 +125,8 @@ export function DocumentBuilder() {
   const [showPreview, setShowPreview] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [docSignatureLines, setDocSignatureLines] = useState<string[]>(["Firma del Representante", "Firma del Director(a)"]);
+  const [newSignatureLine, setNewSignatureLine] = useState("");
 
   // ── Queries ─────────────────────────────────────────────────────
   const { data: templates } = useQuery({
@@ -225,9 +227,7 @@ export function DocumentBuilder() {
     return students.find((ss) => (ss.students as any).id === selectedStudentId);
   }, [selectedStudentId, students]);
 
-  const signatureLines: string[] = useMemo(() => {
-    return planillaConfig?.signature_lines || ["Firma del Representante", "Firma del Director(a)"];
-  }, [planillaConfig]);
+  const signatureLines: string[] = docSignatureLines;
 
   const snippetData = useMemo((): Record<string, string> => {
     const d: Record<string, string> = {
@@ -357,10 +357,10 @@ export function DocumentBuilder() {
   const saveTemplate = useMutation({
     mutationFn: async (name: string) => {
       if (selectedTemplateId) {
-        const { error } = await supabase.from("document_templates").update({ name, content_html: content }).eq("id", selectedTemplateId);
+        const { error } = await supabase.from("document_templates").update({ name, content_html: content, signature_lines: docSignatureLines } as any).eq("id", selectedTemplateId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("document_templates").insert({ school_id: schoolId!, name, content_html: content });
+        const { error } = await supabase.from("document_templates").insert({ school_id: schoolId!, name, content_html: content, signature_lines: docSignatureLines } as any);
         if (error) throw error;
       }
     },
@@ -395,7 +395,7 @@ export function DocumentBuilder() {
       sel.removeAllRanges();
       sel.addRange(savedSelectionRef.current);
     }
-    const snippet = `<span class="snippet" style="background:#dbeafe;padding:1px 4px;border-radius:3px;font-weight:600;color:#1e40af;">{{${key}}}</span>&nbsp;`;
+    const snippet = `{{${key}}} `;
     document.execCommand("insertHTML", false, snippet);
     setTimeout(saveSelection, 0);
   }, [saveSelection]);
@@ -406,8 +406,8 @@ export function DocumentBuilder() {
     if (tpl) {
       setContent(tpl.content_html);
       setTemplateName(tpl.name);
-      const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
-      if (editor) editor.innerHTML = tpl.content_html;
+      const sigs = (tpl as any).signature_lines;
+      if (Array.isArray(sigs)) setDocSignatureLines(sigs);
     }
   }, [templates]);
 
@@ -543,8 +543,7 @@ export function DocumentBuilder() {
                 )}
                 <Button size="sm" variant="outline" className="text-xs" onClick={() => {
                   setSelectedTemplateId(""); setContent(""); setTemplateName("");
-                  const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
-                  if (editor) editor.innerHTML = "";
+                  setDocSignatureLines(["Firma del Representante", "Firma del Director(a)"]);
                 }}>
                   <Plus className="h-3 w-3 mr-1" /> Nuevo
                 </Button>
@@ -634,6 +633,30 @@ export function DocumentBuilder() {
           </div>
 
           <RichTextEditor value={content} onChange={setContent} placeholder="Escribe el contenido de tu planilla aquí... Usa las variables del panel izquierdo para insertar datos automáticos." minHeight={400} />
+
+          {/* Signature lines config */}
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm">Líneas de Firma (obligatorio)</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0 space-y-2">
+              {docSignatureLines.map((sig, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input value={sig} onChange={(e) => setDocSignatureLines(prev => prev.map((s, i) => i === idx ? e.target.value : s))} className="text-sm flex-1" />
+                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive h-8 w-8" onClick={() => setDocSignatureLines(prev => prev.filter((_, i) => i !== idx))}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <div className="flex gap-2">
+                <Input value={newSignatureLine} onChange={(e) => setNewSignatureLine(e.target.value)} placeholder="Ej: Firma del Secretario" className="text-sm flex-1"
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); const v = newSignatureLine.trim(); if (v) { setDocSignatureLines(prev => [...prev, v]); setNewSignatureLine(""); } } }} />
+                <Button variant="outline" size="sm" className="text-xs" onClick={() => { const v = newSignatureLine.trim(); if (v) { setDocSignatureLines(prev => [...prev, v]); setNewSignatureLine(""); } }}>
+                  <Plus className="h-3 w-3 mr-1" /> Agregar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Bold,
@@ -32,6 +32,18 @@ export function RichTextEditor({
   minHeight = 250,
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const isInternalChangeRef = useRef(false);
+
+  // Sync external value changes into contentEditable
+  useEffect(() => {
+    if (isInternalChangeRef.current) {
+      isInternalChangeRef.current = false;
+      return;
+    }
+    if (editorRef.current && value !== editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = value || "";
+    }
+  }, [value]);
 
   const exec = useCallback((command: string, val?: string) => {
     document.execCommand(command, false, val);
@@ -46,6 +58,7 @@ export function RichTextEditor({
 
   const handleInput = useCallback(() => {
     if (editorRef.current) {
+      isInternalChangeRef.current = true;
       onChange(editorRef.current.innerHTML);
     }
   }, [onChange]);
@@ -123,7 +136,6 @@ export function RichTextEditor({
           const text = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
           document.execCommand("insertHTML", false, text);
         }}
-        dangerouslySetInnerHTML={value ? undefined : { __html: "" }}
         data-placeholder={placeholder}
         suppressContentEditableWarning
       />

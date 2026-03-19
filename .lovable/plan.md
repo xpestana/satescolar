@@ -1,42 +1,22 @@
 
 
-## Plan: Corregir snippets, carga de plantillas y firmas
+## Separar Asignación GCRP de Regular — COMPLETADO
 
-### Problemas identificados
+### Cambios realizados:
 
-1. **Snippets con formato azul**: Se insertan con `<span>` con estilos (fondo azul, negrita). Deben insertarse como texto plano `{{variable}}` sin formato.
+1. **Datos GCRP limpiados**: Se eliminaron todos los `student_grades`, `evaluation_plan_items` y `subject_teacher_assignments` vinculados a materias GCRP.
 
-2. **Plantilla no carga en editor**: El `RichTextEditor` usa `dangerouslySetInnerHTML` solo en el render inicial. Cuando se cambia `value` externamente (al cargar plantilla), el `contentEditable` div no se actualiza porque React no re-renderiza contenido de un div `contentEditable`.
+2. **Migración SQL ejecutada**:
+   - `section_id` en `subject_teacher_assignments` ahora es nullable (para GCRP)
+   - Nueva tabla `gcrp_assignment_students` con RLS para school users, teachers y admins
 
-3. **Firma debe configurarse en el constructor**: Actualmente las líneas de firma se toman de `planilla_general_config`. Deben ser un campo editable dentro del constructor, guardadas junto con la plantilla.
+3. **SubjectAssignments.tsx**: Flujo separado Regular vs GCRP
+   - Regular: Docente → Nivel/Grado → Sección (sin cambios)
+   - GCRP: Docente → Buscar estudiantes por nivel/sección → Seleccionar individuales o todos → Crear asignación sin section_id + registros en `gcrp_assignment_students`
+   - Tabla muestra "X estudiantes" para GCRP con modal de visualización
 
-### Cambios
+4. **TeacherGrades.tsx**: Obtiene estudiantes desde `gcrp_assignment_students` cuando la asignación es GCRP
 
-#### 1. `RichTextEditor.tsx` — Soportar actualizaciones externas
+5. **GradesConsultation.tsx**: Misma lógica condicional para GCRP vs Regular
 
-- Agregar un `useEffect` que detecte cuando `value` cambia externamente (no por input del usuario) y actualice el `innerHTML` del div editable. Se usa un flag `isInternalChange` para evitar loops.
-
-#### 2. `DocumentBuilder.tsx` — Snippets sin formato
-
-- Cambiar `insertSnippet` para insertar texto plano `{{key}}` sin HTML de estilo (sin `<span>`, sin colores, sin fondo azul).
-
-#### 3. `DocumentBuilder.tsx` — Firma configurable en el constructor
-
-- Agregar un campo de "Líneas de firma" debajo del editor: input para agregar nombres de firmantes (ej: "Director(a)", "Representante"), con botón agregar/eliminar.
-- Las firmas se guardan como parte de la plantilla en la tabla `document_templates`.
-- Migración SQL: agregar columna `signature_lines text[] DEFAULT '{}'` a `document_templates`.
-- Eliminar la dependencia de `planilla_general_config.signature_lines` para las firmas.
-
-#### 4. `DocumentBuilder.tsx` — Carga de plantilla
-
-- Al cargar plantilla, también cargar sus `signature_lines` al estado local.
-- Al guardar, incluir `signature_lines` en el insert/update.
-
-### Archivos a modificar
-
-| Archivo | Cambio |
-|---|---|
-| `src/components/utilities/RichTextEditor.tsx` | useEffect para sincronizar value externo |
-| `src/components/utilities/DocumentBuilder.tsx` | Snippets sin formato, firma editable en UI, carga de plantilla |
-| Migración SQL | Agregar `signature_lines` a `document_templates` |
-
+6. **TeacherSubjects.tsx**: Muestra "GCRP — Estudiantes individuales" cuando section es null
