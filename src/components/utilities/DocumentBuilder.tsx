@@ -442,10 +442,11 @@ export function DocumentBuilder() {
         return canvas;
       };
 
-      // Render header, body+signatures, footer separately
-      const [headerCanvas, bodyCanvas, footerCanvas] = await Promise.all([
+      // Render header, body (content only), signatures, footer separately
+      const [headerCanvas, bodyCanvas, sigCanvas, footerCanvas] = await Promise.all([
         renderBlock(headerHtml),
-        renderBlock(`<div style="font-size:13.3px;line-height:1.6;">${resolved}</div>${signaturesHtml}`),
+        renderBlock(`<div style="font-size:13.3px;line-height:1.6;">${resolved}</div>`),
+        signatureLines.length ? renderBlock(signaturesHtml) : Promise.resolve(null),
         renderBlock(footerHtml),
       ]);
 
@@ -455,49 +456,61 @@ export function DocumentBuilder() {
       const margin = 10;
       const usableW = pageW - margin * 2;
 
-      // Convert canvas px to mm at usableW scale
       const toMM = (canvas: HTMLCanvasElement) => (canvas.height * usableW) / canvas.width;
 
       const headerH = toMM(headerCanvas);
       const footerH = toMM(footerCanvas);
+      const sigH = sigCanvas ? toMM(sigCanvas) : 0;
       const bodyTotalH = toMM(bodyCanvas);
       
       const headerImg = headerCanvas.toDataURL("image/png");
       const footerImg = footerCanvas.toDataURL("image/png");
       const bodyImg = bodyCanvas.toDataURL("image/png");
+      const sigImg = sigCanvas ? sigCanvas.toDataURL("image/png") : "";
 
-      // Available content height per page
       const contentAreaH = pageH - margin * 2 - headerH - footerH;
       const footerY = pageH - margin - footerH;
 
-      let bodyOffset = 0; // how much of the body we've placed (in mm)
+      // Calculate how many pages the body needs (last page must also fit signatures)
+      let bodyOffset = 0;
       let pageNum = 0;
 
       while (bodyOffset < bodyTotalH) {
         if (pageNum > 0) pdf.addPage();
         pageNum++;
 
+        const isLastPage = (bodyOffset + contentAreaH) >= bodyTotalH;
+        // On last page, reserve space for signatures above footer
+        const availableH = isLastPage ? contentAreaH - sigH : contentAreaH;
+        // But if content doesn't even fill, use what's left
+        const bodyRemaining = bodyTotalH - bodyOffset;
+        const sliceH = Math.min(availableH, bodyRemaining);
+
         // Draw header
         pdf.addImage(headerImg, "PNG", margin, margin, usableW, headerH);
 
-        // Draw body slice - we position the full body image and clip via page boundaries
+        // Draw body slice with clipping
         const bodyY = margin + headerH;
-        // The body image y-position: shift up by bodyOffset
         const bodyImgY = bodyY - bodyOffset;
         
-        // Use clipping to only show the part that fits
         pdf.saveGraphicsState();
-        // @ts-ignore - jsPDF rect clip
-        pdf.rect(margin, bodyY, usableW, contentAreaH, null);
+        // @ts-ignore
+        pdf.rect(margin, bodyY, usableW, isLastPage ? availableH : contentAreaH, null);
         // @ts-ignore
         pdf.clip();
         pdf.addImage(bodyImg, "PNG", margin, bodyImgY, usableW, bodyTotalH);
         pdf.restoreGraphicsState();
 
+        // On last page, draw signatures just above footer
+        if (isLastPage && sigImg) {
+          const sigY = footerY - sigH;
+          pdf.addImage(sigImg, "PNG", margin, sigY, usableW, sigH);
+        }
+
         // Draw footer at bottom
         pdf.addImage(footerImg, "PNG", margin, footerY, usableW, footerH);
 
-        bodyOffset += contentAreaH;
+        bodyOffset += isLastPage ? availableH : contentAreaH;
       }
 
       const studentName = snippetData.nombre_completo || "documento";
