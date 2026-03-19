@@ -336,7 +336,7 @@ export function DocumentBuilder() {
     if (fc.show_rif !== false && s?.rif) parts.push(`Rif: ${s.rif}`);
 
     return `
-      <div style="text-align:center;font-size:8px;color:#888;border-top:1px solid #ddd;padding-top:8px;margin-top:8px;">
+      <div style="text-align:center;font-size:7px;color:#888;border-top:1px solid #ddd;padding-top:6px;margin-top:6px;">
         ${parts.length ? `<div>${parts.join(" ")}</div>` : ""}
       </div>
     `;
