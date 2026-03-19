@@ -716,9 +716,9 @@ export default function GradeSheets() {
             <TabsTrigger value="constructor" className="gap-1.5">
               <Hammer className="h-3.5 w-3.5" /> Constructor
             </TabsTrigger>
-            <TabsTrigger value="sabana">Sábana de Notas</TabsTrigger>
-            <TabsTrigger value="boletin" disabled>Boletín Informativo</TabsTrigger>
-            <TabsTrigger value="resumen" disabled>Resumen Académico</TabsTrigger>
+            <TabsTrigger value="sabana" className="gap-1.5">
+              <FileText className="h-3.5 w-3.5" /> Sábana de Notas
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="constructor" className="mt-4">
