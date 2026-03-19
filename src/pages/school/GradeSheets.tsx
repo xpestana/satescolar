@@ -465,7 +465,7 @@ export default function GradeSheets() {
         doc.setFontSize(8);
         doc.setTextColor(130);
         doc.text(
-          `Aj. = Puntos de ajuste   |   Generado: ${new Date().toLocaleDateString("es-VE")}`,
+          `Números en rojo (esquina) = Puntos de ajuste   |   Generado: ${new Date().toLocaleDateString("es-VE")}`,
           pageWidth / 2, pageH - 6, { align: "center" }
         );
       },
