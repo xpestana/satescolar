@@ -294,7 +294,7 @@ export default function GradeSheets() {
 
     // Header
     doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("Arial", "bold");
     doc.setTextColor(0);
     doc.text(school?.name?.toUpperCase() || "COLEGIO", pageWidth / 2, y, { align: "center" });
     y += 5;
