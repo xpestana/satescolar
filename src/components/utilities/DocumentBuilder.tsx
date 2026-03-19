@@ -314,9 +314,23 @@ export function DocumentBuilder() {
 
   // ── Handlers ────────────────────────────────────────────────────
   const insertSnippet = useCallback((key: string) => {
+    const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
+    if (!editor) return;
+    editor.focus();
+
+    // Restore saved selection if available
+    const sel = window.getSelection();
+    if (sel && savedSelectionRef.current) {
+      sel.removeAllRanges();
+      sel.addRange(savedSelectionRef.current);
+    }
+
     const snippet = `<span class="snippet" style="background:#dbeafe;padding:1px 4px;border-radius:3px;font-weight:600;color:#1e40af;">{{${key}}}</span>&nbsp;`;
     document.execCommand("insertHTML", false, snippet);
-  }, []);
+
+    // Update saved selection after insert
+    setTimeout(saveSelection, 0);
+  }, [saveSelection]);
 
   const loadTemplate = useCallback((id: string) => {
     setSelectedTemplateId(id);
