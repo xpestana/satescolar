@@ -121,10 +121,8 @@ export default function GradeSheets() {
       .eq("school_id", schoolId).eq("school_year_id", selectedYearId)
       .eq("section_id", sectionId).eq("is_suspended", false);
 
-    if (!assignments?.length) return null;
-
     // Filter to subjects that show_in_planilla and sort
-    const validAssignments = assignments
+    const validAssignments = (assignments || [])
       .filter(a => (a.school_subjects as any)?.show_in_planilla !== false)
       .sort((a, b) => ((a.school_subjects as any)?.display_order || 0) - ((b.school_subjects as any)?.display_order || 0));
 
