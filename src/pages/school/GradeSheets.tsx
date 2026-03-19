@@ -408,8 +408,8 @@ export default function GradeSheets() {
       body,
       startY: y,
       margin: { left: margin, right: margin },
-      styles: { fontSize: 6, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
-      headStyles: { fillColor: [41, 128, 185], fontSize: 6, halign: "center" },
+      styles: { fontSize: 10, font: "helvetica", cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
+      headStyles: { fillColor: [41, 128, 185], fontSize: 10, halign: "center" },
       bodyStyles: { halign: "center" },
       columnStyles: {
         ...colWidths,
