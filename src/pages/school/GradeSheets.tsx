@@ -258,7 +258,7 @@ export default function GradeSheets() {
     // Build columns
     const subjects = data.assignments.map(a => ({
       id: a.subject_id,
-      name: (a.school_subjects as any)?.name || "Área",
+      name: (a.school_subjects as any)?.abbreviation || (a.school_subjects as any)?.name || "Área",
     }));
 
     const head = ["N°", "Cédula", "Apellidos y Nombres", ...subjects.map(s => s.name), "Prom", "Pos", "Aplaz"];
