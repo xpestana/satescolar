@@ -357,10 +357,10 @@ export function DocumentBuilder() {
   const saveTemplate = useMutation({
     mutationFn: async (name: string) => {
       if (selectedTemplateId) {
-        const { error } = await supabase.from("document_templates").update({ name, content_html: content }).eq("id", selectedTemplateId);
+        const { error } = await supabase.from("document_templates").update({ name, content_html: content, signature_lines: docSignatureLines } as any).eq("id", selectedTemplateId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("document_templates").insert({ school_id: schoolId!, name, content_html: content });
+        const { error } = await supabase.from("document_templates").insert({ school_id: schoolId!, name, content_html: content, signature_lines: docSignatureLines } as any);
         if (error) throw error;
       }
     },
