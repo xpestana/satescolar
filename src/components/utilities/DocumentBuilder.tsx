@@ -430,7 +430,7 @@ export function DocumentBuilder() {
 
       // Create offscreen container for html2canvas
       const container = document.createElement("div");
-      container.style.cssText = "position:absolute;left:-9999px;top:0;width:680px;background:#fff;padding:40px;font-family:Arial,Helvetica,sans-serif;color:#000;line-height:1.6;font-size:12px;";
+      container.style.cssText = "position:absolute;left:-9999px;top:0;width:680px;background:#fff;padding:40px;font-family:Arial,Helvetica,sans-serif;color:#000;line-height:1.6;font-size:13.3px;";
       
       container.innerHTML = `
         ${headerHtml}
