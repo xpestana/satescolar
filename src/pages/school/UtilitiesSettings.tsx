@@ -16,6 +16,79 @@ import { CarnetLayoutConfig, DEFAULT_LAYOUT } from "@/components/utilities/Carne
 import { CarnetControls } from "@/components/utilities/CarnetControls";
 import { CarnetPreview } from "@/components/utilities/CarnetPreview";
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+function InstallAppCard() {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", () => setIsInstalled(true));
+
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (deferredPrompt) {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") setIsInstalled(true);
+      setDeferredPrompt(null);
+    }
+  };
+
+  return (
+    <Card className="mb-6">
+      <CardHeader className="pb-3">
+        <div className="flex items-center gap-3">
+          <Smartphone className="h-5 w-5 text-primary" />
+          <CardTitle className="text-sm font-medium">Instalar Aplicación</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isInstalled ? (
+          <p className="text-sm text-muted-foreground">✅ SAT Escolar ya está instalada en este dispositivo.</p>
+        ) : deferredPrompt ? (
+          <div className="flex items-center gap-4">
+            <p className="text-sm text-muted-foreground flex-1">
+              Instala SAT Escolar en tu dispositivo para acceso rápido sin abrir el navegador.
+            </p>
+            <Button size="sm" onClick={handleInstall}>
+              <Download className="h-4 w-4 mr-2" /> Instalar App
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Para instalar SAT Escolar en tu dispositivo:
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+              <li><strong>Android (Chrome):</strong> Toca el menú ⋮ → "Instalar aplicación"</li>
+              <li><strong>iPhone/iPad (Safari):</strong> Toca Compartir → "Agregar a pantalla de inicio"</li>
+              <li><strong>PC (Chrome/Edge):</strong> Haz clic en el ícono de instalar en la barra de direcciones</li>
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const DEFAULT_PRIMARY = "#01051e";
 const DEFAULT_SECONDARY = "#1e78c8";
 
