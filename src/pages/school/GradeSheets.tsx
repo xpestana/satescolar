@@ -121,10 +121,8 @@ export default function GradeSheets() {
       .eq("school_id", schoolId).eq("school_year_id", selectedYearId)
       .eq("section_id", sectionId).eq("is_suspended", false);
 
-    if (!assignments?.length) return null;
-
     // Filter to subjects that show_in_planilla and sort
-    const validAssignments = assignments
+    const validAssignments = (assignments || [])
       .filter(a => (a.school_subjects as any)?.show_in_planilla !== false)
       .sort((a, b) => ((a.school_subjects as any)?.display_order || 0) - ((b.school_subjects as any)?.display_order || 0));
 
@@ -132,19 +130,20 @@ export default function GradeSheets() {
 
     // Get final grades
     let allGrades: any[] = [];
-    if (selectedMomento === "definitiva") {
-      // Get all 3 momentos
-      const { data } = await supabase
-        .from("final_grades").select("*")
-        .eq("school_id", schoolId).in("assignment_id", assignmentIds)
-        .in("student_id", studentIds).in("momento", [1, 2, 3]);
-      allGrades = data || [];
-    } else {
-      const { data } = await supabase
-        .from("final_grades").select("*")
-        .eq("school_id", schoolId).in("assignment_id", assignmentIds)
-        .in("student_id", studentIds).eq("momento", parseInt(selectedMomento));
-      allGrades = data || [];
+    if (assignmentIds.length > 0) {
+      if (selectedMomento === "definitiva") {
+        const { data } = await supabase
+          .from("final_grades").select("*")
+          .eq("school_id", schoolId).in("assignment_id", assignmentIds)
+          .in("student_id", studentIds).in("momento", [1, 2, 3]);
+        allGrades = data || [];
+      } else {
+        const { data } = await supabase
+          .from("final_grades").select("*")
+          .eq("school_id", schoolId).in("assignment_id", assignmentIds)
+          .in("student_id", studentIds).eq("momento", parseInt(selectedMomento));
+        allGrades = data || [];
+      }
     }
 
     // Build student rows
@@ -164,7 +163,6 @@ export default function GradeSheets() {
       validAssignments.forEach(assignment => {
         const subjectId = assignment.subject_id;
         if (selectedMomento === "definitiva") {
-          // Average of 3 momentos
           const momentGrades = [1, 2, 3].map(m => {
             const g = allGrades.find(g => g.student_id === student.id && g.assignment_id === assignment.id && g.momento === m);
             return g ? parseFloat(g.grade_value || "0") + (g.adjustment_points || 0) : null;
@@ -213,7 +211,6 @@ export default function GradeSheets() {
     // Calculate positions by average (descending)
     const ranked = [...rows].filter(r => r.average !== null).sort((a, b) => (b.average || 0) - (a.average || 0));
     ranked.forEach((r, i) => { r.position = i + 1; });
-    // Assign position back
     rows.forEach(r => {
       const found = ranked.find(rk => rk.studentId === r.studentId);
       if (found) r.position = found.position;
@@ -261,6 +258,47 @@ export default function GradeSheets() {
       name: (a.school_subjects as any)?.abbreviation || (a.school_subjects as any)?.name || "Área",
     }));
 
+    if (subjects.length === 0) {
+      // No subjects assigned - show student list with message
+      doc.setFontSize(9);
+      doc.setTextColor(180, 50, 50);
+      doc.text("No hay materias asignadas para esta sección", pageWidth / 2, y, { align: "center" });
+      y += 6;
+      doc.setTextColor(0);
+
+      const head = ["N°", "Cédula", "Apellidos y Nombres"];
+      const body = data.students.map((row, idx) => [
+        String(idx + 1),
+        row.documentId,
+        row.fullName,
+      ]);
+
+      autoTable(doc, {
+        head: [head],
+        body,
+        startY: y,
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 7, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
+        headStyles: { fillColor: [41, 128, 185], fontSize: 7, halign: "center" },
+        bodyStyles: { halign: "center" },
+        columnStyles: {
+          0: { cellWidth: 12 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 80, halign: "left" },
+        },
+        didDrawPage: () => {
+          const pageH = doc.internal.pageSize.getHeight();
+          doc.setFontSize(6);
+          doc.setTextColor(130);
+          doc.text(
+            `Generado: ${new Date().toLocaleDateString("es-VE")}`,
+            pageWidth / 2, pageH - 6, { align: "center" }
+          );
+        },
+      });
+      return;
+    }
+
     const head = ["N°", "Cédula", "Apellidos y Nombres", ...subjects.map(s => s.name), "Prom", "Pos", "Aplaz"];
     const body = data.students.map((row, idx) => {
       const subjectCells = subjects.map(s => {
@@ -290,23 +328,21 @@ export default function GradeSheets() {
         avgRow.push("");
       }
     });
-    // General average
     const allAvgs = data.students.map(r => r.average).filter(v => v !== null) as number[];
     avgRow.push(allAvgs.length > 0 ? (allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length).toFixed(1) : "");
-    avgRow.push(""); // pos
-    avgRow.push(""); // aplaz
+    avgRow.push("");
+    avgRow.push("");
     body.push(avgRow);
 
     const colWidths: Record<number, { cellWidth: number }> = {
-      0: { cellWidth: 8 },  // N°
-      1: { cellWidth: 22 }, // Cédula
-      2: { cellWidth: 45 }, // Nombre
+      0: { cellWidth: 8 },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 45 },
     };
-    // Subject columns auto, last 3 fixed
     const lastIdx = 3 + subjects.length;
-    colWidths[lastIdx] = { cellWidth: 12 };     // Prom
-    colWidths[lastIdx + 1] = { cellWidth: 10 }; // Pos
-    colWidths[lastIdx + 2] = { cellWidth: 12 }; // Aplaz
+    colWidths[lastIdx] = { cellWidth: 12 };
+    colWidths[lastIdx + 1] = { cellWidth: 10 };
+    colWidths[lastIdx + 2] = { cellWidth: 12 };
 
     autoTable(doc, {
       head: [head],
@@ -321,12 +357,10 @@ export default function GradeSheets() {
         2: { cellWidth: 45, halign: "left" },
       },
       didParseCell: (hookData) => {
-        // Bold averages row
         if (hookData.row.index === body.length - 1 && hookData.section === "body") {
           hookData.cell.styles.fontStyle = "bold";
           hookData.cell.styles.fillColor = [230, 240, 250];
         }
-        // Highlight failed grades (< 10) in red
         if (hookData.section === "body" && hookData.row.index < body.length - 1) {
           const colIdx = hookData.column.index;
           if (colIdx >= 3 && colIdx < 3 + subjects.length) {
@@ -357,8 +391,8 @@ export default function GradeSheets() {
     setDownloading(section.id);
     try {
       const data = await fetchSectionData(section.id, section.studentIds);
-      if (!data) {
-        toast.error("No se encontraron datos para esta sección");
+      if (!data || !data.students.length) {
+        toast.error("No se encontraron estudiantes para esta sección");
         return;
       }
 
