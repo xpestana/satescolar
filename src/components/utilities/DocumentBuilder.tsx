@@ -543,8 +543,7 @@ export function DocumentBuilder() {
                 )}
                 <Button size="sm" variant="outline" className="text-xs" onClick={() => {
                   setSelectedTemplateId(""); setContent(""); setTemplateName("");
-                  const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
-                  if (editor) editor.innerHTML = "";
+                  setDocSignatureLines(["Firma del Representante", "Firma del Director(a)"]);
                 }}>
                   <Plus className="h-3 w-3 mr-1" /> Nuevo
                 </Button>
