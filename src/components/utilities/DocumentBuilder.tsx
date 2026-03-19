@@ -294,7 +294,7 @@ export function DocumentBuilder() {
     const codeParts: string[] = [];
     if (hc.show_dea_code !== false && s.dea_code) codeParts.push(`Código DEA: ${s.dea_code}`);
     if (hc.show_statistical_code !== false && s.statistical_code) codeParts.push(`Código Estadístico: ${s.statistical_code}`);
-    if (codeParts.length) centerParts.push(`<div style="font-size:9px;color:#666;">${codeParts.join(" - ")}</div>`);
+    if (codeParts.length) centerParts.push(`<div style="font-size:8px;color:#666;">${codeParts.join(" - ")}</div>`);
 
     if (hc.show_address !== false && s.address) {
       const addrParts = [s.address];
