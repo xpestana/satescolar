@@ -457,6 +457,7 @@ export default function GradeSheets() {
       }
 
       const doc = new jsPDF({ orientation: "landscape", format: "a4" });
+      await addArialFont(doc);
       const year = schoolYears?.find(y => y.id === selectedYearId);
       generatePdf(doc, section.name, section.grade_level, year?.year_range || "", data, false);
 
