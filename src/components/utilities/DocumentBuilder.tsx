@@ -278,7 +278,7 @@ export function DocumentBuilder() {
   const headerHtml = useMemo(() => {
     const hc = planillaConfig?.header_config || {};
     const s = schoolFull;
-    if (!s) return `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:16px;">${school?.name || ""}</div>`;
+    if (!s) return `<div style="text-align:center;font-weight:bold;font-size:11px;margin-bottom:8px;">${school?.name || ""}</div>`;
 
     const parts: string[] = [];
     
