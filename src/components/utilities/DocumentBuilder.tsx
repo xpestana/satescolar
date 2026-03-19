@@ -302,7 +302,7 @@ export function DocumentBuilder() {
       if (s.geo.municipality) addrParts.push(`municipio ${s.geo.municipality}`);
       if (s.geo.city) addrParts.push(s.geo.city);
       if (s.geo.state) addrParts.push(s.geo.state);
-      centerParts.push(`<div style="font-size:9px;color:#666;">${addrParts.join(", ")}</div>`);
+      centerParts.push(`<div style="font-size:8px;color:#666;">${addrParts.join(", ")}</div>`);
     }
 
     const infoParts: string[] = [];
