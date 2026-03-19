@@ -348,7 +348,7 @@ export default function GradeSheets() {
         didDrawPage: () => {
           const pageH = doc.internal.pageSize.getHeight();
           doc.setFontSize(8);
-          doc.setFont("helvetica", "normal");
+          doc.setTextColor(130);
           doc.text(
             `Generado: ${new Date().toLocaleDateString("es-VE")}`,
             pageWidth / 2, pageH - 6, { align: "center" }
