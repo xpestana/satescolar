@@ -76,13 +76,23 @@ export default function GradeSheets() {
         .in("grade_level", [...SECONDARY_GRADES]);
       if (!sections?.length) return [];
 
-      // Get enrollments for each section in this year
-      const { data: enrollments } = await supabase
-        .from("enrollments").select("section_id, student_id")
-        .eq("school_id", schoolId).eq("school_year_id", selectedYearId);
+      // Get enrollments for each section in this year (paginated to avoid 1000 row limit)
+      let allEnrollments: { section_id: string; student_id: string }[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data: page } = await supabase
+          .from("enrollments").select("section_id, student_id")
+          .eq("school_id", schoolId).eq("school_year_id", selectedYearId)
+          .range(from, from + pageSize - 1);
+        if (!page || page.length === 0) break;
+        allEnrollments = allEnrollments.concat(page);
+        if (page.length < pageSize) break;
+        from += pageSize;
+      }
 
       const enrollmentsBySection = new Map<string, string[]>();
-      enrollments?.forEach(e => {
+      allEnrollments.forEach(e => {
         const arr = enrollmentsBySection.get(e.section_id) || [];
         arr.push(e.student_id);
         enrollmentsBySection.set(e.section_id, arr);
