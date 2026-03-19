@@ -459,9 +459,10 @@ export default function GradeSheets() {
       const year = schoolYears?.find(y => y.id === selectedYearId);
       generatePdf(doc, section.name, section.grade_level, year?.year_range || "", data, false);
 
-      const momentoLabel = selectedMomento === "definitiva" ? "Definitiva" : `Momento${selectedMomento}`;
-      doc.save(`Sabana_${GRADE_LABELS[section.grade_level]}_${section.name}_${momentoLabel}.pdf`);
-      toast.success("PDF descargado exitosamente");
+      const pdfBlob = doc.output("blob");
+      const url = URL.createObjectURL(pdfBlob);
+      window.open(url, "_blank");
+      toast.success("PDF generado exitosamente");
     } catch (err) {
       console.error(err);
       toast.error("Error al generar el PDF");
@@ -490,9 +491,10 @@ export default function GradeSheets() {
         return;
       }
 
-      const momentoLabel = selectedMomento === "definitiva" ? "Definitiva" : `Momento${selectedMomento}`;
-      doc.save(`Sabana_Todas_Secciones_${momentoLabel}.pdf`);
-      toast.success("PDF descargado exitosamente");
+      const pdfBlob = doc.output("blob");
+      const url = URL.createObjectURL(pdfBlob);
+      window.open(url, "_blank");
+      toast.success("PDF generado exitosamente");
     } catch (err) {
       console.error(err);
       toast.error("Error al generar el PDF");
