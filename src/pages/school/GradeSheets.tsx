@@ -306,7 +306,7 @@ export default function GradeSheets() {
     doc.text(momentoLabel, pageWidth / 2, y, { align: "center" });
     y += 5;
 
-    doc.setFont("helvetica", "normal");
+    doc.setFont("Arial", "normal");
     doc.setFontSize(10);
     doc.text(`${GRADE_LABELS[gradeLevel] || gradeLevel} - Sección: ${sectionName}    |    Año Escolar: ${yearRange}`, pageWidth / 2, y, { align: "center" });
     y += 7;
