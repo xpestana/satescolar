@@ -301,12 +301,12 @@ export default function GradeSheets() {
     const momentoLabel = selectedMomento === "definitiva"
       ? "NOTAS DEFINITIVAS"
       : `NOTAS DEL MOMENTO ${selectedMomento}`;
-    doc.setFontSize(9);
+    doc.setFontSize(10);
     doc.text(momentoLabel, pageWidth / 2, y, { align: "center" });
     y += 5;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(10);
     doc.text(`${GRADE_LABELS[gradeLevel] || gradeLevel} - Sección: ${sectionName}    |    Año Escolar: ${yearRange}`, pageWidth / 2, y, { align: "center" });
     y += 7;
 
@@ -318,7 +318,8 @@ export default function GradeSheets() {
 
     if (subjects.length === 0) {
       // No subjects assigned - show student list with message
-      doc.setFontSize(9);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
       doc.setTextColor(180, 50, 50);
       doc.text("No hay materias asignadas para esta sección", pageWidth / 2, y, { align: "center" });
       y += 6;
@@ -336,8 +337,8 @@ export default function GradeSheets() {
         body,
         startY: y,
         margin: { left: margin, right: margin },
-        styles: { fontSize: 7, cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
-        headStyles: { fillColor: [41, 128, 185], fontSize: 7, halign: "center" },
+        styles: { fontSize: 10, font: "helvetica", cellPadding: 2, lineColor: [0, 0, 0], lineWidth: 0.1 },
+        headStyles: { fillColor: [41, 128, 185], fontSize: 10, halign: "center" },
         bodyStyles: { halign: "center" },
         columnStyles: {
           0: { cellWidth: 12 },
@@ -346,7 +347,7 @@ export default function GradeSheets() {
         },
         didDrawPage: () => {
           const pageH = doc.internal.pageSize.getHeight();
-          doc.setFontSize(6);
+          doc.setFontSize(8);
           doc.setTextColor(130);
           doc.text(
             `Generado: ${new Date().toLocaleDateString("es-VE")}`,
@@ -407,8 +408,8 @@ export default function GradeSheets() {
       body,
       startY: y,
       margin: { left: margin, right: margin },
-      styles: { fontSize: 6, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
-      headStyles: { fillColor: [41, 128, 185], fontSize: 6, halign: "center" },
+      styles: { fontSize: 10, font: "helvetica", cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.1 },
+      headStyles: { fillColor: [41, 128, 185], fontSize: 10, halign: "center" },
       bodyStyles: { halign: "center" },
       columnStyles: {
         ...colWidths,
@@ -435,7 +436,7 @@ export default function GradeSheets() {
       },
       didDrawPage: () => {
         const pageH = doc.internal.pageSize.getHeight();
-        doc.setFontSize(6);
+        doc.setFontSize(8);
         doc.setTextColor(130);
         doc.text(
           `* Indica ajuste de nota   |   Generado: ${new Date().toLocaleDateString("es-VE")}`,
