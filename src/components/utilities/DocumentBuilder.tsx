@@ -1,0 +1,618 @@
+import { useState, useCallback, useRef, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { supabase } from "@/integrations/supabase/client";
+import { useSchoolId } from "@/hooks/useSchoolId";
+import { useSchoolData } from "@/hooks/useSchoolData";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  Search, Save, FileDown, Eye, Plus, Trash2, User, GraduationCap,
+  Home, UserCheck, Calendar, Info, Loader2, FileText, X,
+} from "lucide-react";
+import { RichTextEditor } from "./RichTextEditor";
+import jsPDF from "jspdf";
+import { addArialFont } from "@/lib/pdf-fonts";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+
+// ── Snippet definitions ─────────────────────────────────────────────
+interface SnippetDef {
+  key: string;
+  label: string;
+}
+
+const SNIPPET_GROUPS: { group: string; icon: any; snippets: SnippetDef[] }[] = [
+  {
+    group: "Estudiante",
+    icon: User,
+    snippets: [
+      { key: "primer_nombre", label: "Primer Nombre" },
+      { key: "segundo_nombre", label: "Segundo Nombre" },
+      { key: "primer_apellido", label: "Primer Apellido" },
+      { key: "segundo_apellido", label: "Segundo Apellido" },
+      { key: "nombre_completo", label: "Nombre Completo" },
+      { key: "documento", label: "Documento" },
+      { key: "fecha_nacimiento", label: "Fecha Nacimiento" },
+      { key: "ciudad_nacimiento", label: "Ciudad Nacimiento" },
+      { key: "email", label: "Correo" },
+      { key: "numero_contacto", label: "Teléfono" },
+    ],
+  },
+  {
+    group: "Inscripción",
+    icon: GraduationCap,
+    snippets: [
+      { key: "grado", label: "Grado / Nivel" },
+      { key: "seccion", label: "Sección" },
+      { key: "tipo_de_estudiante", label: "Tipo Estudiante" },
+      { key: "fecha_de_inscripcion", label: "Fecha Inscripción" },
+      { key: "año_escolar", label: "Año Escolar" },
+    ],
+  },
+  {
+    group: "Familia",
+    icon: Home,
+    snippets: [
+      { key: "apellido_paterno", label: "Apellido Paterno" },
+      { key: "apellido_materno", label: "Apellido Materno" },
+      { key: "telefono_familia", label: "Teléfono" },
+      { key: "direccion", label: "Dirección" },
+    ],
+  },
+  {
+    group: "Representante",
+    icon: UserCheck,
+    snippets: [
+      { key: "rep_nombre_completo", label: "Nombre Completo" },
+      { key: "rep_documento", label: "Documento" },
+      { key: "rep_telefono", label: "Teléfono" },
+    ],
+  },
+  {
+    group: "Sistema",
+    icon: Calendar,
+    snippets: [
+      { key: "fecha_actual", label: "Fecha Actual" },
+      { key: "nombre_colegio", label: "Nombre Colegio" },
+    ],
+  },
+];
+
+// ── Helpers ──────────────────────────────────────────────────────────
+const GRADE_LABELS: Record<string, string> = {
+  pre_1: "Preescolar 1er Nivel", pre_2: "Preescolar 2do Nivel", pre_3: "Preescolar 3er Nivel",
+  "1": "1er Grado", "2": "2do Grado", "3": "3er Grado",
+  "4": "4to Grado", "5": "5to Grado", "6": "6to Grado",
+  "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
+  "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
+};
+
+function resolveSnippets(html: string, data: Record<string, string>): string {
+  return html.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] ?? `{{${key}}}`);
+}
+
+// ── Component ────────────────────────────────────────────────────────
+export function DocumentBuilder() {
+  const { schoolId } = useSchoolId();
+  const { school } = useSchoolData();
+  const queryClient = useQueryClient();
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  const [content, setContent] = useState("");
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [showPreview, setShowPreview] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  // ── Queries ─────────────────────────────────────────────────────
+  const { data: templates } = useQuery({
+    queryKey: ["document-templates", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("document_templates")
+        .select("*")
+        .eq("school_id", schoolId!)
+        .order("name");
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  const { data: students } = useQuery({
+    queryKey: ["doc-builder-students", schoolId],
+    queryFn: async () => {
+      // Get all enrolled students with their enrollment + family + representative info
+      const { data } = await supabase
+        .from("student_schools")
+        .select(`
+          student_id,
+          students!inner(
+            id, document_id, form_data, photo_url,
+            families!inner(
+              id, father_last_name, mother_last_name, contact_phone, address, user_id,
+              representatives(id, document_id, phone, form_data, is_primary)
+            )
+          )
+        `)
+        .eq("school_id", schoolId!);
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Get active year enrollments for selected student
+  const { data: studentEnrollment } = useQuery({
+    queryKey: ["doc-builder-enrollment", selectedStudentId, schoolId],
+    queryFn: async () => {
+      const { data: activeYear } = await supabase
+        .from("school_years")
+        .select("id, year_range")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (!activeYear || !selectedStudentId) return null;
+
+      const { data: enrollment } = await supabase
+        .from("enrollments")
+        .select(`
+          id, enrollment_type, enrollment_date, observations,
+          sections!inner(id, name, grade_level),
+          school_years!inner(year_range)
+        `)
+        .eq("student_id", selectedStudentId)
+        .eq("school_year_id", activeYear.id)
+        .maybeSingle();
+
+      return enrollment;
+    },
+    enabled: !!selectedStudentId && !!schoolId,
+  });
+
+  // ── Derived data ────────────────────────────────────────────────
+  const filteredStudents = useMemo(() => {
+    if (!students || !studentSearch.trim()) return [];
+    const q = studentSearch.toLowerCase();
+    return students
+      .filter((ss) => {
+        const s = ss.students as any;
+        const fd = (s.form_data || {}) as Record<string, any>;
+        const fullName = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido]
+          .filter(Boolean).join(" ").toLowerCase();
+        const doc = (s.document_id || "").toLowerCase();
+        return fullName.includes(q) || doc.includes(q);
+      })
+      .slice(0, 10);
+  }, [students, studentSearch]);
+
+  const selectedStudent = useMemo(() => {
+    if (!selectedStudentId || !students) return null;
+    return students.find((ss) => (ss.students as any).id === selectedStudentId);
+  }, [selectedStudentId, students]);
+
+  const snippetData = useMemo((): Record<string, string> => {
+    const d: Record<string, string> = {
+      fecha_actual: format(new Date(), "d 'de' MMMM 'de' yyyy", { locale: es }),
+      nombre_colegio: school?.name || "",
+    };
+
+    if (!selectedStudent) return d;
+
+    const s = selectedStudent.students as any;
+    const fd = (s.form_data || {}) as Record<string, any>;
+    const fam = s.families as any;
+    const primaryRep = fam?.representatives?.find((r: any) => r.is_primary) || fam?.representatives?.[0];
+    const repFd = (primaryRep?.form_data || {}) as Record<string, any>;
+
+    // Student
+    d.primer_nombre = fd.primer_nombre || "";
+    d.segundo_nombre = fd.segundo_nombre || "";
+    d.primer_apellido = fd.primer_apellido || "";
+    d.segundo_apellido = fd.segundo_apellido || "";
+    d.nombre_completo = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido].filter(Boolean).join(" ");
+    d.documento = s.document_id || "";
+    d.fecha_nacimiento = fd.fecha_nacimiento ? format(new Date(fd.fecha_nacimiento), "dd/MM/yyyy") : "";
+    d.ciudad_nacimiento = fd.ciudad_nacimiento || "";
+    d.email = fd.email || "";
+    d.numero_contacto = fd.numero_contacto || "";
+
+    // Enrollment
+    if (studentEnrollment) {
+      const sec = studentEnrollment.sections as any;
+      d.grado = GRADE_LABELS[sec?.grade_level] || sec?.grade_level || "";
+      d.seccion = sec?.name || "";
+      d.tipo_de_estudiante = studentEnrollment.enrollment_type || "";
+      d.fecha_de_inscripcion = studentEnrollment.enrollment_date
+        ? format(new Date(studentEnrollment.enrollment_date), "dd/MM/yyyy")
+        : "";
+      d.año_escolar = (studentEnrollment.school_years as any)?.year_range || "";
+    }
+
+    // Family
+    d.apellido_paterno = fam?.father_last_name || "";
+    d.apellido_materno = fam?.mother_last_name || "";
+    d.telefono_familia = fam?.contact_phone || "";
+    d.direccion = fam?.address || "";
+
+    // Representative
+    if (primaryRep) {
+      d.rep_nombre_completo = [repFd.primer_nombre, repFd.segundo_nombre, repFd.primer_apellido, repFd.segundo_apellido].filter(Boolean).join(" ");
+      d.rep_documento = primaryRep.document_id || "";
+      d.rep_telefono = primaryRep.phone || repFd.numero_contacto || "";
+    }
+
+    return d;
+  }, [selectedStudent, studentEnrollment, school]);
+
+  // ── Mutations ───────────────────────────────────────────────────
+  const saveTemplate = useMutation({
+    mutationFn: async (name: string) => {
+      if (selectedTemplateId) {
+        const { error } = await supabase
+          .from("document_templates")
+          .update({ name, content_html: content })
+          .eq("id", selectedTemplateId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("document_templates")
+          .insert({ school_id: schoolId!, name, content_html: content });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document-templates"] });
+      toast.success("Plantilla guardada");
+      setShowSaveDialog(false);
+    },
+    onError: () => toast.error("Error al guardar la plantilla"),
+  });
+
+  const deleteTemplate = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("document_templates").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["document-templates"] });
+      setSelectedTemplateId("");
+      setContent("");
+      toast.success("Plantilla eliminada");
+    },
+  });
+
+  // ── Handlers ────────────────────────────────────────────────────
+  const insertSnippet = useCallback((key: string) => {
+    const snippet = `<span class="snippet" style="background:#dbeafe;padding:1px 4px;border-radius:3px;font-weight:600;color:#1e40af;">{{${key}}}</span>&nbsp;`;
+    document.execCommand("insertHTML", false, snippet);
+  }, []);
+
+  const loadTemplate = useCallback((id: string) => {
+    setSelectedTemplateId(id);
+    const tpl = templates?.find((t) => t.id === id);
+    if (tpl) {
+      setContent(tpl.content_html);
+      setTemplateName(tpl.name);
+      // Force editor re-render
+      const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
+      if (editor) editor.innerHTML = tpl.content_html;
+    }
+  }, [templates]);
+
+  const handleSave = useCallback(() => {
+    if (!content.trim()) {
+      toast.error("El documento está vacío");
+      return;
+    }
+    if (selectedTemplateId) {
+      const tpl = templates?.find((t) => t.id === selectedTemplateId);
+      setTemplateName(tpl?.name || "");
+    } else {
+      setTemplateName("");
+    }
+    setShowSaveDialog(true);
+  }, [content, selectedTemplateId, templates]);
+
+  const handleGeneratePDF = useCallback(async () => {
+    if (!content.trim()) {
+      toast.error("El documento está vacío");
+      return;
+    }
+    setGenerating(true);
+    try {
+      const resolved = resolveSnippets(content, snippetData);
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+      addArialFont(doc);
+      doc.setFont("Arial", "normal");
+
+      const pageW = doc.internal.pageSize.getWidth();
+      const margin = 20;
+      const usable = pageW - margin * 2;
+
+      // Header: school name
+      doc.setFontSize(14);
+      doc.setFont("Arial", "bold");
+      doc.text(school?.name || "", pageW / 2, 25, { align: "center" });
+
+      // Render HTML content as text blocks
+      let y = 40;
+      doc.setFontSize(11);
+      doc.setFont("Arial", "normal");
+
+      // Strip HTML tags for simple text rendering
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = resolved;
+      const textContent = tempDiv.innerText || tempDiv.textContent || "";
+      const lines = doc.splitTextToSize(textContent, usable);
+
+      for (const line of lines) {
+        if (y > doc.internal.pageSize.getHeight() - 30) {
+          doc.addPage();
+          y = 20;
+        }
+        doc.text(line, margin, y);
+        y += 6;
+      }
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(128);
+      const pageH = doc.internal.pageSize.getHeight();
+      doc.text("https://satescolar.com", pageW / 2, pageH - 10, { align: "center" });
+
+      const studentName = snippetData.nombre_completo || "documento";
+      doc.save(`${studentName.replace(/\s+/g, "_")}.pdf`);
+      toast.success("PDF generado exitosamente");
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al generar el PDF");
+    } finally {
+      setGenerating(false);
+    }
+  }, [content, snippetData, school]);
+
+  // ── Render ──────────────────────────────────────────────────────
+  return (
+    <div className="space-y-4">
+      {/* Info box */}
+      <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg border border-border/50">
+        <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-muted-foreground space-y-1">
+          <p><span className="font-medium text-foreground">¿Cómo usar el Constructor de Planillas?</span></p>
+          <ol className="list-decimal list-inside space-y-0.5 ml-1">
+            <li>Escribe tu documento en el editor o carga una <strong>plantilla guardada</strong>.</li>
+            <li>Usa los botones de <strong>variables</strong> para insertar datos automáticos (ej: nombre, cédula, grado).</li>
+            <li>Busca y selecciona un <strong>estudiante</strong> para ver los datos reales en la previsualización.</li>
+            <li><strong>Guarda como plantilla</strong> para reutilizar el documento con otros estudiantes.</li>
+            <li>Haz clic en <strong>Descargar PDF</strong> para generar el documento final.</li>
+          </ol>
+          <p className="text-xs text-muted-foreground/80 mt-1">
+            Las variables como <code className="bg-muted px-1 rounded text-xs">{"{{primer_nombre}}"}</code> se reemplazan automáticamente con los datos del estudiante seleccionado.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Left sidebar: Templates + Student search + Snippets */}
+        <div className="lg:col-span-1 space-y-4">
+          {/* Templates */}
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Plantillas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0 space-y-2">
+              <Select value={selectedTemplateId} onValueChange={loadTemplate}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Seleccionar plantilla..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates?.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={handleSave}>
+                  <Save className="h-3 w-3 mr-1" /> Guardar
+                </Button>
+                {selectedTemplateId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs text-destructive hover:text-destructive"
+                    onClick={() => deleteTemplate.mutate(selectedTemplateId)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  onClick={() => {
+                    setSelectedTemplateId("");
+                    setContent("");
+                    setTemplateName("");
+                    const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
+                    if (editor) editor.innerHTML = "";
+                  }}
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Nuevo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Student search */}
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Search className="h-4 w-4" /> Buscar Estudiante
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0 space-y-2">
+              <Input
+                placeholder="Nombre o cédula..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="text-sm"
+              />
+              {selectedStudent && (
+                <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-md text-xs">
+                  <User className="h-3 w-3 text-primary" />
+                  <span className="font-medium truncate flex-1">{snippetData.nombre_completo}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-5 w-5 p-0"
+                    onClick={() => { setSelectedStudentId(null); setStudentSearch(""); }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              {studentSearch.trim() && !selectedStudentId && (
+                <ScrollArea className="max-h-40">
+                  <div className="space-y-1">
+                    {filteredStudents.length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-2 text-center">Sin resultados</p>
+                    ) : (
+                      filteredStudents.map((ss) => {
+                        const s = ss.students as any;
+                        const fd = (s.form_data || {}) as Record<string, any>;
+                        const name = [fd.primer_nombre, fd.primer_apellido].filter(Boolean).join(" ");
+                        return (
+                          <button
+                            key={s.id}
+                            className="w-full text-left p-2 hover:bg-accent rounded-sm text-xs transition-colors"
+                            onClick={() => {
+                              setSelectedStudentId(s.id);
+                              setStudentSearch("");
+                            }}
+                          >
+                            <p className="font-medium">{name}</p>
+                            <p className="text-muted-foreground">{s.document_id || "Sin documento"}</p>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Snippet buttons */}
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm">Variables disponibles</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0">
+              <ScrollArea className="max-h-[400px]">
+                <div className="space-y-3">
+                  {SNIPPET_GROUPS.map(({ group, icon: Icon, snippets }) => (
+                    <div key={group}>
+                      <p className="text-xs font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+                        <Icon className="h-3 w-3" /> {group}
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {snippets.map((sn) => (
+                          <Badge
+                            key={sn.key}
+                            variant="outline"
+                            className="cursor-pointer hover:bg-primary/10 hover:border-primary text-[10px] px-1.5 py-0.5 transition-colors"
+                            onClick={() => insertSnippet(sn.key)}
+                          >
+                            {sn.label}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main: Editor + Actions */}
+        <div className="lg:col-span-3 space-y-4">
+          {/* Actions bar */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setShowPreview(true)} disabled={!content.trim()}>
+              <Eye className="h-4 w-4 mr-1" /> Previsualizar
+            </Button>
+            <Button size="sm" onClick={handleGeneratePDF} disabled={generating || !content.trim()}>
+              {generating ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <FileDown className="h-4 w-4 mr-1" />}
+              Descargar PDF
+            </Button>
+          </div>
+
+          <RichTextEditor value={content} onChange={setContent} placeholder="Escribe el contenido de tu planilla aquí... Usa las variables del panel izquierdo para insertar datos automáticos." minHeight={400} />
+        </div>
+      </div>
+
+      {/* Save dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Guardar Plantilla</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Nombre de la plantilla</label>
+            <Input
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="Ej: Constancia de Estudios"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>Cancelar</Button>
+            <Button
+              onClick={() => saveTemplate.mutate(templateName)}
+              disabled={!templateName.trim() || saveTemplate.isPending}
+            >
+              {saveTemplate.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Previsualización del Documento</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[70vh]">
+            <div className="p-6 bg-background border rounded-md">
+              {/* Header */}
+              <div className="text-center mb-6">
+                <h2 className="text-lg font-bold">{school?.name || "Nombre del Colegio"}</h2>
+                <Separator className="my-3" />
+              </div>
+              {/* Content with resolved snippets */}
+              <div
+                className="prose prose-sm max-w-none text-foreground"
+                dangerouslySetInnerHTML={{ __html: resolveSnippets(content, snippetData) }}
+              />
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
