@@ -10,7 +10,8 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, Users, Construction, Info } from "lucide-react";
+import { Loader2, Download, FileText, Users, Construction, Info, Hammer } from "lucide-react";
+import { DocumentBuilder } from "@/components/utilities/DocumentBuilder";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addArialFont } from "@/lib/pdf-fonts";
@@ -710,12 +711,19 @@ export default function GradeSheets() {
       <div className="space-y-6">
         <PageHeader title="Planillas" breadcrumbs={[{ label: "Utilidades" }, { label: "Planillas" }]} />
 
-        <Tabs defaultValue="sabana" className="w-full">
+        <Tabs defaultValue="constructor" className="w-full">
           <TabsList>
+            <TabsTrigger value="constructor" className="gap-1.5">
+              <Hammer className="h-3.5 w-3.5" /> Constructor
+            </TabsTrigger>
             <TabsTrigger value="sabana">Sábana de Notas</TabsTrigger>
             <TabsTrigger value="boletin" disabled>Boletín Informativo</TabsTrigger>
             <TabsTrigger value="resumen" disabled>Resumen Académico</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="constructor" className="mt-4">
+            <DocumentBuilder />
+          </TabsContent>
 
           <TabsContent value="sabana" className="space-y-4 mt-4">
             <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg border border-border/50">
