@@ -718,6 +718,19 @@ export default function GradeSheets() {
           </TabsList>
 
           <TabsContent value="sabana" className="space-y-4 mt-4">
+            <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg border border-border/50">
+              <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p><span className="font-medium text-foreground">¿Cómo usar la Sábana de Notas?</span></p>
+                <ol className="list-decimal list-inside space-y-0.5 ml-1">
+                  <li>Selecciona el <strong>Año Escolar</strong> y el <strong>Momento</strong> que deseas consultar (1, 2, 3 o Definitiva Anual).</li>
+                  <li>Aparecerán las secciones de secundaria con alumnos inscritos.</li>
+                  <li>Haz clic en el ícono de descarga <Download className="h-3.5 w-3.5 inline-block align-text-bottom" /> de cada sección para obtener su PDF individual.</li>
+                  <li>Usa el botón <strong>"Descargar Todas"</strong> para generar un único PDF con todas las secciones.</li>
+                </ol>
+                <p className="text-xs text-muted-foreground/80 mt-1">En la Definitiva Anual, el PDF muestra las notas de los 3 momentos junto al promedio por materia.</p>
+              </div>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
