@@ -207,6 +207,7 @@ export default function GradeSheets() {
       const fullName = [apellido1, apellido2, nombre1, nombre2].filter(Boolean).join(" ");
 
       const grades: Record<string, { value: number | null; adjustment: number }> = {};
+      const momentoDetail: Record<string, { m1: number | null; m2: number | null; m3: number | null; adj1: number; adj2: number; adj3: number; avg: number | null }> = {};
       let totalGrades = 0;
       let gradeSum = 0;
       let failedCount = 0;
@@ -220,25 +221,39 @@ export default function GradeSheets() {
           const enrolledStudents = gcrpStudentMap.get(assignment.id);
           if (!enrolledStudents || !enrolledStudents.has(student.id)) {
             grades[subjectId] = { value: null, adjustment: 0 };
+            momentoDetail[subjectId] = { m1: null, m2: null, m3: null, adj1: 0, adj2: 0, adj3: 0, avg: null };
             return;
           }
         }
         if (selectedMomento === "definitiva") {
-          const momentGrades = [1, 2, 3].map(m => {
+          const detail = { m1: null as number | null, m2: null as number | null, m3: null as number | null, adj1: 0, adj2: 0, adj3: 0, avg: null as number | null };
+          const momentGrades: (number | null)[] = [];
+          [1, 2, 3].forEach(m => {
             const g = allGrades.find(g => g.student_id === student.id && g.assignment_id === assignment.id && g.momento === m);
-            return g ? parseFloat(g.grade_value || "0") + (g.adjustment_points || 0) : null;
+            if (g && g.grade_value != null) {
+              const raw = parseFloat(g.grade_value || "0");
+              const adj = g.adjustment_points || 0;
+              const val = raw + adj;
+              if (m === 1) { detail.m1 = val; detail.adj1 = adj; }
+              if (m === 2) { detail.m2 = val; detail.adj2 = adj; }
+              if (m === 3) { detail.m3 = val; detail.adj3 = adj; }
+              momentGrades.push(val);
+            } else {
+              momentGrades.push(null);
+            }
           });
           const validMoments = momentGrades.filter(v => v !== null) as number[];
-          const hasAdjustment = allGrades.some(g => g.student_id === student.id && g.assignment_id === assignment.id && (g.adjustment_points || 0) !== 0);
           if (validMoments.length > 0) {
             const avg = Math.round((validMoments.reduce((s, v) => s + v, 0) / validMoments.length) * 10) / 10;
-            grades[subjectId] = { value: avg, adjustment: hasAdjustment ? 1 : 0 };
+            detail.avg = avg;
+            grades[subjectId] = { value: avg, adjustment: 0 };
             gradeSum += avg;
             totalGrades++;
             if (avg < 10) failedCount++;
           } else {
             grades[subjectId] = { value: null, adjustment: 0 };
           }
+          momentoDetail[subjectId] = detail;
         } else {
           const g = allGrades.find(g => g.student_id === student.id && g.assignment_id === assignment.id);
           if (g && g.grade_value != null) {
@@ -250,6 +265,7 @@ export default function GradeSheets() {
           } else {
             grades[subjectId] = { value: null, adjustment: 0 };
           }
+          momentoDetail[subjectId] = { m1: null, m2: null, m3: null, adj1: 0, adj2: 0, adj3: 0, avg: null };
         }
       });
 
@@ -260,6 +276,7 @@ export default function GradeSheets() {
         documentId: student.document_id || "",
         fullName,
         grades,
+        momentoDetail,
         average,
         position: 0,
         failedCount,
