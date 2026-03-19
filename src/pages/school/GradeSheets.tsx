@@ -10,7 +10,7 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, Users, Construction, Info, Hammer } from "lucide-react";
+import { Loader2, Download, FileText, Users, Info, Hammer } from "lucide-react";
 import { DocumentBuilder } from "@/components/utilities/DocumentBuilder";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
