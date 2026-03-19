@@ -160,6 +160,28 @@ export default function GradeSheets() {
 
     const assignmentIds = validAssignments.map(a => a.id);
 
+    // Build a map of GCRP assignment -> enrolled student ids
+    const gcrpStudentMap = new Map<string, Set<string>>();
+    (gcrpLinks || []).forEach(l => {
+      if (!gcrpStudentMap.has(l.assignment_id)) gcrpStudentMap.set(l.assignment_id, new Set());
+      gcrpStudentMap.get(l.assignment_id)!.add((gcrpLinks || []).find(x => x.assignment_id === l.assignment_id)?.student_id || "");
+    });
+    // Re-query to get full student mapping for GCRP
+    if (gcrpAssignmentIds.length > 0) {
+      const { data: allGcrpLinks } = await supabase
+        .from("gcrp_assignment_students")
+        .select("assignment_id, student_id")
+        .in("assignment_id", gcrpAssignmentIds)
+        .in("student_id", studentIds);
+      gcrpStudentMap.clear();
+      (allGcrpLinks || []).forEach(l => {
+        if (!gcrpStudentMap.has(l.assignment_id)) gcrpStudentMap.set(l.assignment_id, new Set());
+        gcrpStudentMap.get(l.assignment_id)!.add(l.student_id);
+      });
+    }
+
+    const regularAssignmentIds = new Set((regularAssignments || []).map(a => a.id));
+
     // Get final grades
     let allGrades: any[] = [];
     if (assignmentIds.length > 0) {
