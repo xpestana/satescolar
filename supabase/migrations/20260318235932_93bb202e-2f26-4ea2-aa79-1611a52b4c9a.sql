@@ -1,0 +1,1 @@
+ALTER TABLE public.school_subjects ADD COLUMN abbreviation text DEFAULT '' NOT NULL;

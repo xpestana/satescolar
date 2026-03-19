@@ -32,6 +32,7 @@ interface Subject {
 
 interface SubjectForm {
   name: string;
+  abbreviation: string;
   subject_type: "regular" | "gcrp";
   show_in_report_card: boolean;
   show_in_planilla: boolean;
@@ -40,6 +41,7 @@ interface SubjectForm {
 
 const defaultForm: SubjectForm = {
   name: "",
+  abbreviation: "",
   subject_type: "regular",
   show_in_report_card: true,
   show_in_planilla: true,
@@ -79,6 +81,7 @@ export default function SubjectsList() {
           .from("school_subjects" as any)
           .update({
             name: form.name.trim(),
+            abbreviation: form.abbreviation.trim(),
             subject_type: form.subject_type,
             show_in_report_card: form.show_in_report_card,
             show_in_planilla: form.show_in_planilla,
@@ -94,6 +97,7 @@ export default function SubjectsList() {
           .insert({
             school_id: schoolId,
             name: form.name.trim(),
+            abbreviation: form.abbreviation.trim(),
             subject_type: form.subject_type,
             show_in_report_card: form.show_in_report_card,
             show_in_planilla: form.show_in_planilla,
@@ -143,6 +147,7 @@ export default function SubjectsList() {
     setEditingId(subject.id);
     setForm({
       name: subject.name,
+      abbreviation: (subject as any).abbreviation || "",
       subject_type: subject.subject_type as "regular" | "gcrp",
       show_in_report_card: subject.show_in_report_card,
       show_in_planilla: subject.show_in_planilla,
@@ -297,6 +302,18 @@ export default function SubjectsList() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="subject-abbreviation">Sigla *</Label>
+              <Input
+                id="subject-abbreviation"
+                placeholder="Ej: MAT, CAST, EDU.FIS..."
+                value={form.abbreviation}
+                onChange={(e) => setForm({ ...form, abbreviation: e.target.value.toUpperCase() })}
+                maxLength={20}
+              />
+              <p className="text-xs text-muted-foreground">Abreviatura que aparecerá en las planillas (sábanas de notas)</p>
+            </div>
+
+            <div className="space-y-2">
               <Label>Tipo de Área</Label>
               <Select value={form.subject_type} onValueChange={(v) => setForm({ ...form, subject_type: v as "regular" | "gcrp" })}>
                 <SelectTrigger>
@@ -342,7 +359,7 @@ export default function SubjectsList() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeDialog}>Cancelar</Button>
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.name.trim()}>
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.name.trim() || !form.abbreviation.trim()}>
               {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               {editingId ? "Guardar Cambios" : "Crear Área"}
             </Button>

@@ -117,7 +117,7 @@ export default function GradeSheets() {
     // Get assignments for this section
     const { data: assignments } = await supabase
       .from("subject_teacher_assignments")
-      .select("id, subject_id, school_subjects(id, name, display_order, show_in_planilla)")
+      .select("id, subject_id, school_subjects(id, name, abbreviation, display_order, show_in_planilla)")
       .eq("school_id", schoolId).eq("school_year_id", selectedYearId)
       .eq("section_id", sectionId).eq("is_suspended", false);
 
@@ -258,7 +258,7 @@ export default function GradeSheets() {
     // Build columns
     const subjects = data.assignments.map(a => ({
       id: a.subject_id,
-      name: (a.school_subjects as any)?.name || "Área",
+      name: (a.school_subjects as any)?.abbreviation || (a.school_subjects as any)?.name || "Área",
     }));
 
     const head = ["N°", "Cédula", "Apellidos y Nombres", ...subjects.map(s => s.name), "Prom", "Pos", "Aplaz"];

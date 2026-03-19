@@ -1491,6 +1491,7 @@ export type Database = {
       }
       school_subjects: {
         Row: {
+          abbreviation: string
           created_at: string
           display_order: number
           evaluation_type: string
@@ -1504,6 +1505,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          abbreviation?: string
           created_at?: string
           display_order?: number
           evaluation_type?: string
@@ -1517,6 +1519,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          abbreviation?: string
           created_at?: string
           display_order?: number
           evaluation_type?: string
