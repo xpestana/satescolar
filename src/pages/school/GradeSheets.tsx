@@ -391,8 +391,8 @@ export default function GradeSheets() {
     setDownloading(section.id);
     try {
       const data = await fetchSectionData(section.id, section.studentIds);
-      if (!data) {
-        toast.error("No se encontraron datos para esta sección");
+      if (!data || !data.students.length) {
+        toast.error("No se encontraron estudiantes para esta sección");
         return;
       }
 
