@@ -291,8 +291,21 @@ export default function FinalGradesTab({
   }, [planByMomento, gradesMap]);
 
   useEffect(() => {
+    // Hard reset local grid state when context changes (area/sección/año/asignación GCRP)
+    setEditedGrades({});
+    setDbValues({});
+    setAdjustments({});
+    setDbAdjustments({});
+    setExtraFields({});
+    setDbExtraFields({});
+    setLiterals({});
+    setDbLiterals({});
+    setSavingKeys(new Set());
+    setSavingAdjKeys(new Set());
+    setSavingLiteralKeys(new Set());
+    setSavedKeys(new Set());
     setInitialized(false);
-  }, [assignmentIds.join(","), students.length]);
+  }, [selectedSubject, selectedSection, selectedGcrpAssignment, effectiveYear]);
 
   // Initialize primary literals from primaryReports
   useEffect(() => {
