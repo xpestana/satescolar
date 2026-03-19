@@ -761,6 +761,14 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
   const footerHeight = 30;
 
   function drawHeader(pageDoc: jsPDF): number {
+    // Print date/time
+    const now = new Date();
+    const printDate = now.toLocaleDateString("es-VE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const printTime = now.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
+    pageDoc.setFontSize(6);
+    pageDoc.setTextColor(150, 150, 150);
+    pageDoc.text(`Impreso: ${printDate} ${printTime}`, pageWidth - margin, 6, { align: "right" });
+
     let y = 10;
     const school = planillaData.school;
 
