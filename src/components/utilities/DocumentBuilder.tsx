@@ -427,56 +427,77 @@ export function DocumentBuilder() {
     setGenerating(true);
     try {
       const resolved = resolveSnippets(content, snippetData);
+      const baseStyle = "position:absolute;left:-9999px;top:0;width:680px;background:#fff;font-family:Arial,Helvetica,sans-serif;color:#000;";
 
-      // Create offscreen container for html2canvas
-      const container = document.createElement("div");
-      container.style.cssText = "position:absolute;left:-9999px;top:0;width:680px;background:#fff;padding:40px;font-family:Arial,Helvetica,sans-serif;color:#000;line-height:1.6;font-size:13.3px;";
-      
-      container.innerHTML = `
-        <style>* { font-family: Arial, Helvetica, sans-serif !important; font-size: inherit !important; }</style>
-        ${headerHtml}
-        <div style="min-height:500px;font-size:13.3px;">${resolved}</div>
-        ${signaturesHtml}
-        ${footerHtml}
-      `;
-      document.body.appendChild(container);
+      // Helper to render an HTML block to canvas
+      const renderBlock = async (html: string, width = 680) => {
+        const el = document.createElement("div");
+        el.style.cssText = `${baseStyle}width:${width}px;padding:0 40px;`;
+        el.innerHTML = `<style>* { font-family: Arial, Helvetica, sans-serif !important; }</style>${html}`;
+        document.body.appendChild(el);
+        const imgs = el.querySelectorAll("img");
+        await Promise.all(Array.from(imgs).map(img => img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })));
+        const canvas = await html2canvas(el, { scale: 2, useCORS: true, logging: false, backgroundColor: "#ffffff" });
+        document.body.removeChild(el);
+        return canvas;
+      };
 
-      // Wait for images to load
-      const images = container.querySelectorAll("img");
-      await Promise.all(Array.from(images).map(img =>
-        img.complete ? Promise.resolve() : new Promise(resolve => { img.onload = resolve; img.onerror = resolve; })
-      ));
+      // Render header, body+signatures, footer separately
+      const [headerCanvas, bodyCanvas, footerCanvas] = await Promise.all([
+        renderBlock(headerHtml),
+        renderBlock(`<div style="font-size:13.3px;line-height:1.6;">${resolved}</div>${signaturesHtml}`),
+        renderBlock(footerHtml),
+      ]);
 
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      });
-      document.body.removeChild(container);
-
-      // Create PDF from canvas
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       const margin = 10;
       const usableW = pageW - margin * 2;
+
+      // Convert canvas px to mm at usableW scale
+      const toMM = (canvas: HTMLCanvasElement) => (canvas.height * usableW) / canvas.width;
+
+      const headerH = toMM(headerCanvas);
+      const footerH = toMM(footerCanvas);
+      const bodyTotalH = toMM(bodyCanvas);
       
-      const imgData = canvas.toDataURL("image/png");
-      const imgW = usableW;
-      const imgH = (canvas.height * imgW) / canvas.width;
-      
-      let heightLeft = imgH;
-      let position = margin;
-      
-      pdf.addImage(imgData, "PNG", margin, position, imgW, imgH);
-      heightLeft -= (pageH - margin * 2);
-      
-      while (heightLeft > 0) {
-        pdf.addPage();
-        position = margin - (imgH - heightLeft);
-        pdf.addImage(imgData, "PNG", margin, position, imgW, imgH);
-        heightLeft -= (pageH - margin * 2);
+      const headerImg = headerCanvas.toDataURL("image/png");
+      const footerImg = footerCanvas.toDataURL("image/png");
+      const bodyImg = bodyCanvas.toDataURL("image/png");
+
+      // Available content height per page
+      const contentAreaH = pageH - margin * 2 - headerH - footerH;
+      const footerY = pageH - margin - footerH;
+
+      let bodyOffset = 0; // how much of the body we've placed (in mm)
+      let pageNum = 0;
+
+      while (bodyOffset < bodyTotalH) {
+        if (pageNum > 0) pdf.addPage();
+        pageNum++;
+
+        // Draw header
+        pdf.addImage(headerImg, "PNG", margin, margin, usableW, headerH);
+
+        // Draw body slice - we position the full body image and clip via page boundaries
+        const bodyY = margin + headerH;
+        // The body image y-position: shift up by bodyOffset
+        const bodyImgY = bodyY - bodyOffset;
+        
+        // Use clipping to only show the part that fits
+        pdf.saveGraphicsState();
+        // @ts-ignore - jsPDF rect clip
+        pdf.rect(margin, bodyY, usableW, contentAreaH, null);
+        // @ts-ignore
+        pdf.clip();
+        pdf.addImage(bodyImg, "PNG", margin, bodyImgY, usableW, bodyTotalH);
+        pdf.restoreGraphicsState();
+
+        // Draw footer at bottom
+        pdf.addImage(footerImg, "PNG", margin, footerY, usableW, footerH);
+
+        bodyOffset += contentAreaH;
       }
 
       const studentName = snippetData.nombre_completo || "documento";
