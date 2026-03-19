@@ -118,11 +118,17 @@ export default function GradeSheets() {
   async function fetchSectionData(sectionId: string, studentIds: string[]) {
     if (!schoolId || !selectedYearId) return null;
 
-    // Get students
-    const { data: students } = await supabase
-      .from("students").select("id, document_id, form_data")
-      .in("id", studentIds);
-    if (!students?.length) return null;
+    // Get students in batches to avoid .in() limits
+    let allStudents: any[] = [];
+    const batchSize = 500;
+    for (let i = 0; i < studentIds.length; i += batchSize) {
+      const batch = studentIds.slice(i, i + batchSize);
+      const { data } = await supabase
+        .from("students").select("id, document_id, form_data")
+        .in("id", batch);
+      if (data) allStudents = allStudents.concat(data);
+    }
+    if (!allStudents.length) return null;
 
     // Get assignments for this section
     const { data: assignments } = await supabase
@@ -140,25 +146,27 @@ export default function GradeSheets() {
 
     const assignmentIds = validAssignments.map(a => a.id);
 
-    // Get final grades
+    // Get final grades in batches
     let allGrades: any[] = [];
-    if (selectedMomento === "definitiva") {
-      // Get all 3 momentos
-      const { data } = await supabase
-        .from("final_grades").select("*")
-        .eq("school_id", schoolId).in("assignment_id", assignmentIds)
-        .in("student_id", studentIds).in("momento", [1, 2, 3]);
-      allGrades = data || [];
-    } else {
-      const { data } = await supabase
-        .from("final_grades").select("*")
-        .eq("school_id", schoolId).in("assignment_id", assignmentIds)
-        .in("student_id", studentIds).eq("momento", parseInt(selectedMomento));
-      allGrades = data || [];
+    for (let i = 0; i < studentIds.length; i += batchSize) {
+      const studentBatch = studentIds.slice(i, i + batchSize);
+      if (selectedMomento === "definitiva") {
+        const { data } = await supabase
+          .from("final_grades").select("*")
+          .eq("school_id", schoolId).in("assignment_id", assignmentIds)
+          .in("student_id", studentBatch).in("momento", [1, 2, 3]);
+        if (data) allGrades = allGrades.concat(data);
+      } else {
+        const { data } = await supabase
+          .from("final_grades").select("*")
+          .eq("school_id", schoolId).in("assignment_id", assignmentIds)
+          .in("student_id", studentBatch).eq("momento", parseInt(selectedMomento));
+        if (data) allGrades = allGrades.concat(data);
+      }
     }
 
     // Build student rows
-    const rows: StudentRow[] = students.map(student => {
+    const rows: StudentRow[] = allStudents.map(student => {
       const fd = (student.form_data || {}) as any;
       const apellido1 = fd.primer_apellido || "";
       const apellido2 = fd.segundo_apellido || "";
