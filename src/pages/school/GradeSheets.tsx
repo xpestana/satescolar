@@ -114,17 +114,49 @@ export default function GradeSheets() {
       .in("id", studentIds);
     if (!students?.length) return null;
 
-    // Get assignments for this section
-    const { data: assignments } = await supabase
+    // Get regular assignments for this section
+    const { data: regularAssignments } = await supabase
       .from("subject_teacher_assignments")
       .select("id, subject_id, school_subjects(id, name, abbreviation, display_order, show_in_planilla)")
       .eq("school_id", schoolId).eq("school_year_id", selectedYearId)
       .eq("section_id", sectionId).eq("is_suspended", false);
 
-    // Filter to subjects that show_in_planilla and sort
-    const validAssignments = (assignments || [])
-      .filter(a => (a.school_subjects as any)?.show_in_planilla !== false)
-      .sort((a, b) => ((a.school_subjects as any)?.display_order || 0) - ((b.school_subjects as any)?.display_order || 0));
+    // Get GCRP assignments that include students from this section
+    const { data: gcrpLinks } = await supabase
+      .from("gcrp_assignment_students")
+      .select("assignment_id")
+      .eq("school_id", schoolId)
+      .in("student_id", studentIds);
+
+    const gcrpAssignmentIds = [...new Set((gcrpLinks || []).map(l => l.assignment_id))];
+    let gcrpAssignments: any[] = [];
+    if (gcrpAssignmentIds.length > 0) {
+      const { data } = await supabase
+        .from("subject_teacher_assignments")
+        .select("id, subject_id, school_subjects(id, name, abbreviation, display_order, show_in_planilla)")
+        .in("id", gcrpAssignmentIds)
+        .eq("school_year_id", selectedYearId)
+        .eq("is_suspended", false);
+      gcrpAssignments = data || [];
+    }
+
+    // Combine: regular first (sorted by display_order), then GCRP (sorted by display_order)
+    const allAssignments = [...(regularAssignments || []), ...gcrpAssignments];
+
+    // Filter to subjects that show_in_planilla, deduplicate by assignment id, and sort (regular first, GCRP last)
+    const seenIds = new Set<string>();
+    const validAssignments = allAssignments
+      .filter(a => {
+        if (seenIds.has(a.id)) return false;
+        seenIds.add(a.id);
+        return (a.school_subjects as any)?.show_in_planilla !== false;
+      })
+      .sort((a, b) => {
+        const aIsGcrp = !(regularAssignments || []).some(r => r.id === a.id);
+        const bIsGcrp = !(regularAssignments || []).some(r => r.id === b.id);
+        if (aIsGcrp !== bIsGcrp) return aIsGcrp ? 1 : -1;
+        return ((a.school_subjects as any)?.display_order || 0) - ((b.school_subjects as any)?.display_order || 0);
+      });
 
     const assignmentIds = validAssignments.map(a => a.id);
 
