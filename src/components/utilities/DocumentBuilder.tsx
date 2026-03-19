@@ -406,8 +406,8 @@ export function DocumentBuilder() {
     if (tpl) {
       setContent(tpl.content_html);
       setTemplateName(tpl.name);
-      const editor = document.querySelector("[contenteditable]") as HTMLDivElement;
-      if (editor) editor.innerHTML = tpl.content_html;
+      const sigs = (tpl as any).signature_lines;
+      if (Array.isArray(sigs)) setDocSignatureLines(sigs);
     }
   }, [templates]);
 
