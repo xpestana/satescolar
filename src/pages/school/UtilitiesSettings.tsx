@@ -192,7 +192,9 @@ export default function UtilitiesSettings() {
         breadcrumbs={[{ label: "Ajustes" }, { label: "Utilidades" }]}
       />
 
-      <div className="flex items-center gap-3 mb-6">
+      <InstallAppCard />
+
+      <div className="flex items-center gap-3 mb-6 mt-8">
         <CreditCard className="h-5 w-5 text-primary" />
         <h2 className="text-lg font-semibold">Configuración de Carnet</h2>
       </div>
