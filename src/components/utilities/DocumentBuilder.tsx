@@ -433,8 +433,9 @@ export function DocumentBuilder() {
       container.style.cssText = "position:absolute;left:-9999px;top:0;width:680px;background:#fff;padding:40px;font-family:Arial,Helvetica,sans-serif;color:#000;line-height:1.6;font-size:13.3px;";
       
       container.innerHTML = `
+        <style>* { font-family: Arial, Helvetica, sans-serif !important; font-size: inherit !important; }</style>
         ${headerHtml}
-        <div style="min-height:500px;">${resolved}</div>
+        <div style="min-height:500px;font-size:13.3px;">${resolved}</div>
         ${signaturesHtml}
         ${footerHtml}
       `;
