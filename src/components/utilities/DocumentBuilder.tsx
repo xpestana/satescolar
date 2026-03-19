@@ -289,7 +289,7 @@ export function DocumentBuilder() {
     }
 
     let centerParts: string[] = [];
-    if (hc.show_name !== false) centerParts.push(`<div style="font-weight:bold;font-size:14px;">${s.name}</div>`);
+    if (hc.show_name !== false) centerParts.push(`<div style="font-weight:bold;font-size:11px;">${s.name}</div>`);
     
     const codeParts: string[] = [];
     if (hc.show_dea_code !== false && s.dea_code) codeParts.push(`Código DEA: ${s.dea_code}`);
