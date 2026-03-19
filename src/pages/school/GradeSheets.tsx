@@ -210,6 +210,16 @@ export default function GradeSheets() {
 
       validAssignments.forEach(assignment => {
         const subjectId = assignment.subject_id;
+        const isGcrp = !regularAssignmentIds.has(assignment.id);
+
+        // Skip GCRP assignments for students not enrolled in them
+        if (isGcrp) {
+          const enrolledStudents = gcrpStudentMap.get(assignment.id);
+          if (!enrolledStudents || !enrolledStudents.has(student.id)) {
+            grades[subjectId] = { value: null, adjustment: 0 };
+            return;
+          }
+        }
         if (selectedMomento === "definitiva") {
           const momentGrades = [1, 2, 3].map(m => {
             const g = allGrades.find(g => g.student_id === student.id && g.assignment_id === assignment.id && g.momento === m);
