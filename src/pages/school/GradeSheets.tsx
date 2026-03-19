@@ -359,13 +359,35 @@ export default function GradeSheets() {
       return;
     }
 
-    const head = ["N°", "Cédula", "Apellidos y Nombres", ...subjects.map(s => s.name), "Prom", "Pos", "Aplaz"];
+    // Check if any subject has adjustments
+    const hasAnyAdjustment = data.students.some(row =>
+      subjects.some(s => row.grades[s.id]?.adjustment !== 0)
+    );
+
+    // Build header: for each subject, add grade col + optional "Aj." col
+    const subjectHeaders: string[] = [];
+    subjects.forEach(s => {
+      subjectHeaders.push(s.name);
+      if (hasAnyAdjustment) subjectHeaders.push("Aj.");
+    });
+
+    const head = ["N°", "Cédula", "Apellidos y Nombres", ...subjectHeaders, "Prom", "Pos", "Aplaz"];
+    const totalSubjectCols = subjects.length * (hasAnyAdjustment ? 2 : 1);
+
     const body = data.students.map((row, idx) => {
-      const subjectCells = subjects.map(s => {
+      const subjectCells: string[] = [];
+      subjects.forEach(s => {
         const g = row.grades[s.id];
-        if (!g || g.value === null) return "";
-        const val = g.value % 1 === 0 ? g.value.toFixed(0) : g.value.toFixed(1);
-        return g.adjustment !== 0 ? `${val}*` : val;
+        if (!g || g.value === null) {
+          subjectCells.push("");
+          if (hasAnyAdjustment) subjectCells.push("");
+        } else {
+          const val = g.value % 1 === 0 ? g.value.toFixed(0) : g.value.toFixed(1);
+          subjectCells.push(val);
+          if (hasAnyAdjustment) {
+            subjectCells.push(g.adjustment !== 0 ? (g.adjustment > 0 ? `+${g.adjustment}` : String(g.adjustment)) : "");
+          }
+        }
       });
       return [
         String(idx + 1),
@@ -387,6 +409,7 @@ export default function GradeSheets() {
       } else {
         avgRow.push("");
       }
+      if (hasAnyAdjustment) avgRow.push("");
     });
     const allAvgs = data.students.map(r => r.average).filter(v => v !== null) as number[];
     avgRow.push(allAvgs.length > 0 ? (allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length).toFixed(1) : "");
@@ -399,7 +422,14 @@ export default function GradeSheets() {
       1: { cellWidth: 22 },
       2: { cellWidth: 45 },
     };
-    const lastIdx = 3 + subjects.length;
+    // Set Aj. columns to small width
+    if (hasAnyAdjustment) {
+      for (let i = 0; i < subjects.length; i++) {
+        const ajColIdx = 3 + (i * 2) + 1;
+        colWidths[ajColIdx] = { cellWidth: 8 };
+      }
+    }
+    const lastIdx = 3 + totalSubjectCols;
     colWidths[lastIdx] = { cellWidth: 12 };
     colWidths[lastIdx + 1] = { cellWidth: 10 };
     colWidths[lastIdx + 2] = { cellWidth: 12 };
@@ -423,14 +453,30 @@ export default function GradeSheets() {
         }
         if (hookData.section === "body" && hookData.row.index < body.length - 1) {
           const colIdx = hookData.column.index;
-          if (colIdx >= 3 && colIdx < 3 + subjects.length) {
-            const cellText = hookData.cell.raw as string;
-            const numVal = parseFloat(cellText?.replace("*", "") || "");
-            if (!isNaN(numVal) && numVal < 10) {
-              hookData.cell.styles.textColor = [220, 50, 50];
-            }
-            if (cellText?.includes("*")) {
-              hookData.cell.styles.fontStyle = "bold";
+          // Determine if this is a grade column (not an Aj. column)
+          const subjectStartCol = 3;
+          if (colIdx >= subjectStartCol && colIdx < subjectStartCol + totalSubjectCols) {
+            if (hasAnyAdjustment) {
+              const relIdx = colIdx - subjectStartCol;
+              const isGradeCol = relIdx % 2 === 0;
+              const isAjCol = relIdx % 2 === 1;
+              if (isGradeCol) {
+                const cellText = hookData.cell.raw as string;
+                const numVal = parseFloat(cellText || "");
+                if (!isNaN(numVal) && numVal < 10) {
+                  hookData.cell.styles.textColor = [220, 50, 50];
+                }
+              }
+              if (isAjCol) {
+                hookData.cell.styles.fontSize = 7;
+                hookData.cell.styles.textColor = [100, 100, 100];
+              }
+            } else {
+              const cellText = hookData.cell.raw as string;
+              const numVal = parseFloat(cellText || "");
+              if (!isNaN(numVal) && numVal < 10) {
+                hookData.cell.styles.textColor = [220, 50, 50];
+              }
             }
           }
         }
@@ -440,7 +486,7 @@ export default function GradeSheets() {
         doc.setFontSize(8);
         doc.setTextColor(130);
         doc.text(
-          `* Indica ajuste de nota   |   Generado: ${new Date().toLocaleDateString("es-VE")}`,
+          `Aj. = Puntos de ajuste   |   Generado: ${new Date().toLocaleDateString("es-VE")}`,
           pageWidth / 2, pageH - 6, { align: "center" }
         );
       },
