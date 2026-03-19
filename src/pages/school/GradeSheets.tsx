@@ -494,10 +494,10 @@ export default function GradeSheets() {
         return;
       }
 
-      const pdfBlob = doc.output("blob");
-      const url = URL.createObjectURL(pdfBlob);
-      window.open(url, "_blank");
-      toast.success("PDF generado exitosamente");
+      const momentoLabel = selectedMomento === "definitiva" ? "Definitiva" : `Momento_${selectedMomento}`;
+      const schoolName = (school?.name || "Colegio").replace(/\s+/g, "_");
+      doc.save(`Sabana_de_Notas_${schoolName}_Todas_las_Secciones_${momentoLabel}_${year?.year_range || ""}.pdf`);
+      toast.success("PDF descargado exitosamente");
     } catch (err) {
       console.error(err);
       toast.error("Error al generar el PDF");
