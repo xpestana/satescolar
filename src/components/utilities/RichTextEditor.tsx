@@ -123,7 +123,6 @@ export function RichTextEditor({
           const text = e.clipboardData.getData("text/html") || e.clipboardData.getData("text/plain");
           document.execCommand("insertHTML", false, text);
         }}
-        dangerouslySetInnerHTML={value ? undefined : { __html: "" }}
         data-placeholder={placeholder}
         suppressContentEditableWarning
       />

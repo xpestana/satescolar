@@ -1,0 +1,1 @@
+ALTER TABLE public.document_templates ADD COLUMN signature_lines jsonb NOT NULL DEFAULT '[]'::jsonb;

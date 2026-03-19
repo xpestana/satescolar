@@ -100,6 +100,7 @@ export type Database = {
           id: string
           name: string
           school_id: string
+          signature_lines: Json
           updated_at: string
         }
         Insert: {
@@ -108,6 +109,7 @@ export type Database = {
           id?: string
           name: string
           school_id: string
+          signature_lines?: Json
           updated_at?: string
         }
         Update: {
@@ -116,6 +118,7 @@ export type Database = {
           id?: string
           name?: string
           school_id?: string
+          signature_lines?: Json
           updated_at?: string
         }
         Relationships: [
