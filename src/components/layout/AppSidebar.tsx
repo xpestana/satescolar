@@ -161,6 +161,32 @@ export function AppSidebar() {
   const { school } = useSchoolData();
   const { familyName } = useRepresentativeFamily();
 
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(
+    typeof window !== "undefined" && window.matchMedia("(display-mode: standalone)").matches
+  );
+
+  useEffect(() => {
+    if (isInstalled) return;
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", () => setIsInstalled(true));
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, [isInstalled]);
+
+  const handleInstall = useCallback(async () => {
+    if (!deferredPrompt) return;
+    await deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") setIsInstalled(true);
+    setDeferredPrompt(null);
+  }, [deferredPrompt]);
+
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
