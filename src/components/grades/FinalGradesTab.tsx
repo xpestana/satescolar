@@ -449,7 +449,9 @@ export default function FinalGradesTab({
             const calc = calculateDefinitive(s.student_id, mo);
             return calc ? Number(calc) || 0 : 0;
           });
-          edited[key] = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
+          const calcVal = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
+          edited[key] = calcVal;
+          db[key] = calcVal;
           let totalAtt = 0, totalAbs = 0;
           for (const mo of [1, 2, 3]) {
             const moKey = `${s.student_id}-${mo}`;
@@ -457,9 +459,11 @@ export default function FinalGradesTab({
             totalAbs += extra[moKey]?.absence_count || 0;
           }
           extra[key] = { ...DEFAULT_EXTRA, attendance_count: totalAtt, absence_count: totalAbs };
-          dbExtra[key] = { ...DEFAULT_EXTRA };
+          dbExtra[key] = { ...extra[key] };
         } else {
-          edited[key] = calculateDefinitive(s.student_id, m);
+          const calcVal = calculateDefinitive(s.student_id, m);
+          edited[key] = calcVal;
+          db[key] = calcVal;
           extra[key] = { ...DEFAULT_EXTRA };
           dbExtra[key] = { ...DEFAULT_EXTRA };
         }
