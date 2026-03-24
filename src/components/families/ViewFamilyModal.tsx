@@ -388,7 +388,7 @@ export function ViewFamilyModal({
                         </TableCell>
                         <TableCell>{rep.document_id || "Sin documento"}</TableCell>
                         <TableCell>{rep.phone || "Sin teléfono"}</TableCell>
-                        <TableCell>{rep.email || "Sin correo"}</TableCell>
+                        <TableCell>{family?.email || "Sin correo"}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Button
