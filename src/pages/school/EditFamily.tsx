@@ -248,8 +248,34 @@ export default function EditFamily() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Update email if changed
+    if (familyEmail && familyEmail !== originalEmail) {
+      try {
+        const { data, error } = await supabase.functions.invoke("update-family-email", {
+          body: { family_id: familyId, new_email: familyEmail },
+        });
+        if (error || data?.error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: data?.error || "No se pudo actualizar el correo electrónico",
+          });
+          return;
+        }
+        setOriginalEmail(familyEmail);
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudo actualizar el correo electrónico",
+        });
+        return;
+      }
+    }
+
     updateMutation.mutate(formData);
   };
 
