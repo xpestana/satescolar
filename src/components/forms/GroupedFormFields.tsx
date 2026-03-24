@@ -263,6 +263,21 @@ export function GroupedFormFields({
     }
 
     if (base === "ciudad") {
+      // If there's no estado field in this form AND no initialStateId, render as text input
+      const hasEstadoField = !!geoKeyMap["estado"];
+      const hasStateContext = hasEstadoField || !!effectiveStateId;
+      
+      if (!hasStateContext) {
+        return (
+          <Input
+            type="text"
+            placeholder={field.placeholder || field.field_label}
+            value={formData[field.field_name] || ""}
+            onChange={(e) => onFieldChange(field.field_name, e.target.value)}
+          />
+        );
+      }
+      
       return (
         <Select 
           value={effectiveCityId || undefined} 
