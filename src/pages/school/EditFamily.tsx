@@ -133,6 +133,19 @@ export default function EditFamily() {
     enabled: !!effectiveMunicipalityId,
   });
 
+  // Fetch family email
+  useEffect(() => {
+    if (family?.user_id) {
+      supabase.functions.invoke("get-user-emails", {
+        body: { userIds: [family.user_id] },
+      }).then(({ data }) => {
+        const email = data?.emails?.[family.user_id] || "";
+        setFamilyEmail(email);
+        setOriginalEmail(email);
+      });
+    }
+  }, [family?.user_id]);
+
   // Load family data into form
   useEffect(() => {
     if (family) {
