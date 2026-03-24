@@ -109,6 +109,15 @@ export default function AddTeacher() {
 
   const isDataReady = !isEditing || (!!existingTeacher && formDataInitialized);
 
+  // Find email and phone field names dynamically from form fields
+  const emailFieldName = formFields.find(f => 
+    f.field_name === 'correo_electronico' || f.field_name === 'email'
+  )?.field_name || 'correo_electronico';
+  
+  const phoneFieldName = formFields.find(f => 
+    f.field_name === 'numero_contacto' || f.field_name === 'telefono' || f.field_name === 'celular'
+  )?.field_name || 'numero_contacto';
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       let photoUrl = existingTeacher?.photo_url || null;
@@ -129,14 +138,17 @@ export default function AddTeacher() {
       const documentNum = formData.documento || "";
       const documentId = documentType && documentNum ? `${documentType}-${documentNum}` : documentNum || null;
 
+      const resolvedEmail = formData[emailFieldName] || null;
+      const resolvedPhone = formData[phoneFieldName] || null;
+
       if (isEditing) {
         const teacherData = {
           school_id: schoolId,
           photo_url: photoUrl,
           form_data: formData,
           document_id: documentId,
-          phone: formData.numero_contacto || null,
-          email: formData.correo_electronico || null,
+          phone: resolvedPhone,
+          email: resolvedEmail,
         };
         const { error } = await supabase
           .from("teachers")
@@ -145,7 +157,7 @@ export default function AddTeacher() {
         if (error) throw error;
       } else {
         // Use edge function to create user + role + teacher record
-        const email = formData.correo_electronico;
+        const email = resolvedEmail;
         if (!email) throw new Error("El correo electrónico es obligatorio para crear el docente");
         if (!documentId) throw new Error("El número de documento es obligatorio para crear el docente");
         const response = await supabase.functions.invoke("create-teacher", {
@@ -154,7 +166,7 @@ export default function AddTeacher() {
             form_data: formData,
             photo_url: photoUrl,
             document_id: documentId,
-            phone: formData.numero_contacto || null,
+            phone: resolvedPhone,
           },
         });
 
