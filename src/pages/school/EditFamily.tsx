@@ -25,6 +25,8 @@ export default function EditFamily() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [familyEmail, setFamilyEmail] = useState("");
+  const [originalEmail, setOriginalEmail] = useState("");
   const [formData, setFormData] = useState({
     father_last_name: "",
     mother_last_name: "",
