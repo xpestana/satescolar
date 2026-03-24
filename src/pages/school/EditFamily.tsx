@@ -372,17 +372,27 @@ export default function EditFamily() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="contact_phone">Teléfono de contacto</Label>
-              <Input
-                id="contact_phone"
-                placeholder="Teléfono de contacto"
-                value={formData.contact_phone}
-                onChange={(e) => handleChange("contact_phone", e.target.value)}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact_phone">Teléfono de contacto</Label>
+                <Input
+                  id="contact_phone"
+                  placeholder="Teléfono de contacto"
+                  value={formData.contact_phone}
+                  onChange={(e) => handleChange("contact_phone", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="family_email">Correo electrónico de la familia</Label>
+                <Input
+                  id="family_email"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={familyEmail}
+                  onChange={(e) => setFamilyEmail(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
-        </div>
 
         {/* Location */}
         <div className="bg-card rounded-lg shadow-sm border p-6">
