@@ -25,6 +25,8 @@ export default function EditFamily() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const [familyEmail, setFamilyEmail] = useState("");
+  const [originalEmail, setOriginalEmail] = useState("");
   const [formData, setFormData] = useState({
     father_last_name: "",
     mother_last_name: "",
@@ -131,6 +133,19 @@ export default function EditFamily() {
     enabled: !!effectiveMunicipalityId,
   });
 
+  // Fetch family email
+  useEffect(() => {
+    if (family?.user_id) {
+      supabase.functions.invoke("get-user-emails", {
+        body: { userIds: [family.user_id] },
+      }).then(({ data }) => {
+        const email = data?.emails?.[family.user_id] || "";
+        setFamilyEmail(email);
+        setOriginalEmail(email);
+      });
+    }
+  }, [family?.user_id]);
+
   // Load family data into form
   useEffect(() => {
     if (family) {
@@ -233,8 +248,34 @@ export default function EditFamily() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Update email if changed
+    if (familyEmail && familyEmail !== originalEmail) {
+      try {
+        const { data, error } = await supabase.functions.invoke("update-family-email", {
+          body: { family_id: familyId, new_email: familyEmail },
+        });
+        if (error || data?.error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: data?.error || "No se pudo actualizar el correo electrónico",
+          });
+          return;
+        }
+        setOriginalEmail(familyEmail);
+      } catch {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "No se pudo actualizar el correo electrónico",
+        });
+        return;
+      }
+    }
+
     updateMutation.mutate(formData);
   };
 
@@ -331,14 +372,26 @@ export default function EditFamily() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="contact_phone">Teléfono de contacto</Label>
-              <Input
-                id="contact_phone"
-                placeholder="Teléfono de contacto"
-                value={formData.contact_phone}
-                onChange={(e) => handleChange("contact_phone", e.target.value)}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact_phone">Teléfono de contacto</Label>
+                <Input
+                  id="contact_phone"
+                  placeholder="Teléfono de contacto"
+                  value={formData.contact_phone}
+                  onChange={(e) => handleChange("contact_phone", e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="family_email">Correo electrónico de la familia</Label>
+                <Input
+                  id="family_email"
+                  type="email"
+                  placeholder="correo@ejemplo.com"
+                  value={familyEmail}
+                  onChange={(e) => setFamilyEmail(e.target.value)}
+                />
+              </div>
             </div>
           </div>
         </div>
