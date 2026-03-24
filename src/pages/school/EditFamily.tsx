@@ -393,6 +393,8 @@ export default function EditFamily() {
                 />
               </div>
             </div>
+          </div>
+        </div>
 
         {/* Location */}
         <div className="bg-card rounded-lg shadow-sm border p-6">
