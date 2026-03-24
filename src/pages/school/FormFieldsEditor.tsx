@@ -70,6 +70,16 @@ import { FormGroupsManager } from "@/components/forms/FormGroupsManager";
 type FormType = "representative" | "student" | "teacher";
 type FieldType = "text" | "email" | "phone" | "number" | "date" | "select" | "textarea" | "checkbox" | "file";
 
+// Core fields that cannot be deleted per form type
+const PROTECTED_FIELDS: { [key in FormType]: string[] } = {
+  representative: ["primer_nombre", "primer_apellido", "documento"],
+  student: ["primer_nombre", "primer_apellido", "documento", "fecha_nacimiento"],
+  teacher: [
+    "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
+    "documento", "fecha_nacimiento", "email", "correo_electronico",
+  ],
+};
+
 interface FormField {
   id: string;
   school_id: string;
@@ -464,6 +474,7 @@ export default function FormFieldsEditor() {
               ) : (
                 fields.map((field, index) => {
                   const TypeIcon = getFieldTypeIcon(field.field_type);
+                  const isProtected = PROTECTED_FIELDS[formType]?.includes(field.field_name);
                   return (
                     <TableRow key={field.id} className={!field.is_visible ? "opacity-50" : ""}>
                       <TableCell>
@@ -473,9 +484,16 @@ export default function FormFieldsEditor() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{field.field_label}</p>
-                          <p className="text-xs text-muted-foreground">{field.field_name}</p>
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <p className="font-medium">{field.field_label}</p>
+                            <p className="text-xs text-muted-foreground">{field.field_name}</p>
+                          </div>
+                          {isProtected && (
+                            <Badge variant="outline" className="text-xs border-amber-300 text-amber-600">
+                              Obligatorio
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -499,6 +517,7 @@ export default function FormFieldsEditor() {
                       <TableCell className="text-center">
                         <Switch
                           checked={field.is_visible}
+                          disabled={isProtected}
                           onCheckedChange={(checked) => 
                             toggleVisibilityMutation.mutate({ id: field.id, is_visible: checked })
                           }
@@ -517,7 +536,9 @@ export default function FormFieldsEditor() {
                             variant="ghost"
                             size="icon"
                             onClick={() => setDeleteId(field.id)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            disabled={isProtected}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                            title={isProtected ? "Este campo es obligatorio y no se puede eliminar" : undefined}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
