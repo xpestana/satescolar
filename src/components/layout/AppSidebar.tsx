@@ -21,6 +21,8 @@ import {
   PanelRightClose,
   Download,
   Smartphone,
+  QrCode,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
