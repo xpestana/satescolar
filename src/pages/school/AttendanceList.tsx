@@ -4,14 +4,18 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Search, ClipboardList } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, ClipboardList, SlidersHorizontal, FileDown, FileText, FileSpreadsheet } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { Pagination } from "@/components/ui/data-pagination";
+import { downloadCSV, downloadExcel, downloadPDF, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 
 const PAGE_SIZE = 50;
 
@@ -32,11 +36,41 @@ function normalize(str: string): string {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-function AttendanceTab({ entityType }: { entityType: "teacher" | "student" | "representative" }) {
+interface ColumnDef {
+  key: string;
+  label: string;
+  alwaysVisible?: boolean;
+}
+
+const ALL_COLUMNS: ColumnDef[] = [
+  { key: "firstName", label: "Nombre" },
+  { key: "lastName", label: "Apellido" },
+  { key: "documentId", label: "Documento" },
+  { key: "attendance_date", label: "Fecha", alwaysVisible: true },
+  { key: "attendance_time", label: "Hora", alwaysVisible: true },
+  { key: "record_type", label: "Tipo", alwaysVisible: true },
+  { key: "status", label: "Estado", alwaysVisible: true },
+  { key: "notification_info", label: "Correo Notificado", alwaysVisible: true },
+];
+
+const TOGGLEABLE_COLUMNS = ALL_COLUMNS.filter(c => !c.alwaysVisible);
+
+function AttendanceTab({
+  entityType,
+  schoolInfo,
+  planillaConfig,
+}: {
+  entityType: "teacher" | "student" | "representative";
+  schoolInfo: any;
+  planillaConfig: { header_config: PdfHeaderConfig; footer_config: PdfFooterConfig } | null;
+}) {
   const { schoolId } = useSchoolId();
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [page, setPage] = useState(1);
+  const [visibleOptionalKeys, setVisibleOptionalKeys] = useState<string[]>(
+    TOGGLEABLE_COLUMNS.map(c => c.key)
+  );
 
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["attendance-records", schoolId, entityType, dateFilter],
@@ -56,9 +90,8 @@ function AttendanceTab({ entityType }: { entityType: "teacher" | "student" | "re
     enabled: !!schoolId,
   });
 
-  // Get entity details
   const entityIds = useMemo(() => [...new Set(records.map(r => r.entity_id))], [records]);
-  
+
   const { data: entities = {} } = useQuery({
     queryKey: ["attendance-entities", entityType, entityIds],
     queryFn: async () => {
@@ -83,7 +116,14 @@ function AttendanceTab({ entityType }: { entityType: "teacher" | "student" | "re
       const firstName = fd.primer_nombre || "";
       const lastName = fd.primer_apellido || "";
       const fullName = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido].filter(Boolean).join(" ");
-      return { ...r, firstName, lastName, fullName, documentId: entity?.document_id || fd.documento || "" };
+      return {
+        ...r,
+        firstName,
+        lastName,
+        fullName,
+        documentId: entity?.document_id || fd.documento || "",
+        notification_info: r.notification_sent ? (r.notification_email || "Sí") : "—",
+      };
     });
   }, [records, entities]);
 
@@ -91,7 +131,7 @@ function AttendanceTab({ entityType }: { entityType: "teacher" | "student" | "re
     if (!search.trim()) return enrichedRecords;
     const terms = normalize(search).split(/\s+/);
     return enrichedRecords.filter(r => {
-      const target = normalize(r.fullName);
+      const target = normalize(r.fullName + " " + r.documentId);
       return terms.every(t => target.includes(t));
     });
   }, [enrichedRecords, search]);
@@ -99,13 +139,86 @@ function AttendanceTab({ entityType }: { entityType: "teacher" | "student" | "re
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // Visible columns = always visible + toggled optional
+  const activeColumns = useMemo(() => {
+    return ALL_COLUMNS.filter(c => c.alwaysVisible || visibleOptionalKeys.includes(c.key));
+  }, [visibleOptionalKeys]);
+
+  const toggleColumn = (key: string) => {
+    setVisibleOptionalKeys(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
+  const getCellValue = (r: any, col: ColumnDef) => {
+    switch (col.key) {
+      case "attendance_time": return r.attendance_time?.substring(0, 5);
+      case "record_type": return <Badge variant="outline">{r.record_type?.toUpperCase()}</Badge>;
+      case "status": return (
+        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+          {r.status === "present" ? "Presente" : r.status}
+        </Badge>
+      );
+      case "notification_info": return <span className="text-xs text-muted-foreground">{r.notification_info}</span>;
+      default: return r[col.key] ?? "—";
+    }
+  };
+
+  const getTextValue = (r: any, col: ColumnDef): string => {
+    switch (col.key) {
+      case "attendance_time": return r.attendance_time?.substring(0, 5) || "";
+      case "record_type": return r.record_type?.toUpperCase() || "";
+      case "status": return r.status === "present" ? "Presente" : (r.status || "");
+      case "notification_info": return r.notification_info || "";
+      default: return r[col.key] != null ? String(r[col.key]) : "";
+    }
+  };
+
+  const typeLabel = entityType === "student" ? "Estudiantes" : entityType === "teacher" ? "Docentes" : "Representantes";
+
+  const getExportData = () => {
+    const cols = activeColumns.map(c => ({ key: c.key, label: c.label }));
+    const rows = filtered.map(r => {
+      const row: Record<string, any> = {};
+      cols.forEach(c => { row[c.key] = getTextValue(r, { key: c.key, label: c.label }); });
+      return row;
+    });
+    return { cols, rows };
+  };
+
+  const handleExportExcel = () => {
+    const { cols, rows } = getExportData();
+    downloadExcel(cols, rows, `Asistencias - ${typeLabel}`);
+  };
+
+  const handleExportPDF = () => {
+    const { cols, rows } = getExportData();
+    const institutionType = schoolInfo?.institution_type === "public" ? "Unidad Educativa" :
+      schoolInfo?.institution_type === "private" ? "Unidad Educativa Privada" :
+      schoolInfo?.institution_type === "subsidized" ? "Unidad Educativa Subvencionada" : "Unidad Educativa";
+    const pdfSchool = schoolInfo ? {
+      name: `${institutionType} ${schoolInfo.name}`,
+      deaCode: schoolInfo.dea_code,
+      statisticalCode: schoolInfo.statistical_code,
+      address: schoolInfo.address,
+      phone: schoolInfo.phone,
+      rif: schoolInfo.rif,
+      state: (schoolInfo.states as any)?.name || "",
+      municipality: (schoolInfo.municipalities as any)?.name || "",
+      city: (schoolInfo.cities as any)?.name || "",
+      parish: (schoolInfo.parishes as any)?.name || "",
+      logoUrl: schoolInfo.logo_url || undefined,
+    } : undefined;
+    downloadPDF(cols, rows, `Asistencias - ${typeLabel}`, pdfSchool, planillaConfig?.header_config, planillaConfig?.footer_config);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por nombre o apellido..."
+            placeholder="Buscar por nombre o documento..."
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
             className="pl-9"
@@ -123,47 +236,90 @@ function AttendanceTab({ entityType }: { entityType: "teacher" | "student" | "re
             <SelectItem value="12months">Últimos 12 meses</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Column visibility */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm">
+              <SlidersHorizontal className="h-4 w-4 mr-2" />
+              Columnas
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 max-h-80 overflow-y-auto bg-background z-50" align="end">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b gap-1">
+                <span className="text-sm font-medium">Columnas visibles</span>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setVisibleOptionalKeys([])} className="text-xs h-7">
+                    Ninguna
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setVisibleOptionalKeys(TOGGLEABLE_COLUMNS.map(c => c.key))} className="text-xs h-7">
+                    Todas
+                  </Button>
+                </div>
+              </div>
+              {TOGGLEABLE_COLUMNS.map(col => (
+                <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={visibleOptionalKeys.includes(col.key)}
+                    onCheckedChange={() => toggleColumn(col.key)}
+                  />
+                  {col.label}
+                </label>
+              ))}
+              <p className="text-xs text-muted-foreground pt-1 border-t">
+                Fecha, Hora, Tipo, Estado y Correo siempre visibles.
+              </p>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Export */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm">
+              <FileDown className="h-4 w-4 mr-2" />
+              Exportar
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 bg-background z-50" align="end">
+            <div className="flex flex-col gap-2">
+              <Button size="sm" variant="outline" onClick={handleExportExcel} className="justify-start">
+                <FileSpreadsheet className="h-4 w-4 mr-2" /> Excel
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleExportPDF} className="justify-start">
+                <FileText className="h-4 w-4 mr-2" /> PDF
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Apellido</TableHead>
-              <TableHead>Documento</TableHead>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Hora</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Correo Notificado</TableHead>
+              {activeColumns.map(col => (
+                <TableHead key={col.key}>{col.label}</TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
+                <TableCell colSpan={activeColumns.length} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
               </TableRow>
             ) : paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No hay registros</TableCell>
+                <TableCell colSpan={activeColumns.length} className="text-center py-8 text-muted-foreground">No hay registros</TableCell>
               </TableRow>
             ) : paged.map(r => (
               <TableRow key={r.id}>
-                <TableCell className="font-medium">{r.firstName}</TableCell>
-                <TableCell>{r.lastName}</TableCell>
-                <TableCell className="text-muted-foreground">{r.documentId}</TableCell>
-                <TableCell>{r.attendance_date}</TableCell>
-                <TableCell>{r.attendance_time?.substring(0, 5)}</TableCell>
-                <TableCell><Badge variant="outline">{r.record_type?.toUpperCase()}</Badge></TableCell>
-                <TableCell>
-                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                    {r.status === "present" ? "Presente" : r.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {r.notification_sent ? r.notification_email || "Sí" : "—"}
-                </TableCell>
+                {activeColumns.map(col => (
+                  <TableCell key={col.key} className={col.key === "firstName" ? "font-medium" : col.key === "documentId" ? "text-muted-foreground" : ""}>
+                    {getCellValue(r, col)}
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>
@@ -180,6 +336,36 @@ function AttendanceTab({ entityType }: { entityType: "teacher" | "student" | "re
 }
 
 export default function AttendanceList() {
+  const { schoolId } = useSchoolId();
+
+  const { data: schoolInfo } = useQuery({
+    queryKey: ["school-info-export", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("schools")
+        .select("name, dea_code, statistical_code, address, logo_url, institution_type, phone, rif, states(name), municipalities(name), cities(name), parishes(name)")
+        .eq("id", schoolId!)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  const { data: planillaConfig } = useQuery({
+    queryKey: ["planilla-general-config", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("planilla_general_config" as any)
+        .select("header_config, footer_config")
+        .eq("school_id", schoolId!)
+        .single();
+      if (error && error.code !== "PGRST116") throw error;
+      return data as unknown as { header_config: PdfHeaderConfig; footer_config: PdfFooterConfig } | null;
+    },
+    enabled: !!schoolId,
+  });
+
   return (
     <DashboardLayout>
       <PageHeader
@@ -207,13 +393,13 @@ export default function AttendanceList() {
             </TabsList>
 
             <TabsContent value="students">
-              <AttendanceTab entityType="student" />
+              <AttendanceTab entityType="student" schoolInfo={schoolInfo} planillaConfig={planillaConfig ?? null} />
             </TabsContent>
             <TabsContent value="teachers">
-              <AttendanceTab entityType="teacher" />
+              <AttendanceTab entityType="teacher" schoolInfo={schoolInfo} planillaConfig={planillaConfig ?? null} />
             </TabsContent>
             <TabsContent value="representatives">
-              <AttendanceTab entityType="representative" />
+              <AttendanceTab entityType="representative" schoolInfo={schoolInfo} planillaConfig={planillaConfig ?? null} />
             </TabsContent>
           </Tabs>
         </CardContent>
