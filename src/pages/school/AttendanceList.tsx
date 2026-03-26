@@ -11,7 +11,7 @@ import { Search, ClipboardList } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { DataPagination } from "@/components/ui/data-pagination";
+import { Pagination } from "@/components/ui/data-pagination";
 
 const PAGE_SIZE = 50;
 
