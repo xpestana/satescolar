@@ -305,6 +305,7 @@ export async function downloadCarnet(params: {
   watermarkOpacity?: number;
   watermarkSize?: number;
   layoutConfig?: CarnetLayoutParams;
+  attendanceToken?: string;
 }) {
   // ─── Constants matching CarnetPreview.tsx exactly ───
   const CARD_W_PX = 280;
