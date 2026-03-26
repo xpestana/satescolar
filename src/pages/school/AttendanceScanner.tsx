@@ -127,7 +127,82 @@ export default function AttendanceScanner() {
         breadcrumbs={[{ label: "Utilidades" }, { label: "Escáner QR" }]}
       />
 
-      <div className="max-w-lg mx-auto space-y-6">
+      <div className="max-w-lg mx-auto space-y-4">
+        {/* Result Card - Always on top */}
+        {status === "loading" && (
+          <Card className="border-primary/30">
+            <CardContent className="p-6 flex flex-col items-center gap-3">
+              <Loader2 className="h-10 w-10 text-primary animate-spin" />
+              <p className="text-muted-foreground">Procesando...</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {status === "success" && result && (
+          <Card className="border-green-300 bg-green-50">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-10 w-10 text-green-500 flex-shrink-0" />
+                <div>
+                  <h3 className="text-base font-bold text-green-700">Asistencia Registrada</h3>
+                  <p className="text-sm text-green-600">Registro exitoso</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 space-y-1 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Nombre</span>
+                  <strong>{result.personName}</strong>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Rol</span>
+                  <Badge className={`${roleBadgeColor(result.role)} text-white`}>{result.role}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Hora</span>
+                  <span>{result.time}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {status === "duplicate" && result && (
+          <Card className="border-amber-300 bg-amber-50">
+            <CardContent className="p-5 space-y-3">
+              <div className="flex items-center gap-3">
+                <Clock className="h-10 w-10 text-amber-500 flex-shrink-0" />
+                <div>
+                  <h3 className="text-base font-bold text-amber-700">Ya Registrado</h3>
+                  <p className="text-sm text-amber-600">Asistencia ya registrada</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-3 space-y-1 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Nombre</span>
+                  <strong>{result.personName}</strong>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Rol</span>
+                  <Badge className={`${roleBadgeColor(result.role)} text-white`}>{result.role}</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {status === "error" && result && (
+          <Card className="border-red-300 bg-red-50">
+            <CardContent className="p-5 flex items-center gap-3">
+              <XCircle className="h-10 w-10 text-red-500 flex-shrink-0" />
+              <div>
+                <h3 className="text-base font-bold text-red-700">Error</h3>
+                <p className="text-sm text-red-600">{result.message || "QR inválido o usuario no encontrado"}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Scanner Card */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -177,91 +252,6 @@ export default function AttendanceScanner() {
             </Tabs>
           </CardContent>
         </Card>
-
-        {/* Result Card */}
-        {status === "loading" && (
-          <Card className="border-primary/30">
-            <CardContent className="p-8 flex flex-col items-center gap-3">
-              <Loader2 className="h-12 w-12 text-primary animate-spin" />
-              <p className="text-muted-foreground">Procesando...</p>
-            </CardContent>
-          </Card>
-        )}
-
-        {status === "success" && result && (
-          <Card className="border-green-300 bg-green-50">
-            <CardContent className="p-8 space-y-4">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="h-12 w-12 text-green-500 flex-shrink-0" />
-                <div>
-                  <h3 className="text-lg font-bold text-green-700">Asistencia Registrada</h3>
-                  <p className="text-sm text-green-600">Registro exitoso</p>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Nombre</span>
-                  <strong>{result.personName}</strong>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Rol</span>
-                  <Badge className={`${roleBadgeColor(result.role)} text-white`}>{result.role}</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fecha</span>
-                  <span>{result.date}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Hora</span>
-                  <span>{result.time}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {status === "duplicate" && result && (
-          <Card className="border-amber-300 bg-amber-50">
-            <CardContent className="p-8 space-y-4">
-              <div className="flex items-center gap-3">
-                <Clock className="h-12 w-12 text-amber-500 flex-shrink-0" />
-                <div>
-                  <h3 className="text-lg font-bold text-amber-700">Ya Registrado</h3>
-                  <p className="text-sm text-amber-600">Asistencia ya registrada recientemente</p>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg p-4 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Nombre</span>
-                  <strong>{result.personName}</strong>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Rol</span>
-                  <Badge className={`${roleBadgeColor(result.role)} text-white`}>{result.role}</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {status === "error" && result && (
-          <Card className="border-red-300 bg-red-50">
-            <CardContent className="p-8 flex items-center gap-3">
-              <XCircle className="h-12 w-12 text-red-500 flex-shrink-0" />
-              <div>
-                <h3 className="text-lg font-bold text-red-700">Error</h3>
-                <p className="text-sm text-red-600">{result.message || "QR inválido o usuario no encontrado"}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {status === "idle" && (
-          <div className="text-center text-muted-foreground text-sm py-4">
-            <p>{activeTab === "camera" ? "Active la cámara y apunte al código QR del carnet" : "Apunte el lector QR al carnet del usuario"}</p>
-            <p className="text-xs mt-1">El registro se realizará automáticamente al detectar el QR</p>
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );
