@@ -311,6 +311,10 @@ const App = () => (
               <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
               <Route path="/teacher/materias/:assignmentId/notas" element={<ProtectedRoute requiredRole="teacher"><TeacherGrades /></ProtectedRoute>} />
               <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />
+              {/* Attendance routes */}
+              <Route path="/attendance/scan/:token" element={<AttendanceScan />} />
+              <Route path="/utilidades/escaner-qr" element={<ProtectedRoute requiredRole="school"><AttendanceScanner /></ProtectedRoute>} />
+              <Route path="/utilidades/asistencias" element={<ProtectedRoute requiredRole="school"><AttendanceList /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -171,7 +171,7 @@ function AttendanceTab({ entityType }: { entityType: "teacher" | "student" | "re
       </div>
 
       {totalPages > 1 && (
-        <DataPagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} itemsPerPage={PAGE_SIZE} />
       )}
 
       <p className="text-xs text-muted-foreground text-right">{filtered.length} registro(s)</p>
