@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,16 +10,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, ClipboardList, SlidersHorizontal, FileDown, FileText, FileSpreadsheet } from "lucide-react";
+import { Search, ClipboardList, SlidersHorizontal, FileDown, FileText, FileSpreadsheet, GripVertical } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { Pagination } from "@/components/ui/data-pagination";
-import { downloadCSV, downloadExcel, downloadPDF, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
+import { downloadExcel, downloadPDF, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const PAGE_SIZE = 50;
 
 type DateFilter = "today" | "7days" | "30days" | "6months" | "12months";
+type EntityType = "student" | "teacher" | "representative";
 
 function getDateFrom(filter: DateFilter): string {
   const now = new Date();
@@ -39,28 +56,63 @@ function normalize(str: string): string {
 interface ColumnDef {
   key: string;
   label: string;
-  alwaysVisible?: boolean;
+  isFormData?: boolean;
+  isFixed?: boolean; // always visible, not toggleable
 }
 
-const ALL_COLUMNS: ColumnDef[] = [
-  { key: "firstName", label: "Nombre" },
-  { key: "lastName", label: "Apellido" },
-  { key: "documentId", label: "Documento" },
-  { key: "attendance_date", label: "Fecha", alwaysVisible: true },
-  { key: "attendance_time", label: "Hora", alwaysVisible: true },
-  { key: "record_type", label: "Tipo", alwaysVisible: true },
-  { key: "status", label: "Estado", alwaysVisible: true },
-  { key: "notification_info", label: "Correo Notificado", alwaysVisible: true },
+// Fixed attendance columns (always visible)
+const ATTENDANCE_FIXED_COLUMNS: ColumnDef[] = [
+  { key: "attendance_date", label: "Fecha", isFixed: true },
+  { key: "attendance_time", label: "Hora", isFixed: true },
+  { key: "record_type", label: "Tipo", isFixed: true },
+  { key: "status", label: "Estado", isFixed: true },
+  { key: "notification_info", label: "Correo Notificado", isFixed: true },
 ];
 
-const TOGGLEABLE_COLUMNS = ALL_COLUMNS.filter(c => !c.alwaysVisible);
+// Entity base columns per type
+const ENTITY_BASE_COLUMNS: Record<EntityType, ColumnDef[]> = {
+  student: [
+    { key: "document_id", label: "Cédula" },
+  ],
+  teacher: [
+    { key: "document_id", label: "Cédula" },
+    { key: "email", label: "Email" },
+    { key: "phone", label: "Teléfono" },
+  ],
+  representative: [
+    { key: "document_id", label: "Cédula" },
+    { key: "email", label: "Email" },
+    { key: "phone", label: "Teléfono" },
+  ],
+};
+
+function SortableHeaderCell({ col }: { col: ColumnDef }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: col.key });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    cursor: "grab",
+  };
+
+  return (
+    <TableHead ref={setNodeRef} style={style} className="select-none whitespace-nowrap">
+      <span className="inline-flex items-center gap-1" {...attributes} {...listeners}>
+        <GripVertical className="h-3 w-3 text-muted-foreground shrink-0" />
+        {col.label}
+      </span>
+    </TableHead>
+  );
+}
 
 function AttendanceTab({
   entityType,
   schoolInfo,
   planillaConfig,
 }: {
-  entityType: "teacher" | "student" | "representative";
+  entityType: EntityType;
   schoolInfo: any;
   planillaConfig: { header_config: PdfHeaderConfig; footer_config: PdfFooterConfig } | null;
 }) {
@@ -68,10 +120,105 @@ function AttendanceTab({
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState<DateFilter>("today");
   const [page, setPage] = useState(1);
-  const [visibleOptionalKeys, setVisibleOptionalKeys] = useState<string[]>(
-    TOGGLEABLE_COLUMNS.map(c => c.key)
+  const [visibleColumns, setVisibleColumns] = useState<string[] | null>(null);
+  const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor)
   );
 
+  // Fetch form fields for dynamic columns
+  const formType = entityType === "student" ? "student" : entityType === "teacher" ? "teacher" : "representative";
+  const { data: formFields } = useQuery({
+    queryKey: ["form-fields-search", schoolId, formType],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("form_fields")
+        .select("field_name, field_label, field_order")
+        .eq("school_id", schoolId!)
+        .eq("form_type", formType)
+        .eq("is_visible", true)
+        .order("field_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Build all columns: entity base + form data + attendance fixed
+  const allColumns = useMemo<ColumnDef[]>(() => {
+    const base = ENTITY_BASE_COLUMNS[entityType];
+    const dynamic: ColumnDef[] = (formFields ?? []).map(f => ({
+      key: `fd_${f.field_name}`,
+      label: f.field_label,
+      isFormData: true,
+    }));
+    return [...base, ...dynamic, ...ATTENDANCE_FIXED_COLUMNS];
+  }, [entityType, formFields]);
+
+  const toggleableColumns = useMemo(() => allColumns.filter(c => !c.isFixed), [allColumns]);
+
+  // localStorage keys
+  const visKey = `att-cols-${schoolId}-${entityType}`;
+  const ordKey = `att-order-${schoolId}-${entityType}`;
+
+  useEffect(() => {
+    if (!schoolId) return;
+    try {
+      const sv = localStorage.getItem(visKey);
+      setVisibleColumns(sv ? JSON.parse(sv) : null);
+    } catch { setVisibleColumns(null); }
+    try {
+      const so = localStorage.getItem(ordKey);
+      setColumnOrder(so ? JSON.parse(so) : null);
+    } catch { setColumnOrder(null); }
+  }, [visKey, ordKey, schoolId]);
+
+  const activeColumnKeys = visibleColumns ?? toggleableColumns.map(c => c.key);
+
+  const orderedActiveColumns = useMemo(() => {
+    // Always include fixed columns, plus toggled ones
+    const visibleSet = new Set([...activeColumnKeys, ...ATTENDANCE_FIXED_COLUMNS.map(c => c.key)]);
+    const allKeys = allColumns.filter(c => visibleSet.has(c.key)).map(c => c.key);
+    if (columnOrder) {
+      const ordered = columnOrder.filter(k => visibleSet.has(k));
+      const remaining = allKeys.filter(k => !columnOrder.includes(k));
+      const keys = [...ordered, ...remaining];
+      return keys.map(k => allColumns.find(c => c.key === k)!).filter(Boolean);
+    }
+    return allColumns.filter(c => visibleSet.has(c.key));
+  }, [activeColumnKeys, columnOrder, allColumns]);
+
+  const saveVisibility = useCallback((cols: string[] | null) => {
+    setVisibleColumns(cols);
+    if (cols) localStorage.setItem(visKey, JSON.stringify(cols));
+    else localStorage.removeItem(visKey);
+  }, [visKey]);
+
+  const saveOrder = useCallback((order: string[] | null) => {
+    setColumnOrder(order);
+    if (order) localStorage.setItem(ordKey, JSON.stringify(order));
+    else localStorage.removeItem(ordKey);
+  }, [ordKey]);
+
+  const toggleColumn = (key: string) => {
+    const current = activeColumnKeys;
+    const next = current.includes(key) ? current.filter(k => k !== key) : [...current, key];
+    saveVisibility(next);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const currentKeys = orderedActiveColumns.map(c => c.key);
+    const oldIndex = currentKeys.indexOf(active.id as string);
+    const newIndex = currentKeys.indexOf(over.id as string);
+    const newOrder = arrayMove(currentKeys, oldIndex, newIndex);
+    saveOrder(newOrder);
+  };
+
+  // Fetch attendance records
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["attendance-records", schoolId, entityType, dateFilter],
     queryFn: async () => {
@@ -96,12 +243,19 @@ function AttendanceTab({
     queryKey: ["attendance-entities", entityType, entityIds],
     queryFn: async () => {
       if (entityIds.length === 0) return {};
-      const table = entityType === "teacher" ? "teachers" :
-                    entityType === "student" ? "students" : "representatives";
-      const { data } = await supabase
-        .from(table)
-        .select("id, form_data, document_id")
-        .in("id", entityIds);
+      if (entityType === "teacher") {
+        const { data } = await supabase.from("teachers").select("id, form_data, document_id, email, phone").in("id", entityIds);
+        const map: Record<string, any> = {};
+        (data || []).forEach(e => { map[e.id] = e; });
+        return map;
+      }
+      if (entityType === "representative") {
+        const { data } = await supabase.from("representatives").select("id, form_data, document_id, email, phone").in("id", entityIds);
+        const map: Record<string, any> = {};
+        (data || []).forEach(e => { map[e.id] = e; });
+        return map;
+      }
+      const { data } = await supabase.from("students").select("id, form_data, document_id").in("id", entityIds);
       const map: Record<string, any> = {};
       (data || []).forEach(e => { map[e.id] = e; });
       return map;
@@ -113,17 +267,23 @@ function AttendanceTab({
     return records.map(r => {
       const entity = entities[r.entity_id];
       const fd = (entity?.form_data as any) || {};
-      const firstName = fd.primer_nombre || "";
-      const lastName = fd.primer_apellido || "";
       const fullName = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido].filter(Boolean).join(" ");
-      return {
+      // Build flat record with form data prefixed
+      const row: Record<string, any> = {
         ...r,
-        firstName,
-        lastName,
         fullName,
-        documentId: entity?.document_id || fd.documento || "",
+        document_id: entity?.document_id || fd.documento || "",
+        email: entity?.email || "",
+        phone: entity?.phone || fd.telefono || "",
         notification_info: r.notification_sent ? (r.notification_email || "Sí") : "—",
       };
+      // Add form_data fields with fd_ prefix
+      if (fd) {
+        Object.keys(fd).forEach(k => {
+          row[`fd_${k}`] = fd[k];
+        });
+      }
+      return row;
     });
   }, [records, entities]);
 
@@ -131,24 +291,13 @@ function AttendanceTab({
     if (!search.trim()) return enrichedRecords;
     const terms = normalize(search).split(/\s+/);
     return enrichedRecords.filter(r => {
-      const target = normalize(r.fullName + " " + r.documentId);
+      const target = normalize([r.fullName, r.document_id, r.email].filter(Boolean).join(" "));
       return terms.every(t => target.includes(t));
     });
   }, [enrichedRecords, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  // Visible columns = always visible + toggled optional
-  const activeColumns = useMemo(() => {
-    return ALL_COLUMNS.filter(c => c.alwaysVisible || visibleOptionalKeys.includes(c.key));
-  }, [visibleOptionalKeys]);
-
-  const toggleColumn = (key: string) => {
-    setVisibleOptionalKeys(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
-  };
 
   const getCellValue = (r: any, col: ColumnDef) => {
     switch (col.key) {
@@ -177,10 +326,10 @@ function AttendanceTab({
   const typeLabel = entityType === "student" ? "Estudiantes" : entityType === "teacher" ? "Docentes" : "Representantes";
 
   const getExportData = () => {
-    const cols = activeColumns.map(c => ({ key: c.key, label: c.label }));
+    const cols = orderedActiveColumns.map(c => ({ key: c.key, label: c.label }));
     const rows = filtered.map(r => {
       const row: Record<string, any> = {};
-      cols.forEach(c => { row[c.key] = getTextValue(r, { key: c.key, label: c.label }); });
+      cols.forEach(c => { row[c.key] = getTextValue(r, c); });
       return row;
     });
     return { cols, rows };
@@ -250,18 +399,18 @@ function AttendanceTab({
               <div className="flex items-center justify-between pb-2 border-b gap-1">
                 <span className="text-sm font-medium">Columnas visibles</span>
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={() => setVisibleOptionalKeys([])} className="text-xs h-7">
+                  <Button variant="ghost" size="sm" onClick={() => saveVisibility([])} className="text-xs h-7">
                     Ninguna
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setVisibleOptionalKeys(TOGGLEABLE_COLUMNS.map(c => c.key))} className="text-xs h-7">
+                  <Button variant="ghost" size="sm" onClick={() => { saveVisibility(null); saveOrder(null); }} className="text-xs h-7">
                     Todas
                   </Button>
                 </div>
               </div>
-              {TOGGLEABLE_COLUMNS.map(col => (
+              {toggleableColumns.map(col => (
                 <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
                   <Checkbox
-                    checked={visibleOptionalKeys.includes(col.key)}
+                    checked={activeColumnKeys.includes(col.key)}
                     onCheckedChange={() => toggleColumn(col.key)}
                   />
                   {col.label}
@@ -296,34 +445,38 @@ function AttendanceTab({
       </div>
 
       <div className="rounded-md border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {activeColumns.map(col => (
-                <TableHead key={col.key}>{col.label}</TableHead>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableContext items={orderedActiveColumns.map(c => c.key)} strategy={horizontalListSortingStrategy}>
+                  {orderedActiveColumns.map(col => (
+                    <SortableHeaderCell key={col.key} col={col} />
+                  ))}
+                </SortableContext>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={orderedActiveColumns.length} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
+                </TableRow>
+              ) : paged.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={orderedActiveColumns.length} className="text-center py-8 text-muted-foreground">No hay registros</TableCell>
+                </TableRow>
+              ) : paged.map(r => (
+                <TableRow key={r.id}>
+                  {orderedActiveColumns.map(col => (
+                    <TableCell key={col.key} className={col.key === "document_id" ? "text-muted-foreground" : ""}>
+                      {getCellValue(r, col)}
+                    </TableCell>
+                  ))}
+                </TableRow>
               ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={activeColumns.length} className="text-center py-8 text-muted-foreground">Cargando...</TableCell>
-              </TableRow>
-            ) : paged.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={activeColumns.length} className="text-center py-8 text-muted-foreground">No hay registros</TableCell>
-              </TableRow>
-            ) : paged.map(r => (
-              <TableRow key={r.id}>
-                {activeColumns.map(col => (
-                  <TableCell key={col.key} className={col.key === "firstName" ? "font-medium" : col.key === "documentId" ? "text-muted-foreground" : ""}>
-                    {getCellValue(r, col)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
+        </DndContext>
       </div>
 
       {totalPages > 1 && (
