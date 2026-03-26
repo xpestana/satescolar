@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Camera, CameraOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,11 @@ export function CameraQrScanner({ onScan, disabled }: CameraQrScannerProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const lastScanRef = useRef<string>("");
   const scanCooldownRef = useRef(false);
+  const onScanRef = useRef(onScan);
+  onScanRef.current = onScan;
 
-  const startScanning = async () => {
+  const startScanning = useCallback(async () => {
     setError(null);
     try {
       const scanner = new Html5Qrcode("camera-qr-reader");
@@ -25,21 +25,30 @@ export function CameraQrScanner({ onScan, disabled }: CameraQrScannerProps) {
       await scanner.start(
         { facingMode: "environment" },
         {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
+          fps: 15,
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            // Use 80% of the viewfinder for better detection
+            const size = Math.min(viewfinderWidth, viewfinderHeight) * 0.8;
+            return { width: Math.floor(size), height: Math.floor(size) };
+          },
           aspectRatio: 1,
+          disableFlip: false,
         },
         (decodedText) => {
           if (scanCooldownRef.current) return;
-          if (decodedText === lastScanRef.current) return;
-          lastScanRef.current = decodedText;
           scanCooldownRef.current = true;
-          onScan(decodedText);
-          // Cooldown to prevent rapid duplicate scans
+
+          // Vibrate on mobile for feedback
+          if (navigator.vibrate) {
+            navigator.vibrate(200);
+          }
+
+          onScanRef.current(decodedText);
+
+          // Cooldown: allow next scan after 6 seconds
           setTimeout(() => {
             scanCooldownRef.current = false;
-            lastScanRef.current = "";
-          }, 5000);
+          }, 6000);
         },
         () => { /* ignore scan failures */ }
       );
@@ -47,17 +56,18 @@ export function CameraQrScanner({ onScan, disabled }: CameraQrScannerProps) {
       setIsScanning(true);
     } catch (err: any) {
       console.error("Camera error:", err);
-      if (err?.toString?.().includes("NotAllowedError")) {
+      const errStr = err?.toString?.() || "";
+      if (errStr.includes("NotAllowedError")) {
         setError("Permiso de cámara denegado. Habilítelo en la configuración del navegador.");
-      } else if (err?.toString?.().includes("NotFoundError")) {
+      } else if (errStr.includes("NotFoundError")) {
         setError("No se encontró una cámara en este dispositivo.");
       } else {
         setError("No se pudo iniciar la cámara. Intente de nuevo.");
       }
     }
-  };
+  }, []);
 
-  const stopScanning = async () => {
+  const stopScanning = useCallback(async () => {
     try {
       if (scannerRef.current?.isScanning) {
         await scannerRef.current.stop();
@@ -66,20 +76,19 @@ export function CameraQrScanner({ onScan, disabled }: CameraQrScannerProps) {
     } catch { /* ignore */ }
     scannerRef.current = null;
     setIsScanning(false);
-  };
+  }, []);
 
   useEffect(() => {
     return () => {
       stopScanning();
     };
-  }, []);
+  }, [stopScanning]);
 
   return (
     <div className="space-y-3">
       <div
         id="camera-qr-reader"
-        ref={containerRef}
-        className={`w-full rounded-lg overflow-hidden bg-muted ${isScanning ? "min-h-[300px]" : "min-h-0"}`}
+        className={`w-full rounded-lg overflow-hidden bg-muted ${isScanning ? "min-h-[350px]" : "min-h-0"}`}
       />
 
       {error && (
