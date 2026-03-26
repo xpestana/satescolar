@@ -43,14 +43,14 @@ serve(async (req) => {
 
     const { entity_type, entity_id, school_id, id: token_id } = tokenData;
 
-    // 2. Anti-duplicate: check last 60 seconds
-    const sixtySecsAgo = new Date(Date.now() - 60000).toISOString();
+    // 2. Anti-duplicate: only one entry per day
+    const todayStr = new Date().toISOString().split("T")[0];
     const { data: recentRecord } = await supabase
       .from("attendance_records")
-      .select("id")
+      .select("id, attendance_time")
       .eq("entity_type", entity_type)
       .eq("entity_id", entity_id)
-      .gte("attendance_timestamp", sixtySecsAgo)
+      .eq("attendance_date", todayStr)
       .limit(1)
       .maybeSingle();
 
@@ -127,17 +127,17 @@ serve(async (req) => {
 
     if (!personName) personName = "Usuario";
 
-    // If duplicate, return info but don't insert
+    // If already registered today, reject
     if (recentRecord) {
       return new Response(JSON.stringify({
         status: "duplicate",
-        message: "Asistencia ya registrada recientemente",
+        message: "Ya se registró la entrada de hoy",
         personName,
         documentId,
         role: rolLabel,
         entity_type,
         date: new Date().toLocaleDateString("es-VE"),
-        time: new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }),
+        time: recentRecord.attendance_time?.substring(0, 5) || "",
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
