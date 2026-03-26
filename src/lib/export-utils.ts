@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import QRCode from "qrcode";
+import { buildAttendanceScanUrl } from "@/lib/attendance-url";
 
 interface ExportColumn {
   key: string;
@@ -498,7 +499,7 @@ export async function downloadCarnet(params: {
   // ─── BODY: QR Code ───
   const qp = bPos(qrPos);
   const qrContent = params.attendanceToken
-    ? `${window.location.origin}/attendance/scan/${params.attendanceToken}`
+    ? buildAttendanceScanUrl(params.attendanceToken)
     : params.documentId || params.personName;
   try {
     const qrDataUrl = await QRCode.toDataURL(qrContent, {
