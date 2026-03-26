@@ -37,7 +37,7 @@ export default function AttendanceScanner() {
     }
   }, [activeTab]);
 
-  // Re-focus after showing result
+  // Auto-clear result after delay
   useEffect(() => {
     if (status !== "idle" && status !== "loading") {
       timeoutRef.current = setTimeout(() => {
@@ -45,7 +45,7 @@ export default function AttendanceScanner() {
         setResult(null);
         setInputValue("");
         inputRef.current?.focus();
-      }, 5000);
+      }, 8000);
     }
     return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
   }, [status]);
