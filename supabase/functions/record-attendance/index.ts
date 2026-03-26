@@ -43,14 +43,14 @@ serve(async (req) => {
 
     const { entity_type, entity_id, school_id, id: token_id } = tokenData;
 
-    // 2. Anti-duplicate: check last 60 seconds
-    const sixtySecsAgo = new Date(Date.now() - 60000).toISOString();
+    // 2. Anti-duplicate: only one entry per day
+    const todayStr = new Date().toISOString().split("T")[0];
     const { data: recentRecord } = await supabase
       .from("attendance_records")
-      .select("id")
+      .select("id, attendance_time")
       .eq("entity_type", entity_type)
       .eq("entity_id", entity_id)
-      .gte("attendance_timestamp", sixtySecsAgo)
+      .eq("attendance_date", todayStr)
       .limit(1)
       .maybeSingle();
 
