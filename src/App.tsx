@@ -44,6 +44,9 @@ import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherSubjects from "./pages/teacher/TeacherSubjects";
 import TeacherCarnet from "./pages/teacher/TeacherCarnet";
 import TeacherGrades from "./pages/teacher/TeacherGrades";
+import AttendanceScan from "./pages/AttendanceScan";
+import AttendanceScanner from "./pages/school/AttendanceScanner";
+import AttendanceList from "./pages/school/AttendanceList";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
