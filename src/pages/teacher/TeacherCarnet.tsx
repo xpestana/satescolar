@@ -186,9 +186,19 @@ export default function TeacherCarnet() {
         pdf.text(documentId, dX, dY, { align: "center" });
       }
 
-      // QR Code
+      // QR Code - use attendance token URL
       try {
-        const qrData = `DOCENTE|${teacherName}|${documentId}|${school?.name || ""}`;
+        // Fetch attendance token for this teacher
+        let qrData = `DOCENTE|${teacherName}|${documentId}|${school?.name || ""}`;
+        const { data: tokenData } = await supabase
+          .from("attendance_tokens")
+          .select("token")
+          .eq("entity_type", "teacher")
+          .eq("entity_id", teacher.id)
+          .maybeSingle();
+        if (tokenData?.token) {
+          qrData = `${window.location.origin}/attendance/scan/${tokenData.token}`;
+        }
         const qrDataUrl = await QRCode.toDataURL(qrData, { width: 200, margin: 1 });
         const qrSize = (layout.qrSize || 28) * (CARD_W_MM / 216);
         const qX = ((layout.qrPos?.x || 50) / 100) * CARD_W_MM - qrSize / 2;

@@ -14,6 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance_records: {
+        Row: {
+          attendance_date: string
+          attendance_time: string
+          attendance_timestamp: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          notification_email: string | null
+          notification_sent: boolean
+          record_type: string
+          school_id: string
+          status: string
+          token_id: string | null
+        }
+        Insert: {
+          attendance_date?: string
+          attendance_time?: string
+          attendance_timestamp?: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          notification_email?: string | null
+          notification_sent?: boolean
+          record_type?: string
+          school_id: string
+          status?: string
+          token_id?: string | null
+        }
+        Update: {
+          attendance_date?: string
+          attendance_time?: string
+          attendance_timestamp?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          notification_email?: string | null
+          notification_sent?: boolean
+          record_type?: string
+          school_id?: string
+          status?: string
+          token_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_tokens: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          is_active: boolean
+          school_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          is_active?: boolean
+          school_id: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          is_active?: boolean
+          school_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_tokens_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       carnet_config: {
         Row: {
           created_at: string

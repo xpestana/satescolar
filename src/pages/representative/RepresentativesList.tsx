@@ -81,6 +81,12 @@ export default function RepresentativesList() {
   const getType = (rep: any) => (rep.form_data as Record<string, any>)?.parentesco || "Representante";
 
   const handleCarnet = async (rep: any) => {
+    const { data: tokenData } = await supabase
+      .from("attendance_tokens")
+      .select("token")
+      .eq("entity_type", "representative")
+      .eq("entity_id", rep.id)
+      .maybeSingle();
     await downloadCarnet({
       personName: getName(rep),
       documentId: rep.document_id || "Sin documento",
@@ -96,6 +102,7 @@ export default function RepresentativesList() {
       watermarkOpacity: carnetConfig?.watermark_opacity ? Number(carnetConfig.watermark_opacity) : undefined,
       watermarkSize: carnetConfig?.watermark_size ? Number(carnetConfig.watermark_size) : undefined,
       layoutConfig: (carnetConfig?.layout_config as any) || undefined,
+      attendanceToken: tokenData?.token || undefined,
     });
   };
 

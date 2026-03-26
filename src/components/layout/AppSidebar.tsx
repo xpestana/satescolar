@@ -21,6 +21,8 @@ import {
   PanelRightClose,
   Download,
   Smartphone,
+  QrCode,
+  ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -88,6 +90,8 @@ const navSections: NavSection[] = [
     items: [
       { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school" },
       { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school" },
+      { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school" },
+      { label: "Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school" },
     ],
   },
   {

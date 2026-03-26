@@ -370,6 +370,13 @@ export default function TeachersList() {
       schoolInfo?.institution_type === "private" ? "Unidad Educativa Privada" :
       schoolInfo?.institution_type === "subsidized" ? "Unidad Educativa Subvencionada" : "Unidad Educativa";
     const locationParts = [(schoolInfo?.cities as any)?.name, (schoolInfo?.states as any)?.name].filter(Boolean);
+    // Fetch attendance token
+    const { data: tokenData } = await supabase
+      .from("attendance_tokens")
+      .select("token")
+      .eq("entity_type", "teacher")
+      .eq("entity_id", record.id)
+      .maybeSingle();
     await downloadCarnet({
       personName: name,
       documentId: record.document_id || fd.documento || "",
@@ -385,6 +392,7 @@ export default function TeachersList() {
       watermarkOpacity: carnetConfig?.watermark_opacity ? Number(carnetConfig.watermark_opacity) : undefined,
       watermarkSize: carnetConfig?.watermark_size ? Number(carnetConfig.watermark_size) : undefined,
       layoutConfig: (carnetConfig?.layout_config as any) || undefined,
+      attendanceToken: tokenData?.token || undefined,
     });
   };
 
