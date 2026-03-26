@@ -243,12 +243,19 @@ function AttendanceTab({
     queryKey: ["attendance-entities", entityType, entityIds],
     queryFn: async () => {
       if (entityIds.length === 0) return {};
-      const table = entityType === "teacher" ? "teachers" :
-                    entityType === "student" ? "students" : "representatives";
-      const { data } = await supabase
-        .from(table)
-        .select("id, form_data, document_id, email, phone")
-        .in("id", entityIds);
+      if (entityType === "teacher") {
+        const { data } = await supabase.from("teachers").select("id, form_data, document_id, email, phone").in("id", entityIds);
+        const map: Record<string, any> = {};
+        (data || []).forEach(e => { map[e.id] = e; });
+        return map;
+      }
+      if (entityType === "representative") {
+        const { data } = await supabase.from("representatives").select("id, form_data, document_id, email, phone").in("id", entityIds);
+        const map: Record<string, any> = {};
+        (data || []).forEach(e => { map[e.id] = e; });
+        return map;
+      }
+      const { data } = await supabase.from("students").select("id, form_data, document_id").in("id", entityIds);
       const map: Record<string, any> = {};
       (data || []).forEach(e => { map[e.id] = e; });
       return map;
