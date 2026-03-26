@@ -11,6 +11,7 @@ import { Download, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import QRCode from "qrcode";
+import { buildAttendanceScanUrl } from "@/lib/attendance-url";
 
 // CR80 card dimensions in mm
 const CARD_W_MM = 54;
@@ -197,7 +198,7 @@ export default function TeacherCarnet() {
           .eq("entity_id", teacher.id)
           .maybeSingle();
         if (tokenData?.token) {
-          qrData = `${window.location.origin}/attendance/scan/${tokenData.token}`;
+          qrData = buildAttendanceScanUrl(tokenData.token);
         }
         const qrDataUrl = await QRCode.toDataURL(qrData, { width: 200, margin: 1 });
         const qrSize = (layout.qrSize || 28) * (CARD_W_MM / 216);
