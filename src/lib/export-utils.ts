@@ -497,7 +497,9 @@ export async function downloadCarnet(params: {
 
   // ─── BODY: QR Code ───
   const qp = bPos(qrPos);
-  const qrContent = params.documentId || params.personName;
+  const qrContent = params.attendanceToken
+    ? `${window.location.origin}/attendance/scan/${params.attendanceToken}`
+    : params.documentId || params.personName;
   try {
     const qrDataUrl = await QRCode.toDataURL(qrContent, {
       width: 300, margin: 0,
