@@ -3,8 +3,12 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { CheckCircle, XCircle, Clock, QrCode, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, QrCode, Loader2, Camera, Keyboard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CameraQrScanner } from "@/components/attendance/CameraQrScanner";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type ScanStatus = "idle" | "loading" | "success" | "duplicate" | "error";
 
@@ -24,11 +28,14 @@ export default function AttendanceScanner() {
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const isMobile = useIsMobile();
+  const [activeTab, setActiveTab] = useState<string>(isMobile ? "camera" : "reader");
 
-  // Auto-focus input
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (activeTab === "reader") {
+      inputRef.current?.focus();
+    }
+  }, [activeTab]);
 
   // Re-focus after showing result
   useEffect(() => {
@@ -94,6 +101,10 @@ export default function AttendanceScanner() {
     }
   }, []);
 
+  const handleCameraScan = useCallback((decodedText: string) => {
+    handleScan(decodedText);
+  }, [handleScan]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && inputValue.trim()) {
       handleScan(inputValue);
@@ -117,7 +128,6 @@ export default function AttendanceScanner() {
       />
 
       <div className="max-w-lg mx-auto space-y-6">
-        {/* Scanner Input */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3 mb-4">
@@ -129,16 +139,42 @@ export default function AttendanceScanner() {
                 <p className="text-sm text-muted-foreground">Escanee un carnet QR para registrar asistencia</p>
               </div>
             </div>
-            <Input
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Esperando lectura de QR..."
-              className="text-center text-lg h-14"
-              disabled={status === "loading"}
-              autoFocus
-            />
+
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="w-full mb-4">
+                <TabsTrigger value="camera" className="flex-1 gap-2">
+                  <Camera className="h-4 w-4" />
+                  Cámara
+                </TabsTrigger>
+                <TabsTrigger value="reader" className="flex-1 gap-2">
+                  <Keyboard className="h-4 w-4" />
+                  Lector Físico
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="camera">
+                <CameraQrScanner
+                  onScan={handleCameraScan}
+                  disabled={status === "loading"}
+                />
+              </TabsContent>
+
+              <TabsContent value="reader">
+                <Input
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Esperando lectura de QR..."
+                  className="text-center text-lg h-14"
+                  disabled={status === "loading"}
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Conecte un lector QR USB y escanee el carnet
+                </p>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
@@ -221,10 +257,9 @@ export default function AttendanceScanner() {
         )}
 
         {status === "idle" && (
-          <div className="text-center text-muted-foreground text-sm py-8">
-            <QrCode className="h-20 w-20 mx-auto mb-4 text-muted-foreground/30" />
-            <p>Apunte el lector QR al carnet del usuario</p>
-            <p className="text-xs mt-1">El registro se realizará automáticamente</p>
+          <div className="text-center text-muted-foreground text-sm py-4">
+            <p>{activeTab === "camera" ? "Active la cámara y apunte al código QR del carnet" : "Apunte el lector QR al carnet del usuario"}</p>
+            <p className="text-xs mt-1">El registro se realizará automáticamente al detectar el QR</p>
           </div>
         )}
       </div>
