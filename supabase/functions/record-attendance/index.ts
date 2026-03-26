@@ -127,17 +127,17 @@ serve(async (req) => {
 
     if (!personName) personName = "Usuario";
 
-    // If duplicate, return info but don't insert
+    // If already registered today, reject
     if (recentRecord) {
       return new Response(JSON.stringify({
         status: "duplicate",
-        message: "Asistencia ya registrada recientemente",
+        message: "Ya se registró la entrada de hoy",
         personName,
         documentId,
         role: rolLabel,
         entity_type,
         date: new Date().toLocaleDateString("es-VE"),
-        time: new Date().toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }),
+        time: recentRecord.attendance_time?.substring(0, 5) || "",
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
