@@ -199,18 +199,18 @@ export default function AttendanceList() {
             </div>
           </div>
 
-          <Tabs defaultValue="teachers">
+          <Tabs defaultValue="students">
             <TabsList className="mb-4">
-              <TabsTrigger value="teachers">Docentes</TabsTrigger>
               <TabsTrigger value="students">Estudiantes</TabsTrigger>
+              <TabsTrigger value="teachers">Docentes</TabsTrigger>
               <TabsTrigger value="representatives">Representantes</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="teachers">
-              <AttendanceTab entityType="teacher" />
-            </TabsContent>
             <TabsContent value="students">
               <AttendanceTab entityType="student" />
+            </TabsContent>
+            <TabsContent value="teachers">
+              <AttendanceTab entityType="teacher" />
             </TabsContent>
             <TabsContent value="representatives">
               <AttendanceTab entityType="representative" />
