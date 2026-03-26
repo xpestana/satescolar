@@ -59,6 +59,12 @@ export default function StudentsList() {
   };
 
   const handleCarnet = async (student: any) => {
+    const { data: tokenData } = await supabase
+      .from("attendance_tokens")
+      .select("token")
+      .eq("entity_type", "student")
+      .eq("entity_id", student.id)
+      .maybeSingle();
     await downloadCarnet({
       personName: getName(student),
       documentId: student.document_id || "Sin documento",
@@ -74,6 +80,7 @@ export default function StudentsList() {
       watermarkOpacity: carnetConfig?.watermark_opacity ? Number(carnetConfig.watermark_opacity) : undefined,
       watermarkSize: carnetConfig?.watermark_size ? Number(carnetConfig.watermark_size) : undefined,
       layoutConfig: (carnetConfig?.layout_config as any) || undefined,
+      attendanceToken: tokenData?.token || undefined,
     });
   };
 
