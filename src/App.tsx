@@ -26,6 +26,10 @@ import AddTeacher from "./pages/school/AddTeacher";
 import EnrollmentsList from "./pages/school/EnrollmentsList";
 import EnrollmentDisplayConfig from "./pages/school/EnrollmentDisplayConfig";
 import UtilitiesSettings from "./pages/school/UtilitiesSettings";
+import PaymentsConfig from "./pages/school/PaymentsConfig";
+import PaymentRegistration from "./pages/school/PaymentRegistration";
+import DelinquentStudents from "./pages/school/DelinquentStudents";
+import AccountStatement from "./pages/school/AccountStatement";
 import GradesSettings from "./pages/school/GradesSettings";
 import GradesConsultation from "./pages/school/GradesConsultation";
 import GradeSheets from "./pages/school/GradeSheets";
@@ -316,6 +320,11 @@ const App = () => (
               <Route path="/attendance/scan/:token/*" element={<AttendanceScan />} />
               <Route path="/utilidades/escaner-qr" element={<ProtectedRoute requiredRole="school"><AttendanceScanner /></ProtectedRoute>} />
               <Route path="/utilidades/asistencias" element={<ProtectedRoute requiredRole="school"><AttendanceList /></ProtectedRoute>} />
+              {/* Payment routes */}
+              <Route path="/school/configuraciones/pagos" element={<ProtectedRoute requiredRole="school"><PaymentsConfig /></ProtectedRoute>} />
+              <Route path="/pagos/registro" element={<ProtectedRoute requiredRole="school"><PaymentRegistration /></ProtectedRoute>} />
+              <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
+              <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><AccountStatement /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
