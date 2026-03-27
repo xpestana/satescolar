@@ -146,23 +146,18 @@ export default function DelinquentStudents() {
 
   const grades = useMemo(() => [...new Set(morosos.map((m: any) => m.gradeLevel))].sort(), [morosos]);
 
-  const handleExportPDF = () => {
-    const cols = ["Alumno", "Grado", "Sección", "Plan", "Representante", "Deuda (Bs.)", "Conceptos", "Último Recordatorio"];
-    const rows = filtered.map((s: any) => [
-      `${s.firstName} ${s.lastName}`, s.gradeLevel, s.section, s.planName, s.repName,
-      `Bs. ${s.totalDebt.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`, s.concepts, s.lastReminder,
-    ]);
-    downloadPDF(cols, rows, "Reporte de Morosos");
-  };
+  const exportCols = [
+    { key: "alumno", label: "Alumno" }, { key: "grado", label: "Grado" }, { key: "seccion", label: "Sección" },
+    { key: "plan", label: "Plan" }, { key: "rep", label: "Representante" }, { key: "deuda", label: "Deuda (Bs.)" },
+    { key: "conceptos", label: "Conceptos" }, { key: "reminder", label: "Último Recordatorio" },
+  ];
+  const exportRows = filtered.map((s: any) => ({
+    alumno: `${s.firstName} ${s.lastName}`, grado: s.gradeLevel, seccion: s.section, plan: s.planName, rep: s.repName,
+    deuda: `Bs. ${s.totalDebt.toLocaleString("es-VE", { minimumFractionDigits: 2 })}`, conceptos: s.concepts, reminder: s.lastReminder,
+  }));
 
-  const handleExportExcel = () => {
-    const cols = ["Alumno", "Grado", "Sección", "Plan", "Representante", "Deuda (Bs.)", "Conceptos", "Último Recordatorio"];
-    const rows = filtered.map((s: any) => [
-      `${s.firstName} ${s.lastName}`, s.gradeLevel, s.section, s.planName, s.repName,
-      s.totalDebt, s.concepts, s.lastReminder,
-    ]);
-    downloadExcel(cols, rows, "Morosos");
-  };
+  const handleExportPDF = () => { downloadPDF(exportCols, exportRows, "Reporte de Morosos"); };
+  const handleExportExcel = () => { downloadExcel(exportCols, exportRows, "Morosos"); };
 
   if (schoolLoading) return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></DashboardLayout>;
 
