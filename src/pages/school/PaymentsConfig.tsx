@@ -310,7 +310,7 @@ export default function PaymentsConfig() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Configuración de Pagos" description="Administra conceptos, planes, tasas de cambio y morosidad" />
+      <PageHeader title="Configuración de Pagos" breadcrumbs={[{ label: "Ajustes" }, { label: "Pagos" }]} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
