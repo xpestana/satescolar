@@ -320,6 +320,11 @@ const App = () => (
               <Route path="/attendance/scan/:token/*" element={<AttendanceScan />} />
               <Route path="/utilidades/escaner-qr" element={<ProtectedRoute requiredRole="school"><AttendanceScanner /></ProtectedRoute>} />
               <Route path="/utilidades/asistencias" element={<ProtectedRoute requiredRole="school"><AttendanceList /></ProtectedRoute>} />
+              {/* Payment routes */}
+              <Route path="/school/configuraciones/pagos" element={<ProtectedRoute requiredRole="school"><PaymentsConfig /></ProtectedRoute>} />
+              <Route path="/pagos/registro" element={<ProtectedRoute requiredRole="school"><PaymentRegistration /></ProtectedRoute>} />
+              <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
+              <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><AccountStatement /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
