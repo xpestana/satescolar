@@ -112,7 +112,10 @@ const navSections: NavSection[] = [
     title: "Administrativo",
     requiredRole: "school",
     items: [
-      { label: "Pagos", href: "/admin/pagos", icon: CreditCard, requiredRole: "school" },
+      { label: "Dashboard Pagos", href: "/pagos", icon: CreditCard, requiredRole: "school" },
+      { label: "Registro de Pagos", href: "/pagos/registro", icon: CreditCard, requiredRole: "school" },
+      { label: "Estado de Cuenta", href: "/pagos/estado-cuenta", icon: FileText, requiredRole: "school" },
+      { label: "Morosos", href: "/pagos/morosos", icon: Users, requiredRole: "school" },
     ],
   },
   {
