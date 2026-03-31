@@ -17,7 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Loader2, Package, FileText, Link2 } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, Package, FileText, Link2, CreditCard } from "lucide-react";
+import { PaymentMethodsTab } from "@/components/payments/PaymentMethodsTab";
 
 // ─── Concepts Tab ───
 function ConceptsTab({ schoolId }: { schoolId: string }) {
