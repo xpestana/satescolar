@@ -47,6 +47,12 @@ import TeacherGrades from "./pages/teacher/TeacherGrades";
 import AttendanceScan from "./pages/AttendanceScan";
 import AttendanceScanner from "./pages/school/AttendanceScanner";
 import AttendanceList from "./pages/school/AttendanceList";
+import PaymentDashboard from "./pages/school/PaymentDashboard";
+import PaymentConfig from "./pages/school/PaymentConfig";
+import PaymentRegistration from "./pages/school/PaymentRegistration";
+import StudentLedger from "./pages/school/StudentLedger";
+import DelinquentStudents from "./pages/school/DelinquentStudents";
+import DelinquencyConfig from "./pages/school/DelinquencyConfig";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
