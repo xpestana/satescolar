@@ -57,6 +57,21 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
 
+  // Load school payment methods
+  const { data: schoolMethods = [] } = useQuery({
+    queryKey: ["school-payment-methods", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_payment_methods").select("*").eq("school_id", schoolId).eq("is_active", true).order("display_order");
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Build method options from school config, fallback to METHOD_TYPE_LABELS if none configured
+  const methodOptions = schoolMethods.length > 0
+    ? schoolMethods.map((sm: any) => ({ value: sm.id, label: `${sm.label}`, config: sm.config, method_type: sm.method_type }))
+    : Object.entries(METHOD_TYPE_LABELS).map(([k, v]) => ({ value: k, label: v, config: {}, method_type: k }));
+
   // Load rates
   const { data: rates = [] } = useQuery({
     queryKey: ["exchange-rates", schoolId],
