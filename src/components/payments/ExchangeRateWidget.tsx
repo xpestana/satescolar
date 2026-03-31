@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, DollarSign, Euro, Loader2 } from "lucide-react";
+import { RefreshCw, DollarSign, Euro, Loader2, Download } from "lucide-react";
 
 interface ExchangeRateWidgetProps {
   schoolId: string;
@@ -21,6 +21,21 @@ export function ExchangeRateWidget({ schoolId, floating = true }: ExchangeRateWi
     queryFn: async () => {
       const { data, error } = await supabase.from("exchange_rates").select("*").eq("school_id", schoolId).order("currency");
       if (error) throw error;
+      return data;
+    },
+  });
+
+  // Latest BCV rate date
+  const { data: bcvInfo } = useQuery({
+    queryKey: ["bcv-latest"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("bcv_rates")
+        .select("published_date, fetched_at")
+        .eq("currency", "USD")
+        .order("published_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       return data;
     },
   });
@@ -44,6 +59,35 @@ export function ExchangeRateWidget({ schoolId, floating = true }: ExchangeRateWi
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const fetchBcv = useMutation({
+    mutationFn: async () => {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/fetch-bcv-rates`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+        }
+      );
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "Error al obtener tasas BCV");
+      return json.data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["exchange-rates", schoolId] });
+      qc.invalidateQueries({ queryKey: ["bcv-latest"] });
+      toast({ title: "Tasas BCV actualizadas", description: `USD: ${data.usd} | EUR: ${data.eur} (${data.published_date})` });
+    },
+    onError: (e: any) => toast({ title: "Error BCV", description: e.message, variant: "destructive" }),
+  });
+
   const currencies = [
     { code: "USD", label: "Dólar", icon: DollarSign, color: "text-green-600" },
     { code: "EUR", label: "Euro", icon: Euro, color: "text-blue-600" },
@@ -60,8 +104,27 @@ export function ExchangeRateWidget({ schoolId, floating = true }: ExchangeRateWi
     <div className={wrapperClass}>
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-bold text-foreground">Tasas de Cambio</h4>
-        {isLoading && <Loader2 className="animate-spin h-3 w-3" />}
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7"
+            onClick={() => fetchBcv.mutate()}
+            disabled={fetchBcv.isPending}
+            title="Descargar tasa BCV"
+          >
+            {fetchBcv.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : <Download className="h-3 w-3" />}
+          </Button>
+          {isLoading && <Loader2 className="animate-spin h-3 w-3" />}
+        </div>
       </div>
+
+      {bcvInfo && (
+        <p className="text-[10px] text-muted-foreground">
+          BCV: {new Date(bcvInfo.published_date + "T12:00:00").toLocaleDateString("es-VE", { day: "2-digit", month: "short", year: "numeric" })}
+        </p>
+      )}
+
       {currencies.map(({ code, label, icon: Icon, color }) => {
         const rate = getRate(code);
         const isEditing = code in editing;
@@ -98,7 +161,7 @@ export function ExchangeRateWidget({ schoolId, floating = true }: ExchangeRateWi
           </div>
         );
       })}
-      <p className="text-[10px] text-muted-foreground">Click en la tasa para editar</p>
+      <p className="text-[10px] text-muted-foreground">Click en la tasa para editar · <Download className="inline h-2.5 w-2.5" /> para BCV</p>
     </div>
   );
 }

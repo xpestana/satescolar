@@ -115,6 +115,30 @@ export type Database = {
           },
         ]
       }
+      bcv_rates: {
+        Row: {
+          currency: string
+          fetched_at: string
+          id: string
+          published_date: string
+          rate_to_ves: number
+        }
+        Insert: {
+          currency: string
+          fetched_at?: string
+          id?: string
+          published_date: string
+          rate_to_ves: number
+        }
+        Update: {
+          currency?: string
+          fetched_at?: string
+          id?: string
+          published_date?: string
+          rate_to_ves?: number
+        }
+        Relationships: []
+      }
       carnet_config: {
         Row: {
           created_at: string

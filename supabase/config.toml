@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.record-attendance]
 verify_jwt = false
+
+[functions.fetch-bcv-rates]
+verify_jwt = false
