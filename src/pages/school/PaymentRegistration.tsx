@@ -128,7 +128,7 @@ export default function PaymentRegistration() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Registro de Pagos" description={activeYear ? `Año escolar: ${activeYear.year_range}` : "No hay año escolar activo"} />
+      <PageHeader title="Registro de Pagos" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Registro de Pagos" }]} />
 
       {!activeYear ? (
         <Card><CardContent className="py-8 text-center text-muted-foreground">No hay un año escolar activo configurado.</CardContent></Card>

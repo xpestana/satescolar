@@ -75,7 +75,7 @@ export default function PaymentDashboard() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Dashboard de Pagos" description={activeYear ? `Año escolar: ${activeYear.year_range}` : "Sin año activo"} />
+      <PageHeader title="Dashboard de Pagos" breadcrumbs={[{ label: "Administrativo" }, { label: "Dashboard de Pagos" }]} />
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">

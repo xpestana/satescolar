@@ -79,7 +79,7 @@ export default function DelinquencyConfig() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Configuración de Morosidad" description="Defina cuándo un alumno es moroso y la frecuencia de recordatorios" />
+      <PageHeader title="Configuración de Morosidad" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Configuración Morosidad" }]} />
 
       <div className="max-w-2xl space-y-6">
         {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (

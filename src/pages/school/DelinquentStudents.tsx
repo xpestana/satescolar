@@ -141,7 +141,7 @@ export default function DelinquentStudents() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Estudiantes Morosos" description={`${filtered.length} estudiantes con saldo pendiente`} />
+      <PageHeader title="Estudiantes Morosos" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Morosos" }]} />
 
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px]">

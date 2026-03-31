@@ -174,7 +174,7 @@ export default function StudentLedger() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Estado de Cuenta" description="Consulte el historial de pagos y saldos por alumno" />
+      <PageHeader title="Estado de Cuenta" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Estado de Cuenta" }]} />
 
       {!selectedStudentId ? (
         <>
