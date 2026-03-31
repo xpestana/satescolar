@@ -10,9 +10,43 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Loader2, CreditCard, Building2, Phone, Mail, Banknote } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, CreditCard, Building2, Phone, Mail, Banknote, Check, ChevronsUpDown } from "lucide-react";
 import { VENEZUELAN_BANKS, METHOD_TYPE_LABELS, METHOD_TYPES } from "@/lib/venezuelan-banks";
+import { cn } from "@/lib/utils";
+
+function BankCombobox({ value, onChange }: { value: string; onChange: (code: string, name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = VENEZUELAN_BANKS.find((b) => b.codigo === value);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="h-8 w-full justify-between text-xs font-normal">
+          {selected ? `${selected.codigo} - ${selected.nombre}` : "Seleccione banco"}
+          <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[400px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar banco..." className="h-8 text-xs" />
+          <CommandList>
+            <CommandEmpty>No se encontró banco.</CommandEmpty>
+            <CommandGroup>
+              {VENEZUELAN_BANKS.map((b) => (
+                <CommandItem key={b.codigo} value={`${b.codigo} ${b.nombre}`} onSelect={() => { onChange(b.codigo, b.nombre); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-3 w-3", value === b.codigo ? "opacity-100" : "opacity-0")} />
+                  <span className="text-xs">{b.codigo} - {b.nombre}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const METHOD_ICONS: Record<string, React.ReactNode> = {
   transferencia: <Building2 className="h-4 w-4" />,
@@ -54,15 +88,7 @@ function MethodConfigFields({ methodType, config, onChange }: { methodType: stri
         <div className="grid gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Banco *</Label>
-            <Select value={config.bank_code || ""} onValueChange={(v) => {
-              const bank = VENEZUELAN_BANKS.find((b) => b.codigo === v);
-              onChange({ ...config, bank_code: v, bank_name: bank?.nombre || "" });
-            }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccione banco" /></SelectTrigger>
-              <SelectContent>
-                {VENEZUELAN_BANKS.map((b) => <SelectItem key={b.codigo} value={b.codigo}>{b.codigo} - {b.nombre}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <BankCombobox value={config.bank_code || ""} onChange={(code, name) => onChange({ ...config, bank_code: code, bank_name: name })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -92,15 +118,7 @@ function MethodConfigFields({ methodType, config, onChange }: { methodType: stri
         <div className="grid gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Banco *</Label>
-            <Select value={config.bank_code || ""} onValueChange={(v) => {
-              const bank = VENEZUELAN_BANKS.find((b) => b.codigo === v);
-              onChange({ ...config, bank_code: v, bank_name: bank?.nombre || "" });
-            }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccione banco" /></SelectTrigger>
-              <SelectContent>
-                {VENEZUELAN_BANKS.map((b) => <SelectItem key={b.codigo} value={b.codigo}>{b.codigo} - {b.nombre}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <BankCombobox value={config.bank_code || ""} onChange={(code, name) => onChange({ ...config, bank_code: code, bank_name: name })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label className="text-xs">Teléfono *</Label><Input className="h-8 text-xs" value={config.phone || ""} onChange={(e) => set("phone", e.target.value)} placeholder="04XX-XXXXXXX" /></div>
@@ -144,15 +162,7 @@ function MethodConfigFields({ methodType, config, onChange }: { methodType: stri
       return (
         <div className="space-y-1">
           <Label className="text-xs">Banco (opcional)</Label>
-          <Select value={config.bank_code || ""} onValueChange={(v) => {
-            const bank = VENEZUELAN_BANKS.find((b) => b.codigo === v);
-            onChange({ ...config, bank_code: v, bank_name: bank?.nombre || "" });
-          }}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccione banco" /></SelectTrigger>
-            <SelectContent>
-              {VENEZUELAN_BANKS.map((b) => <SelectItem key={b.codigo} value={b.codigo}>{b.codigo} - {b.nombre}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <BankCombobox value={config.bank_code || ""} onChange={(code, name) => onChange({ ...config, bank_code: code, bank_name: name })} />
         </div>
       );
 
