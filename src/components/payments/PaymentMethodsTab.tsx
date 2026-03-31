@@ -162,15 +162,7 @@ function MethodConfigFields({ methodType, config, onChange }: { methodType: stri
       return (
         <div className="space-y-1">
           <Label className="text-xs">Banco (opcional)</Label>
-          <Select value={config.bank_code || ""} onValueChange={(v) => {
-            const bank = VENEZUELAN_BANKS.find((b) => b.codigo === v);
-            onChange({ ...config, bank_code: v, bank_name: bank?.nombre || "" });
-          }}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccione banco" /></SelectTrigger>
-            <SelectContent>
-              {VENEZUELAN_BANKS.map((b) => <SelectItem key={b.codigo} value={b.codigo}>{b.codigo} - {b.nombre}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <BankCombobox value={config.bank_code || ""} onChange={(code, name) => onChange({ ...config, bank_code: code, bank_name: name })} />
         </div>
       );
 
