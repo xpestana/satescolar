@@ -16,34 +16,46 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Fetch BCV page - use proxy to bypass untrusted SSL cert from Venezuelan CA
+    // Fetch BCV page - try multiple proxies to bypass untrusted SSL cert
     let html = "";
     const bcvUrl = "https://www.bcv.org.ve/";
     
-    // Try direct fetch first, then fallback to proxy
+    const proxies = [
+      `https://corsproxy.io/?${encodeURIComponent(bcvUrl)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(bcvUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(bcvUrl)}`,
+    ];
+
+    // Try direct first
     try {
       const directRes = await fetch(bcvUrl, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; SchoolApp/1.0)", Accept: "text/html" },
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", Accept: "text/html" },
       });
       if (directRes.ok) html = await directRes.text();
-    } catch (_directErr) {
-      console.log("Direct fetch failed, trying proxy...");
+    } catch (_e) {
+      console.log("Direct fetch failed, trying proxies...");
     }
 
-    if (!html) {
-      // Use allorigins proxy as fallback
-      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(bcvUrl)}`;
-      const proxyRes = await fetch(proxyUrl, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; SchoolApp/1.0)" },
-      });
-      if (!proxyRes.ok) {
-        throw new Error(`Proxy fetch failed with status ${proxyRes.status}`);
+    // Try proxies in order
+    for (const proxy of proxies) {
+      if (html) break;
+      try {
+        console.log("Trying proxy:", proxy.substring(0, 50));
+        const res = await fetch(proxy, {
+          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+        });
+        if (res.ok) {
+          html = await res.text();
+        } else {
+          await res.text(); // consume body
+        }
+      } catch (e) {
+        console.log("Proxy failed:", e.message);
       }
-      html = await proxyRes.text();
     }
 
     if (!html) {
-      throw new Error("Could not fetch BCV page");
+      throw new Error("Could not fetch BCV page from any source");
     }
 
     // Extract USD rate from id="dolar" block
