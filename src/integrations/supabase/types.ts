@@ -2081,6 +2081,47 @@ export type Database = {
           },
         ]
       }
+      school_payment_methods: {
+        Row: {
+          config: Json
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          label: string
+          method_type: string
+          school_id: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          label: string
+          method_type: string
+          school_id: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          label?: string
+          method_type?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_payment_methods_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_subjects: {
         Row: {
           abbreviation: string

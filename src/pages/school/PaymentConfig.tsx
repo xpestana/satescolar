@@ -17,7 +17,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Loader2, Package, FileText, Link2 } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, Package, FileText, Link2, CreditCard } from "lucide-react";
+import { PaymentMethodsTab } from "@/components/payments/PaymentMethodsTab";
 
 // ─── Concepts Tab ───
 function ConceptsTab({ schoolId }: { schoolId: string }) {
@@ -429,9 +430,11 @@ export default function PaymentConfig() {
         <TabsList>
           <TabsTrigger value="concepts" className="gap-2"><Package className="h-4 w-4" />Conceptos</TabsTrigger>
           <TabsTrigger value="plans" className="gap-2"><FileText className="h-4 w-4" />Planes</TabsTrigger>
+          <TabsTrigger value="methods" className="gap-2"><CreditCard className="h-4 w-4" />Métodos de Pago</TabsTrigger>
         </TabsList>
         <TabsContent value="concepts"><ConceptsTab schoolId={schoolId} /></TabsContent>
         <TabsContent value="plans"><PlansTab schoolId={schoolId} /></TabsContent>
+        <TabsContent value="methods"><PaymentMethodsTab schoolId={schoolId} /></TabsContent>
       </Tabs>
     </DashboardLayout>
   );

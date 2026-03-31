@@ -29,13 +29,7 @@ interface PaymentMethodLine {
   details: string;
 }
 
-const METHODS = [
-  { value: "transferencia", label: "Transferencia" },
-  { value: "efectivo", label: "Efectivo" },
-  { value: "pago_movil", label: "Pago Móvil" },
-  { value: "zelle", label: "Zelle" },
-  { value: "punto_venta", label: "Punto de Venta" },
-];
+import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 
 const today = () => new Date().toISOString().split("T")[0];
 
@@ -62,6 +56,21 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
+
+  // Load school payment methods
+  const { data: schoolMethods = [] } = useQuery({
+    queryKey: ["school-payment-methods", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_payment_methods").select("*").eq("school_id", schoolId).eq("is_active", true).order("display_order");
+      return data || [];
+    },
+    enabled: open,
+  });
+
+  // Build method options from school config, fallback to METHOD_TYPE_LABELS if none configured
+  const methodOptions = schoolMethods.length > 0
+    ? schoolMethods.map((sm: any) => ({ value: sm.id, label: `${sm.label}`, config: sm.config, method_type: sm.method_type }))
+    : Object.entries(METHOD_TYPE_LABELS).map(([k, v]) => ({ value: k, label: v, config: {}, method_type: k }));
 
   // Load rates
   const { data: rates = [] } = useQuery({
@@ -384,8 +393,16 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                       <Label className="text-xs">Método</Label>
                       <Select value={m.method} onValueChange={(v) => updateMethodField(m.id, "method", v)}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{METHODS.map((mt) => <SelectItem key={mt.value} value={mt.value}>{mt.label}</SelectItem>)}</SelectContent>
+                        <SelectContent>{methodOptions.map((mt) => <SelectItem key={mt.value} value={mt.value}>{mt.label}</SelectItem>)}</SelectContent>
                       </Select>
+                      {(() => {
+                        const selected = methodOptions.find((mo) => mo.value === m.method);
+                        if (!selected || !selected.config || Object.keys(selected.config).length === 0) return null;
+                        const cfg = selected.config as Record<string, any>;
+                        const details = [cfg.bank_name, cfg.account_number ? `Cta: ...${cfg.account_number.slice(-4)}` : null, cfg.account_holder, cfg.phone, cfg.email, cfg.document_id].filter(Boolean);
+                        if (details.length === 0) return null;
+                        return <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{details.join(" · ")}</p>;
+                      })()}
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Moneda</Label>
