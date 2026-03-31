@@ -393,8 +393,16 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                       <Label className="text-xs">Método</Label>
                       <Select value={m.method} onValueChange={(v) => updateMethodField(m.id, "method", v)}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{METHODS.map((mt) => <SelectItem key={mt.value} value={mt.value}>{mt.label}</SelectItem>)}</SelectContent>
+                        <SelectContent>{methodOptions.map((mt) => <SelectItem key={mt.value} value={mt.value}>{mt.label}</SelectItem>)}</SelectContent>
                       </Select>
+                      {(() => {
+                        const selected = methodOptions.find((mo) => mo.value === m.method);
+                        if (!selected || !selected.config || Object.keys(selected.config).length === 0) return null;
+                        const cfg = selected.config as Record<string, any>;
+                        const details = [cfg.bank_name, cfg.account_number ? `Cta: ...${cfg.account_number.slice(-4)}` : null, cfg.account_holder, cfg.phone, cfg.email, cfg.document_id].filter(Boolean);
+                        if (details.length === 0) return null;
+                        return <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{details.join(" · ")}</p>;
+                      })()}
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Moneda</Label>
