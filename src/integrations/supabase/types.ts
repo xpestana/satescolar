@@ -194,6 +194,111 @@ export type Database = {
           },
         ]
       }
+      delinquency_config: {
+        Row: {
+          created_at: string
+          id: string
+          overdue_after_day: number
+          reminder_days_of_month: Json | null
+          reminder_days_of_week: Json | null
+          reminder_mode: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          overdue_after_day?: number
+          reminder_days_of_month?: Json | null
+          reminder_days_of_week?: Json | null
+          reminder_mode?: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          overdue_after_day?: number
+          reminder_days_of_month?: Json | null
+          reminder_days_of_week?: Json | null
+          reminder_mode?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delinquency_config_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delinquency_notifications: {
+        Row: {
+          concepts_detail: Json
+          created_at: string
+          email_sent_to: string
+          error_message: string | null
+          family_id: string
+          id: string
+          school_id: string
+          sent_at: string
+          status: string
+          student_id: string
+          total_owed_ves: number
+        }
+        Insert: {
+          concepts_detail?: Json
+          created_at?: string
+          email_sent_to: string
+          error_message?: string | null
+          family_id: string
+          id?: string
+          school_id: string
+          sent_at?: string
+          status?: string
+          student_id: string
+          total_owed_ves?: number
+        }
+        Update: {
+          concepts_detail?: Json
+          created_at?: string
+          email_sent_to?: string
+          error_message?: string | null
+          family_id?: string
+          id?: string
+          school_id?: string
+          sent_at?: string
+          status?: string
+          student_id?: string
+          total_owed_ves?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delinquency_notifications_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delinquency_notifications_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delinquency_notifications_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_templates: {
         Row: {
           content_html: string
@@ -479,6 +584,41 @@ export type Database = {
           },
           {
             foreignKeyName: "evaluation_plan_items_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exchange_rates: {
+        Row: {
+          currency: string
+          id: string
+          rate_to_ves: number
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          currency: string
+          id?: string
+          rate_to_ves?: number
+          school_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          currency?: string
+          id?: string
+          rate_to_ves?: number
+          school_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_rates_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -974,6 +1114,319 @@ export type Database = {
             columns: ["municipality_id"]
             isOneToOne: false
             referencedRelation: "municipalities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_concepts: {
+        Row: {
+          concept_type: string
+          created_at: string
+          default_amount: number
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          concept_type?: string
+          created_at?: string
+          default_amount?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          concept_type?: string
+          created_at?: string
+          default_amount?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_concepts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_items: {
+        Row: {
+          amount_ves: number
+          created_at: string
+          id: string
+          is_partial: boolean
+          payment_id: string
+          plan_concept_id: string
+        }
+        Insert: {
+          amount_ves?: number
+          created_at?: string
+          id?: string
+          is_partial?: boolean
+          payment_id: string
+          plan_concept_id: string
+        }
+        Update: {
+          amount_ves?: number
+          created_at?: string
+          id?: string
+          is_partial?: boolean
+          payment_id?: string
+          plan_concept_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_items_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_items_plan_concept_id_fkey"
+            columns: ["plan_concept_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plan_concepts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_method_entries: {
+        Row: {
+          amount_original: number
+          amount_ves: number
+          bank_name: string | null
+          created_at: string
+          currency: string
+          details: string | null
+          exchange_rate: number
+          id: string
+          method: string
+          payment_date: string
+          payment_id: string
+          reference_code: string | null
+        }
+        Insert: {
+          amount_original?: number
+          amount_ves?: number
+          bank_name?: string | null
+          created_at?: string
+          currency?: string
+          details?: string | null
+          exchange_rate?: number
+          id?: string
+          method?: string
+          payment_date?: string
+          payment_id: string
+          reference_code?: string | null
+        }
+        Update: {
+          amount_original?: number
+          amount_ves?: number
+          bank_name?: string | null
+          created_at?: string
+          currency?: string
+          details?: string | null
+          exchange_rate?: number
+          id?: string
+          method?: string
+          payment_date?: string
+          payment_id?: string
+          reference_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_method_entries_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_plan_concepts: {
+        Row: {
+          amount: number
+          concept_id: string
+          created_at: string
+          display_order: number
+          due_day: number | null
+          id: string
+          is_mandatory: boolean
+          is_recurring: boolean
+          plan_id: string
+        }
+        Insert: {
+          amount?: number
+          concept_id: string
+          created_at?: string
+          display_order?: number
+          due_day?: number | null
+          id?: string
+          is_mandatory?: boolean
+          is_recurring?: boolean
+          plan_id: string
+        }
+        Update: {
+          amount?: number
+          concept_id?: string
+          created_at?: string
+          display_order?: number
+          due_day?: number | null
+          id?: string
+          is_mandatory?: boolean
+          is_recurring?: boolean
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_plan_concepts_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "payment_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_plan_concepts_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_plans: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_plans_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          invoice_address: string | null
+          invoice_name: string | null
+          invoice_phone: string | null
+          invoice_rif: string | null
+          observations: string | null
+          payment_date: string
+          school_id: string
+          school_year_id: string
+          status: string
+          student_id: string
+          total_amount_ves: number
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          invoice_address?: string | null
+          invoice_name?: string | null
+          invoice_phone?: string | null
+          invoice_rif?: string | null
+          observations?: string | null
+          payment_date?: string
+          school_id: string
+          school_year_id: string
+          status?: string
+          student_id: string
+          total_amount_ves?: number
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          invoice_address?: string | null
+          invoice_name?: string | null
+          invoice_phone?: string | null
+          invoice_rif?: string | null
+          observations?: string | null
+          payment_date?: string
+          school_id?: string
+          school_year_id?: string
+          status?: string
+          student_id?: string
+          total_amount_ves?: number
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
         ]
@@ -1867,6 +2320,77 @@ export type Database = {
         }
         Relationships: []
       }
+      student_concept_balances: {
+        Row: {
+          balance: number
+          id: string
+          last_payment_date: string | null
+          paid_amount: number
+          plan_concept_id: string
+          school_id: string
+          school_year_id: string
+          status: string
+          student_id: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          id?: string
+          last_payment_date?: string | null
+          paid_amount?: number
+          plan_concept_id: string
+          school_id: string
+          school_year_id: string
+          status?: string
+          student_id: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          id?: string
+          last_payment_date?: string | null
+          paid_amount?: number
+          plan_concept_id?: string
+          school_id?: string
+          school_year_id?: string
+          status?: string
+          student_id?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_concept_balances_plan_concept_id_fkey"
+            columns: ["plan_concept_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plan_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_concept_balances_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_concept_balances_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_concept_balances_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_grades: {
         Row: {
           assignment_id: string
@@ -1922,6 +2446,65 @@ export type Database = {
           },
           {
             foreignKeyName: "student_grades_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      student_payment_plans: {
+        Row: {
+          assigned_at: string
+          created_at: string
+          id: string
+          plan_id: string
+          school_id: string
+          school_year_id: string
+          student_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          created_at?: string
+          id?: string
+          plan_id: string
+          school_id: string
+          school_year_id: string
+          student_id: string
+        }
+        Update: {
+          assigned_at?: string
+          created_at?: string
+          id?: string
+          plan_id?: string
+          school_id?: string
+          school_year_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_payment_plans_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payment_plans_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payment_plans_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_payment_plans_student_id_fkey"
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
