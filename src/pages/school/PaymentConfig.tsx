@@ -430,9 +430,11 @@ export default function PaymentConfig() {
         <TabsList>
           <TabsTrigger value="concepts" className="gap-2"><Package className="h-4 w-4" />Conceptos</TabsTrigger>
           <TabsTrigger value="plans" className="gap-2"><FileText className="h-4 w-4" />Planes</TabsTrigger>
+          <TabsTrigger value="methods" className="gap-2"><CreditCard className="h-4 w-4" />Métodos de Pago</TabsTrigger>
         </TabsList>
         <TabsContent value="concepts"><ConceptsTab schoolId={schoolId} /></TabsContent>
         <TabsContent value="plans"><PlansTab schoolId={schoolId} /></TabsContent>
+        <TabsContent value="methods"><PaymentMethodsTab schoolId={schoolId} /></TabsContent>
       </Tabs>
     </DashboardLayout>
   );

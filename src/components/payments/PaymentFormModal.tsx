@@ -29,13 +29,7 @@ interface PaymentMethodLine {
   details: string;
 }
 
-const METHODS = [
-  { value: "transferencia", label: "Transferencia" },
-  { value: "efectivo", label: "Efectivo" },
-  { value: "pago_movil", label: "Pago Móvil" },
-  { value: "zelle", label: "Zelle" },
-  { value: "punto_venta", label: "Punto de Venta" },
-];
+import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 
 const today = () => new Date().toISOString().split("T")[0];
 
