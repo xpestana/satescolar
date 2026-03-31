@@ -16,19 +16,35 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Fetch BCV page
-    const response = await fetch("https://www.bcv.org.ve/", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; SchoolApp/1.0)",
-        Accept: "text/html",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`BCV responded with status ${response.status}`);
+    // Fetch BCV page - use proxy to bypass untrusted SSL cert from Venezuelan CA
+    let html = "";
+    const bcvUrl = "https://www.bcv.org.ve/";
+    
+    // Try direct fetch first, then fallback to proxy
+    try {
+      const directRes = await fetch(bcvUrl, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; SchoolApp/1.0)", Accept: "text/html" },
+      });
+      if (directRes.ok) html = await directRes.text();
+    } catch (_directErr) {
+      console.log("Direct fetch failed, trying proxy...");
     }
 
-    const html = await response.text();
+    if (!html) {
+      // Use allorigins proxy as fallback
+      const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(bcvUrl)}`;
+      const proxyRes = await fetch(proxyUrl, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; SchoolApp/1.0)" },
+      });
+      if (!proxyRes.ok) {
+        throw new Error(`Proxy fetch failed with status ${proxyRes.status}`);
+      }
+      html = await proxyRes.text();
+    }
+
+    if (!html) {
+      throw new Error("Could not fetch BCV page");
+    }
 
     // Extract USD rate from id="dolar" block
     const usdMatch = html.match(
