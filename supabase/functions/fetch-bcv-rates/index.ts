@@ -16,41 +16,35 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Fetch BCV page via jina.ai reader to bypass SSL issues
-    let html = "";
-    const bcvUrl = "https://www.bcv.org.ve/";
-    
-    // Try jina.ai reader first (most reliable from edge functions)
-    try {
-      const jinaRes = await fetch(`https://r.jina.ai/${bcvUrl}`, {
-        headers: { "Accept": "text/html", "X-Return-Format": "html" },
-      });
-      if (jinaRes.ok) {
-        html = await jinaRes.text();
-        console.log("Fetched BCV via jina.ai reader");
-      } else {
-        console.log("Jina reader returned:", jinaRes.status);
-        await jinaRes.text();
-      }
-    } catch (e) {
-      console.log("Jina reader failed:", e.message);
+    // Fetch BCV page via Firecrawl API
+    const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
+    if (!firecrawlKey) {
+      throw new Error("FIRECRAWL_API_KEY not configured");
     }
 
-    // Fallback: try direct fetch
-    if (!html) {
-      try {
-        const directRes = await fetch(bcvUrl, {
-          headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-        });
-        if (directRes.ok) html = await directRes.text();
-      } catch (_e) {
-        console.log("Direct fetch also failed");
-      }
+    const fcRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${firecrawlKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: "https://www.bcv.org.ve/",
+        formats: ["html"],
+        onlyMainContent: false,
+      }),
+    });
+
+    const fcData = await fcRes.json();
+    if (!fcRes.ok || !fcData.success) {
+      throw new Error(`Firecrawl error: ${fcData.error || fcRes.status}`);
     }
 
+    const html = fcData.data?.html || "";
     if (!html) {
-      throw new Error("Could not fetch BCV page from any source");
+      throw new Error("Firecrawl returned empty HTML");
     }
+    console.log("Fetched BCV via Firecrawl");
 
     // Extract USD rate from id="dolar" block
     const usdMatch = html.match(
