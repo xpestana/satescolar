@@ -28,10 +28,10 @@ function BankCombobox({ value, onChange }: { value: string; onChange: (code: str
           <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
+      <PopoverContent className="w-[400px] p-0 z-[9999]" align="start" side="bottom" avoidCollisions>
         <Command>
           <CommandInput placeholder="Buscar banco..." className="h-8 text-xs" />
-          <CommandList>
+          <CommandList className="max-h-[200px] overflow-y-auto">
             <CommandEmpty>No se encontró banco.</CommandEmpty>
             <CommandGroup>
               {VENEZUELAN_BANKS.map((b) => (
