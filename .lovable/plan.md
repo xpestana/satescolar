@@ -1,190 +1,205 @@
 
 
-# Plan: Módulo Completo de Pagos Escolar
+# Plan: Módulo de Asistencias por QR
 
 ## Resumen
 
-Construir un sistema de pagos multi-moneda con configuración de planes, registro de pagos dinámicos, control de morosidad, recordatorios automáticos por correo y panel administrativo completo. Se integra con la infraestructura existente de escuelas, años escolares, inscripciones y el sistema de correo SMTP.
+Construir un sistema completo de asistencias por QR que permita registrar el ingreso de estudiantes, representantes y docentes al escanear su carnet, guardar el registro en base de datos, enviar notificaciones por correo y gestionar los registros desde un panel administrativo.
+
+## Situación actual
+
+- Los carnets ya generan QR con datos como `DOCENTE|NombreCompleto|Documento|Colegio` (texto plano).
+- No existe infraestructura de asistencias ni tokens seguros en el QR.
+- El sistema de correos SMTP ya funciona vía la Edge Function `send-email`.
 
 ---
 
-## Fase 1: Base de Datos (Migración SQL)
+## Arquitectura propuesta
 
-### Tablas a crear:
-
-1. **`payment_concepts`** — Catálogo reutilizable de conceptos
-   - `id`, `school_id`, `name`, `description`, `default_amount` (VES), `concept_type` (inscripcion, mensualidad, uniforme, transporte, laboratorio, otro), `is_active`, `created_at`, `updated_at`
-
-2. **`payment_plans`** — Planes de pago
-   - `id`, `school_id`, `name`, `description`, `is_active`, `created_at`, `updated_at`
-
-3. **`payment_plan_concepts`** — Relación M:N plan-concepto con metadatos
-   - `id`, `plan_id`, `concept_id`, `amount` (monto específico en ese plan), `display_order`, `is_mandatory`, `is_recurring`, `due_day` (día del mes de vencimiento), `created_at`
-   - UNIQUE(plan_id, concept_id)
-
-4. **`student_payment_plans`** — Asignación plan-alumno por año escolar
-   - `id`, `school_id`, `student_id`, `school_year_id`, `plan_id`, `assigned_at`, `created_at`
-   - UNIQUE(student_id, school_year_id)
-
-5. **`exchange_rates`** — Tasas de cambio vigentes del colegio
-   - `id`, `school_id`, `currency` (USD, EUR, COP), `rate_to_ves`, `updated_at`, `updated_by`
-
-6. **`payments`** — Cabecera de pagos
-   - `id`, `school_id`, `student_id`, `school_year_id`, `payment_date`, `total_amount_ves`, `observations`, `invoice_rif`, `invoice_name`, `invoice_address`, `invoice_phone`, `status` (completed, voided), `void_reason`, `voided_by`, `voided_at`, `created_by`, `created_at`, `updated_at`
-
-7. **`payment_items`** — Detalle de conceptos pagados por pago
-   - `id`, `payment_id`, `plan_concept_id`, `amount_ves`, `is_partial`, `created_at`
-
-8. **`payment_methods`** — Métodos de pago por transacción
-   - `id`, `payment_id`, `method` (transferencia, efectivo, pago_movil, zelle, punto_venta), `bank_name`, `reference_code`, `amount_original`, `currency` (VES, USD, EUR, COP), `exchange_rate`, `amount_ves`, `payment_date`, `details`, `created_at`
-
-9. **`student_concept_balances`** — Vista materializada o tabla de saldos
-   - `id`, `school_id`, `student_id`, `school_year_id`, `plan_concept_id`, `total_amount`, `paid_amount`, `balance`, `status` (pending, partial, paid, overdue, voided), `last_payment_date`, `updated_at`
-
-10. **`delinquency_config`** — Configuración de morosidad por colegio
-    - `id`, `school_id`, `overdue_after_day` (día del mes), `reminder_mode` (never, daily, weekly, monthly), `reminder_days_of_week` (jsonb), `reminder_days_of_month` (jsonb), `created_at`, `updated_at`
-
-11. **`delinquency_notifications`** — Historial de recordatorios enviados
-    - `id`, `school_id`, `student_id`, `family_id`, `email_sent_to`, `concepts_detail` (jsonb), `total_owed_ves`, `sent_at`, `status` (sent, failed), `error_message`, `created_at`
-
-### RLS Policies
-- Todas las tablas: admin ALL, school users CRUD para su school_id
-- Patrón existente: `EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND school_id = table.school_id)`
-
-### Trigger
-- `update_updated_at_column` en tablas que lo requieran (ya existe la función)
-
----
-
-## Fase 2: Edge Functions
-
-### 2a. `process-delinquency-reminders`
-- Cron job diario que:
-  1. Lee `delinquency_config` de cada colegio
-  2. Evalúa si hoy corresponde enviar según el modo configurado
-  3. Identifica alumnos morosos (saldo > 0 y pasado el día de vencimiento)
-  4. Envía correo al email de la familia usando SMTP (mismo patrón que `send-email`)
-  5. Registra en `delinquency_notifications`
-  6. Template HTML profesional, respetuoso y formal con datos dinámicos
-
-### 2b. Programar cron job con `pg_cron` + `pg_net`
-
----
-
-## Fase 3: Frontend — Páginas
-
-### 3a. Configuración de Pagos (`/school/configuraciones/pagos`)
-- **Tab 1: Conceptos de Pago** — CRUD de conceptos reutilizables (nombre, tipo, monto por defecto)
-- **Tab 2: Planes de Pago** — CRUD de planes. Al editar un plan, modal para asociar conceptos con monto, orden, obligatorio, recurrente, día de vencimiento
-- **Tab 3: Tasas de Cambio** — Editar tasas USD/EUR/COP a VES
-- **Tab 4: Morosidad** — Configurar día de mora, modo de recordatorio, días específicos
-
-### 3b. Registro de Pagos (`/pagos/registro`)
-- Lista de estudiantes del año escolar activo con: nombre, plan, grado, sección, saldo pendiente, badge morosidad
-- Buscador inteligente
-- Al seleccionar alumno → formulario de registro:
-  - Info del alumno (nombre, plan, grado, sección)
-  - Datos de factura (pre-cargados del representante, editables)
-  - Lista de conceptos con checkboxes (pendientes/parciales/pagados), montos, saldo
-  - Formulario dinámico de múltiples formas de pago (agregar/eliminar líneas)
-  - **Widget flotante de tasas de cambio** (panel fijo/sticky con inputs editables USD/EUR/COP→VES)
-  - Resumen final con validación antes de guardar
-  - Campo de observaciones
-
-### 3c. Morosos (`/pagos/morosos`)
-- Tabla de alumnos morosos con: nombre, plan, grado, sección, representante, correo familia, conceptos vencidos, monto, antigüedad, último recordatorio, próximo
-- Filtros: grado, sección, plan, rango de deuda, antigüedad, búsqueda
-- Exportar PDF/Excel
-- Botón reenviar recordatorio manual
-
-### 3d. Estado de Cuenta (`/pagos/estado-cuenta`)
-- Seleccionar alumno → historial de cargos y abonos
-- Saldo total, conceptos pagados/pendientes
-- Filtros por período
-- Generar recibo/comprobante PDF descargable por pago
-
-### 3e. Dashboard de Pagos (widget en SchoolDashboard o página dedicada)
-- Total recaudado hoy / mes
-- Alumnos morosos
-- Deuda acumulada
-- Pagos recientes
-- Resumen por método de pago
-
----
-
-## Fase 4: Sidebar y Rutas
-
-### Sidebar — Nueva sección "Pagos"
-```
-Pagos
-├── Registro de Pagos
-├── Morosos
-├── Estado de Cuenta
+```text
+┌─────────────┐    Escaneo QR     ┌──────────────────┐
+│  Lector QR  │ ──────────────── │ /attendance/scan/ │ (ruta pública)
+│  (físico)   │   URL con token   │    :token         │
+└─────────────┘                   └────────┬─────────┘
+                                           │
+                                   invoke Edge Function
+                                           │
+                                  ┌────────▼──────────┐
+                                  │ record-attendance  │
+                                  │  (Edge Function)   │
+                                  ├────────────────────┤
+                                  │ 1. Validar token   │
+                                  │ 2. Identificar rol │
+                                  │ 3. Anti-duplicado  │
+                                  │ 4. INSERT registro │
+                                  │ 5. Enviar correo   │
+                                  │ 6. Retornar JSON   │
+                                  └────────────────────┘
 ```
 
-### Ajustes del Colegio — Agregar
+---
+
+## Cambios en la base de datos
+
+### 1. Nueva tabla: `attendance_tokens`
+Almacena tokens seguros para cada persona del sistema.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| id | uuid PK | |
+| token | text UNIQUE | Token aleatorio seguro (UUID v4) |
+| entity_type | text | `student`, `teacher`, `representative` |
+| entity_id | uuid | ID en la tabla correspondiente |
+| school_id | uuid FK | Colegio al que pertenece |
+| is_active | boolean | Para desactivar tokens |
+| created_at | timestamptz | |
+
+Indice unico en `(entity_type, entity_id)` para un token por persona.
+
+### 2. Nueva tabla: `attendance_records`
+Tabla unificada para todos los registros de asistencia.
+
+| Columna | Tipo | Descripción |
+|---------|------|-------------|
+| id | uuid PK | |
+| school_id | uuid FK | |
+| entity_type | text | `student`, `teacher`, `representative` |
+| entity_id | uuid | ID de la persona |
+| token_id | uuid FK | Referencia al token usado |
+| attendance_date | date | Fecha del registro |
+| attendance_time | time | Hora del registro |
+| attendance_timestamp | timestamptz | Timestamp completo |
+| record_type | text | `qr` (extensible) |
+| status | text | `present`, `late`, etc. |
+| notification_sent | boolean | Si se envió correo |
+| notification_email | text | Email al que se notificó |
+| created_at | timestamptz | |
+
+Indice en `(entity_type, entity_id, attendance_date)` para consultas rápidas y anti-duplicados.
+
+### 3. RLS Policies
+- Solo lectura para usuarios `school` del mismo colegio.
+- Sin acceso directo para otros roles (todo pasa por Edge Function con service role).
+
+### 4. Trigger para generar tokens automáticamente
+Al insertar un nuevo student, teacher o representative, generar automáticamente un token en `attendance_tokens`. Tambien hacer un backfill de tokens para los registros existentes.
+
+---
+
+## Cambios en el QR de los carnets
+
+### Actualizar contenido del QR
+Actualmente el QR contiene texto plano. Se cambiará para que contenga una URL:
+
 ```
-├── Pagos (configuración)
+https://app.satescolar.com/attendance/scan/{token}
 ```
 
-### Rutas en App.tsx
-- `/school/configuraciones/pagos` → PaymentsConfig
-- `/pagos/registro` → PaymentRegistration
-- `/pagos/morosos` → DelinquentStudents
-- `/pagos/estado-cuenta` → AccountStatement
+Archivos a modificar:
+- `src/lib/export-utils.ts` - Función de generación de carnet PDF (estudiantes y representantes)
+- `src/pages/teacher/TeacherCarnet.tsx` - Carnet de docente
+
+La función de generación consultará `attendance_tokens` para obtener el token de cada persona antes de generar el QR.
 
 ---
 
-## Fase 5: Componentes Clave
+## Edge Function: `record-attendance`
 
-1. **`ExchangeRateWidget`** — Panel flotante/sticky con inputs para USD/EUR/COP→VES, actualiza estado local y guarda en BD
-2. **`PaymentMethodRow`** — Línea dinámica de forma de pago (método, banco, referencia, monto, moneda, tasa, conversión)
-3. **`ConceptSelector`** — Lista de conceptos con checkboxes, estados visuales, soporte pago parcial
-4. **`PaymentReceiptPDF`** — Generación de recibo con jsPDF usando el header institucional existente
-5. **`DelinquencyConfigForm`** — Formulario de configuración de morosidad con opciones de frecuencia
+Endpoint que recibe el token y procesa todo el flujo:
 
----
-
-## Detalles Técnicos
-
-- **Multi-moneda**: Cada `payment_method` guarda `amount_original`, `currency`, `exchange_rate`, `amount_ves`. La tasa se guarda como snapshot histórico.
-- **Pagos parciales**: `student_concept_balances` mantiene `paid_amount` y `balance`. Al registrar pago parcial, se actualiza el saldo.
-- **Anulación**: Campo `status` en `payments` con `void_reason`, `voided_by`, `voided_at`. Al anular se revierten los saldos.
-- **Descuentos/becas**: Campo `amount` en `payment_items` puede ser menor al monto del concepto, con observación justificativa.
-- **Recibos**: PDF con detalle de conceptos, formas de pago, tasas usadas, header institucional.
-- **Trazabilidad**: `created_by`, `voided_by`, timestamps en todas las operaciones.
+1. Recibir `token` del body
+2. Buscar en `attendance_tokens` el token, verificar `is_active`
+3. Obtener `entity_type` y `entity_id`
+4. Verificar anti-duplicado: no registrar si ya existe un registro en los últimos 60 segundos para la misma persona
+5. Insertar en `attendance_records`
+6. Determinar email de notificación:
+   - **Teacher**: su propio `email`
+   - **Student/Representative**: email del `auth.users` de la familia (`families.user_id`)
+7. Enviar correo via SMTP (reutilizando la lógica de `send-email`)
+8. Retornar JSON con datos para mostrar en pantalla
 
 ---
 
-## Archivos a crear/modificar
+## Nuevas páginas frontend
 
-| Archivo | Acción |
+### 1. Escáner QR (`/utilidades/escaner-qr`)
+Pantalla simple para recepción/entrada:
+- Input autofocused que recibe la lectura del escáner físico (actúa como teclado)
+- Al detectar una URL o token completo (por Enter), invoca la Edge Function
+- Muestra tarjeta de resultado:
+  - Nombre completo
+  - Rol (badge con color)
+  - Fecha y hora
+  - Estado (exito, error, ya registrado, QR inválido)
+- Feedback visual con colores: verde (exito), rojo (error), amarillo (duplicado)
+- Se limpia automáticamente después de 5 segundos para el siguiente escaneo
+
+### 2. Asistencias (`/utilidades/asistencias`)
+Panel administrativo con:
+- 3 Tabs: Docentes, Estudiantes, Representantes
+- Cada tab con:
+  - Buscador inteligente (nombre, apellido, combinaciones, insensible a acentos)
+  - Filtros de fecha: Hoy, Últimos 7 días, Último mes, Últimos 6 meses, Últimos 12 meses, Rango personalizado
+  - Tabla con columnas: Nombre, Apellido, Fecha, Hora, Tipo, Estado, Correo notificado, Creado
+  - Paginación (50 registros por página)
+
+### 3. Ruta pública: `/attendance/scan/:token`
+Página pública (sin autenticación) que:
+- Extrae el token de la URL
+- Invoca la Edge Function
+- Muestra resultado al usuario que escaneó (confirmación simple)
+
+---
+
+## Cambios en el sidebar
+
+Agregar en la sección "Utilidades" del rol `school`:
+- "Escáner QR" con icono `QrCode`
+- "Asistencias" con icono `ClipboardList`
+
+---
+
+## Correos de notificación
+
+Se usará la Edge Function `send-email` existente (SMTP) para enviar correos con formato HTML que incluyan:
+- Logo del colegio
+- Nombre del usuario
+- Rol
+- Fecha y hora de ingreso
+- Mensaje de confirmación
+- Branding de SAT ESCOLAR
+
+---
+
+## Archivos a crear
+
+| Archivo | Descripción |
+|---------|-------------|
+| `supabase/functions/record-attendance/index.ts` | Edge Function principal |
+| `src/pages/school/AttendanceScanner.tsx` | Pantalla de escáner QR |
+| `src/pages/school/AttendanceList.tsx` | Panel administrativo de asistencias |
+| `src/pages/AttendanceScan.tsx` | Ruta pública para escaneo directo |
+| Migración SQL | Tablas, indices, RLS, trigger de tokens |
+
+## Archivos a modificar
+
+| Archivo | Cambio |
 |---------|--------|
-| Migración SQL | ~12 tablas, RLS, triggers |
-| `supabase/functions/process-delinquency-reminders/index.ts` | Edge function + cron |
-| `src/pages/school/PaymentsConfig.tsx` | Configuración (conceptos, planes, tasas, morosidad) |
-| `src/pages/school/PaymentRegistration.tsx` | Registro de pagos |
-| `src/pages/school/DelinquentStudents.tsx` | Morosos |
-| `src/pages/school/AccountStatement.tsx` | Estado de cuenta |
-| `src/components/payments/ExchangeRateWidget.tsx` | Widget flotante tasas |
-| `src/components/payments/PaymentMethodRow.tsx` | Línea de forma de pago |
-| `src/components/payments/ConceptSelector.tsx` | Selector de conceptos |
-| `src/components/payments/PaymentReceiptPDF.tsx` | Generador de recibo |
-| `src/components/payments/DelinquencyConfigForm.tsx` | Config morosidad |
-| `src/components/payments/PaymentForm.tsx` | Formulario principal de pago |
-| `src/components/layout/AppSidebar.tsx` | Agregar sección Pagos |
-| `src/App.tsx` | Agregar rutas |
-| `supabase/config.toml` | Agregar función con verify_jwt = false |
+| `src/App.tsx` | Agregar 3 nuevas rutas |
+| `src/components/layout/AppSidebar.tsx` | Agregar items en Utilidades |
+| `src/lib/export-utils.ts` | QR con URL de asistencia en lugar de texto plano |
+| `src/pages/teacher/TeacherCarnet.tsx` | QR con URL de asistencia |
+| `supabase/config.toml` | Agregar `record-attendance` con `verify_jwt = false` |
 
 ---
 
 ## Orden de implementación
 
-1. Migración SQL (todas las tablas, RLS, triggers)
-2. Configuración de Pagos (conceptos + planes + tasas + morosidad)
-3. Registro de Pagos (formulario completo con widget de tasas)
-4. Morosos (listado con filtros y exportación)
-5. Estado de Cuenta (historial + recibos PDF)
-6. Edge Function de recordatorios + cron job
-7. Sidebar + rutas + integración final
+1. Migración SQL (tablas, tokens, trigger, backfill, RLS)
+2. Edge Function `record-attendance`
+3. Página pública `/attendance/scan/:token`
+4. Página escáner QR `/utilidades/escaner-qr`
+5. Página administrativa `/utilidades/asistencias`
+6. Sidebar + rutas en App.tsx
+7. Actualizar QR en carnets (export-utils + TeacherCarnet)
 

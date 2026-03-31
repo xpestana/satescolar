@@ -35,6 +35,3 @@ verify_jwt = false
 
 [functions.record-attendance]
 verify_jwt = false
-
-[functions.process-delinquency-reminders]
-verify_jwt = false
