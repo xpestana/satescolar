@@ -16,41 +16,35 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Fetch BCV page - try multiple proxies to bypass untrusted SSL cert
+    // Fetch BCV page via jina.ai reader to bypass SSL issues
     let html = "";
     const bcvUrl = "https://www.bcv.org.ve/";
     
-    const proxies = [
-      `https://corsproxy.io/?${encodeURIComponent(bcvUrl)}`,
-      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(bcvUrl)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(bcvUrl)}`,
-    ];
-
-    // Try direct first
+    // Try jina.ai reader first (most reliable from edge functions)
     try {
-      const directRes = await fetch(bcvUrl, {
-        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", Accept: "text/html" },
+      const jinaRes = await fetch(`https://r.jina.ai/${bcvUrl}`, {
+        headers: { "Accept": "text/html", "X-Return-Format": "html" },
       });
-      if (directRes.ok) html = await directRes.text();
-    } catch (_e) {
-      console.log("Direct fetch failed, trying proxies...");
+      if (jinaRes.ok) {
+        html = await jinaRes.text();
+        console.log("Fetched BCV via jina.ai reader");
+      } else {
+        console.log("Jina reader returned:", jinaRes.status);
+        await jinaRes.text();
+      }
+    } catch (e) {
+      console.log("Jina reader failed:", e.message);
     }
 
-    // Try proxies in order
-    for (const proxy of proxies) {
-      if (html) break;
+    // Fallback: try direct fetch
+    if (!html) {
       try {
-        console.log("Trying proxy:", proxy.substring(0, 50));
-        const res = await fetch(proxy, {
+        const directRes = await fetch(bcvUrl, {
           headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
         });
-        if (res.ok) {
-          html = await res.text();
-        } else {
-          await res.text(); // consume body
-        }
-      } catch (e) {
-        console.log("Proxy failed:", e.message);
+        if (directRes.ok) html = await directRes.text();
+      } catch (_e) {
+        console.log("Direct fetch also failed");
       }
     }
 
