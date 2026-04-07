@@ -145,7 +145,7 @@ export default function PaymentRegistration() {
               <SelectTrigger className="w-[180px]"><SelectValue placeholder="Grado" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los grados</SelectItem>
-                {grades.map((g: any) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                {grades.map((g: any) => <SelectItem key={g} value={g}>{formatGradeLevel(g)}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={sectionFilter} onValueChange={setSectionFilter}>
@@ -153,7 +153,7 @@ export default function PaymentRegistration() {
               <SelectContent>
                 <SelectItem value="all">Todas las secciones</SelectItem>
                 {sections.filter((s: any) => gradeFilter === "all" || s.grade_level === gradeFilter).map((s: any) => (
-                  <SelectItem key={s.id} value={s.id}>{s.grade_level} - {s.name}</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>{formatGradeLevel(s.grade_level)} - {s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -185,7 +185,7 @@ export default function PaymentRegistration() {
                         <TableRow key={e.id}>
                           <TableCell className="font-medium">{fullName || "Sin nombre"}</TableCell>
                           <TableCell>{e.students?.document_id || "—"}</TableCell>
-                          <TableCell>{e.sections?.grade_level || "—"}</TableCell>
+                          <TableCell>{formatGradeLevel(e.sections?.grade_level)}</TableCell>
                           <TableCell>{e.sections?.name || "—"}</TableCell>
                           <TableCell>
                             {hasPlan ? <Badge variant="outline">{planMap[e.students?.id]}</Badge> : <Badge variant="destructive" className="text-xs">Sin plan</Badge>}
