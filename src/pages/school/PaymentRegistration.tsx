@@ -187,7 +187,7 @@ export default function PaymentRegistration() {
                           <TableCell>{e.students?.document_id || "—"}</TableCell>
                           <TableCell>{formatGradeLevel(e.sections?.grade_level)}</TableCell>
                           <TableCell>{e.sections?.name || "—"}</TableCell>
-                          <TableCell>
+                          <TableCell className="text-center">
                             {hasPlan ? <Badge variant="outline">{planMap[e.students?.id]}</Badge> : <Badge variant="destructive" className="text-xs">Sin plan</Badge>}
                           </TableCell>
                           <TableCell>
