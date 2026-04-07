@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -10,19 +10,30 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Loader2, Search, CreditCard, AlertTriangle } from "lucide-react";
 import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
 import { formatGradeLevel } from "@/lib/utils";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PaymentRegistration() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedEnrollment, setSelectedEnrollment] = useState<any>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+
+  // Assign plan state
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignStudentId, setAssignStudentId] = useState<string | null>(null);
+  const [assignEnrollment, setAssignEnrollment] = useState<any>(null);
+  const [assignPlanId, setAssignPlanId] = useState("");
 
   // Active school year
   const { data: activeYear } = useQuery({
@@ -75,6 +86,20 @@ export default function PaymentRegistration() {
     enabled: !!schoolId && !!activeYear?.id,
   });
 
+  // Available payment plans for assignment
+  const { data: availablePlans = [] } = useQuery({
+    queryKey: ["available-plans", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("payment_plans")
+        .select("id, name, description")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .order("name");
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
   // Sections for filter
   const { data: sections = [] } = useQuery({
     queryKey: ["school-sections", schoolId],
@@ -119,10 +144,49 @@ export default function PaymentRegistration() {
     return result;
   }, [enrollments, gradeFilter, sectionFilter, search]);
 
-  const openPayment = (enrollment: any) => {
-    setSelectedStudent(enrollment.students);
-    setSelectedEnrollment(enrollment);
-    setPaymentOpen(true);
+  // Assign plan mutation
+  const assignPlanMut = useMutation({
+    mutationFn: async () => {
+      if (!assignStudentId || !assignPlanId || !activeYear?.id) throw new Error("Datos incompletos");
+      const { error } = await supabase.from("student_payment_plans").insert({
+        student_id: assignStudentId,
+        plan_id: assignPlanId,
+        school_id: schoolId!,
+        school_year_id: activeYear.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-student-plans"] });
+      qc.invalidateQueries({ queryKey: ["all-student-balances"] });
+      toast({ title: "Plan asignado exitosamente" });
+      setAssignOpen(false);
+      // Open payment modal after assigning
+      if (assignEnrollment) {
+        setSelectedStudent(assignEnrollment.students);
+        setSelectedEnrollment(assignEnrollment);
+        setPaymentOpen(true);
+      }
+      setAssignPlanId("");
+      setAssignStudentId(null);
+      setAssignEnrollment(null);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const handlePayClick = (enrollment: any) => {
+    const hasPlan = !!planMap[enrollment.students?.id];
+    if (hasPlan) {
+      setSelectedStudent(enrollment.students);
+      setSelectedEnrollment(enrollment);
+      setPaymentOpen(true);
+    } else {
+      // Open assign plan dialog
+      setAssignStudentId(enrollment.students?.id);
+      setAssignEnrollment(enrollment);
+      setAssignPlanId("");
+      setAssignOpen(true);
+    }
   };
 
   if (schoolLoading || !schoolId) return <DashboardLayout><div className="flex justify-center py-12"><Loader2 className="animate-spin h-8 w-8" /></div></DashboardLayout>;
@@ -200,8 +264,8 @@ export default function PaymentRegistration() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button size="sm" variant="outline" onClick={() => openPayment(e)} disabled={!hasPlan}>
-                              <CreditCard className="h-3 w-3 mr-1" />Pagar
+                            <Button size="sm" variant="outline" onClick={() => handlePayClick(e)}>
+                              <CreditCard className="h-3 w-3 mr-1" />{hasPlan ? "Pagar" : "Asignar Plan"}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -216,6 +280,41 @@ export default function PaymentRegistration() {
 
           {/* Exchange Rate Widget */}
           <ExchangeRateWidget schoolId={schoolId} />
+
+          {/* Assign Plan Dialog */}
+          <Dialog open={assignOpen} onOpenChange={(v) => { if (!v) { setAssignOpen(false); setAssignPlanId(""); setAssignStudentId(null); setAssignEnrollment(null); } else setAssignOpen(v); }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Asignar Plan de Pago</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <p className="text-sm text-muted-foreground">
+                  Seleccione el plan de pago para este estudiante. Una vez asignado, podrá registrar pagos.
+                </p>
+                <div className="space-y-2">
+                  <Label>Plan de Pago *</Label>
+                  <Select value={assignPlanId} onValueChange={setAssignPlanId}>
+                    <SelectTrigger><SelectValue placeholder="Seleccione un plan" /></SelectTrigger>
+                    <SelectContent>
+                      {availablePlans.map((p: any) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                          {p.description ? ` — ${p.description}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAssignOpen(false)}>Cancelar</Button>
+                <Button onClick={() => assignPlanMut.mutate()} disabled={!assignPlanId || assignPlanMut.isPending}>
+                  {assignPlanMut.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
+                  Asignar y Continuar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Payment Form Modal */}
           {selectedStudent && selectedEnrollment && activeYear && (
