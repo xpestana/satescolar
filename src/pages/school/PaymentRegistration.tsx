@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Search, CreditCard, AlertTriangle } from "lucide-react";
 import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
+import { formatGradeLevel } from "@/lib/utils";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
 
 export default function PaymentRegistration() {
