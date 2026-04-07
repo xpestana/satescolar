@@ -340,11 +340,11 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Conceptos del Plan: {plan.name}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-2">
           <div className="flex justify-between items-center">
             <p className="text-sm text-muted-foreground">Total del plan: <span className="font-bold text-foreground">{totalPlan.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span></p>
             <Button size="sm" onClick={() => setAddOpen(true)} disabled={availableConcepts.length === 0}>
@@ -385,7 +385,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
 
         {/* Add concept sub-dialog */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Agregar Concepto al Plan</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-2">
               <div className="space-y-1">
