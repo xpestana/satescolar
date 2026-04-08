@@ -230,7 +230,7 @@ export default function FamiliesList() {
           };
         });
 
-      return { families, count: count || 0 };
+      return { families, count: totalCount };
     },
     enabled: !!schoolId,
   });
