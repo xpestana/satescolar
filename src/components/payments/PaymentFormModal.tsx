@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Loader2, Receipt, AlertTriangle } from "lucide-react";
+import { formatGradeLevel } from "@/lib/utils";
 
 interface PaymentMethodLine {
   id: string;
@@ -131,7 +132,8 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   useEffect(() => {
     if (primaryRep && open) {
       const fd = primaryRep.form_data as Record<string, any> | null;
-      const doc = fd?.tipo_documento ? `${fd.tipo_documento}-${primaryRep.document_id || ""}` : primaryRep.document_id || "";
+      // Use document_id directly — it already contains the prefix (e.g. "V-12345678")
+      const doc = primaryRep.document_id || "";
       const fullName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
       setInvoice({
         rif: doc,
@@ -281,7 +283,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   ].filter(Boolean).join(" ") : "";
 
   const sectionName = enrollment?.sections?.name || "";
-  const gradeName = enrollment?.sections?.grade_level || "";
+  const gradeName = formatGradeLevel(enrollment?.sections?.grade_level);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
