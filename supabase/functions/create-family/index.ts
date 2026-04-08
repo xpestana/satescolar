@@ -25,12 +25,10 @@ function buildWelcomeEmailHtml(
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:32px 0;">
 <tr><td align="center">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-  <!-- Header -->
   <tr><td align="center" style="padding:32px 24px 16px;background-color:#f8f9fc;border-bottom:1px solid #e8e8ed;">
     ${logoBlock}
     <h2 style="margin:0;font-size:20px;color:#1a1a2e;">${schoolName}</h2>
   </td></tr>
-  <!-- Body -->
   <tr><td style="padding:32px 32px 24px;">
     <h1 style="margin:0 0 16px;font-size:24px;color:#1a1a2e;">¡Bienvenido/a!</h1>
     <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4a4a5a;">
@@ -52,7 +50,6 @@ function buildWelcomeEmailHtml(
     </table>
     <p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">Le recomendamos cambiar su contraseña una vez ingrese al sistema.</p>
   </td></tr>
-  <!-- Footer -->
   <tr><td align="center" style="padding:20px 24px;background-color:#f8f9fc;border-top:1px solid #e8e8ed;">
     <p style="margin:0 0 4px;font-size:13px;font-weight:bold;color:#6b7280;">SAT ESCOLAR</p>
     <a href="https://satescolar.com" target="_blank" style="font-size:13px;color:#1e78c8;text-decoration:none;">satescolar.com</a>
@@ -98,6 +95,13 @@ async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
   } catch (err) {
     console.error("Failed to send welcome email:", err);
   }
+}
+
+function generateRandomPassword(length = 16): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => chars[byte % chars.length]).join('');
 }
 
 Deno.serve(async (req) => {
@@ -155,14 +159,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    function generateRandomPassword(length = 16): string {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-      const array = new Uint8Array(length);
-      crypto.getRandomValues(array);
-      return Array.from(array, (byte) => chars[byte % chars.length]).join('');
-    }
     const genericPassword = generateRandomPassword();
 
+    // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(u => u.email === email);
 
@@ -171,6 +170,22 @@ Deno.serve(async (req) => {
     if (existingUser) {
       userId = existingUser.id;
 
+      // ── NEW: Validate existing user's role ──
+      // Block if user has a non-representative role (admin, school, teacher)
+      const { data: existingRoles } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      const nonRepRoles = (existingRoles || []).filter(r => r.role !== "representative");
+      if (nonRepRoles.length > 0) {
+        return new Response(
+          JSON.stringify({ error: "Este correo pertenece a una cuenta administrativa o docente. Use un correo diferente para la familia." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if user already has a family
       const { data: userFamilies } = await supabaseAdmin
         .from("families")
         .select("id")
@@ -178,6 +193,8 @@ Deno.serve(async (req) => {
 
       if (userFamilies && userFamilies.length > 0) {
         const familyIds = userFamilies.map(f => f.id);
+        
+        // Check if already associated with this school
         const { data: existingAssoc } = await supabaseAdmin
           .from("family_schools")
           .select("id")
@@ -192,6 +209,7 @@ Deno.serve(async (req) => {
           );
         }
 
+        // Associate existing family to this school
         const familyId = userFamilies[0].id;
         const { error: assocError } = await supabaseAdmin
           .from("family_schools")
@@ -205,6 +223,14 @@ Deno.serve(async (req) => {
           );
         }
 
+        // Ensure user has representative role for this school
+        await supabaseAdmin
+          .from("user_roles")
+          .upsert(
+            { user_id: userId, role: "representative", school_id: roleData.school_id },
+            { onConflict: "user_id,role,school_id", ignoreDuplicates: true }
+          );
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -214,7 +240,17 @@ Deno.serve(async (req) => {
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      // User exists but has no family — ensure they have representative role, then create family
+      await supabaseAdmin
+        .from("user_roles")
+        .upsert(
+          { user_id: userId, role: "representative", school_id: roleData.school_id },
+          { onConflict: "user_id,role,school_id", ignoreDuplicates: true }
+        );
+
     } else {
+      // Create new user
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password: genericPassword,
@@ -249,6 +285,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Create family record
     const { data: family, error: familyError } = await supabaseAdmin
       .from("families")
       .insert({ user_id: userId })
@@ -275,7 +312,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fire and forget: send welcome email only for NEW users
+    // Send welcome email only for NEW users
     if (!existingUser) {
       const { data: schoolData } = await supabaseAdmin
         .from("schools")

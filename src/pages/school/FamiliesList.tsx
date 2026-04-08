@@ -143,10 +143,41 @@ export default function FamiliesList() {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      const { data, error, count } = await supabase
+      // Step 1: Get all family IDs for this school that belong to representative users
+      const { data: allFamilySchools } = await supabase
+        .from("family_schools")
+        .select("family_id")
+        .eq("school_id", schoolId);
+
+      const allFamIds = (allFamilySchools || []).map((fs) => fs.family_id);
+      if (allFamIds.length === 0) return { families: [], count: 0 };
+
+      const { data: allFamiliesRaw } = await supabase
         .from("families")
-        .select("id, user_id, father_last_name, mother_last_name, contact_phone, address, is_suspended, family_schools!inner(school_id)", { count: "exact" })
-        .eq("family_schools.school_id", schoolId)
+        .select("id, user_id")
+        .in("id", allFamIds);
+
+      if (!allFamiliesRaw || allFamiliesRaw.length === 0) return { families: [], count: 0 };
+
+      const allUserIds = allFamiliesRaw.map((f) => f.user_id);
+      const { data: rolesCheck } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "representative")
+        .in("user_id", allUserIds);
+
+      const repUserIdsSet = new Set((rolesCheck || []).map((r) => r.user_id));
+      const validFamilyIds = allFamiliesRaw
+        .filter((f) => repUserIdsSet.has(f.user_id))
+        .map((f) => f.id);
+
+      if (validFamilyIds.length === 0) return { families: [], count: 0 };
+
+      // Step 2: Paginate only over valid family IDs
+      const { data, error } = await supabase
+        .from("families")
+        .select("id, user_id, father_last_name, mother_last_name, contact_phone, address, is_suspended")
+        .in("id", validFamilyIds)
         .range(from, to)
         .order("created_at", { ascending: false });
 
@@ -156,15 +187,14 @@ export default function FamiliesList() {
       const userIds = data.map((f) => f.user_id);
       const familyIds = data.map((f) => f.id);
 
-      const [rolesRes, emailsRes, repsRes, studentsRes] = await Promise.all([
-        supabase.from("user_roles").select("user_id").eq("role", "representative").in("user_id", userIds),
+      const [emailsRes, repsRes, studentsRes] = await Promise.all([
         supabase.functions.invoke("get-user-emails", { body: { userIds } }),
         supabase.from("representatives").select("family_id, form_data").in("family_id", familyIds),
         supabase.from("students").select("family_id, form_data").in("family_id", familyIds),
       ]);
 
-      const repUserIds = new Set((rolesRes.data || []).map((r) => r.user_id));
       const emails = emailsRes.data?.emails || {};
+      const totalCount = validFamilyIds.length;
 
       const repsByFamily = new Map<string, any[]>();
       for (const r of repsRes.data || []) {
@@ -186,7 +216,6 @@ export default function FamiliesList() {
       };
 
       const families: FamilyWithEmail[] = data
-        .filter((f) => repUserIds.has(f.user_id))
         .map((family) => {
           const reps = repsByFamily.get(family.id) || [];
           const students = studentsByFamily.get(family.id) || [];
