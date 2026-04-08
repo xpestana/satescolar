@@ -1,63 +1,67 @@
 
 
-# Plan: Insertar datos de prueba de pagos + becas
+# Plan: Corregir gestión de familias y roles
 
-## Resumen
+## Problema raíz
 
-Insertar directamente en la base de datos (vía script SQL) datos de prueba para el colegio "Santo Domingo de Guzmán": 20 conceptos de pago, 3 planes (Regular, Beca 50%, Beca 100%), y 7 métodos de pago (uno por tipo). No se requieren cambios de esquema ya que las becas se modelan ajustando el `amount` en `payment_plan_concepts`.
+La edge function `create-family` tiene dos bugs principales:
 
-## Datos a insertar
+1. **No valida el rol del usuario existente**: Si se crea una familia con un correo que ya pertenece a un usuario con rol `school` (el admin del colegio), la función crea un registro en `families` vinculado al `user_id` del admin. Esta familia queda "fantasma" porque el listado filtra por rol `representative`.
 
-### 20 Conceptos de Pago
+2. **No impide crear familias duplicadas para el mismo user_id**: Si el usuario ya existe y NO tiene familia, crea una nueva sin verificar que el usuario tenga un rol compatible.
 
-| # | Nombre | Tipo | Monto (VES) |
-|---|--------|------|-------------|
-| 1 | Inscripción | inscripcion | 150.00 |
-| 2 | Reinscripción | inscripcion | 120.00 |
-| 3 | Mensualidad Octubre | mensualidad | 80.00 |
-| 4 | Mensualidad Noviembre | mensualidad | 80.00 |
-| 5 | Mensualidad Diciembre | mensualidad | 80.00 |
-| 6 | Mensualidad Enero | mensualidad | 80.00 |
-| 7 | Mensualidad Febrero | mensualidad | 80.00 |
-| 8 | Mensualidad Marzo | mensualidad | 80.00 |
-| 9 | Mensualidad Abril | mensualidad | 80.00 |
-| 10 | Mensualidad Mayo | mensualidad | 80.00 |
-| 11 | Mensualidad Junio | mensualidad | 80.00 |
-| 12 | Mensualidad Julio | mensualidad | 80.00 |
-| 13 | Uniforme Escolar | uniforme | 45.00 |
-| 14 | Uniforme Deportivo | uniforme | 35.00 |
-| 15 | Transporte Ida y Vuelta | transporte | 60.00 |
-| 16 | Transporte Solo Ida | transporte | 35.00 |
-| 17 | Laboratorio de Ciencias | laboratorio | 25.00 |
-| 18 | Laboratorio de Computación | laboratorio | 20.00 |
-| 19 | Material Didáctico | otro | 30.00 |
-| 20 | Seguro Estudiantil | otro | 15.00 |
+Esto explica por qué solo ves 1 familia cuando debería haber más: las familias creadas con correos de usuarios `school` quedan ocultas pero ocupan espacio en la base de datos.
 
-### 3 Planes de Pago
+## Paso 1: Diagnosticar datos actuales
 
-1. **Plan Regular** - Todos los conceptos a precio completo
-2. **Plan Beca 50%** - Mismos conceptos pero inscripción y mensualidades al 50%
-3. **Plan Beca 100%** - Inscripción y mensualidades a 0 (beca total), otros conceptos se mantienen
+Ejecutar consultas SQL para identificar:
+- Familias vinculadas a usuarios con rol distinto a `representative`
+- Usuarios con rol `representative` que NO tienen registro en `families`
+- Familias sin asociación en `family_schools`
+- Estudiantes huérfanos (sin familia válida)
 
-### 7 Métodos de Pago (uno por tipo)
+## Paso 2: Reparar datos existentes
 
-| Tipo | Etiqueta | Config |
-|------|----------|--------|
-| transferencia | Banesco Corriente | Banco 0134, cuenta ficticia |
-| pago_movil | Pago Móvil BDV | Banco 0102, teléfono ficticio |
-| zelle | Zelle Principal | correo ficticio |
-| efectivo | Efectivo Caja | VES, USD |
-| punto_venta | POS Banesco | Banco 0134 |
-| tarjeta_debito | Débito Mercantil | Banco 0105 |
-| tarjeta_credito | Crédito Provincial | Banco 0108 |
+Script SQL para:
+- Eliminar registros `family_schools` y `families` vinculados a usuarios con rol `school` o `admin` (son familias fantasma creadas por error)
+- Verificar que cada usuario `representative` tenga exactamente un registro en `families` y su correspondiente `family_schools`
 
-## Implementación
+## Paso 3: Corregir la edge function `create-family`
 
-Un solo script SQL ejecutado con `psql` que:
-1. Inserta los 20 conceptos y captura sus IDs con `RETURNING`
-2. Inserta los 3 planes y captura sus IDs
-3. Asocia conceptos a cada plan con montos ajustados según beca
-4. Inserta los 7 métodos de pago con sus configs JSON
+Modificar `supabase/functions/create-family/index.ts`:
 
-No se modifican archivos del proyecto. No se necesitan migraciones.
+- **Validar rol del usuario existente**: Si el email ya pertenece a un usuario con rol `school`, `admin` o `teacher`, rechazar la operación con un mensaje claro: "Este correo pertenece a una cuenta administrativa. Use un correo diferente."
+- **Evitar duplicados**: Verificar que no se cree un segundo registro `families` para el mismo `user_id`
+
+Cambio clave en la lógica (pseudocódigo):
+```text
+Si el usuario ya existe:
+  Si tiene rol != representative → ERROR "correo pertenece a cuenta administrativa"
+  Si ya tiene familia en este colegio → ERROR "ya existe"
+  Si tiene familia pero no en este colegio → asociar familia existente
+  Si NO tiene familia → crear familia + asociar
+Si el usuario no existe:
+  Crear usuario + rol representative + familia + asociar
+```
+
+## Paso 4: Corregir el conteo de paginación en FamiliesList
+
+En `src/pages/school/FamiliesList.tsx`, el `count` devuelto por la query paginada incluye familias de usuarios no-representative. El filtro `.filter(f => repUserIds.has(f.user_id))` en el cliente reduce la lista pero el `count` sigue siendo el total sin filtrar.
+
+**Solución**: Cambiar la query paginada para que use los `familyIds` ya filtrados del `globalCounts` query, o hacer la query en dos pasos (primero obtener IDs válidos, luego paginar sobre esos IDs).
+
+## Archivos a modificar
+
+| Archivo | Cambio |
+|---------|--------|
+| `supabase/functions/create-family/index.ts` | Validar rol del usuario existente antes de crear familia |
+| `src/pages/school/FamiliesList.tsx` | Corregir conteo de paginación para excluir familias fantasma |
+| (SQL via psql) | Diagnosticar y limpiar datos corruptos |
+
+## Orden de ejecución
+
+1. Diagnosticar datos con `psql` (read-only)
+2. Limpiar datos corruptos (script SQL)
+3. Corregir edge function
+4. Corregir paginación del listado
 
