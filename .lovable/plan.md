@@ -1,67 +1,87 @@
 
 
-# Plan: Corregir gestión de familias y roles
+# Plan: Docker + Docker Compose para desarrollo local completo
 
-## Problema raíz
+## Qué se creará
 
-La edge function `create-family` tiene dos bugs principales:
+### 1. `Dockerfile` (Frontend React)
+- Multi-stage build: `node:20-alpine` para build, `nginx:alpine` para servir
+- Variables `VITE_*` como build args inyectadas desde `.env`
 
-1. **No valida el rol del usuario existente**: Si se crea una familia con un correo que ya pertenece a un usuario con rol `school` (el admin del colegio), la función crea un registro en `families` vinculado al `user_id` del admin. Esta familia queda "fantasma" porque el listado filtra por rol `representative`.
+### 2. `docker-compose.yml`
+Servicios:
+- **`app`** — Frontend React (Nginx), puerto 3000
+- **`supabase-db`** — PostgreSQL 15, puerto 5432
+- **`supabase-auth`** — GoTrue (auth), puerto 9999
+- **`supabase-rest`** — PostgREST (API REST), puerto 3001
+- **`supabase-storage`** — Supabase Storage, puerto 5000
+- **`supabase-functions`** — Deno Edge Functions, puerto 5001
 
-2. **No impide crear familias duplicadas para el mismo user_id**: Si el usuario ya existe y NO tiene familia, crea una nueva sin verificar que el usuario tenga un rol compatible.
+Se usará la imagen oficial `supabase/` para cada componente.
 
-Esto explica por qué solo ves 1 familia cuando debería haber más: las familias creadas con correos de usuarios `school` quedan ocultas pero ocupan espacio en la base de datos.
+### 3. `nginx.conf`
+- SPA fallback (`try_files $uri /index.html`)
+- Gzip habilitado
 
-## Paso 1: Diagnosticar datos actuales
-
-Ejecutar consultas SQL para identificar:
-- Familias vinculadas a usuarios con rol distinto a `representative`
-- Usuarios con rol `representative` que NO tienen registro en `families`
-- Familias sin asociación en `family_schools`
-- Estudiantes huérfanos (sin familia válida)
-
-## Paso 2: Reparar datos existentes
-
-Script SQL para:
-- Eliminar registros `family_schools` y `families` vinculados a usuarios con rol `school` o `admin` (son familias fantasma creadas por error)
-- Verificar que cada usuario `representative` tenga exactamente un registro en `families` y su correspondiente `family_schools`
-
-## Paso 3: Corregir la edge function `create-family`
-
-Modificar `supabase/functions/create-family/index.ts`:
-
-- **Validar rol del usuario existente**: Si el email ya pertenece a un usuario con rol `school`, `admin` o `teacher`, rechazar la operación con un mensaje claro: "Este correo pertenece a una cuenta administrativa. Use un correo diferente."
-- **Evitar duplicados**: Verificar que no se cree un segundo registro `families` para el mismo `user_id`
-
-Cambio clave en la lógica (pseudocódigo):
-```text
-Si el usuario ya existe:
-  Si tiene rol != representative → ERROR "correo pertenece a cuenta administrativa"
-  Si ya tiene familia en este colegio → ERROR "ya existe"
-  Si tiene familia pero no en este colegio → asociar familia existente
-  Si NO tiene familia → crear familia + asociar
-Si el usuario no existe:
-  Crear usuario + rol representative + familia + asociar
+### 4. `.env.example`
+Plantilla con todas las variables necesarias:
+```
+POSTGRES_PASSWORD=your-super-secret-password
+JWT_SECRET=your-jwt-secret-at-least-32-chars
+ANON_KEY=...
+SERVICE_ROLE_KEY=...
+VITE_SUPABASE_URL=http://localhost:3001
+VITE_SUPABASE_PUBLISHABLE_KEY=...
+SMTP_HOST=...
+SMTP_PORT=...
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_FROM_EMAIL=...
+SMTP_FROM_NAME=...
 ```
 
-## Paso 4: Corregir el conteo de paginación en FamiliesList
+### 5. Scripts auxiliares para importar datos
 
-En `src/pages/school/FamiliesList.tsx`, el `count` devuelto por la query paginada incluye familias de usuarios no-representative. El filtro `.filter(f => repUserIds.has(f.user_id))` en el cliente reduce la lista pero el `count` sigue siendo el total sin filtrar.
+- **`scripts/export-schema.sh`** — Exporta el esquema completo (tablas, funciones, triggers, RLS policies) de la BD de producción usando `pg_dump --schema-only`
+- **`scripts/export-data.sh`** — Exporta datos seleccionados con `pg_dump --data-only` (tablas configurables)
+- **`scripts/import-to-local.sh`** — Aplica las migraciones de `supabase/migrations/` en orden al PostgreSQL local, luego importa datos si existen
+- **`scripts/seed-from-production.sh`** — Script todo-en-uno que conecta a la BD remota (usando `SUPABASE_DB_URL` del `.env`), exporta esquema+datos, y los importa al contenedor local
 
-**Solución**: Cambiar la query paginada para que use los `familyIds` ya filtrados del `globalCounts` query, o hacer la query en dos pasos (primero obtener IDs válidos, luego paginar sobre esos IDs).
+### 6. `scripts/generate-keys.sh`
+Genera `JWT_SECRET`, `ANON_KEY` y `SERVICE_ROLE_KEY` locales usando Node.js y `jsonwebtoken`, para no depender de claves de producción.
 
-## Archivos a modificar
+## Estructura de archivos
 
-| Archivo | Cambio |
-|---------|--------|
-| `supabase/functions/create-family/index.ts` | Validar rol del usuario existente antes de crear familia |
-| `src/pages/school/FamiliesList.tsx` | Corregir conteo de paginación para excluir familias fantasma |
-| (SQL via psql) | Diagnosticar y limpiar datos corruptos |
+```text
+/
+├── Dockerfile
+├── docker-compose.yml
+├── nginx.conf
+├── .env.example
+└── scripts/
+    ├── export-schema.sh
+    ├── export-data.sh
+    ├── import-to-local.sh
+    ├── seed-from-production.sh
+    └── generate-keys.sh
+```
 
-## Orden de ejecución
+## Flujo de uso
 
-1. Diagnosticar datos con `psql` (read-only)
-2. Limpiar datos corruptos (script SQL)
-3. Corregir edge function
-4. Corregir paginación del listado
+```text
+1. cp .env.example .env          # Configurar variables
+2. bash scripts/generate-keys.sh # Generar JWT y API keys locales
+3. docker-compose up -d          # Levantar todo
+4. bash scripts/import-to-local.sh  # Aplicar migraciones
+5. bash scripts/seed-from-production.sh  # (Opcional) Importar datos de producción
+6. Abrir http://localhost:3000
+```
+
+## Detalle técnico
+
+- Las 70 migraciones en `supabase/migrations/` se aplicarán secuencialmente al PostgreSQL local
+- Las edge functions (15 funciones) se montarán como volumen en el contenedor de Deno
+- Los buckets de storage (`school-logos`, `family-photos`, `school-assets`) se crearán automáticamente via script de inicialización
+- El `docker-compose.yml` usará `env_file: .env` para todas las variables sensibles — ninguna credencial estará hardcodeada
+- Los scripts de exportación/importación usan `SUPABASE_DB_URL` del `.env` para conectar a producción de forma segura
 
