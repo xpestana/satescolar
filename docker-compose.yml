@@ -1,0 +1,172 @@
+version: "3.8"
+
+services:
+  # ─── PostgreSQL ───
+  supabase-db:
+    image: supabase/postgres:15.6.1.143
+    container_name: sat-db
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/00-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ─── GoTrue (Auth) ───
+  supabase-auth:
+    image: supabase/gotrue:v2.158.1
+    container_name: sat-auth
+    ports:
+      - "9999:9999"
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://localhost:8000
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-http://localhost:3000}
+      GOTRUE_URI_ALLOW_LIST: ${GOTRUE_URI_ALLOW_LIST:-http://localhost:3000}
+      GOTRUE_DISABLE_SIGNUP: ${GOTRUE_DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: ${GOTRUE_JWT_EXP:-3600}
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${GOTRUE_EXTERNAL_EMAIL_ENABLED:-true}
+      GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM:-false}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_FROM_EMAIL}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_FROM_NAME:-SAT Escolar}
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── PostgREST (REST API) ───
+  supabase-rest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: sat-rest
+    ports:
+      - "3001:3000"
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB:-postgres}
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Supabase Storage ───
+  supabase-storage:
+    image: supabase/storage-api:v1.11.13
+    container_name: sat-storage
+    ports:
+      - "5000:5000"
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://supabase-rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB:-postgres}
+      FILE_SIZE_LIMIT: 52428800
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      GLOBAL_S3_BUCKET: stub
+      IS_MULTITENANT: "false"
+    volumes:
+      - storagedata:/var/lib/storage
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-rest:
+        condition: service_started
+    restart: unless-stopped
+
+  # ─── Kong (API Gateway) ───
+  supabase-kong:
+    image: kong:2.8.1
+    container_name: sat-kong
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    volumes:
+      - ./docker/kong.yml:/var/lib/kong/kong.yml
+    depends_on:
+      - supabase-auth
+      - supabase-rest
+      - supabase-storage
+    restart: unless-stopped
+
+  # ─── Edge Functions (Deno) ───
+  supabase-functions:
+    image: supabase/edge-runtime:v1.58.3
+    container_name: sat-functions
+    ports:
+      - "5001:9000"
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://supabase-kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB:-postgres}
+      VERIFY_JWT: "false"
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-SAT Escolar}
+    volumes:
+      - ./supabase/functions:/home/deno/functions
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Frontend (React + Nginx) ───
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-http://localhost:8000}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID:-local}
+    container_name: sat-app
+    ports:
+      - "3000:80"
+    depends_on:
+      - supabase-kong
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  storagedata:
