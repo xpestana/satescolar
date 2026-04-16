@@ -48,6 +48,7 @@ import ClassroomList from "./pages/teacher/ClassroomList";
 import ClassroomDetail from "./pages/teacher/ClassroomDetail";
 import ChildClassroom from "./pages/representative/ChildClassroom";
 import ClassroomAccessCodes from "./pages/school/ClassroomAccessCodes";
+import ClassroomSupervision from "./pages/school/ClassroomSupervision";
 import AttendanceScan from "./pages/AttendanceScan";
 import AttendanceScanner from "./pages/school/AttendanceScanner";
 import AttendanceList from "./pages/school/AttendanceList";
@@ -337,6 +338,7 @@ const App = () => (
               <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
               <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
               <Route path="/school/aula-virtual/codigos" element={<ProtectedRoute requiredRole="school"><ClassroomAccessCodes /></ProtectedRoute>} />
+              <Route path="/school/aula-virtual/supervision" element={<ProtectedRoute requiredRole="school"><ClassroomSupervision /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
