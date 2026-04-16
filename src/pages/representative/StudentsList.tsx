@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText, AlertTriangle, BookOpen, Key, Copy } from "lucide-react";
+import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText, AlertTriangle, BookOpen, Key, Copy, Info, ArrowRight, MonitorSmartphone, ShieldCheck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
