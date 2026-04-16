@@ -79,7 +79,7 @@ export function SubmissionReview({ activity, onBack }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("all");
-  const [gradingSubmission, setGradingSubmission] = useState<(Submission & { student: StudentInfo }) | null>(null);
+  const [gradingSubmission, setGradingSubmission] = useState<{ submission: Submission | null; student: StudentInfo } | null>(null);
   const [gradeScore, setGradeScore] = useState("");
   const [gradeFeedback, setGradeFeedback] = useState("");
 
