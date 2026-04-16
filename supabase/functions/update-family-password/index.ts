@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     });
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "No autorizado" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -30,19 +30,22 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
       return new Response(
         JSON.stringify({ error: "No autorizado" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    const userId = claimsData.claims.sub as string;
+
     // Verify requesting user has school or admin role
-    const { data: roleData } = await supabaseClient
+    const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("school_id, role")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .single();
 
     if (!roleData || !["school", "admin"].includes(roleData.role)) {
