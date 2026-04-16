@@ -160,6 +160,7 @@ const navSections: NavSection[] = [
     requiredRole: "teacher",
     items: [
       { label: "Materias", href: "/teacher/materias", icon: BookOpen, requiredRole: "teacher" },
+      { label: "Aula Virtual", href: "/teacher/aula-virtual", icon: GraduationCap, requiredRole: "teacher" },
       { label: "Carnet", href: "/teacher/carnet", icon: CreditCard, requiredRole: "teacher" },
     ],
   },
