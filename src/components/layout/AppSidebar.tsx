@@ -94,6 +94,7 @@ const navSections: NavSection[] = [
       { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school" },
       { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school" },
       { label: "Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school" },
+      { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school" },
     ],
   },
   {
