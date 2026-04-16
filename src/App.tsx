@@ -46,6 +46,8 @@ import TeacherCarnet from "./pages/teacher/TeacherCarnet";
 import TeacherGrades from "./pages/teacher/TeacherGrades";
 import ClassroomList from "./pages/teacher/ClassroomList";
 import ClassroomDetail from "./pages/teacher/ClassroomDetail";
+import ChildClassroom from "./pages/representative/ChildClassroom";
+import ClassroomAccessCodes from "./pages/school/ClassroomAccessCodes";
 import AttendanceScan from "./pages/AttendanceScan";
 import AttendanceScanner from "./pages/school/AttendanceScanner";
 import AttendanceList from "./pages/school/AttendanceList";
@@ -314,6 +316,7 @@ const App = () => (
               <Route path="/representative/representante/:representativeId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddRepresentative /></ProtectedRoute>} />
               <Route path="/representative/estudiante/nuevo" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
               <Route path="/representative/estudiante/:studentId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
+              <Route path="/representative/aula-virtual/:studentId" element={<ProtectedRoute requiredRole="representative"><ChildClassroom /></ProtectedRoute>} />
               {/* Teacher routes */}
               <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
               <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
@@ -333,6 +336,7 @@ const App = () => (
               <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><StudentLedger /></ProtectedRoute>} />
               <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
               <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
+              <Route path="/school/aula-virtual/codigos" element={<ProtectedRoute requiredRole="school"><ClassroomAccessCodes /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
