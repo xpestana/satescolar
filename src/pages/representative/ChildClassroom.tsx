@@ -11,6 +11,7 @@ import { BookOpen, Calendar, FileText, Clock, CheckCircle2, AlertCircle, Chevron
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { AccessCodeGate } from "@/components/classroom/AccessCodeGate";
+import { ChildClassroomTutorial } from "@/components/classroom/ClassroomTutorial";
 import { formatGradeLevel } from "@/lib/utils";
 
 export default function ChildClassroom() {
@@ -203,6 +204,8 @@ export default function ChildClassroom() {
           { label: "Aula Virtual" },
         ]}
       />
+
+      <ChildClassroomTutorial />
 
       {!selectedAssignment ? (
         // Subject cards grid
