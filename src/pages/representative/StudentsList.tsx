@@ -232,9 +232,68 @@ export default function StudentsList() {
     }
   };
 
+  const [tutorialOpen, setTutorialOpen] = useState(true);
+
   return (
     <DashboardLayout>
       <PageHeader title="Mis Estudiantes" breadcrumbs={[{ label: "Dashboard", href: "/representative/dashboard" }, { label: "Estudiantes" }]} />
+
+      {/* Tutorial: Cómo acceder al Aula Virtual */}
+      <Collapsible open={tutorialOpen} onOpenChange={setTutorialOpen} className="mb-6">
+        <Alert className="border-primary/30 bg-primary/5">
+          <Info className="h-4 w-4 text-primary" />
+          <AlertDescription className="flex items-center justify-between w-full">
+            <span className="font-medium text-sm">¿Cómo acceder al Aula Virtual de mi representado?</span>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="ml-2">
+                {tutorialOpen ? "Ocultar" : "Ver tutorial"}
+              </Button>
+            </CollapsibleTrigger>
+          </AlertDescription>
+        </Alert>
+        <CollapsibleContent>
+          <Card className="mt-2 border-primary/20">
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">1</div>
+                  <div>
+                    <p className="font-semibold text-sm mb-1 flex items-center gap-1.5">
+                      <Key className="h-4 w-4 text-primary" /> Copiar el Código
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Cada estudiante inscrito tiene un <strong>Código Aula</strong> visible en su tarjeta. Presione el ícono de copiar para guardarlo.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">2</div>
+                  <div>
+                    <p className="font-semibold text-sm mb-1 flex items-center gap-1.5">
+                      <MonitorSmartphone className="h-4 w-4 text-primary" /> Entrar al Aula Virtual
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Presione el botón <strong>"Aula Virtual"</strong> en la tarjeta del estudiante para acceder a la pantalla de verificación.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">3</div>
+                  <div>
+                    <p className="font-semibold text-sm mb-1 flex items-center gap-1.5">
+                      <ShieldCheck className="h-4 w-4 text-primary" /> Verificar Acceso
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Pegue el código copiado en el campo de verificación y presione <strong>"Verificar Acceso"</strong>. Podrá ver materias, actividades y calificaciones.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
+
       <div className="bg-card rounded-lg shadow-sm border p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold">Estudiantes</h2>
@@ -301,6 +360,8 @@ export default function StudentsList() {
               </Card>
             ))}
           </div>
+        )}
+      </div>
         )}
       </div>
 
