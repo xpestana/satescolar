@@ -47,7 +47,7 @@ import TeacherGrades from "./pages/teacher/TeacherGrades";
 import ClassroomList from "./pages/teacher/ClassroomList";
 import ClassroomDetail from "./pages/teacher/ClassroomDetail";
 import ChildClassroom from "./pages/representative/ChildClassroom";
-import ClassroomAccessCodes from "./pages/school/ClassroomAccessCodes";
+
 import ClassroomSupervision from "./pages/school/ClassroomSupervision";
 import AttendanceScan from "./pages/AttendanceScan";
 import AttendanceScanner from "./pages/school/AttendanceScanner";

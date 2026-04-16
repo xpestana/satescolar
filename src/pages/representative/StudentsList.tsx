@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText, AlertTriangle, BookOpen } from "lucide-react";
+import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText, AlertTriangle, BookOpen, Key, Copy } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +48,29 @@ export default function StudentsList() {
   });
 
   const { data: carnetConfig } = useCarnetConfig(school?.id);
+
+  // Fetch access codes for all students
+  const { data: accessCodes = [] } = useQuery({
+    queryKey: ["classroom-access-codes", familyId, school?.id],
+    queryFn: async () => {
+      const studentIds = students.map((s) => s.id);
+      if (!studentIds.length) return [];
+      const { data } = await supabase
+        .from("classroom_access_codes")
+        .select("student_id, access_code, is_active")
+        .in("student_id", studentIds)
+        .eq("is_active", true);
+      return data || [];
+    },
+    enabled: !!familyId && students.length > 0,
+  });
+
+  const getAccessCode = (studentId: string) => accessCodes.find((c) => c.student_id === studentId);
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast.success("Código copiado al portapapeles");
+  };
 
   const getName = (s: any) => {
     const fd = s.form_data as Record<string, any> || {};
@@ -238,6 +261,17 @@ export default function StudentsList() {
                       <Badge variant={student.status === "active" ? "default" : "secondary"} className="mt-1">{getStatusLabel(student.status)}</Badge>
                     </div>
                   </div>
+                  {/* Access code display */}
+                  {getAccessCode(student.id) && (
+                    <div className="flex items-center gap-2 mb-3 p-2 bg-muted/50 rounded-md">
+                      <Key className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      <span className="text-xs text-muted-foreground">Código Aula:</span>
+                      <code className="text-xs font-mono font-semibold tracking-wider">{getAccessCode(student.id)!.access_code}</code>
+                      <Button size="icon" variant="ghost" className="h-5 w-5 ml-auto" onClick={() => copyCode(getAccessCode(student.id)!.access_code)}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 flex-wrap">
                     <Button size="sm" variant="outline" onClick={() => navigate(`/representative/estudiante/${student.id}/editar`)}>
                       <Edit className="h-3 w-3 mr-1" /> Editar
