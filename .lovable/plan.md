@@ -1,87 +1,201 @@
 
 
-# Plan: Docker + Docker Compose para desarrollo local completo
+# Plan: Módulo Aula Virtual — Implementación por Fases
 
-## Qué se creará
+Este es un módulo de gran escala (~15-20 tablas nuevas, ~30+ pantallas, ~10+ componentes complejos). Se implementará en **5 fases incrementales**, cada una entregando funcionalidad usable.
 
-### 1. `Dockerfile` (Frontend React)
-- Multi-stage build: `node:20-alpine` para build, `nginx:alpine` para servir
-- Variables `VITE_*` como build args inyectadas desde `.env`
+---
 
-### 2. `docker-compose.yml`
-Servicios:
-- **`app`** — Frontend React (Nginx), puerto 3000
-- **`supabase-db`** — PostgreSQL 15, puerto 5432
-- **`supabase-auth`** — GoTrue (auth), puerto 9999
-- **`supabase-rest`** — PostgREST (API REST), puerto 3001
-- **`supabase-storage`** — Supabase Storage, puerto 5000
-- **`supabase-functions`** — Deno Edge Functions, puerto 5001
+## Fase 1: Fundación — Base de datos, configuración de aula y vista de materias del docente
 
-Se usará la imagen oficial `supabase/` para cada componente.
-
-### 3. `nginx.conf`
-- SPA fallback (`try_files $uri /index.html`)
-- Gzip habilitado
-
-### 4. `.env.example`
-Plantilla con todas las variables necesarias:
-```
-POSTGRES_PASSWORD=your-super-secret-password
-JWT_SECRET=your-jwt-secret-at-least-32-chars
-ANON_KEY=...
-SERVICE_ROLE_KEY=...
-VITE_SUPABASE_URL=http://localhost:3001
-VITE_SUPABASE_PUBLISHABLE_KEY=...
-SMTP_HOST=...
-SMTP_PORT=...
-SMTP_USER=...
-SMTP_PASS=...
-SMTP_FROM_EMAIL=...
-SMTP_FROM_NAME=...
-```
-
-### 5. Scripts auxiliares para importar datos
-
-- **`scripts/export-schema.sh`** — Exporta el esquema completo (tablas, funciones, triggers, RLS policies) de la BD de producción usando `pg_dump --schema-only`
-- **`scripts/export-data.sh`** — Exporta datos seleccionados con `pg_dump --data-only` (tablas configurables)
-- **`scripts/import-to-local.sh`** — Aplica las migraciones de `supabase/migrations/` en orden al PostgreSQL local, luego importa datos si existen
-- **`scripts/seed-from-production.sh`** — Script todo-en-uno que conecta a la BD remota (usando `SUPABASE_DB_URL` del `.env`), exporta esquema+datos, y los importa al contenedor local
-
-### 6. `scripts/generate-keys.sh`
-Genera `JWT_SECRET`, `ANON_KEY` y `SERVICE_ROLE_KEY` locales usando Node.js y `jsonwebtoken`, para no depender de claves de producción.
-
-## Estructura de archivos
+### Tablas nuevas (migración SQL)
 
 ```text
-/
-├── Dockerfile
-├── docker-compose.yml
-├── nginx.conf
-├── .env.example
-└── scripts/
-    ├── export-schema.sh
-    ├── export-data.sh
-    ├── import-to-local.sh
-    ├── seed-from-production.sh
-    └── generate-keys.sh
+classroom_config          — personalización del aula por assignment (portada, color, descripción, normas, bienvenida)
+classroom_topics          — temas/unidades creados por el docente dentro de una materia
+classroom_posts           — publicaciones del muro (anuncios, tipo: announcement/material/assignment/question)
+classroom_post_attachments — archivos adjuntos a publicaciones
+classroom_activities      — tareas, cuestionarios, materiales (tipo: task/quiz/forum/material/link/video/document)
+classroom_activity_attachments — archivos adjuntos a actividades
+classroom_submissions     — entregas de alumnos
+classroom_submission_attachments — archivos adjuntos a entregas
+classroom_comments        — comentarios en posts y actividades (públicos y privados)
+classroom_rubrics         — rúbricas por actividad
+classroom_rubric_criteria — criterios de la rúbrica con niveles y puntaje
+classroom_events          — eventos del calendario del aula
+classroom_access_codes    — código anual + QR por alumno por año escolar
+classroom_access_log      — bitácora de accesos del representante
+classroom_notifications   — notificaciones internas del módulo
 ```
 
-## Flujo de uso
+### Relaciones clave con tablas existentes
+
+- `classroom_config.assignment_id` → `subject_teacher_assignments.id` (1:1)
+- `classroom_activities.evaluation_plan_item_id` → `evaluation_plan_items.id` (vinculación con notas)
+- `classroom_submissions.student_id` → `students.id`
+- `classroom_access_codes.student_id` → `students.id`, `.school_year_id` → `school_years.id`
+- Todas las tablas llevan `school_id` para RLS multi-tenant
+
+### RLS Policies
+
+- Docente: CRUD en config/topics/posts/activities de sus assignments
+- Alumno: SELECT en posts/activities de sus enrollments, INSERT en submissions/comments
+- Representante: SELECT filtrado por student_id de sus hijos (via families → students)
+- School/Admin: SELECT/UPDATE completo por school_id
+
+### Pantallas (Fase 1)
+
+1. **Docente: Lista de Aulas** (`/teacher/aula-virtual`) — tarjetas tipo Classroom por materia asignada
+2. **Docente: Configuración del Aula** — modal/página para portada, color, descripción, normas
+3. **Docente: Gestión de Temas** — crear/editar/reordenar/ocultar temas dentro de una materia
+
+### Storage
+
+- Nuevo bucket `classroom-files` (público) para archivos adjuntos
+
+### Navegación
+
+- Agregar "Aula Virtual" al sidebar del docente
+- Nueva ruta `/teacher/aula-virtual`
+- Nueva ruta `/teacher/aula-virtual/:assignmentId`
+
+---
+
+## Fase 2: Muro (Stream) y Trabajo de Clase
+
+### Pantallas
+
+4. **Muro/Stream** — vista tipo feed con anuncios, publicaciones fijadas, adjuntos
+5. **Trabajo de Clase** — listado organizado por temas con tipos de contenido
+6. **Crear/Editar Actividad** — formulario completo (título, descripción, instrucciones, fecha entrega, puntaje, adjuntos, tema, rúbrica, vinculación con plan de evaluación, programación/borrador)
+7. **Crear/Editar Publicación** — anuncios con adjuntos, comentarios habilitables, programación
+
+### Funcionalidades
+
+- Publicación inmediata, borrador y programación
+- Fijar publicaciones
+- Habilitar/deshabilitar comentarios por publicación
+- Adjuntar archivos, enlaces, videos
+- Vincular actividad evaluada con `evaluation_plan_items` existente (momento + porcentaje)
+
+---
+
+## Fase 3: Entregas, Calificación y Rúbricas
+
+### Pantallas
+
+8. **Vista del Alumno: Mis Materias** (`/student/aula-virtual`) — tarjetas de materias activas
+9. **Vista del Alumno: Detalle Materia** — muro, trabajo, calendario, entregas
+10. **Entrega de Actividad** — subir archivos, texto, enlaces, reemplazar antes del vencimiento
+11. **Docente: Revisar Entregas** — listado con filtros por estado, calificar, devolver con observaciones
+12. **Docente: Vista Individual del Alumno** — resumen completo por materia
+13. **Rúbricas** — creación por actividad, vista previa para alumno, calificación con rúbrica
+
+### Estados de entrega
+
+`pending` | `submitted` | `submitted_late` | `reviewed` | `graded` | `expired` | `not_submitted`
+
+### Integración con Notas
+
+- Al calificar una actividad vinculada a `evaluation_plan_item_id`, se puede reflejar opcionalmente en `student_grades`
+
+---
+
+## Fase 4: Acceso del Representante, Códigos QR y Seguridad
+
+### Pantallas
+
+14. **Representante: Botón "Aula Virtual" por hijo** en dashboard existente
+15. **Representante: Vista del Aula del Hijo** — materias, muro filtrado, calendario, tareas, entregas, pendientes, vencidas
+16. **Validación de Código de Acceso** — pantalla intermedia que pide código anual antes de entrar
+17. **Admin/School: Gestión de Códigos** — regenerar códigos, ver bitácora de accesos
+
+### Seguridad
+
+- `classroom_access_codes`: código UUID único por alumno + año escolar, auto-generado
+- QR que codifica URL + token (no da acceso directo sin validación)
+- Control de intentos fallidos (max 5, bloqueo temporal)
+- Bitácora en `classroom_access_log`
+- Expiración al cambiar de año escolar
+- Representante NUNCA ve datos de otros alumnos (RLS estricto por student → family → user)
+
+### Configuración institucional
+
+- El school define qué ve el representante (calificaciones sí/no, observaciones docente sí/no)
+
+---
+
+## Fase 5: Calendario, Notificaciones y Supervisión Escolar
+
+### Pantallas
+
+18. **Calendario del Aula** — vista mensual/semanal alimentada por `evaluation_plan_items` + `classroom_activities` + `classroom_events`
+19. **Panel de Notificaciones** — nueva tarea, tarea por vencer, calificación disponible, comentario del docente
+20. **School: Supervisión de Aulas** — listado de todas las aulas activas, auditoría
+21. **School: Configuración del Módulo** — permisos globales, visibilidad representante, políticas institucionales
+22. **Archivado de Aula** — archivar por periodo, reutilizar publicaciones
+
+### Notificaciones
+
+- Tabla `classroom_notifications` con tipo, destinatario, leído/no leído
+- Opcional: integración con edge function `send-email` existente para notificaciones por correo
+
+---
+
+## Modelo de datos resumido
 
 ```text
-1. cp .env.example .env          # Configurar variables
-2. bash scripts/generate-keys.sh # Generar JWT y API keys locales
-3. docker-compose up -d          # Levantar todo
-4. bash scripts/import-to-local.sh  # Aplicar migraciones
-5. bash scripts/seed-from-production.sh  # (Opcional) Importar datos de producción
-6. Abrir http://localhost:3000
+subject_teacher_assignments (existente)
+  └── classroom_config (1:1)
+  └── classroom_topics (1:N)
+  └── classroom_posts (1:N)
+       └── classroom_post_attachments (1:N)
+       └── classroom_comments (1:N)
+  └── classroom_activities (1:N)
+       └── classroom_activity_attachments (1:N)
+       └── classroom_submissions (1:N por alumno)
+            └── classroom_submission_attachments (1:N)
+       └── classroom_rubrics (1:1)
+            └── classroom_rubric_criteria (1:N)
+       └── classroom_comments (1:N)
+  └── classroom_events (1:N)
+
+students (existente)
+  └── classroom_access_codes (1:N por año escolar)
+
+classroom_access_log (bitácora plana)
+classroom_notifications (notificaciones)
 ```
 
-## Detalle técnico
+---
 
-- Las 70 migraciones en `supabase/migrations/` se aplicarán secuencialmente al PostgreSQL local
-- Las edge functions (15 funciones) se montarán como volumen en el contenedor de Deno
-- Los buckets de storage (`school-logos`, `family-photos`, `school-assets`) se crearán automáticamente via script de inicialización
-- El `docker-compose.yml` usará `env_file: .env` para todas las variables sensibles — ninguna credencial estará hardcodeada
-- Los scripts de exportación/importación usan `SUPABASE_DB_URL` del `.env` para conectar a producción de forma segura
+## Archivos principales a crear
+
+| Ruta | Descripción |
+|------|-------------|
+| `src/pages/teacher/ClassroomList.tsx` | Lista de aulas del docente |
+| `src/pages/teacher/ClassroomDetail.tsx` | Detalle del aula con tabs (Muro, Trabajo, Calendario, Personas) |
+| `src/components/classroom/StreamFeed.tsx` | Muro/Stream |
+| `src/components/classroom/ClassworkList.tsx` | Trabajo de clase organizado por temas |
+| `src/components/classroom/ActivityForm.tsx` | Crear/editar actividad |
+| `src/components/classroom/SubmissionReview.tsx` | Revisar entregas |
+| `src/components/classroom/RubricEditor.tsx` | Editor de rúbricas |
+| `src/components/classroom/ClassroomCalendar.tsx` | Calendario |
+| `src/components/classroom/TopicsManager.tsx` | Gestión de temas |
+| `src/components/classroom/ClassroomConfig.tsx` | Configuración del aula |
+| `src/pages/representative/ChildClassroom.tsx` | Vista del representante por hijo |
+| `src/components/classroom/AccessCodeGate.tsx` | Validación de código de acceso |
+| `src/hooks/useClassroomData.ts` | Hook principal de datos del aula |
+
+---
+
+## Primera acción al aprobar
+
+1. Corregir los 7 errores de build existentes en edge functions (tipos `unknown` y `null` checks)
+2. Crear migración con las primeras 6 tablas (config, topics, posts, attachments, comments, activities)
+3. Crear bucket `classroom-files`
+4. Implementar `ClassroomList.tsx` y `ClassroomConfig.tsx` con rutas y sidebar
+5. Implementar `TopicsManager.tsx`
+
+Esto entrega en la Fase 1 la base funcional: el docente entra, ve sus materias como aulas, configura cada una y organiza temas.
 
