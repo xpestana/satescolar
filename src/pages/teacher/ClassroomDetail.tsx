@@ -16,6 +16,7 @@ import { ClassworkList } from "@/components/classroom/ClassworkList";
 import { PeopleList } from "@/components/classroom/PeopleList";
 import { ClassroomCalendar } from "@/components/classroom/ClassroomCalendar";
 import { ClassroomNotifications } from "@/components/classroom/ClassroomNotifications";
+import { ClassroomDetailTutorial } from "@/components/classroom/ClassroomTutorial";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -105,6 +106,8 @@ export default function ClassroomDetail() {
           <p className="text-sm text-muted-foreground">{config.welcome_message}</p>
         </div>
       )}
+
+      <ClassroomDetailTutorial />
 
       {/* Tabs */}
       <Tabs defaultValue="stream" className="space-y-4">
