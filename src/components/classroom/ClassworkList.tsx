@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useClassroomTopics, type ClassroomTopic } from "@/hooks/useClassroomData";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus, FileText, ClipboardList, HelpCircle, BookOpen, Link as LinkIcon,
   Video, File, ChevronDown, ChevronRight, Loader2, Clock, CheckCircle2,
+  Users, ClipboardCheck, Ruler,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { ActivityFormModal } from "@/components/classroom/ActivityFormModal";
+import { SubmissionReview } from "@/components/classroom/SubmissionReview";
+import { RubricEditor } from "@/components/classroom/RubricEditor";
 
 interface Props {
   assignmentId: string;
@@ -52,10 +55,14 @@ const STATUS_BADGE: Record<string, { label: string; variant: "default" | "second
   scheduled: { label: "Programado", variant: "outline" },
 };
 
+const EVALUABLE_TYPES = ["task", "quiz", "evaluated", "forum"];
+
 export function ClassworkList({ assignmentId, schoolId }: Props) {
   const { data: topics = [], isLoading: topicsLoading } = useClassroomTopics(assignmentId);
   const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
   const [activityModal, setActivityModal] = useState<{ open: boolean; topicId?: string; activity?: Activity }>({ open: false });
+  const [reviewActivity, setReviewActivity] = useState<Activity | null>(null);
+  const [rubricActivity, setRubricActivity] = useState<Activity | null>(null);
 
   const { data: activities = [], isLoading: activitiesLoading } = useQuery({
     queryKey: ["classroom-activities", assignmentId],
@@ -80,6 +87,16 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
     );
   }
 
+  // Show submission review mode
+  if (reviewActivity) {
+    return (
+      <SubmissionReview
+        activity={reviewActivity}
+        onBack={() => setReviewActivity(null)}
+      />
+    );
+  }
+
   const visibleTopics = topics.filter((t) => !t.is_archived);
   const noTopicActivities = activities.filter((a) => !a.topic_id);
 
@@ -92,40 +109,68 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
     });
   };
 
+  const isEvaluable = (type: string) => EVALUABLE_TYPES.includes(type);
+
   const renderActivity = (activity: Activity) => {
     const config = ACTIVITY_TYPE_CONFIG[activity.activity_type] || ACTIVITY_TYPE_CONFIG.task;
     const Icon = config.icon;
     const statusBadge = STATUS_BADGE[activity.status] || STATUS_BADGE.draft;
 
     return (
-      <Card
-        key={activity.id}
-        className="hover:shadow-sm transition-shadow cursor-pointer"
-        onClick={() => setActivityModal({ open: true, activity })}
-      >
-        <CardContent className="p-3 flex items-center gap-3">
-          <div className={`flex-shrink-0 p-2 rounded-full bg-muted ${config.color}`}>
-            <Icon className="h-4 w-4" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm truncate">{activity.title}</span>
-              {activity.status !== "published" && (
-                <Badge variant={statusBadge.variant} className="text-[10px] py-0">
-                  {statusBadge.label}
-                </Badge>
-              )}
+      <Card key={activity.id} className="hover:shadow-sm transition-shadow">
+        <CardContent className="p-3">
+          <div className="flex items-center gap-3">
+            <div className={`flex-shrink-0 p-2 rounded-full bg-muted ${config.color}`}>
+              <Icon className="h-4 w-4" />
             </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-              <span>{config.label}</span>
-              {activity.due_date && (
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Entrega: {format(new Date(activity.due_date), "d MMM, HH:mm", { locale: es })}
-                </span>
-              )}
-              {activity.max_score != null && (
-                <span>{activity.max_score} pts</span>
+            <div
+              className="flex-1 min-w-0 cursor-pointer"
+              onClick={() => setActivityModal({ open: true, activity })}
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-sm truncate">{activity.title}</span>
+                {activity.status !== "published" && (
+                  <Badge variant={statusBadge.variant} className="text-[10px] py-0">
+                    {statusBadge.label}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+                <span>{config.label}</span>
+                {activity.due_date && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Entrega: {format(new Date(activity.due_date), "d MMM, HH:mm", { locale: es })}
+                  </span>
+                )}
+                {activity.max_score != null && (
+                  <span>{activity.max_score} pts</span>
+                )}
+              </div>
+            </div>
+            {/* Action buttons */}
+            <div className="flex gap-1 flex-shrink-0">
+              {isEvaluable(activity.activity_type) && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs h-7 px-2"
+                    onClick={(e) => { e.stopPropagation(); setReviewActivity(activity); }}
+                    title="Ver entregas"
+                  >
+                    <ClipboardCheck className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs h-7 px-2"
+                    onClick={(e) => { e.stopPropagation(); setRubricActivity(activity); }}
+                    title="Rúbrica"
+                  >
+                    <Ruler className="h-3.5 w-3.5" />
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -217,6 +262,17 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
           topics={visibleTopics}
           defaultTopicId={activityModal.topicId}
           activity={activityModal.activity}
+        />
+      )}
+
+      {/* Rubric Editor Modal */}
+      {rubricActivity && (
+        <RubricEditor
+          open={!!rubricActivity}
+          onClose={() => setRubricActivity(null)}
+          activityId={rubricActivity.id}
+          schoolId={schoolId}
+          maxScore={rubricActivity.max_score}
         />
       )}
     </div>
