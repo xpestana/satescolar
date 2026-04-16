@@ -24,6 +24,7 @@ import {
   QrCode,
   ClipboardList,
   Bell,
+  Key,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -130,6 +131,7 @@ const navSections: NavSection[] = [
       { label: "Carnet", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school" },
       { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school" },
       { label: "Config. Morosidad", href: "/pagos/morosidad", icon: Bell, requiredRole: "school" },
+      { label: "Códigos Aula Virtual", href: "/school/aula-virtual/codigos", icon: Key, requiredRole: "school" },
     ],
   },
   // Representative

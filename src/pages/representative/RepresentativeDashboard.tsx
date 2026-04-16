@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, GraduationCap, AlertCircle, School } from "lucide-react";
+import { Users, GraduationCap, AlertCircle, School, BookOpen } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 
@@ -173,7 +174,7 @@ export default function RepresentativeDashboard() {
             {students.map((student) => (
               <Card key={student.id}>
                 <CardContent className="pt-6">
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 mb-3">
                     <Avatar className="h-16 w-16">
                       <AvatarImage src={student.photo_url || ""} />
                       <AvatarFallback className="bg-primary/10 text-primary text-lg">
@@ -188,6 +189,15 @@ export default function RepresentativeDashboard() {
                       </Badge>
                     </div>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate(`/representative/aula-virtual/${student.id}`)}
+                  >
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Aula Virtual
+                  </Button>
                 </CardContent>
               </Card>
             ))}
