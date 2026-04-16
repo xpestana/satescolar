@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Settings, MessageSquare, BookOpen, Calendar, Users, Loader2 } from "lucide-react";
 import { ClassroomConfigModal } from "@/components/classroom/ClassroomConfigModal";
 import { TopicsManager } from "@/components/classroom/TopicsManager";
+import { StreamFeed } from "@/components/classroom/StreamFeed";
+import { ClassworkList } from "@/components/classroom/ClassworkList";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -119,18 +121,17 @@ export default function ClassroomDetail() {
         </TabsList>
 
         <TabsContent value="stream">
-          <div className="text-center py-12 text-muted-foreground">
-            <MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p className="font-medium">Muro del aula</p>
-            <p className="text-sm mt-1">Próximamente: publicaciones, anuncios y comentarios.</p>
-          </div>
+          <StreamFeed
+            assignmentId={assignmentId!}
+            schoolId={assignment.school_id}
+            allowStudentPosts={config?.allow_student_posts}
+          />
         </TabsContent>
 
         <TabsContent value="classwork">
           <TopicsManager assignmentId={assignmentId!} schoolId={assignment.school_id} />
-          <div className="text-center py-8 text-muted-foreground mt-4">
-            <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">Próximamente: tareas, materiales y evaluaciones organizados por temas.</p>
+          <div className="mt-6">
+            <ClassworkList assignmentId={assignmentId!} schoolId={assignment.school_id} />
           </div>
         </TabsContent>
 
