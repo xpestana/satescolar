@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Users, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ClassroomListTutorial } from "@/components/classroom/ClassroomTutorial";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -92,6 +93,8 @@ export default function ClassroomList() {
         title="Aula Virtual"
         breadcrumbs={[{ label: "Inicio", href: "/teacher/dashboard" }, { label: "Aula Virtual" }]}
       />
+
+      <ClassroomListTutorial />
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
