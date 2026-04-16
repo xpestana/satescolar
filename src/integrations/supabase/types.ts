@@ -218,6 +218,886 @@ export type Database = {
           },
         ]
       }
+      classroom_access_codes: {
+        Row: {
+          access_code: string
+          created_at: string
+          failed_attempts: number
+          id: string
+          is_active: boolean
+          locked_until: string | null
+          school_id: string
+          school_year_id: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_code?: string
+          created_at?: string
+          failed_attempts?: number
+          id?: string
+          is_active?: boolean
+          locked_until?: string | null
+          school_id: string
+          school_year_id: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_code?: string
+          created_at?: string
+          failed_attempts?: number
+          id?: string
+          is_active?: boolean
+          locked_until?: string | null
+          school_id?: string
+          school_year_id?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_access_codes_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_access_codes_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_access_codes_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_access_log: {
+        Row: {
+          access_type: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          school_id: string
+          student_id: string
+          user_id: string
+        }
+        Insert: {
+          access_type?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          school_id: string
+          student_id: string
+          user_id: string
+        }
+        Update: {
+          access_type?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          school_id?: string
+          student_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_access_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_access_log_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_activities: {
+        Row: {
+          activity_type: string
+          allow_late_submission: boolean
+          allow_resubmission: boolean
+          assignment_id: string
+          created_at: string
+          description: string | null
+          due_date: string | null
+          evaluation_plan_item_id: string | null
+          external_url: string | null
+          id: string
+          instructions: string | null
+          max_score: number | null
+          publish_date: string | null
+          school_id: string
+          status: string
+          title: string
+          topic_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activity_type?: string
+          allow_late_submission?: boolean
+          allow_resubmission?: boolean
+          assignment_id: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          evaluation_plan_item_id?: string | null
+          external_url?: string | null
+          id?: string
+          instructions?: string | null
+          max_score?: number | null
+          publish_date?: string | null
+          school_id: string
+          status?: string
+          title: string
+          topic_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activity_type?: string
+          allow_late_submission?: boolean
+          allow_resubmission?: boolean
+          assignment_id?: string
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          evaluation_plan_item_id?: string | null
+          external_url?: string | null
+          id?: string
+          instructions?: string | null
+          max_score?: number | null
+          publish_date?: string | null
+          school_id?: string
+          status?: string
+          title?: string
+          topic_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_activities_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_activities_evaluation_plan_item_id_fkey"
+            columns: ["evaluation_plan_item_id"]
+            isOneToOne: false
+            referencedRelation: "evaluation_plan_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_activities_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_activities_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_activity_attachments: {
+        Row: {
+          activity_id: string
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          school_id: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          school_id: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_activity_attachments_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_activity_attachments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_comments: {
+        Row: {
+          activity_id: string | null
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          is_private: boolean
+          post_id: string | null
+          school_id: string
+          target_student_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          activity_id?: string | null
+          author_id: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_private?: boolean
+          post_id?: string | null
+          school_id: string
+          target_student_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activity_id?: string | null
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_private?: boolean
+          post_id?: string | null
+          school_id?: string
+          target_student_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_comments_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_comments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_comments_target_student_id_fkey"
+            columns: ["target_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_config: {
+        Row: {
+          allow_student_comments: boolean
+          allow_student_posts: boolean
+          assignment_id: string
+          color: string
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_archived: boolean
+          rules: string | null
+          school_id: string
+          updated_at: string
+          welcome_message: string | null
+        }
+        Insert: {
+          allow_student_comments?: boolean
+          allow_student_posts?: boolean
+          assignment_id: string
+          color?: string
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          rules?: string | null
+          school_id: string
+          updated_at?: string
+          welcome_message?: string | null
+        }
+        Update: {
+          allow_student_comments?: boolean
+          allow_student_posts?: boolean
+          assignment_id?: string
+          color?: string
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          rules?: string | null
+          school_id?: string
+          updated_at?: string
+          welcome_message?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_config_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: true
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_config_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_events: {
+        Row: {
+          activity_id: string | null
+          assignment_id: string
+          created_at: string
+          description: string | null
+          event_date: string
+          event_end_date: string | null
+          event_type: string
+          id: string
+          school_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          activity_id?: string | null
+          assignment_id: string
+          created_at?: string
+          description?: string | null
+          event_date: string
+          event_end_date?: string | null
+          event_type?: string
+          id?: string
+          school_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          activity_id?: string | null
+          assignment_id?: string
+          created_at?: string
+          description?: string | null
+          event_date?: string
+          event_end_date?: string | null
+          event_type?: string
+          id?: string
+          school_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_events_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_events_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_events_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string | null
+          notification_type: string
+          recipient_id: string
+          reference_id: string | null
+          reference_type: string | null
+          school_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string | null
+          notification_type: string
+          recipient_id: string
+          reference_id?: string | null
+          reference_type?: string | null
+          school_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string | null
+          notification_type?: string
+          recipient_id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          school_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_notifications_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_post_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          post_id: string
+          school_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          post_id: string
+          school_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          post_id?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_post_attachments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_post_attachments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_posts: {
+        Row: {
+          allow_comments: boolean
+          assignment_id: string
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          is_pinned: boolean
+          post_type: string
+          scheduled_at: string | null
+          school_id: string
+          status: string
+          title: string | null
+          topic_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          allow_comments?: boolean
+          assignment_id: string
+          author_id: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          post_type?: string
+          scheduled_at?: string | null
+          school_id: string
+          status?: string
+          title?: string | null
+          topic_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          allow_comments?: boolean
+          assignment_id?: string
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean
+          post_type?: string
+          scheduled_at?: string | null
+          school_id?: string
+          status?: string
+          title?: string | null
+          topic_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_posts_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_posts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_posts_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_rubric_criteria: {
+        Row: {
+          created_at: string
+          criterion_name: string
+          description: string | null
+          display_order: number
+          id: string
+          levels: Json
+          max_points: number
+          rubric_id: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criterion_name: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          levels?: Json
+          max_points?: number
+          rubric_id: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criterion_name?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          levels?: Json
+          max_points?: number
+          rubric_id?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_rubric_criteria_rubric_id_fkey"
+            columns: ["rubric_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_rubrics"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_rubric_criteria_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_rubrics: {
+        Row: {
+          activity_id: string
+          created_at: string
+          id: string
+          max_score: number
+          school_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          activity_id: string
+          created_at?: string
+          id?: string
+          max_score?: number
+          school_id: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          activity_id?: string
+          created_at?: string
+          id?: string
+          max_score?: number
+          school_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_rubrics_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: true
+            referencedRelation: "classroom_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_rubrics_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_submission_attachments: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          school_id: string
+          submission_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          school_id: string
+          submission_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          school_id?: string
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_submission_attachments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_submission_attachments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_submissions: {
+        Row: {
+          activity_id: string
+          content: string | null
+          created_at: string
+          feedback: string | null
+          graded_at: string | null
+          graded_by: string | null
+          id: string
+          school_id: string
+          score: number | null
+          status: string
+          student_id: string
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          activity_id: string
+          content?: string | null
+          created_at?: string
+          feedback?: string | null
+          graded_at?: string | null
+          graded_by?: string | null
+          id?: string
+          school_id: string
+          score?: number | null
+          status?: string
+          student_id: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activity_id?: string
+          content?: string | null
+          created_at?: string
+          feedback?: string | null
+          graded_at?: string | null
+          graded_by?: string | null
+          id?: string
+          school_id?: string
+          score?: number | null
+          status?: string
+          student_id?: string
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_submissions_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_submissions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_submissions_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classroom_topics: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          is_archived: boolean
+          is_visible: boolean
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_archived?: boolean
+          is_visible?: boolean
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_archived?: boolean
+          is_visible?: boolean
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_topics_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_topics_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delinquency_config: {
         Row: {
           created_at: string
@@ -2825,6 +3705,18 @@ export type Database = {
         Args: { p_school_id: string }
         Returns: undefined
       }
+      representative_child_in_assignment: {
+        Args: { _assignment_id: string; _user_id: string }
+        Returns: boolean
+      }
+      student_in_assignment: {
+        Args: { _assignment_id: string; _student_id: string }
+        Returns: boolean
+      }
+      teacher_owns_assignment: {
+        Args: { _assignment_id: string; _user_id: string }
+        Returns: boolean
+      }
       user_has_school_access_to_family: {
         Args: { _family_id: string; _user_id: string }
         Returns: boolean
@@ -2833,6 +3725,7 @@ export type Database = {
         Args: { _student_id: string; _user_id: string }
         Returns: boolean
       }
+      user_is_student: { Args: { _user_id: string }; Returns: string }
       user_shares_school: {
         Args: { requesting_user_id: string; target_school_id: string }
         Returns: boolean
