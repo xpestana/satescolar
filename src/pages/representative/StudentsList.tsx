@@ -362,8 +362,6 @@ export default function StudentsList() {
           </div>
         )}
       </div>
-        )}
-      </div>
 
       <Dialog open={missingFieldsModal.open} onOpenChange={(o) => setMissingFieldsModal(prev => ({ ...prev, open: o }))}>
         <DialogContent className="max-w-md">
