@@ -13,6 +13,7 @@ import { ClassroomConfigModal } from "@/components/classroom/ClassroomConfigModa
 import { TopicsManager } from "@/components/classroom/TopicsManager";
 import { StreamFeed } from "@/components/classroom/StreamFeed";
 import { ClassworkList } from "@/components/classroom/ClassworkList";
+import { PeopleList } from "@/components/classroom/PeopleList";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -144,11 +145,7 @@ export default function ClassroomDetail() {
         </TabsContent>
 
         <TabsContent value="people">
-          <div className="text-center py-12 text-muted-foreground">
-            <Users className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p className="font-medium">Personas</p>
-            <p className="text-sm mt-1">Próximamente: lista de estudiantes matriculados.</p>
-          </div>
+          <PeopleList assignmentId={assignmentId!} schoolId={assignment.school_id} />
         </TabsContent>
       </Tabs>
 
