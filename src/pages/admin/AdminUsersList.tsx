@@ -1,0 +1,351 @@
+import { useEffect, useState } from "react";
+import { Plus, Search, Trash2, Ban, CheckCircle, ShieldAlert } from "lucide-react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Pagination } from "@/components/ui/data-pagination";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+
+const ITEMS_PER_PAGE = 10;
+
+interface AdminUser {
+  id: string;
+  user_id: string;
+  full_name: string;
+  email: string;
+  is_suspended: boolean;
+}
+
+interface FormData {
+  full_name: string;
+  email: string;
+  password: string;
+}
+
+export default function AdminUsersList() {
+  const { user: currentUser } = useAuth();
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formData, setFormData] = useState<FormData>({ full_name: "", email: "", password: "" });
+  const [isSaving, setIsSaving] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const { data: rolesData, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("id, user_id, role")
+        .eq("role", "admin");
+
+      if (rolesError) throw rolesError;
+
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("user_id, full_name");
+
+      const usersMap = new Map<string, AdminUser>();
+      rolesData?.forEach((role: any) => {
+        const profile = profilesData?.find((p) => p.user_id === role.user_id);
+        usersMap.set(role.user_id, {
+          id: role.id,
+          user_id: role.user_id,
+          full_name: profile?.full_name || "Sin nombre",
+          email: "",
+          is_suspended: false,
+        });
+      });
+
+      const userIds = Array.from(usersMap.keys());
+      if (userIds.length > 0) {
+        const { data: emailsData } = await supabase.functions.invoke("get-user-emails", {
+          body: { user_ids: userIds },
+        });
+        if (emailsData?.users) {
+          emailsData.users.forEach((u: { id: string; email: string; banned_until: string | null }) => {
+            const user = usersMap.get(u.id);
+            if (user) {
+              user.email = u.email;
+              user.is_suspended = u.banned_until ? new Date(u.banned_until) > new Date() : false;
+            }
+          });
+        }
+      }
+
+      setUsers(Array.from(usersMap.values()));
+    } catch (error) {
+      console.error("Error fetching admins:", error);
+      toast.error("Error al cargar los administradores");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchUsers(); }, []);
+
+  const handleSubmit = async () => {
+    if (!formData.full_name || !formData.email || !formData.password) {
+      toast.error("Completa todos los campos");
+      return;
+    }
+    if (formData.password.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-system-admin", {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          full_name: formData.full_name,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success("Administrador creado correctamente");
+      setIsDialogOpen(false);
+      setFormData({ full_name: "", email: "", password: "" });
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Error creating admin:", error);
+      toast.error(error.message || "Error al crear el administrador");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!userToDelete) return;
+    try {
+      const { error } = await supabase.functions.invoke("delete-user", {
+        body: { user_id: userToDelete.user_id },
+      });
+      if (error) throw error;
+      setUsers(users.filter((u) => u.user_id !== userToDelete.user_id));
+      toast.success("Administrador eliminado");
+    } catch (error) {
+      console.error("Error deleting admin:", error);
+      toast.error("Error al eliminar el administrador");
+    } finally {
+      setUserToDelete(null);
+    }
+  };
+
+  const handleSuspendToggle = async (userId: string, suspended: boolean) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("suspend-user", {
+        body: { user_id: userId, suspend: !suspended },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setUsers(users.map((u) => u.user_id === userId ? { ...u, is_suspended: !suspended } : u));
+      toast.success(suspended ? "Administrador reactivado" : "Administrador suspendido");
+    } catch (error: any) {
+      toast.error(error.message || "Error al cambiar el estado");
+    }
+  };
+
+  const filteredUsers = users.filter(
+    (u) =>
+      u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
+
+  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  return (
+    <DashboardLayout>
+      <PageHeader
+        title="Administradores del Sistema"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Administradores" },
+        ]}
+        imageUrl="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=300&h=200&fit=crop"
+      />
+
+      <div className="bg-card rounded-xl shadow-sm border">
+        <div className="flex items-center justify-between p-5 border-b">
+          <Button onClick={() => setIsDialogOpen(true)} className="shadow-sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar Administrador
+          </Button>
+
+          <div className="flex items-center gap-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-72 bg-muted/50 border-0"
+              />
+            </div>
+          </div>
+        </div>
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nombre</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Rol</TableHead>
+              <TableHead className="text-right">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow><TableCell colSpan={4} className="text-center py-8">Cargando...</TableCell></TableRow>
+            ) : paginatedUsers.length === 0 ? (
+              <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No hay administradores</TableCell></TableRow>
+            ) : (
+              paginatedUsers.map((user) => {
+                const isSelf = user.user_id === currentUser?.id;
+                return (
+                  <TableRow key={user.id} className={user.is_suspended ? "opacity-60 bg-muted/30" : ""}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        {user.full_name}
+                        {isSelf && <Badge variant="outline" className="text-xs">Tú</Badge>}
+                        {user.is_suspended && <Badge variant="destructive" className="text-xs">Suspendido</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Badge className="bg-primary/10 text-primary hover:bg-primary/20 gap-1">
+                        <ShieldAlert className="h-3 w-3" /> Administrador
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost" size="icon"
+                          title={user.is_suspended ? "Reactivar" : "Suspender"}
+                          onClick={() => handleSuspendToggle(user.user_id, user.is_suspended)}
+                          disabled={isSelf}
+                        >
+                          {user.is_suspended ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <Ban className="h-4 w-4 text-orange-500" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon" title="Eliminar"
+                          onClick={() => setUserToDelete(user)}
+                          disabled={isSelf}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+
+        {totalPages > 1 && (
+          <div className="p-4 border-t">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredUsers.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
+      </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nuevo Administrador del Sistema</DialogTitle>
+            <DialogDescription>
+              Esta cuenta tendrá acceso completo al sistema, igual que admin@email.com.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nombre completo</Label>
+              <Input
+                value={formData.full_name}
+                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                placeholder="Ej: Juan Pérez"
+              />
+            </div>
+            <div>
+              <Label>Correo electrónico</Label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="admin@example.com"
+              />
+            </div>
+            <div>
+              <Label>Contraseña</Label>
+              <Input
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="Mínimo 8 caracteres"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={isSaving}>
+              {isSaving ? "Creando..." : "Crear Administrador"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar administrador?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará permanentemente la cuenta de <strong>{userToDelete?.full_name}</strong>. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </DashboardLayout>
+  );
+}
