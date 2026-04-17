@@ -34,6 +34,7 @@ import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import SendEmail from "./pages/admin/SendEmail";
 import UsersList from "./pages/admin/UsersList";
+import AdminUsersList from "./pages/admin/AdminUsersList";
 import RepresentativeDashboard from "./pages/representative/RepresentativeDashboard";
 import RepresentativesList from "./pages/representative/RepresentativesList";
 import RepStudentsList from "./pages/representative/StudentsList";
@@ -297,6 +298,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <UsersList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/administradores"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminUsersList />
                   </ProtectedRoute>
                 }
               />

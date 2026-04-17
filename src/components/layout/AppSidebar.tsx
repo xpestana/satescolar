@@ -25,6 +25,7 @@ import {
   ClipboardList,
   Bell,
   Key,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -65,6 +66,7 @@ const navSections: NavSection[] = [
     requiredRole: "admin",
     items: [
       { label: "Usuarios", href: "/admin/usuarios", icon: Users, requiredRole: "admin" },
+      { label: "Administradores", href: "/admin/administradores", icon: ShieldAlert, requiredRole: "admin" },
       { label: "Colegios", href: "/admin/colegios", icon: GraduationCap, requiredRole: "admin" },
       { label: "Enviar Email", href: "/admin/enviar-email", icon: Mail, requiredRole: "admin" },
     ],
