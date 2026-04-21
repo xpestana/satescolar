@@ -288,6 +288,7 @@ export function SubmissionReview({ activity, onBack }: Props) {
                 <TableHead>Estudiante</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Entregado</TableHead>
+                <TableHead>Adjuntos</TableHead>
                 <TableHead>Nota</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
