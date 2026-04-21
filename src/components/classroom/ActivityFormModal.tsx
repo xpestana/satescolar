@@ -138,6 +138,7 @@ export function ActivityFormModal({ open, onClose, assignmentId, schoolId, class
         evaluation_plan_item_id: evalPlanItemId === "none" ? null : evalPlanItemId,
       };
 
+      let activityId = activity?.id;
       if (isEditing) {
         const { error } = await supabase
           .from("classroom_activities")
@@ -145,10 +146,30 @@ export function ActivityFormModal({ open, onClose, assignmentId, schoolId, class
           .eq("id", activity!.id!);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("classroom_activities")
-          .insert(payload);
+          .insert(payload)
+          .select("id")
+          .single();
         if (error) throw error;
+        activityId = data.id;
+      }
+
+      // Persist new attachments
+      const uploaded = pendingAttachments.filter(a => a.publicUrl);
+      if (activityId && uploaded.length > 0) {
+        const rows = uploaded.map(a => ({
+          activity_id: activityId!,
+          school_id: schoolId,
+          file_url: a.publicUrl!,
+          file_name: a.file.name,
+          file_size: a.file.size,
+          file_type: a.file.type || null,
+        }));
+        const { error: attErr } = await supabase
+          .from("classroom_activity_attachments")
+          .insert(rows);
+        if (attErr) throw attErr;
       }
     },
     onSuccess: () => {
