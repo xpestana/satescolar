@@ -20,7 +20,7 @@ import {
 import { Label } from "@/components/ui/label";
 import {
   ArrowLeft, CheckCircle2, Clock, AlertCircle, XCircle,
-  Loader2, Send, FileText, Download, Eye,
+  Loader2, Send, FileText, Download, Eye, Paperclip,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
