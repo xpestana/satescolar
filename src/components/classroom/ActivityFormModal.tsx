@@ -60,7 +60,7 @@ const ACTIVITY_TYPES = [
   { value: "non_evaluated", label: "Actividad no evaluada" },
 ];
 
-export function ActivityFormModal({ open, onClose, assignmentId, schoolId, topics, defaultTopicId, activity }: Props) {
+export function ActivityFormModal({ open, onClose, assignmentId, schoolId, classroomId, topics, defaultTopicId, activity }: Props) {
   const queryClient = useQueryClient();
   const isEditing = !!activity?.id;
 
@@ -76,6 +76,33 @@ export function ActivityFormModal({ open, onClose, assignmentId, schoolId, topic
   const [allowLate, setAllowLate] = useState(activity?.allow_late_submission ?? false);
   const [allowResub, setAllowResub] = useState(activity?.allow_resubmission ?? false);
   const [evalPlanItemId, setEvalPlanItemId] = useState(activity?.evaluation_plan_item_id || "none");
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+
+  // Existing attachments (when editing)
+  const { data: existingAttachments = [], refetch: refetchAttachments } = useQuery({
+    queryKey: ["activity-attachments", activity?.id],
+    queryFn: async () => {
+      if (!activity?.id) return [];
+      const { data, error } = await sb
+        .from("classroom_activity_attachments")
+        .select("*")
+        .eq("activity_id", activity.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activity?.id,
+  });
+
+  const removeExistingAttachment = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await sb.from("classroom_activity_attachments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchAttachments();
+      toast({ title: "Adjunto eliminado" });
+    },
+  });
 
   // Fetch evaluation plan items for linking
   const { data: evalPlanItems = [] } = useQuery({
