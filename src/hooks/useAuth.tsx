@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -43,58 +43,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<AppRole | null>(null);
+  const roleRequestRef = useRef(0);
 
   useEffect(() => {
     let mounted = true;
 
-    // Set up auth state listener FIRST
+    const applySession = async (nextSession: Session | null) => {
+      const requestId = ++roleRequestRef.current;
+
+      if (!mounted) return;
+
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+
+      if (!nextSession?.user) {
+        setUserRole(null);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const role = await fetchUserRole(nextSession.user.id);
+
+      if (!mounted || roleRequestRef.current !== requestId) return;
+
+      setUserRole(role);
+      setLoading(false);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         console.log("Auth state change:", event, session?.user?.email);
-        
+
         if (!mounted) return;
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Fetch user role - use setTimeout to avoid Supabase deadlock
-          setTimeout(async () => {
-            if (!mounted) return;
-            const role = await fetchUserRole(session.user.id);
-            if (mounted) {
-              setUserRole(role);
-              setLoading(false);
-            }
-          }, 0);
-        } else {
+
+        if (event === 'INITIAL_SESSION') {
+          return;
+        }
+
+        if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          setSession(session);
+          setUser(session?.user ?? null);
+          return;
+        }
+
+        if (!session?.user) {
+          roleRequestRef.current += 1;
+          setSession(null);
+          setUser(null);
           setUserRole(null);
           setLoading(false);
+          return;
         }
+
+        void applySession(session);
       }
     );
 
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
-      
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserRole(session.user.id).then((role) => {
-          if (mounted) {
-            setUserRole(role);
-            setLoading(false);
-          }
-        });
-      } else {
-        setLoading(false);
-      }
+
+      void applySession(session);
     });
 
     return () => {
       mounted = false;
+      roleRequestRef.current += 1;
       subscription.unsubscribe();
     };
   }, []);
