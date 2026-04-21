@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, AlertCircle, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadToS3 } from "@/lib/s3-upload";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/families/PhotoUpload";
@@ -174,7 +175,7 @@ export default function AddRepresentative() {
       } else {
         const { error } = await supabase
           .from("representatives")
-          .insert(repData);
+          .insert({ id: repIdForUpload, ...repData });
         if (error) throw error;
       }
     },
