@@ -14,7 +14,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Save, Trash2 } from "lucide-react";
+import { Loader2, Save, Trash2, Download } from "lucide-react";
+import { S3AttachmentInput, type PendingAttachment } from "./S3AttachmentInput";
+import { supabase as sb } from "@/integrations/supabase/client";
 
 interface Activity {
   id: string;
