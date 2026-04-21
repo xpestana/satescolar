@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { S3AttachmentInput, type PendingAttachment } from "./S3AttachmentInput";
 
 interface Props {
   assignmentId: string;
@@ -77,6 +78,7 @@ export function StreamFeed({ assignmentId, schoolId, allowStudentPosts }: Props)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
   const [commentTexts, setCommentTexts] = useState<Record<string, string>>({});
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
 
   // Fetch posts
   const { data: posts = [], isLoading } = useQuery({
@@ -141,7 +143,10 @@ export function StreamFeed({ assignmentId, schoolId, allowStudentPosts }: Props)
   const createPost = useMutation({
     mutationFn: async () => {
       if (!content.trim()) throw new Error("El contenido no puede estar vacío");
-      const { error } = await supabase.from("classroom_posts").insert({
+      const stillUploading = pendingAttachments.some(a => a.uploading);
+      if (stillUploading) throw new Error("Espera a que terminen de subirse los archivos");
+
+      const { data: post, error } = await supabase.from("classroom_posts").insert({
         assignment_id: assignmentId,
         school_id: schoolId,
         author_id: user!.id,
@@ -151,19 +156,38 @@ export function StreamFeed({ assignmentId, schoolId, allowStudentPosts }: Props)
         status: "published",
         is_pinned: isPinned,
         allow_comments: allowComments,
-      });
+      }).select("id").single();
       if (error) throw error;
+
+      // Persist uploaded attachments
+      const uploaded = pendingAttachments.filter(a => a.publicUrl);
+      if (uploaded.length > 0 && post) {
+        const rows = uploaded.map(a => ({
+          post_id: post.id,
+          school_id: schoolId,
+          file_url: a.publicUrl!,
+          file_name: a.file.name,
+          file_size: a.file.size,
+          file_type: a.file.type || null,
+        }));
+        const { error: attErr } = await supabase
+          .from("classroom_post_attachments")
+          .insert(rows);
+        if (attErr) throw attErr;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["classroom-posts", assignmentId] });
+      queryClient.invalidateQueries({ queryKey: ["classroom-post-attachments", assignmentId] });
       setContent("");
       setTitle("");
       setComposing(false);
       setIsPinned(false);
       setAllowComments(true);
+      setPendingAttachments([]);
       toast({ title: "Publicación creada" });
     },
-    onError: () => toast({ title: "Error al publicar", variant: "destructive" }),
+    onError: (e: any) => toast({ title: e?.message || "Error al publicar", variant: "destructive" }),
   });
 
   // Toggle pin
