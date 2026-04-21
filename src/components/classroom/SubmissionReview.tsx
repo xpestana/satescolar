@@ -315,6 +315,25 @@ export function SubmissionReview({ activity, onBack }: Props) {
                         : "—"}
                     </TableCell>
                     <TableCell>
+                      {subAttachments.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {subAttachments.map((a: any) => (
+                            <a
+                              key={a.id}
+                              href={a.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-primary hover:underline flex items-center gap-1 max-w-[180px]"
+                              title={a.file_name}
+                            >
+                              <Download className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{a.file_name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell>
                       {submission?.score != null ? (
                         <span className="font-semibold text-sm">
                           {submission.score}{activity.max_score ? `/${activity.max_score}` : ""}
@@ -352,7 +371,7 @@ export function SubmissionReview({ activity, onBack }: Props) {
               })}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No se encontraron estudiantes con este filtro.
                   </TableCell>
                 </TableRow>
