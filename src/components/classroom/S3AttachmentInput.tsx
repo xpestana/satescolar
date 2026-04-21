@@ -60,6 +60,9 @@ export function S3AttachmentInput({
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const list = Array.from(files);
+    setBusy(true);
+
+    let working = [...attachments];
 
     for (const file of list) {
       if (file.size > maxFileSizeMb * 1024 * 1024) {
@@ -72,38 +75,30 @@ export function S3AttachmentInput({
       }
 
       const localId = crypto.randomUUID();
-      const pending: PendingAttachment = {
-        id: localId,
-        file,
-        uploading: true,
-      };
-      onChange([...attachments, pending]);
-      setBusy(true);
+      const pending: PendingAttachment = { id: localId, file, uploading: true };
+      working = [...working, pending];
+      onChange(working);
 
       try {
         const result = await uploadToS3({
-          file,
-          folder,
-          schoolId,
-          classroomId,
-          entityId,
+          file, folder, schoolId, classroomId, entityId,
         });
-        // Use a fresh snapshot to avoid stale state
-        onChange((prev => prev.map(a => a.id === localId
-          ? { ...a, uploading: false, publicUrl: result.publicUrl }
-          : a))(attachments.concat(pending)));
+        working = working.map(a =>
+          a.id === localId ? { ...a, uploading: false, publicUrl: result.publicUrl } : a
+        );
+        onChange(working);
       } catch (err: any) {
         toast({
           title: "Error subiendo archivo",
           description: err?.message || "Inténtalo de nuevo",
           variant: "destructive",
         });
-        onChange(attachments.filter(a => a.id !== localId).concat([]));
-      } finally {
-        setBusy(false);
+        working = working.filter(a => a.id !== localId);
+        onChange(working);
       }
     }
 
+    setBusy(false);
     if (inputRef.current) inputRef.current.value = "";
   };
 
