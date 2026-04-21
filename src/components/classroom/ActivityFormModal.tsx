@@ -298,6 +298,42 @@ export function ActivityFormModal({ open, onClose, assignmentId, schoolId, class
             </div>
           )}
 
+          {/* Materiales adjuntos */}
+          <div className="space-y-2">
+            <Label>Materiales adjuntos</Label>
+            {existingAttachments.length > 0 && (
+              <div className="space-y-1">
+                {existingAttachments.map((a: any) => (
+                  <div key={a.id} className="flex items-center justify-between gap-2 p-2 bg-muted/40 rounded text-xs">
+                    <a href={a.file_url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:underline truncate">
+                      <Download className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{a.file_name}</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => removeExistingAttachment.mutate(a.id)}
+                      className="text-destructive hover:underline shrink-0"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <S3AttachmentInput
+              folder="activities"
+              schoolId={schoolId}
+              classroomId={classroomId}
+              entityId={activity?.id}
+              attachments={pendingAttachments}
+              onChange={setPendingAttachments}
+              buttonLabel="Adjuntar material"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Los archivos se suben a S3 y quedan visibles para los estudiantes al publicar.
+            </p>
+          </div>
+
           {/* Toggles */}
           {needsDueDate && (
             <div className="flex items-center gap-6">
