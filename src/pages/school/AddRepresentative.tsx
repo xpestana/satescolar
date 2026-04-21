@@ -132,20 +132,19 @@ export default function AddRepresentative() {
     mutationFn: async () => {
       let photoUrl = existingRep?.photo_url || null;
 
-      // Upload photo if provided
-      if (photoBlob) {
-        const fileName = `${familyId}/representatives/${Date.now()}.png`;
-        const { error: uploadError } = await supabase.storage
-          .from("family-photos")
-          .upload(fileName, photoBlob);
+      // Generate ID upfront so the S3 path can scope under representatives/<id>/
+      const repIdForUpload = isEditing ? representativeId! : crypto.randomUUID();
 
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("family-photos")
-          .getPublicUrl(fileName);
-
-        photoUrl = urlData.publicUrl;
+      // Upload photo to AWS S3 if provided
+      if (photoBlob && schoolId) {
+        const result = await uploadToS3({
+          file: photoBlob,
+          folder: "representatives",
+          schoolId,
+          entityId: repIdForUpload,
+          fileName: `${Date.now()}.png`,
+        });
+        photoUrl = result.publicUrl;
       }
 
       // Extract known fields from form_data to sync direct columns
