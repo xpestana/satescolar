@@ -42,6 +42,7 @@ interface Props {
   onClose: () => void;
   assignmentId: string;
   schoolId: string;
+  classroomId: string;
   topics: ClassroomTopic[];
   defaultTopicId?: string;
   activity?: Partial<Activity>;
