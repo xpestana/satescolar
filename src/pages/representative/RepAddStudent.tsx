@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadToS3 } from "@/lib/s3-upload";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/families/PhotoUpload";
@@ -79,12 +80,16 @@ export default function RepAddStudent() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       let photoUrl = existingStudent?.photo_url || null;
-      if (photoBlob) {
-        const fileName = `${familyId}/students/${Date.now()}.png`;
-        const { error: uploadError } = await supabase.storage.from("family-photos").upload(fileName, photoBlob);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("family-photos").getPublicUrl(fileName);
-        photoUrl = urlData.publicUrl;
+      const studentIdForUpload = isEditing ? studentId! : crypto.randomUUID();
+      if (photoBlob && schoolId) {
+        const result = await uploadToS3({
+          file: photoBlob,
+          folder: "students",
+          schoolId,
+          entityId: studentIdForUpload,
+          fileName: `${Date.now()}.png`,
+        });
+        photoUrl = result.publicUrl;
       }
       const documentType = formData.tipo_documento || "";
       const documentNum = formData.documento || formData.cedula || "";
@@ -94,11 +99,10 @@ export default function RepAddStudent() {
         const { error } = await supabase.from("students").update(studentData).eq("id", studentId);
         if (error) throw error;
       } else {
-        const newId = crypto.randomUUID();
-        const { error } = await supabase.from("students").insert({ id: newId, ...studentData });
+        const { error } = await supabase.from("students").insert({ id: studentIdForUpload, ...studentData });
         if (error) throw error;
         if (schoolId) {
-          const { error: assocError } = await supabase.from("student_schools").insert({ student_id: newId, school_id: schoolId });
+          const { error: assocError } = await supabase.from("student_schools").insert({ student_id: studentIdForUpload, school_id: schoolId });
           if (assocError) throw assocError;
         }
       }

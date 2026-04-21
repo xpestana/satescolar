@@ -26,6 +26,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ImageCropModal } from "@/components/ImageCropModal";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadToS3 } from "@/lib/s3-upload";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
@@ -238,25 +239,18 @@ export default function SchoolForm() {
     try {
       let uploadedLogoUrl = logoUrl;
 
+      // Determine the school id to scope the S3 path under (creates use a fresh uuid)
+      const schoolIdForUpload = isEditing && id ? id : crypto.randomUUID();
+
       // Upload logo if there's a new one
       if (logoBlob) {
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("school-logos")
-          .upload(fileName, logoBlob, {
-            contentType: "image/png",
-            upsert: false,
-          });
-
-        if (uploadError) {
-          throw uploadError;
-        }
-
-        const { data: publicUrlData } = supabase.storage
-          .from("school-logos")
-          .getPublicUrl(uploadData.path);
-
-        uploadedLogoUrl = publicUrlData.publicUrl;
+        const result = await uploadToS3({
+          file: logoBlob,
+          folder: "logo",
+          schoolId: schoolIdForUpload,
+          fileName: `${Date.now()}.png`,
+        });
+        uploadedLogoUrl = result.publicUrl;
       }
 
       const schoolData = {

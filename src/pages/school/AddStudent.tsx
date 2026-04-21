@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, AlertCircle, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadToS3 } from "@/lib/s3-upload";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/families/PhotoUpload";
@@ -132,20 +133,19 @@ export default function AddStudent() {
     mutationFn: async () => {
       let photoUrl = existingStudent?.photo_url || null;
 
-      // Upload photo if provided
-      if (photoBlob) {
-        const fileName = `${familyId}/students/${Date.now()}.png`;
-        const { error: uploadError } = await supabase.storage
-          .from("family-photos")
-          .upload(fileName, photoBlob);
+      // Generate ID upfront so we can scope the S3 path under students/<id>/
+      const studentIdForUpload = isEditing ? studentId! : crypto.randomUUID();
 
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("family-photos")
-          .getPublicUrl(fileName);
-
-        photoUrl = urlData.publicUrl;
+      // Upload photo to AWS S3 if provided
+      if (photoBlob && schoolId) {
+        const result = await uploadToS3({
+          file: photoBlob,
+          folder: "students",
+          schoolId,
+          entityId: studentIdForUpload,
+          fileName: `${Date.now()}.png`,
+        });
+        photoUrl = result.publicUrl;
       }
 
       // Extract known fields from form_data to sync direct columns
@@ -171,17 +171,15 @@ export default function AddStudent() {
           .eq("id", studentId);
         if (error) throw error;
       } else {
-        // Generate ID client-side so we can create student + association without needing SELECT back
-        const newStudentId = crypto.randomUUID();
         const { error } = await supabase
           .from("students")
-          .insert({ id: newStudentId, ...studentData });
+          .insert({ id: studentIdForUpload, ...studentData });
         if (error) throw error;
 
         // Create student-school association
         const { error: assocError } = await supabase
           .from("student_schools")
-          .insert({ student_id: newStudentId, school_id: schoolId });
+          .insert({ student_id: studentIdForUpload, school_id: schoolId });
         if (assocError) throw assocError;
       }
     },

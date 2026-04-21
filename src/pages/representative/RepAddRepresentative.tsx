@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, AlertCircle, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadToS3 } from "@/lib/s3-upload";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/families/PhotoUpload";
@@ -79,12 +80,16 @@ export default function RepAddRepresentative() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       let photoUrl = existingRep?.photo_url || null;
-      if (photoBlob) {
-        const fileName = `${familyId}/representatives/${Date.now()}.png`;
-        const { error: uploadError } = await supabase.storage.from("family-photos").upload(fileName, photoBlob);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("family-photos").getPublicUrl(fileName);
-        photoUrl = urlData.publicUrl;
+      const repIdForUpload = isEditing ? representativeId! : crypto.randomUUID();
+      if (photoBlob && schoolId) {
+        const result = await uploadToS3({
+          file: photoBlob,
+          folder: "representatives",
+          schoolId,
+          entityId: repIdForUpload,
+          fileName: `${Date.now()}.png`,
+        });
+        photoUrl = result.publicUrl;
       }
       const documentType = formData.tipo_documento || "";
       const documentNum = formData.documento || "";
@@ -101,7 +106,7 @@ export default function RepAddRepresentative() {
         // Check if this is the first representative for the family
         const { count } = await supabase.from("representatives").select("id", { count: "exact", head: true }).eq("family_id", familyId!);
         const isFirst = (count || 0) === 0;
-        const { error } = await supabase.from("representatives").insert({ ...repData, is_primary: isFirst });
+        const { error } = await supabase.from("representatives").insert({ id: repIdForUpload, ...repData, is_primary: isFirst });
         if (error) throw error;
       }
     },

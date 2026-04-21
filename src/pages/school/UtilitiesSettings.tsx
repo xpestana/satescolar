@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Save, Upload, RotateCcw, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadToS3 } from "@/lib/s3-upload";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { toast } from "sonner";
@@ -124,14 +125,14 @@ export default function UtilitiesSettings() {
       let watermarkUrl = config?.watermark_url || null;
 
       if (watermarkFile && schoolId) {
-        const ext = watermarkFile.name.split(".").pop();
-        const path = `${schoolId}/carnet-watermark.${ext}`;
-        const { error: uploadError } = await supabase.storage
-          .from("school-assets")
-          .upload(path, watermarkFile, { upsert: true });
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("school-assets").getPublicUrl(path);
-        watermarkUrl = urlData.publicUrl;
+        const ext = watermarkFile.name.split(".").pop() || "png";
+        const result = await uploadToS3({
+          file: watermarkFile,
+          folder: "assets",
+          schoolId,
+          fileName: `carnet-watermark-${Date.now()}.${ext}`,
+        });
+        watermarkUrl = result.publicUrl;
       } else if (!useCustomWatermark) {
         watermarkUrl = null;
       }

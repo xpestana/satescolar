@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, AlertCircle, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadToS3 } from "@/lib/s3-upload";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/families/PhotoUpload";
@@ -122,16 +123,18 @@ export default function AddTeacher() {
     mutationFn: async () => {
       let photoUrl = existingTeacher?.photo_url || null;
 
-      if (photoBlob) {
-        const fileName = `teachers/${schoolId}/${Date.now()}.png`;
-        const { error: uploadError } = await supabase.storage
-          .from("family-photos")
-          .upload(fileName, photoBlob);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage
-          .from("family-photos")
-          .getPublicUrl(fileName);
-        photoUrl = urlData.publicUrl;
+      if (photoBlob && schoolId) {
+        // For edit mode use teacherId; for create we don't have one yet —
+        // use a temporary uuid; create-teacher edge function will store the url as-is
+        const entityId = isEditing ? teacherId! : crypto.randomUUID();
+        const result = await uploadToS3({
+          file: photoBlob,
+          folder: "teachers",
+          schoolId,
+          entityId,
+          fileName: `${Date.now()}.png`,
+        });
+        photoUrl = result.publicUrl;
       }
 
       const documentType = formData.tipo_documento || "";
