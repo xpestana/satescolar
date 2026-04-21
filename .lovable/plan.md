@@ -1,201 +1,102 @@
 
 
-# Plan: Módulo Aula Virtual — Implementación por Fases
+# Migración a AWS S3 con organización por colegio
 
-Este es un módulo de gran escala (~15-20 tablas nuevas, ~30+ pantallas, ~10+ componentes complejos). Se implementará en **5 fases incrementales**, cada una entregando funcionalidad usable.
+## Objetivo
+Mover todas las subidas de archivos a un bucket S3 de AWS, organizando las carpetas **por colegio** para mantener todo aislado y fácil de auditar.
 
----
+## Inventario de subidas actuales
 
-## Fase 1: Fundación — Base de datos, configuración de aula y vista de materias del docente
+| # | Origen | Tipo de archivo |
+|---|--------|-----------------|
+| 1 | `AddStudent.tsx` | Foto estudiante |
+| 2 | `AddRepresentative.tsx` | Foto representante |
+| 3 | `AddTeacher.tsx` | Foto docente |
+| 4 | `RepAddStudent.tsx` | Foto estudiante (rol representante) |
+| 5 | `RepAddRepresentative.tsx` | Foto representante (rol representante) |
+| 6 | `SchoolForm.tsx` | Logo del colegio |
+| 7 | `UtilitiesSettings.tsx` | Marca de agua / assets de carnet |
+| 8 | **Nuevo** `StreamFeed.tsx` | Adjuntos en publicaciones del aula |
+| 9 | **Nuevo** `ActivityFormModal.tsx` | Adjuntos en actividades |
+| 10 | **Nuevo** `SubmissionReview.tsx` | Adjuntos en entregas de estudiantes |
 
-### Tablas nuevas (migración SQL)
-
-```text
-classroom_config          — personalización del aula por assignment (portada, color, descripción, normas, bienvenida)
-classroom_topics          — temas/unidades creados por el docente dentro de una materia
-classroom_posts           — publicaciones del muro (anuncios, tipo: announcement/material/assignment/question)
-classroom_post_attachments — archivos adjuntos a publicaciones
-classroom_activities      — tareas, cuestionarios, materiales (tipo: task/quiz/forum/material/link/video/document)
-classroom_activity_attachments — archivos adjuntos a actividades
-classroom_submissions     — entregas de alumnos
-classroom_submission_attachments — archivos adjuntos a entregas
-classroom_comments        — comentarios en posts y actividades (públicos y privados)
-classroom_rubrics         — rúbricas por actividad
-classroom_rubric_criteria — criterios de la rúbrica con niveles y puntaje
-classroom_events          — eventos del calendario del aula
-classroom_access_codes    — código anual + QR por alumno por año escolar
-classroom_access_log      — bitácora de accesos del representante
-classroom_notifications   — notificaciones internas del módulo
-```
-
-### Relaciones clave con tablas existentes
-
-- `classroom_config.assignment_id` → `subject_teacher_assignments.id` (1:1)
-- `classroom_activities.evaluation_plan_item_id` → `evaluation_plan_items.id` (vinculación con notas)
-- `classroom_submissions.student_id` → `students.id`
-- `classroom_access_codes.student_id` → `students.id`, `.school_year_id` → `school_years.id`
-- Todas las tablas llevan `school_id` para RLS multi-tenant
-
-### RLS Policies
-
-- Docente: CRUD en config/topics/posts/activities de sus assignments
-- Alumno: SELECT en posts/activities de sus enrollments, INSERT en submissions/comments
-- Representante: SELECT filtrado por student_id de sus hijos (via families → students)
-- School/Admin: SELECT/UPDATE completo por school_id
-
-### Pantallas (Fase 1)
-
-1. **Docente: Lista de Aulas** (`/teacher/aula-virtual`) — tarjetas tipo Classroom por materia asignada
-2. **Docente: Configuración del Aula** — modal/página para portada, color, descripción, normas
-3. **Docente: Gestión de Temas** — crear/editar/reordenar/ocultar temas dentro de una materia
-
-### Storage
-
-- Nuevo bucket `classroom-files` (público) para archivos adjuntos
-
-### Navegación
-
-- Agregar "Aula Virtual" al sidebar del docente
-- Nueva ruta `/teacher/aula-virtual`
-- Nueva ruta `/teacher/aula-virtual/:assignmentId`
-
----
-
-## Fase 2: Muro (Stream) y Trabajo de Clase
-
-### Pantallas
-
-4. **Muro/Stream** — vista tipo feed con anuncios, publicaciones fijadas, adjuntos
-5. **Trabajo de Clase** — listado organizado por temas con tipos de contenido
-6. **Crear/Editar Actividad** — formulario completo (título, descripción, instrucciones, fecha entrega, puntaje, adjuntos, tema, rúbrica, vinculación con plan de evaluación, programación/borrador)
-7. **Crear/Editar Publicación** — anuncios con adjuntos, comentarios habilitables, programación
-
-### Funcionalidades
-
-- Publicación inmediata, borrador y programación
-- Fijar publicaciones
-- Habilitar/deshabilitar comentarios por publicación
-- Adjuntar archivos, enlaces, videos
-- Vincular actividad evaluada con `evaluation_plan_items` existente (momento + porcentaje)
-
----
-
-## Fase 3: Entregas, Calificación y Rúbricas
-
-### Pantallas
-
-8. **Vista del Alumno: Mis Materias** (`/student/aula-virtual`) — tarjetas de materias activas
-9. **Vista del Alumno: Detalle Materia** — muro, trabajo, calendario, entregas
-10. **Entrega de Actividad** — subir archivos, texto, enlaces, reemplazar antes del vencimiento
-11. **Docente: Revisar Entregas** — listado con filtros por estado, calificar, devolver con observaciones
-12. **Docente: Vista Individual del Alumno** — resumen completo por materia
-13. **Rúbricas** — creación por actividad, vista previa para alumno, calificación con rúbrica
-
-### Estados de entrega
-
-`pending` | `submitted` | `submitted_late` | `reviewed` | `graded` | `expired` | `not_submitted`
-
-### Integración con Notas
-
-- Al calificar una actividad vinculada a `evaluation_plan_item_id`, se puede reflejar opcionalmente en `student_grades`
-
----
-
-## Fase 4: Acceso del Representante, Códigos QR y Seguridad
-
-### Pantallas
-
-14. **Representante: Botón "Aula Virtual" por hijo** en dashboard existente
-15. **Representante: Vista del Aula del Hijo** — materias, muro filtrado, calendario, tareas, entregas, pendientes, vencidas
-16. **Validación de Código de Acceso** — pantalla intermedia que pide código anual antes de entrar
-17. **Admin/School: Gestión de Códigos** — regenerar códigos, ver bitácora de accesos
-
-### Seguridad
-
-- `classroom_access_codes`: código UUID único por alumno + año escolar, auto-generado
-- QR que codifica URL + token (no da acceso directo sin validación)
-- Control de intentos fallidos (max 5, bloqueo temporal)
-- Bitácora en `classroom_access_log`
-- Expiración al cambiar de año escolar
-- Representante NUNCA ve datos de otros alumnos (RLS estricto por student → family → user)
-
-### Configuración institucional
-
-- El school define qué ve el representante (calificaciones sí/no, observaciones docente sí/no)
-
----
-
-## Fase 5: Calendario, Notificaciones y Supervisión Escolar
-
-### Pantallas
-
-18. **Calendario del Aula** — vista mensual/semanal alimentada por `evaluation_plan_items` + `classroom_activities` + `classroom_events`
-19. **Panel de Notificaciones** — nueva tarea, tarea por vencer, calificación disponible, comentario del docente
-20. **School: Supervisión de Aulas** — listado de todas las aulas activas, auditoría
-21. **School: Configuración del Módulo** — permisos globales, visibilidad representante, políticas institucionales
-22. **Archivado de Aula** — archivar por periodo, reutilizar publicaciones
-
-### Notificaciones
-
-- Tabla `classroom_notifications` con tipo, destinatario, leído/no leído
-- Opcional: integración con edge function `send-email` existente para notificaciones por correo
-
----
-
-## Modelo de datos resumido
+## Estructura de carpetas en S3 (separada por colegio)
 
 ```text
-subject_teacher_assignments (existente)
-  └── classroom_config (1:1)
-  └── classroom_topics (1:N)
-  └── classroom_posts (1:N)
-       └── classroom_post_attachments (1:N)
-       └── classroom_comments (1:N)
-  └── classroom_activities (1:N)
-       └── classroom_activity_attachments (1:N)
-       └── classroom_submissions (1:N por alumno)
-            └── classroom_submission_attachments (1:N)
-       └── classroom_rubrics (1:1)
-            └── classroom_rubric_criteria (1:N)
-       └── classroom_comments (1:N)
-  └── classroom_events (1:N)
-
-students (existente)
-  └── classroom_access_codes (1:N por año escolar)
-
-classroom_access_log (bitácora plana)
-classroom_notifications (notificaciones)
+s3://<bucket>/
+  └── schools/
+        └── <school_id>/
+              ├── logo/<timestamp>.png
+              ├── assets/<filename>          (marca de agua, etc.)
+              ├── students/<student_id>/<timestamp>.png
+              ├── representatives/<family_id>/<timestamp>.png
+              ├── teachers/<teacher_id>/<timestamp>.png
+              └── classroom/<classroom_id>/
+                    ├── posts/<post_id>/<timestamp>-<filename>
+                    ├── activities/<activity_id>/<timestamp>-<filename>
+                    └── submissions/<submission_id>/<timestamp>-<filename>
 ```
 
----
+Ventajas:
+- Todo lo de un colegio queda bajo un solo prefijo → fácil de auditar, respaldar o eliminar.
+- Las URLs revelan el contexto (colegio + tipo + entidad).
+- Aislamiento natural entre instituciones.
 
-## Archivos principales a crear
+## Arquitectura técnica
 
-| Ruta | Descripción |
-|------|-------------|
-| `src/pages/teacher/ClassroomList.tsx` | Lista de aulas del docente |
-| `src/pages/teacher/ClassroomDetail.tsx` | Detalle del aula con tabs (Muro, Trabajo, Calendario, Personas) |
-| `src/components/classroom/StreamFeed.tsx` | Muro/Stream |
-| `src/components/classroom/ClassworkList.tsx` | Trabajo de clase organizado por temas |
-| `src/components/classroom/ActivityForm.tsx` | Crear/editar actividad |
-| `src/components/classroom/SubmissionReview.tsx` | Revisar entregas |
-| `src/components/classroom/RubricEditor.tsx` | Editor de rúbricas |
-| `src/components/classroom/ClassroomCalendar.tsx` | Calendario |
-| `src/components/classroom/TopicsManager.tsx` | Gestión de temas |
-| `src/components/classroom/ClassroomConfig.tsx` | Configuración del aula |
-| `src/pages/representative/ChildClassroom.tsx` | Vista del representante por hijo |
-| `src/components/classroom/AccessCodeGate.tsx` | Validación de código de acceso |
-| `src/hooks/useClassroomData.ts` | Hook principal de datos del aula |
+```text
+Frontend → edge function `s3-sign-upload` → AWS gateway de Lovable → URL firmada PUT
+Frontend → PUT directo a S3 → URL pública guardada en BD
+```
 
----
+- **Conector usado**: `aws_s3` de Lovable (gateway oficial). Maneja la firma SigV4 automáticamente. Solo hace falta tener configurada la conexión con `scopes` que incluyan `write`.
+- **Edge functions nuevas**:
+  - `s3-sign-upload` — recibe `{ folder, fileName, contentType, schoolId }`, valida sesión del usuario, construye la `object_path` con el prefijo `schools/<school_id>/...`, devuelve URL firmada PUT.
+  - `s3-migrate-existing` — ejecutable bajo demanda desde panel admin: recorre buckets actuales (`family-photos`, `school-logos`, `school-assets`), descarga cada archivo, lo sube a S3 al prefijo del colegio correspondiente y actualiza URLs en BD.
+- **Helper frontend**: `src/lib/s3-upload.ts` con `uploadToS3({ file, folder, schoolId, entityId })`.
 
-## Primera acción al aprobar
+## UI nueva del Aula Virtual
 
-1. Corregir los 7 errores de build existentes en edge functions (tipos `unknown` y `null` checks)
-2. Crear migración con las primeras 6 tablas (config, topics, posts, attachments, comments, activities)
-3. Crear bucket `classroom-files`
-4. Implementar `ClassroomList.tsx` y `ClassroomConfig.tsx` con rutas y sidebar
-5. Implementar `TopicsManager.tsx`
+1. **`StreamFeed.tsx`** — botón "Adjuntar archivo" en composer de posts; chips con archivos del post.
+2. **`ActivityFormModal.tsx`** — sección "Materiales adjuntos" al crear/editar actividad.
+3. **`SubmissionReview.tsx`** — los estudiantes adjuntan su entrega; el docente la descarga.
 
-Esto entrega en la Fase 1 la base funcional: el docente entra, ve sus materias como aulas, configura cada una y organiza temas.
+Cada adjunto guarda en BD: `file_url`, `file_name`, `file_size`, `mime_type`, `uploaded_by`, `created_at`.
+
+## Migración de archivos existentes
+
+Edge function `s3-migrate-existing` con botón en el panel admin:
+- Recorre buckets Supabase y para cada archivo:
+  1. Detecta a qué colegio pertenece (vía `student.school_id`, `representative.family_id → family_schools`, `teacher.school_id`, `school.id`).
+  2. Descarga del bucket Supabase.
+  3. Sube a S3 al prefijo `schools/<school_id>/...`.
+  4. Actualiza la URL en la tabla correspondiente.
+- **Idempotente**: salta URLs que ya empiezan con dominio S3.
+- Reporta progreso (procesados / total / errores).
+
+## Detalles técnicos
+
+- **Conexión S3**: usar el conector oficial `aws_s3` de Lovable (más seguro que secretos manuales). El usuario lo conecta una vez y el gateway maneja la autenticación.
+- **Permisos del bucket**: archivos públicos (URL directa, igual que hoy). El bucket debe tener política `public-read` y CORS abierto para PUT/GET desde el dominio de la app.
+- **Tablas nuevas** vía migración SQL: `classroom_post_attachments`, `classroom_submission_attachments` con RLS por colegio. `classroom_activity_attachments` ya existe — solo verificar RLS.
+- **Buckets Supabase actuales**: se mantienen hasta confirmar que la migración terminó bien; luego se vacían manualmente.
+
+## Pasos de implementación (en orden)
+
+1. Conectar el conector `aws_s3` (te lanzo el flujo de conexión con `scopes: read, write`).
+2. Crear edge function `s3-sign-upload` + helper `src/lib/s3-upload.ts`.
+3. Reemplazar las 7 subidas existentes por `uploadToS3` con el `schoolId` correcto.
+4. Migración SQL para tablas de adjuntos del aula virtual.
+5. Construir UI de adjuntos en `StreamFeed`, `ActivityFormModal`, `SubmissionReview`.
+6. Crear edge function `s3-migrate-existing` + botón en panel admin.
+7. Probar flujo completo (subida nueva + migración + descarga).
+
+## Lo que el usuario debe hacer
+
+- Aprobar la conexión del conector AWS S3 (te pediré el bucket name, region, access key, secret).
+- Configurar CORS en el bucket S3 (te paso el JSON exacto):
+  ```json
+  [{"AllowedOrigins":["*"],"AllowedMethods":["PUT","GET"],"AllowedHeaders":["*"]}]
+  ```
+- Confirmar que el bucket tiene política `public-read` para los objetos.
 
