@@ -259,6 +259,7 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
           onClose={() => setActivityModal({ open: false })}
           assignmentId={assignmentId}
           schoolId={schoolId}
+          classroomId={assignmentId}
           topics={visibleTopics}
           defaultTopicId={activityModal.topicId}
           activity={activityModal.activity}

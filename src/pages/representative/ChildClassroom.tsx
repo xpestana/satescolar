@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { AccessCodeGate } from "@/components/classroom/AccessCodeGate";
 import { ChildClassroomTutorial } from "@/components/classroom/ClassroomTutorial";
+import { StudentSubmissionPanel } from "@/components/classroom/StudentSubmissionPanel";
 import { formatGradeLevel } from "@/lib/utils";
 
 export default function ChildClassroom() {
@@ -321,7 +322,7 @@ export default function ChildClassroom() {
               ) : (
                 activities.map((act) => (
                   <Card key={act.id}>
-                    <CardContent className="pt-4">
+                    <CardContent className="pt-4 space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <p className="font-semibold">{act.title}</p>
@@ -341,6 +342,24 @@ export default function ChildClassroom() {
                         </div>
                         {getStatusBadge(act)}
                       </div>
+
+                      {/* Submission panel for evaluable activities */}
+                      {["task", "quiz", "forum", "evaluated"].includes(act.activity_type) && studentId && selectedAssignment && (
+                        <StudentSubmissionPanel
+                          activity={{
+                            id: act.id,
+                            title: act.title,
+                            due_date: act.due_date,
+                            max_score: act.max_score,
+                            allow_late_submission: act.allow_late_submission,
+                            allow_resubmission: act.allow_resubmission,
+                            school_id: act.school_id,
+                            assignment_id: act.assignment_id,
+                          }}
+                          studentId={studentId}
+                          classroomId={selectedAssignment}
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 ))

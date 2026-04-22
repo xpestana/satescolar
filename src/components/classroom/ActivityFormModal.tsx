@@ -14,7 +14,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Save, Trash2 } from "lucide-react";
+import { Loader2, Save, Trash2, Download } from "lucide-react";
+import { S3AttachmentInput, type PendingAttachment } from "./S3AttachmentInput";
+import { supabase as sb } from "@/integrations/supabase/client";
 
 interface Activity {
   id: string;
@@ -40,6 +42,7 @@ interface Props {
   onClose: () => void;
   assignmentId: string;
   schoolId: string;
+  classroomId: string;
   topics: ClassroomTopic[];
   defaultTopicId?: string;
   activity?: Partial<Activity>;
@@ -57,7 +60,7 @@ const ACTIVITY_TYPES = [
   { value: "non_evaluated", label: "Actividad no evaluada" },
 ];
 
-export function ActivityFormModal({ open, onClose, assignmentId, schoolId, topics, defaultTopicId, activity }: Props) {
+export function ActivityFormModal({ open, onClose, assignmentId, schoolId, classroomId, topics, defaultTopicId, activity }: Props) {
   const queryClient = useQueryClient();
   const isEditing = !!activity?.id;
 
@@ -73,6 +76,33 @@ export function ActivityFormModal({ open, onClose, assignmentId, schoolId, topic
   const [allowLate, setAllowLate] = useState(activity?.allow_late_submission ?? false);
   const [allowResub, setAllowResub] = useState(activity?.allow_resubmission ?? false);
   const [evalPlanItemId, setEvalPlanItemId] = useState(activity?.evaluation_plan_item_id || "none");
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+
+  // Existing attachments (when editing)
+  const { data: existingAttachments = [], refetch: refetchAttachments } = useQuery({
+    queryKey: ["activity-attachments", activity?.id],
+    queryFn: async () => {
+      if (!activity?.id) return [];
+      const { data, error } = await sb
+        .from("classroom_activity_attachments")
+        .select("*")
+        .eq("activity_id", activity.id);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!activity?.id,
+  });
+
+  const removeExistingAttachment = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await sb.from("classroom_activity_attachments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchAttachments();
+      toast({ title: "Adjunto eliminado" });
+    },
+  });
 
   // Fetch evaluation plan items for linking
   const { data: evalPlanItems = [] } = useQuery({
@@ -108,6 +138,7 @@ export function ActivityFormModal({ open, onClose, assignmentId, schoolId, topic
         evaluation_plan_item_id: evalPlanItemId === "none" ? null : evalPlanItemId,
       };
 
+      let activityId = activity?.id;
       if (isEditing) {
         const { error } = await supabase
           .from("classroom_activities")
@@ -115,10 +146,30 @@ export function ActivityFormModal({ open, onClose, assignmentId, schoolId, topic
           .eq("id", activity!.id!);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("classroom_activities")
-          .insert(payload);
+          .insert(payload)
+          .select("id")
+          .single();
         if (error) throw error;
+        activityId = data.id;
+      }
+
+      // Persist new attachments
+      const uploaded = pendingAttachments.filter(a => a.publicUrl);
+      if (activityId && uploaded.length > 0) {
+        const rows = uploaded.map(a => ({
+          activity_id: activityId!,
+          school_id: schoolId,
+          file_url: a.publicUrl!,
+          file_name: a.file.name,
+          file_size: a.file.size,
+          file_type: a.file.type || null,
+        }));
+        const { error: attErr } = await supabase
+          .from("classroom_activity_attachments")
+          .insert(rows);
+        if (attErr) throw attErr;
       }
     },
     onSuccess: () => {
@@ -246,6 +297,42 @@ export function ActivityFormModal({ open, onClose, assignmentId, schoolId, topic
               </p>
             </div>
           )}
+
+          {/* Materiales adjuntos */}
+          <div className="space-y-2">
+            <Label>Materiales adjuntos</Label>
+            {existingAttachments.length > 0 && (
+              <div className="space-y-1">
+                {existingAttachments.map((a: any) => (
+                  <div key={a.id} className="flex items-center justify-between gap-2 p-2 bg-muted/40 rounded text-xs">
+                    <a href={a.file_url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:underline truncate">
+                      <Download className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{a.file_name}</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => removeExistingAttachment.mutate(a.id)}
+                      className="text-destructive hover:underline shrink-0"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <S3AttachmentInput
+              folder="activities"
+              schoolId={schoolId}
+              classroomId={classroomId}
+              entityId={activity?.id}
+              attachments={pendingAttachments}
+              onChange={setPendingAttachments}
+              buttonLabel="Adjuntar material"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Los archivos se suben a S3 y quedan visibles para los estudiantes al publicar.
+            </p>
+          </div>
 
           {/* Toggles */}
           {needsDueDate && (

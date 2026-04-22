@@ -20,7 +20,7 @@ import {
 import { Label } from "@/components/ui/label";
 import {
   ArrowLeft, CheckCircle2, Clock, AlertCircle, XCircle,
-  Loader2, Send, FileText, Download, Eye,
+  Loader2, Send, FileText, Download, Eye, Paperclip,
 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -288,6 +288,7 @@ export function SubmissionReview({ activity, onBack }: Props) {
                 <TableHead>Estudiante</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Entregado</TableHead>
+                <TableHead>Adjuntos</TableHead>
                 <TableHead>Nota</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -312,6 +313,25 @@ export function SubmissionReview({ activity, onBack }: Props) {
                       {submission?.submitted_at
                         ? format(new Date(submission.submitted_at), "d MMM, HH:mm", { locale: es })
                         : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {subAttachments.length > 0 ? (
+                        <div className="flex flex-col gap-0.5">
+                          {subAttachments.map((a: any) => (
+                            <a
+                              key={a.id}
+                              href={a.file_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-primary hover:underline flex items-center gap-1 max-w-[180px]"
+                              title={a.file_name}
+                            >
+                              <Download className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{a.file_name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      ) : <span className="text-xs text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell>
                       {submission?.score != null ? (
@@ -351,7 +371,7 @@ export function SubmissionReview({ activity, onBack }: Props) {
               })}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No se encontraron estudiantes con este filtro.
                   </TableCell>
                 </TableRow>
@@ -376,6 +396,27 @@ export function SubmissionReview({ activity, onBack }: Props) {
                 <Label className="text-xs text-muted-foreground">Respuesta del estudiante</Label>
                 <div className="bg-muted rounded-md p-3 text-sm whitespace-pre-wrap max-h-40 overflow-y-auto">
                   {gradingSubmission.submission.content}
+                </div>
+              </div>
+            )}
+
+            {/* Submission attachments */}
+            {gradingSubmission?.submission?.id && (attachmentsMap[gradingSubmission.submission.id] || []).length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Archivos entregados</Label>
+                <div className="flex flex-col gap-1">
+                  {(attachmentsMap[gradingSubmission.submission.id] || []).map((a: any) => (
+                    <a
+                      key={a.id}
+                      href={a.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-primary hover:underline flex items-center gap-1.5 p-2 bg-muted/40 rounded"
+                    >
+                      <Download className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{a.file_name}</span>
+                    </a>
+                  ))}
                 </div>
               </div>
             )}
