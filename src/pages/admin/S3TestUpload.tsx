@@ -32,6 +32,8 @@ export default function S3TestUpload() {
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<any>(null);
 
   useEffect(() => {
     (async () => {
@@ -83,6 +85,26 @@ export default function S3TestUpload() {
     await navigator.clipboard.writeText(result.publicUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const runMigration = async () => {
+    if (!confirm("Esto migrará TODAS las imágenes existentes (logos, fotos, adjuntos) desde Lovable Cloud Storage a S3 y eliminará los originales. ¿Continuar?")) return;
+    setMigrating(true);
+    setMigrateResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("s3-migrate-existing", {
+        body: { deleteOriginals: true },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      setMigrateResult(data?.stats || data);
+      toast.success(`Migración completa: ${data?.stats?.uploaded || 0} subidos, ${data?.stats?.deleted || 0} originales borrados`);
+    } catch (e: any) {
+      toast.error(e?.message || "Error en la migración");
+      setMigrateResult({ error: e?.message });
+    } finally {
+      setMigrating(false);
+    }
   };
 
   const isImage = file?.type.startsWith("image/");
