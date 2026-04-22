@@ -12,8 +12,10 @@ interface MigrationStats {
   scanned: number;
   uploaded: number;
   skipped: number;
+  deleted: number;
   errors: number;
   errorDetails: string[];
+  migrated: { table: string; id: string; from: string; to: string }[];
 }
 
 function sanitize(name: string): string {
@@ -41,21 +43,18 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claims, error: authErr } = await userClient.auth.getClaims(token);
-    if (authErr || !claims?.claims) {
+    const { data: userData, error: authErr } = await userClient.auth.getUser();
+    if (authErr || !userData?.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Check admin role
-    const userId = claims.claims.sub as string;
     const { data: roleRow } = await userClient
       .from("user_roles")
       .select("role")
-      .eq("user_id", userId)
+      .eq("user_id", userData.user.id)
       .eq("role", "admin")
       .maybeSingle();
 
@@ -66,30 +65,43 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ---- Service client for cross-school access ----
+    // ---- Body opts ----
+    const body = await req.json().catch(() => ({}));
+    const deleteOriginals = body?.deleteOriginals !== false; // default true
+
+    // ---- Service client ----
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // ---- AWS client ----
+    // ---- AWS ----
     const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID")!;
     const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY")!;
     const region = Deno.env.get("AWS_REGION")!;
     const bucket = Deno.env.get("AWS_S3_BUCKET")!;
-    const aws = new AwsClient({
-      accessKeyId, secretAccessKey, service: "s3", region,
-    });
+    const aws = new AwsClient({ accessKeyId, secretAccessKey, service: "s3", region });
     const s3Host = `${bucket}.s3.${region}.amazonaws.com`;
     const s3Origin = `https://${s3Host}`;
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const stats: MigrationStats = {
-      scanned: 0, uploaded: 0, skipped: 0, errors: 0, errorDetails: [],
+      scanned: 0, uploaded: 0, skipped: 0, deleted: 0, errors: 0,
+      errorDetails: [], migrated: [],
     };
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    function isAlreadyOnS3(url?: string | null): boolean {
+      if (!url) return true;
+      return url.includes(s3Host);
+    }
 
-    // Helper: download from supabase storage and upload to S3
+    function extractPath(url: string, bucketName: string): string | null {
+      const marker = `/${bucketName}/`;
+      const i = url.indexOf(marker);
+      if (i < 0) return null;
+      return url.slice(i + marker.length);
+    }
+
     async function migrateOne(
       bucketName: string,
       objectPath: string,
@@ -99,7 +111,6 @@ Deno.serve(async (req) => {
     ): Promise<string | null> {
       stats.scanned++;
       try {
-        // Download from Supabase storage
         const { data: blob, error: dlErr } = await admin.storage
           .from(bucketName)
           .download(objectPath);
@@ -113,13 +124,9 @@ Deno.serve(async (req) => {
         if (entityId) key += `${entityId}/`;
         key += `${ts}-${fileName}`;
 
-        // Upload to S3
         const putRes = await aws.fetch(`${s3Origin}/${key}`, {
           method: "PUT",
-          headers: {
-            "x-amz-acl": "public-read",
-            "Content-Type": contentType,
-          },
+          headers: { "Content-Type": contentType },
           body: blob,
         });
 
@@ -129,6 +136,12 @@ Deno.serve(async (req) => {
         }
 
         stats.uploaded++;
+
+        if (deleteOriginals) {
+          const { error: rmErr } = await admin.storage.from(bucketName).remove([objectPath]);
+          if (!rmErr) stats.deleted++;
+        }
+
         return `${s3Origin}/${key}`;
       } catch (e: any) {
         stats.errors++;
@@ -137,86 +150,99 @@ Deno.serve(async (req) => {
       }
     }
 
-    function isAlreadyMigrated(url: string | null | undefined): boolean {
-      if (!url) return true;
-      return url.includes(s3Host);
+    async function updateAndRecord(
+      table: string, id: string, urlCol: string,
+      oldUrl: string, newUrl: string,
+    ) {
+      await admin.from(table).update({ [urlCol]: newUrl }).eq("id", id);
+      stats.migrated.push({ table, id, from: oldUrl, to: newUrl });
     }
 
-    // ---- 1. school-logos → schools.logo_url ----
-    const { data: schools } = await admin
-      .from("schools")
-      .select("id, logo_url");
+    // 1. schools.logo_url  (school-logos)
+    const { data: schools } = await admin.from("schools").select("id, logo_url");
     for (const s of schools || []) {
-      if (isAlreadyMigrated(s.logo_url)) { stats.skipped++; continue; }
-      const path = (s.logo_url as string).split("/school-logos/")[1];
+      if (isAlreadyOnS3(s.logo_url)) { stats.skipped++; continue; }
+      const path = extractPath(s.logo_url as string, "school-logos");
       if (!path) { stats.skipped++; continue; }
       const newUrl = await migrateOne("school-logos", path, s.id, "logo", null);
-      if (newUrl) {
-        await admin.from("schools").update({ logo_url: newUrl }).eq("id", s.id);
-      }
+      if (newUrl) await updateAndRecord("schools", s.id, "logo_url", s.logo_url as string, newUrl);
     }
 
-    // ---- 2. school-assets → carnet_config.watermark_url ----
-    const { data: carnets } = await admin
-      .from("carnet_config")
-      .select("id, school_id, watermark_url");
+    // 2. carnet_config.watermark_url  (school-assets)
+    const { data: carnets } = await admin.from("carnet_config").select("id, school_id, watermark_url");
     for (const c of carnets || []) {
-      if (isAlreadyMigrated(c.watermark_url)) { stats.skipped++; continue; }
-      const path = (c.watermark_url as string).split("/school-assets/")[1];
+      if (isAlreadyOnS3(c.watermark_url)) { stats.skipped++; continue; }
+      const path = extractPath(c.watermark_url as string, "school-assets");
       if (!path) { stats.skipped++; continue; }
       const newUrl = await migrateOne("school-assets", path, c.school_id, "assets", null);
-      if (newUrl) {
-        await admin.from("carnet_config").update({ watermark_url: newUrl }).eq("id", c.id);
-      }
+      if (newUrl) await updateAndRecord("carnet_config", c.id, "watermark_url", c.watermark_url as string, newUrl);
     }
 
-    // ---- 3. family-photos → students.photo_url ----
-    const { data: students } = await admin
-      .from("students")
-      .select("id, photo_url, school_id");
+    // 3. students.photo_url  (school via student_schools)
+    const { data: students } = await admin.from("students").select("id, photo_url");
     for (const st of students || []) {
-      if (isAlreadyMigrated(st.photo_url)) { stats.skipped++; continue; }
-      const path = (st.photo_url as string).split("/family-photos/")[1];
-      if (!path || !st.school_id) { stats.skipped++; continue; }
-      const newUrl = await migrateOne("family-photos", path, st.school_id, "students", st.id);
-      if (newUrl) {
-        await admin.from("students").update({ photo_url: newUrl }).eq("id", st.id);
-      }
-    }
-
-    // ---- 4. family-photos → representatives.photo_url ----
-    const { data: reps } = await admin
-      .from("representatives")
-      .select("id, photo_url, family_id");
-    for (const r of reps || []) {
-      if (isAlreadyMigrated(r.photo_url)) { stats.skipped++; continue; }
-      const path = (r.photo_url as string).split("/family-photos/")[1];
+      if (isAlreadyOnS3(st.photo_url)) { stats.skipped++; continue; }
+      const path = extractPath(st.photo_url as string, "family-photos");
       if (!path) { stats.skipped++; continue; }
-      // Resolve school via family_schools
-      const { data: fs } = await admin
-        .from("family_schools")
-        .select("school_id")
-        .eq("family_id", r.family_id)
-        .limit(1)
-        .maybeSingle();
-      if (!fs?.school_id) { stats.skipped++; continue; }
-      const newUrl = await migrateOne("family-photos", path, fs.school_id, "representatives", r.family_id);
-      if (newUrl) {
-        await admin.from("representatives").update({ photo_url: newUrl }).eq("id", r.id);
-      }
+      const { data: ss } = await admin
+        .from("student_schools").select("school_id").eq("student_id", st.id).limit(1).maybeSingle();
+      if (!ss?.school_id) { stats.skipped++; continue; }
+      const newUrl = await migrateOne("family-photos", path, ss.school_id, "students", st.id);
+      if (newUrl) await updateAndRecord("students", st.id, "photo_url", st.photo_url as string, newUrl);
     }
 
-    // ---- 5. family-photos → teachers.photo_url ----
-    const { data: teachers } = await admin
-      .from("teachers")
-      .select("id, photo_url, school_id");
+    // 4. representatives.photo_url  (school via family_schools)
+    const { data: reps } = await admin.from("representatives").select("id, photo_url, family_id");
+    for (const r of reps || []) {
+      if (isAlreadyOnS3(r.photo_url)) { stats.skipped++; continue; }
+      const path = extractPath(r.photo_url as string, "family-photos");
+      if (!path) { stats.skipped++; continue; }
+      const { data: fs } = await admin
+        .from("family_schools").select("school_id").eq("family_id", r.family_id).limit(1).maybeSingle();
+      if (!fs?.school_id) { stats.skipped++; continue; }
+      const newUrl = await migrateOne("family-photos", path, fs.school_id, "representatives", r.id);
+      if (newUrl) await updateAndRecord("representatives", r.id, "photo_url", r.photo_url as string, newUrl);
+    }
+
+    // 5. teachers.photo_url
+    const { data: teachers } = await admin.from("teachers").select("id, school_id, photo_url");
     for (const t of teachers || []) {
-      if (isAlreadyMigrated(t.photo_url)) { stats.skipped++; continue; }
-      const path = (t.photo_url as string).split("/family-photos/")[1];
+      if (isAlreadyOnS3(t.photo_url)) { stats.skipped++; continue; }
+      const path = extractPath(t.photo_url as string, "family-photos");
       if (!path || !t.school_id) { stats.skipped++; continue; }
       const newUrl = await migrateOne("family-photos", path, t.school_id, "teachers", t.id);
-      if (newUrl) {
-        await admin.from("teachers").update({ photo_url: newUrl }).eq("id", t.id);
+      if (newUrl) await updateAndRecord("teachers", t.id, "photo_url", t.photo_url as string, newUrl);
+    }
+
+    // 6. classroom_config.cover_url  (classroom-files o school-assets)
+    const { data: ccfg } = await admin.from("classroom_config").select("id, school_id, cover_url");
+    for (const c of ccfg || []) {
+      if (isAlreadyOnS3(c.cover_url)) { stats.skipped++; continue; }
+      const url = c.cover_url as string;
+      const supaIdx = url.indexOf("/storage/v1/object/public/");
+      if (supaIdx < 0) { stats.skipped++; continue; }
+      const tail = url.slice(supaIdx + "/storage/v1/object/public/".length);
+      const slash = tail.indexOf("/");
+      const bucketName = tail.slice(0, slash);
+      const path = tail.slice(slash + 1);
+      const newUrl = await migrateOne(bucketName, path, c.school_id, "assets", null);
+      if (newUrl) await updateAndRecord("classroom_config", c.id, "cover_url", url, newUrl);
+    }
+
+    // 7. classroom attachments
+    for (const t of ["classroom_activity_attachments","classroom_post_attachments","classroom_submission_attachments"]) {
+      const { data: rows } = await admin.from(t).select("id, school_id, file_url");
+      for (const r of rows || []) {
+        if (isAlreadyOnS3(r.file_url)) { stats.skipped++; continue; }
+        const url = r.file_url as string;
+        const supaIdx = url.indexOf("/storage/v1/object/public/");
+        if (supaIdx < 0) { stats.skipped++; continue; }
+        const tail = url.slice(supaIdx + "/storage/v1/object/public/".length);
+        const slash = tail.indexOf("/");
+        const bucketName = tail.slice(0, slash);
+        const path = tail.slice(slash + 1);
+        const newUrl = await migrateOne(bucketName, path, r.school_id, "assets", null);
+        if (newUrl) await updateAndRecord(t, r.id, "file_url", url, newUrl);
       }
     }
 
