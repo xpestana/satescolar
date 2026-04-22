@@ -400,6 +400,27 @@ export function SubmissionReview({ activity, onBack }: Props) {
               </div>
             )}
 
+            {/* Submission attachments */}
+            {gradingSubmission?.submission?.id && (attachmentsMap[gradingSubmission.submission.id] || []).length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Archivos entregados</Label>
+                <div className="flex flex-col gap-1">
+                  {(attachmentsMap[gradingSubmission.submission.id] || []).map((a: any) => (
+                    <a
+                      key={a.id}
+                      href={a.file_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-primary hover:underline flex items-center gap-1.5 p-2 bg-muted/40 rounded"
+                    >
+                      <Download className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{a.file_name}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {!gradingSubmission?.submission && (
               <p className="text-sm text-muted-foreground italic">
                 Este estudiante no ha realizado una entrega.
