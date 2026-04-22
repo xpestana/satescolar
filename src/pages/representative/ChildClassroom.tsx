@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { AccessCodeGate } from "@/components/classroom/AccessCodeGate";
 import { ChildClassroomTutorial } from "@/components/classroom/ClassroomTutorial";
+import { StudentSubmissionPanel } from "@/components/classroom/StudentSubmissionPanel";
 import { formatGradeLevel } from "@/lib/utils";
 
 export default function ChildClassroom() {
