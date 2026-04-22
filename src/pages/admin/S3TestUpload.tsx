@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Upload, ExternalLink, Copy, CheckCircle2 } from "lucide-react";
+import { Loader2, Upload, ExternalLink, Copy, CheckCircle2, RefreshCw } from "lucide-react";
 import { uploadToS3, type S3Folder, type UploadResult } from "@/lib/s3-upload";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
