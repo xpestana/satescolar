@@ -265,6 +265,32 @@ export default function S3TestUpload() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Migrar imágenes existentes a S3</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Mueve todos los logos, fotos de estudiantes/representantes/profesores, watermarks y adjuntos
+            que aún están en Lovable Cloud Storage hacia S3, actualiza las URLs en la base de datos y
+            elimina los originales.
+          </p>
+          <Button onClick={runMigration} disabled={migrating} variant="default">
+            {migrating ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Migrando...</>
+            ) : (
+              <><RefreshCw className="h-4 w-4 mr-2" /> Migrar todo a S3</>
+            )}
+          </Button>
+
+          {migrateResult && (
+            <pre className="text-xs bg-muted p-3 rounded max-h-96 overflow-auto">
+              {JSON.stringify(migrateResult, null, 2)}
+            </pre>
+          )}
+        </CardContent>
+      </Card>
     </DashboardLayout>
   );
 }
