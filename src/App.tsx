@@ -35,6 +35,7 @@ import SchoolForm from "./pages/admin/SchoolForm";
 import SendEmail from "./pages/admin/SendEmail";
 import UsersList from "./pages/admin/UsersList";
 import AdminUsersList from "./pages/admin/AdminUsersList";
+import S3TestUpload from "./pages/admin/S3TestUpload";
 import RepresentativeDashboard from "./pages/representative/RepresentativeDashboard";
 import RepresentativesList from "./pages/representative/RepresentativesList";
 import RepStudentsList from "./pages/representative/StudentsList";
@@ -306,6 +307,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <AdminUsersList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/prueba-s3"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <S3TestUpload />
                   </ProtectedRoute>
                 }
               />
