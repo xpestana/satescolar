@@ -117,12 +117,11 @@ Deno.serve(async (req) => {
     const url = new URL(`https://${host}/${key}`);
     url.searchParams.set("X-Amz-Expires", "900");
 
-    // Sign as PUT with public-read ACL and content-type
+    // Sign as PUT — sin ACL (el bucket usa Bucket Policy para acceso público)
     const signed = await aws.sign(
       new Request(url.toString(), {
         method: "PUT",
         headers: {
-          "x-amz-acl": "public-read",
           "Content-Type": contentType,
         },
       }),
@@ -137,7 +136,6 @@ Deno.serve(async (req) => {
         publicUrl,
         key,
         headers: {
-          "x-amz-acl": "public-read",
           "Content-Type": contentType,
         },
       }),
