@@ -119,12 +119,31 @@ export default function SchoolsList() {
       <div className="bg-card rounded-xl shadow-sm border">
         {/* Toolbar */}
         <div className="flex items-center justify-between p-5 border-b">
-          <Link to="/admin/colegios/crear">
-            <Button className="shadow-sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar Colegio
+          <div className="flex items-center gap-2">
+            <Link to="/admin/colegios/crear">
+              <Button className="shadow-sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Agregar Colegio
+              </Button>
+            </Link>
+            <Button
+              variant="outline"
+              className="shadow-sm"
+              onClick={async () => {
+                toast.info("Migrando archivos a S3... esto puede tardar.");
+                const { data, error } = await supabase.functions.invoke("s3-migrate-existing");
+                if (error) {
+                  toast.error("Error en la migración: " + error.message);
+                  return;
+                }
+                const s = data?.stats || {};
+                toast.success(`Migración completa — Subidos: ${s.uploaded ?? 0} · Saltados: ${s.skipped ?? 0} · Errores: ${s.errors ?? 0}`);
+                if (s.errorDetails?.length) console.error("Errores:", s.errorDetails);
+              }}
+            >
+              Migrar archivos a S3
             </Button>
-          </Link>
+          </div>
 
           <div className="flex items-center gap-6">
             <div className="relative">

@@ -34,6 +34,8 @@ import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
 import SendEmail from "./pages/admin/SendEmail";
 import UsersList from "./pages/admin/UsersList";
+import AdminUsersList from "./pages/admin/AdminUsersList";
+import S3TestUpload from "./pages/admin/S3TestUpload";
 import RepresentativeDashboard from "./pages/representative/RepresentativeDashboard";
 import RepresentativesList from "./pages/representative/RepresentativesList";
 import RepStudentsList from "./pages/representative/StudentsList";
@@ -44,6 +46,11 @@ import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherSubjects from "./pages/teacher/TeacherSubjects";
 import TeacherCarnet from "./pages/teacher/TeacherCarnet";
 import TeacherGrades from "./pages/teacher/TeacherGrades";
+import ClassroomList from "./pages/teacher/ClassroomList";
+import ClassroomDetail from "./pages/teacher/ClassroomDetail";
+import ChildClassroom from "./pages/representative/ChildClassroom";
+
+import ClassroomSupervision from "./pages/school/ClassroomSupervision";
 import AttendanceScan from "./pages/AttendanceScan";
 import AttendanceScanner from "./pages/school/AttendanceScanner";
 import AttendanceList from "./pages/school/AttendanceList";
@@ -296,6 +303,22 @@ const App = () => (
                 }
               />
               <Route
+                path="/admin/administradores"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <AdminUsersList />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/prueba-s3"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <S3TestUpload />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/admin/enviar-email"
                 element={
                   <ProtectedRoute requiredRole="admin">
@@ -312,10 +335,13 @@ const App = () => (
               <Route path="/representative/representante/:representativeId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddRepresentative /></ProtectedRoute>} />
               <Route path="/representative/estudiante/nuevo" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
               <Route path="/representative/estudiante/:studentId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
+              <Route path="/representative/aula-virtual/:studentId" element={<ProtectedRoute requiredRole="representative"><ChildClassroom /></ProtectedRoute>} />
               {/* Teacher routes */}
               <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
               <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
               <Route path="/teacher/materias/:assignmentId/notas" element={<ProtectedRoute requiredRole="teacher"><TeacherGrades /></ProtectedRoute>} />
+              <Route path="/teacher/aula-virtual" element={<ProtectedRoute requiredRole="teacher"><ClassroomList /></ProtectedRoute>} />
+              <Route path="/teacher/aula-virtual/:assignmentId" element={<ProtectedRoute requiredRole="teacher"><ClassroomDetail /></ProtectedRoute>} />
               <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />
               {/* Attendance routes */}
               <Route path="/attendance/scan/:token" element={<AttendanceScan />} />
@@ -329,6 +355,8 @@ const App = () => (
               <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><StudentLedger /></ProtectedRoute>} />
               <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
               <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
+              
+              <Route path="/school/aula-virtual/supervision" element={<ProtectedRoute requiredRole="school"><ClassroomSupervision /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -24,6 +24,9 @@ import {
   QrCode,
   ClipboardList,
   Bell,
+  Key,
+  ShieldAlert,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -64,8 +67,10 @@ const navSections: NavSection[] = [
     requiredRole: "admin",
     items: [
       { label: "Usuarios", href: "/admin/usuarios", icon: Users, requiredRole: "admin" },
+      { label: "Administradores", href: "/admin/administradores", icon: ShieldAlert, requiredRole: "admin" },
       { label: "Colegios", href: "/admin/colegios", icon: GraduationCap, requiredRole: "admin" },
       { label: "Enviar Email", href: "/admin/enviar-email", icon: Mail, requiredRole: "admin" },
+      { label: "Prueba S3", href: "/admin/prueba-s3", icon: Upload, requiredRole: "admin" },
     ],
   },
   {
@@ -93,6 +98,7 @@ const navSections: NavSection[] = [
       { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school" },
       { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school" },
       { label: "Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school" },
+      { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school" },
     ],
   },
   {
@@ -130,6 +136,7 @@ const navSections: NavSection[] = [
       { label: "Carnet", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school" },
       { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school" },
       { label: "Config. Morosidad", href: "/pagos/morosidad", icon: Bell, requiredRole: "school" },
+      
     ],
   },
   // Representative
@@ -160,6 +167,7 @@ const navSections: NavSection[] = [
     requiredRole: "teacher",
     items: [
       { label: "Materias", href: "/teacher/materias", icon: BookOpen, requiredRole: "teacher" },
+      { label: "Aula Virtual", href: "/teacher/aula-virtual", icon: GraduationCap, requiredRole: "teacher" },
       { label: "Carnet", href: "/teacher/carnet", icon: CreditCard, requiredRole: "teacher" },
     ],
   },
