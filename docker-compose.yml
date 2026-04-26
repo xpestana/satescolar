@@ -89,6 +89,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-supabase_admin}
     volumes:
       - ./supabase/migrations:/migrations:ro
+      - ./scripts/seeds:/seeds:ro
       - ./scripts/run-migrations.sh:/run-migrations.sh:ro
     command: ["/bin/sh", "/run-migrations.sh"]
     depends_on:

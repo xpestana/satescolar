@@ -25,13 +25,34 @@ if [ ! -d "$MIGRATIONS_DIR" ]; then
   exit 1
 fi
 
+SEED_DIR="./scripts/seeds"
+SEED_APPLIED=0
+
+apply_seeds() {
+  if [ -d "$SEED_DIR" ] && [ "$SEED_APPLIED" -eq 0 ]; then
+    for seed in $(ls "$SEED_DIR"/*.sql 2>/dev/null | sort); do
+      seed_name=$(basename "$seed")
+      echo "  🌱 seed: ${seed_name}"
+      psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$seed" --quiet --no-psqlrc 2>&1 | grep -v "^$" || true
+    done
+    SEED_APPLIED=1
+  fi
+}
+
 MIGRATION_COUNT=0
 for migration in $(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sort); do
   filename=$(basename "$migration")
   echo "  ▶ ${filename}"
   psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$migration" --quiet --no-psqlrc 2>&1 | grep -v "^$" || true
   MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
+  # Después de la primera migración (que crea public.schools), aplicar
+  # los seeds de ./scripts/seeds/ para garantizar que filas referenciadas
+  # por migraciones posteriores existan antes de tiempo.
+  apply_seeds
 done
+
+# Por si no había ninguna migración, aplicar seeds igualmente.
+apply_seeds
 
 echo ""
 echo "✅ ${MIGRATION_COUNT} migraciones aplicadas."
