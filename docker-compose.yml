@@ -1,4 +1,7 @@
-version: "3.8"
+# Red compartida (nombre fijo) para conectar servicios de forma predecible
+networks:
+  default:
+    name: satescolar-net
 
 services:
   # ─── PostgreSQL ───
@@ -10,48 +13,18 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      # La imagen supabase/postgres usa supabase_admin (no existe el rol postgres)
+      POSTGRES_USER: ${POSTGRES_USER:-supabase_admin}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/00-init.sql
+      # Contraseñas tras migrate.sh de la imagen (no usar 00-init.sql: duplica roles y rompe el init)
+      - ./scripts/zz-set-role-passwords.sh:/docker-entrypoint-initdb.d/zz-set-role-passwords.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      # Sustitución en tiempo de `docker compose` (lee .env); la imagen supabase usa supabase_admin
+      test: ["CMD-SHELL", "pg_isready -U \"${POSTGRES_USER:-supabase_admin}\" -d \"${POSTGRES_DB:-postgres}\" -h localhost"]
       interval: 5s
       timeout: 5s
       retries: 10
-    restart: unless-stopped
-
-  # ─── GoTrue (Auth) ───
-  supabase-auth:
-    image: supabase/gotrue:v2.158.1
-    container_name: sat-auth
-    ports:
-      - "9999:9999"
-    environment:
-      GOTRUE_API_HOST: 0.0.0.0
-      GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: http://localhost:8000
-      GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB:-postgres}
-      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-http://localhost:3000}
-      GOTRUE_URI_ALLOW_LIST: ${GOTRUE_URI_ALLOW_LIST:-http://localhost:3000}
-      GOTRUE_DISABLE_SIGNUP: ${GOTRUE_DISABLE_SIGNUP:-false}
-      GOTRUE_JWT_SECRET: ${JWT_SECRET}
-      GOTRUE_JWT_EXP: ${GOTRUE_JWT_EXP:-3600}
-      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
-      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${GOTRUE_EXTERNAL_EMAIL_ENABLED:-true}
-      GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM:-false}
-      GOTRUE_SMTP_HOST: ${SMTP_HOST}
-      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
-      GOTRUE_SMTP_USER: ${SMTP_USER}
-      GOTRUE_SMTP_PASS: ${SMTP_PASS}
-      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_FROM_EMAIL}
-      GOTRUE_SMTP_SENDER_NAME: ${SMTP_FROM_NAME:-SAT Escolar}
-      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
-      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
-      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
-    depends_on:
-      supabase-db:
-        condition: service_healthy
     restart: unless-stopped
 
   # ─── PostgREST (REST API) ───
@@ -97,28 +70,68 @@ services:
         condition: service_healthy
       supabase-rest:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/status >/dev/null 2>&1 || wget -qO- http://127.0.0.1:5000/ >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: unless-stopped
 
-  # ─── Kong (API Gateway) ───
-  supabase-kong:
-    image: kong:2.8.1
-    container_name: sat-kong
-    ports:
-      - "8000:8000"
-      - "8443:8443"
+  # ─── Aplicar migraciones SQL (esquema + RLS) ───
+  supabase-migrations:
+    image: postgres:15-alpine
+    container_name: sat-migrations
     environment:
-      KONG_DATABASE: "off"
-      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
-      KONG_DNS_ORDER: LAST,A,CNAME
-      KONG_PLUGINS: request-transformer,cors,key-auth,acl,basic-auth
-      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
-      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: supabase-db
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-supabase_admin}
     volumes:
-      - ./docker/kong.yml:/var/lib/kong/kong.yml
+      - ./supabase/migrations:/migrations:ro
+      - ./scripts/run-migrations.sh:/run-migrations.sh:ro
+    command: ["/bin/sh", "/run-migrations.sh"]
     depends_on:
-      - supabase-auth
-      - supabase-rest
-      - supabase-storage
+      supabase-db:
+        condition: service_healthy
+      supabase-storage:
+        condition: service_healthy
+    restart: "no"
+
+  # ─── GoTrue (Auth) ───
+  supabase-auth:
+    image: supabase/gotrue:v2.158.1
+    container_name: sat-auth
+    ports:
+      - "9999:9999"
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://localhost:8000
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_SITE_URL: ${GOTRUE_SITE_URL:-http://localhost:3000}
+      GOTRUE_URI_ALLOW_LIST: ${GOTRUE_URI_ALLOW_LIST:-http://localhost:3000}
+      GOTRUE_DISABLE_SIGNUP: ${GOTRUE_DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      GOTRUE_JWT_EXP: ${GOTRUE_JWT_EXP:-3600}
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: ${GOTRUE_EXTERNAL_EMAIL_ENABLED:-true}
+      GOTRUE_MAILER_AUTOCONFIRM: ${GOTRUE_MAILER_AUTOCONFIRM:-false}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_FROM_EMAIL}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_FROM_NAME:-SAT Escolar}
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-migrations:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   # ─── Edge Functions (Deno) ───
@@ -129,10 +142,10 @@ services:
       - "5001:9000"
     environment:
       JWT_SECRET: ${JWT_SECRET}
-      SUPABASE_URL: http://supabase-kong:8000
+      SUPABASE_URL: http://supabase-gateway:8000
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
-      SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB:-postgres}
+      SUPABASE_DB_URL: postgres://${POSTGRES_USER:-supabase_admin}:${POSTGRES_PASSWORD}@supabase-db:5432/${POSTGRES_DB:-postgres}
       VERIFY_JWT: "false"
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -149,6 +162,27 @@ services:
     depends_on:
       supabase-db:
         condition: service_healthy
+      supabase-migrations:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # ─── Nginx (API Gateway) ───
+  supabase-gateway:
+    image: nginx:alpine
+    container_name: sat-gateway
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./docker/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      supabase-auth:
+        condition: service_started
+      supabase-rest:
+        condition: service_started
+      supabase-storage:
+        condition: service_started
+      supabase-functions:
+        condition: service_started
     restart: unless-stopped
 
   # ─── Frontend (React + Nginx) ───
@@ -164,7 +198,8 @@ services:
     ports:
       - "3000:80"
     depends_on:
-      - supabase-kong
+      supabase-gateway:
+        condition: service_started
     restart: unless-stopped
 
 volumes:

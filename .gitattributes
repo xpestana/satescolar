@@ -1,0 +1,2 @@
+# Scripts ejecutados en Linux/Docker: forzar LF en Windows para evitar /bin/sh^M
+*.sh text eol=lf

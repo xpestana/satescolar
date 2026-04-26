@@ -6,3 +6,4 @@ scripts/dumps
 pgdata
 storagedata
 *.md
+supabase/
