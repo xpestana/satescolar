@@ -23,8 +23,9 @@ serve(async (req: Request) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return new Response(
-      JSON.stringify({ error: `Function '${functionName}' not found: ${error.message}` }),
+      JSON.stringify({ error: `Function '${functionName}' not found: ${message}` }),
       {
         status: 404,
         headers: { "Content-Type": "application/json" },

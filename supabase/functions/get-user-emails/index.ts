@@ -106,7 +106,7 @@ serve(async (req) => {
       })
     );
 
-    const users = userResults.filter(Boolean);
+    const users = userResults.filter((u): u is NonNullable<typeof u> => u !== null);
 
     const emails: Record<string, string> = {};
     for (const user of users) {
