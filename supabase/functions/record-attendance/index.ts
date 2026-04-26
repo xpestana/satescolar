@@ -259,8 +259,9 @@ serve(async (req) => {
     }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     console.error("Attendance error:", error);
-    return new Response(JSON.stringify({ error: error.message || "Error interno", status: "error" }), {
+    return new Response(JSON.stringify({ error: message || "Error interno", status: "error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
