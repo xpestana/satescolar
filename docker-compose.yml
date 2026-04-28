@@ -21,7 +21,11 @@ services:
       - ./scripts/zz-set-role-passwords.sh:/docker-entrypoint-initdb.d/zz-set-role-passwords.sh:ro
     healthcheck:
       # Sustitución en tiempo de `docker compose` (lee .env); la imagen supabase usa supabase_admin
-      test: ["CMD-SHELL", "pg_isready -U \"${POSTGRES_USER:-supabase_admin}\" -d \"${POSTGRES_DB:-postgres}\" -h localhost"]
+      test:
+        [
+          "CMD-SHELL",
+          'pg_isready -U "${POSTGRES_USER:-supabase_admin}" -d "${POSTGRES_DB:-postgres}" -h localhost',
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -71,7 +75,11 @@ services:
       supabase-rest:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/status >/dev/null 2>&1 || wget -qO- http://127.0.0.1:5000/ >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:5000/status >/dev/null 2>&1 || wget -qO- http://127.0.0.1:5000/ >/dev/null 2>&1 || exit 1",
+        ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -184,6 +192,93 @@ services:
         condition: service_started
       supabase-functions:
         condition: service_started
+    restart: unless-stopped
+
+  # ─── Postgres Meta (API para Studio: esquema, tablas, RLS helpers) ───
+  supabase-meta:
+    image: supabase/postgres-meta:v0.96.3
+    container_name: sat-meta
+    restart: unless-stopped
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: supabase-db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: ${POSTGRES_DB:-postgres}
+      PG_META_DB_USER: ${POSTGRES_USER:-supabase_admin}
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  # ─── Supabase Studio (UI: tablas, SQL, políticas cuando la versión lo permita) ───
+  supabase-studio:
+    image: supabase/studio:2026.04.27-sha-5f60601
+    container_name: sat-studio
+    restart: unless-stopped
+    environment:
+      HOSTNAME: "0.0.0.0"
+      STUDIO_PG_META_URL: http://supabase-meta:8080
+      POSTGRES_HOST: supabase-db
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER:-supabase_admin}
+      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_DB_MAX_ROWS: "1000"
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+      DEFAULT_ORGANIZATION_NAME: ${STUDIO_DEFAULT_ORGANIZATION:-SAT Escolar}
+      DEFAULT_PROJECT_NAME: ${STUDIO_DEFAULT_PROJECT:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SUPABASE_URL: http://supabase-gateway:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL:-http://localhost:8000}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_ENABLE_LOGS: "false"
+    depends_on:
+      supabase-meta:
+        condition: service_healthy
+      supabase-gateway:
+        condition: service_started
+
+  # ─── Nginx frente a Studio: HTTP Basic Auth + solo expuesto tras el puerto configurado ───
+  supabase-studio-guard:
+    build:
+      context: ./docker/studio-guard
+      dockerfile: Dockerfile
+    container_name: sat-studio-guard
+    ports:
+      - "${STUDIO_BIND:-127.0.0.1}:${STUDIO_PORT:-54321}:80"
+    environment:
+      STUDIO_AUTH_USER: ${STUDIO_AUTH_USER}
+      STUDIO_AUTH_PASSWORD: ${STUDIO_AUTH_PASSWORD}
+    depends_on:
+      supabase-studio:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'curl -sf -u "$$STUDIO_AUTH_USER:$$STUDIO_AUTH_PASSWORD" http://127.0.0.1/ -o /dev/null',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
   # ─── Frontend (React + Nginx) ───
