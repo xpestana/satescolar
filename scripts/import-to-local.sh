@@ -25,17 +25,35 @@ if [ ! -d "$MIGRATIONS_DIR" ]; then
   exit 1
 fi
 
-SEED_DIR="./scripts/seeds"
-SEED_APPLIED=0
+EARLY_DIR="./scripts/seeds/early"
+LATE_DIR="./scripts/seeds/late"
+EARLY_APPLIED=0
 
-apply_seeds() {
-  if [ -d "$SEED_DIR" ] && [ "$SEED_APPLIED" -eq 0 ]; then
-    for seed in $(ls "$SEED_DIR"/*.sql 2>/dev/null | sort); do
+apply_early_seeds() {
+  if [ -d "$EARLY_DIR" ] && [ "$EARLY_APPLIED" -eq 0 ]; then
+    for seed in $(ls "$EARLY_DIR"/*.sql 2>/dev/null | sort); do
       seed_name=$(basename "$seed")
-      echo "  🌱 seed: ${seed_name}"
+      echo "  🌱 early seed: ${seed_name}"
       psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$seed" --quiet --no-psqlrc 2>&1 | grep -v "^$" || true
     done
-    SEED_APPLIED=1
+    EARLY_APPLIED=1
+  fi
+}
+
+apply_late_seeds() {
+  if [ -d "$LATE_DIR" ]; then
+    ADMIN_EMAIL="${ADMIN_SEED_EMAIL:-admin@local.test}"
+    ADMIN_PASSWORD="${ADMIN_SEED_PASSWORD:-ChangeMe123!}"
+    ADMIN_NAME="${ADMIN_SEED_NAME:-Administrador Local}"
+    for seed in $(ls "$LATE_DIR"/*.sql 2>/dev/null | sort); do
+      seed_name=$(basename "$seed")
+      echo "  🌱 late seed: ${seed_name}"
+      psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+        -v admin_email="'${ADMIN_EMAIL}'" \
+        -v admin_password="'${ADMIN_PASSWORD}'" \
+        -v admin_name="'${ADMIN_NAME}'" \
+        -f "$seed" --quiet --no-psqlrc 2>&1 | grep -v "^$" || true
+    done
   fi
 }
 
@@ -45,14 +63,11 @@ for migration in $(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sort); do
   echo "  ▶ ${filename}"
   psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$migration" --quiet --no-psqlrc 2>&1 | grep -v "^$" || true
   MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
-  # Después de la primera migración (que crea public.schools), aplicar
-  # los seeds de ./scripts/seeds/ para garantizar que filas referenciadas
-  # por migraciones posteriores existan antes de tiempo.
-  apply_seeds
+  apply_early_seeds
 done
 
-# Por si no había ninguna migración, aplicar seeds igualmente.
-apply_seeds
+apply_early_seeds
+apply_late_seeds
 
 echo ""
 echo "✅ ${MIGRATION_COUNT} migraciones aplicadas."
