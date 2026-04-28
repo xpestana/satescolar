@@ -95,6 +95,11 @@ services:
       POSTGRES_HOST: supabase-db
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
       POSTGRES_USER: ${POSTGRES_USER:-supabase_admin}
+      # Credenciales del primer admin sembrado en auth.users + public.user_roles.
+      # Solo se usan en el primer arranque; el seed es idempotente.
+      ADMIN_SEED_EMAIL: ${ADMIN_SEED_EMAIL:-admin@local.test}
+      ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:-ChangeMe123!}
+      ADMIN_SEED_NAME: ${ADMIN_SEED_NAME:-Administrador Local}
     volumes:
       - ./supabase/migrations:/migrations:ro
       - ./scripts/seeds:/seeds:ro
