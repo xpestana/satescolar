@@ -2,36 +2,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-function resolveSupabaseUrl(): string {
-  const configured = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  if (!configured) return `${window.location.protocol}//${window.location.hostname}:8000`;
-
-  try {
-    const parsed = new URL(configured);
-    const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-    const pageProtocol = window.location.protocol; // "http:" | "https:"
-    const pageHost = window.location.hostname;
-    const pageIsLocalhost = pageHost === 'localhost' || pageHost === '127.0.0.1';
-
-    // Si la página corre en HTTPS, nunca intentes pegarle a HTTP (el browser lo bloquea por mixed content).
-    if (pageProtocol === 'https:' && parsed.protocol !== 'https:') {
-      parsed.protocol = 'https:';
-    }
-
-    if (!isLocalhost) return parsed.toString().replace(/\/$/, '');
-
-    // Si la app no está corriendo en localhost, "localhost" apuntaría al PC del usuario.
-    // En ese caso, usamos el mismo host desde donde se cargó la app, pero al puerto 8000.
-    if (pageIsLocalhost) return configured;
-
-    parsed.hostname = pageHost;
-    return parsed.toString().replace(/\/$/, '');
-  } catch {
-    return configured;
-  }
-}
-
-const SUPABASE_URL = resolveSupabaseUrl();
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
