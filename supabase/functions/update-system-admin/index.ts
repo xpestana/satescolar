@@ -25,6 +25,7 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log("[update-system-admin] invoked", req.method);
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -50,8 +51,10 @@ export default async function handler(req: Request): Promise<Response> {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    console.log("[update-system-admin] verifying token");
     const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
     const requestingUserId = claimsData?.claims?.sub;
+    console.log("[update-system-admin] requestingUserId:", requestingUserId, "claimsError:", claimsError?.message);
     if (claimsError || !requestingUserId) {
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401,
@@ -144,7 +147,9 @@ export default async function handler(req: Request): Promise<Response> {
       authUpdate.password = password;
     }
 
+    console.log("[update-system-admin] updating auth user", { user_id, hasEmail: !!authUpdate.email, hasPwd: !!authUpdate.password });
     const { error: updAuthErr } = await supabaseAdmin.auth.admin.updateUserById(user_id, authUpdate);
+    console.log("[update-system-admin] auth update done", updAuthErr?.message);
     if (updAuthErr) {
       return new Response(JSON.stringify({ error: getSafeErrorMessage(updAuthErr) }), {
         status: 400,
