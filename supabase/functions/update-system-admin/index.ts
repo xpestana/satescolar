@@ -147,7 +147,9 @@ export default async function handler(req: Request): Promise<Response> {
       authUpdate.password = password;
     }
 
+    console.log("[update-system-admin] updating auth user", { user_id, hasEmail: !!authUpdate.email, hasPwd: !!authUpdate.password });
     const { error: updAuthErr } = await supabaseAdmin.auth.admin.updateUserById(user_id, authUpdate);
+    console.log("[update-system-admin] auth update done", updAuthErr?.message);
     if (updAuthErr) {
       return new Response(JSON.stringify({ error: getSafeErrorMessage(updAuthErr) }), {
         status: 400,
