@@ -1,4 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import createSystemAdmin from "../create-system-admin/index.ts";
+import updateSystemAdmin from "../update-system-admin/index.ts";
+
+/**
+ * El edge-runtime en Docker no resuelve bien `import(\`../${name}/index.ts\`)` para todas las funciones.
+ * Las que fallen con "Module not found" deben registrarse aquí (import estático).
+ */
+const staticHandlers: Record<string, (req: Request) => Promise<Response>> = {
+  "create-system-admin": (req) => createSystemAdmin(req),
+  "update-system-admin": (req) => updateSystemAdmin(req),
+};
 
 serve(async (req: Request) => {
   const url = new URL(req.url);
@@ -10,6 +21,11 @@ serve(async (req: Request) => {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  const staticFn = staticHandlers[functionName];
+  if (staticFn) {
+    return await staticFn(req);
   }
 
   try {
