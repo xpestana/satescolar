@@ -49,7 +49,6 @@ for migration in $(ls "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sort); do
 done
 
 apply_early_seeds
-apply_late_seeds
 
 echo ""
 echo "✅ ${MIGRATION_COUNT} migraciones aplicadas."
