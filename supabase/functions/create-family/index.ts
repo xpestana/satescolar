@@ -104,7 +104,7 @@ function generateRandomPassword(length = 16): string {
   return Array.from(array, (byte) => chars[byte % chars.length]).join('');
 }
 
-Deno.serve(async (req) => {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -351,4 +351,4 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+}
