@@ -1,3 +1,4 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -20,7 +21,7 @@ function getSafeErrorMessage(error: unknown): string {
   return "Error al actualizar el administrador";
 }
 
-export default async function handler(req: Request): Promise<Response> {
+async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -187,3 +188,7 @@ export default async function handler(req: Request): Promise<Response> {
     });
   }
 }
+
+serve(handler);
+
+export default handler;
