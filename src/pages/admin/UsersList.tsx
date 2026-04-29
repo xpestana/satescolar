@@ -473,6 +473,7 @@ export default function UsersList() {
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Rol</TableHead>
               <TableHead>Institución</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -480,7 +481,7 @@ export default function UsersList() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
+                <TableCell colSpan={5} className="text-center py-8">
                   <div className="flex items-center justify-center gap-2">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                     Cargando...
@@ -489,14 +490,27 @@ export default function UsersList() {
               </TableRow>
             ) : paginatedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   {searchTerm
                     ? "No se encontraron usuarios con ese criterio de búsqueda"
                     : "No hay usuarios registrados. ¡Crea el primero!"}
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedUsers.map((user) => (
+              paginatedUsers.map((user) => {
+                const roleLabel =
+                  user.role === "school"
+                    ? "Colegio"
+                    : user.role === "teacher"
+                    ? "Docente"
+                    : "Representante";
+                const roleBadgeClass =
+                  user.role === "school"
+                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                    : user.role === "teacher"
+                    ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20"
+                    : "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20";
+                return (
                 <TableRow key={user.id} className={user.is_suspended ? "opacity-60 bg-muted/30" : ""}>
                   <TableCell className="font-medium max-w-xs truncate">
                     <div className="flex items-center gap-2">
@@ -509,6 +523,9 @@ export default function UsersList() {
                     </div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <Badge className={roleBadgeClass}>{roleLabel}</Badge>
+                  </TableCell>
                   <TableCell>{user.school_name || "—"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -516,7 +533,7 @@ export default function UsersList() {
                         variant="ghost"
                         size="icon"
                         title="Iniciar sesión como este usuario"
-                        onClick={() => handleImpersonate(user.user_id, user.full_name)}
+                        onClick={() => handleImpersonate(user.user_id, user.full_name, user.role)}
                         disabled={user.is_suspended || isImpersonating}
                       >
                         <LogIn className="h-4 w-4 text-primary" />
@@ -533,6 +550,7 @@ export default function UsersList() {
                           <Ban className="h-4 w-4 text-orange-500" />
                         )}
                       </Button>
+                      {user.role === "school" && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -541,6 +559,7 @@ export default function UsersList() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      )}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" title="Eliminar">
