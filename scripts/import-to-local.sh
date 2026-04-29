@@ -26,7 +26,6 @@ if [ ! -d "$MIGRATIONS_DIR" ]; then
 fi
 
 EARLY_DIR="./scripts/seeds/early"
-LATE_DIR="./scripts/seeds/late"
 EARLY_APPLIED=0
 
 apply_early_seeds() {
@@ -37,23 +36,6 @@ apply_early_seeds() {
       psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -f "$seed" --quiet --no-psqlrc 2>&1 | grep -v "^$" || true
     done
     EARLY_APPLIED=1
-  fi
-}
-
-apply_late_seeds() {
-  if [ -d "$LATE_DIR" ]; then
-    ADMIN_EMAIL="${ADMIN_SEED_EMAIL:-admin@local.test}"
-    ADMIN_PASSWORD="${ADMIN_SEED_PASSWORD:-ChangeMe123!}"
-    ADMIN_NAME="${ADMIN_SEED_NAME:-Administrador Local}"
-    for seed in $(ls "$LATE_DIR"/*.sql 2>/dev/null | sort); do
-      seed_name=$(basename "$seed")
-      echo "  🌱 late seed: ${seed_name}"
-      psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-        -v admin_email="'${ADMIN_EMAIL}'" \
-        -v admin_password="'${ADMIN_PASSWORD}'" \
-        -v admin_name="'${ADMIN_NAME}'" \
-        -f "$seed" --quiet --no-psqlrc 2>&1 | grep -v "^$" || true
-    done
   fi
 }
 
