@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Trash2, Ban, CheckCircle, ShieldAlert } from "lucide-react";
+import { Plus, Search, Trash2, Ban, CheckCircle, ShieldAlert, Pencil } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ interface AdminUser {
   user_id: string;
   full_name: string;
   email: string;
+  phone: string | null;
   is_suspended: boolean;
 }
 
@@ -35,6 +36,13 @@ interface FormData {
   full_name: string;
   email: string;
   password: string;
+}
+
+interface EditFormData {
+  full_name: string;
+  email: string;
+  password: string;
+  phone: string;
 }
 
 export default function AdminUsersList() {
@@ -47,6 +55,14 @@ export default function AdminUsersList() {
   const [formData, setFormData] = useState<FormData>({ full_name: "", email: "", password: "" });
   const [isSaving, setIsSaving] = useState(false);
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
+  const [userToEdit, setUserToEdit] = useState<AdminUser | null>(null);
+  const [editForm, setEditForm] = useState<EditFormData>({
+    full_name: "",
+    email: "",
+    password: "",
+    phone: "",
+  });
+  const [isEditSaving, setIsEditSaving] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -60,7 +76,7 @@ export default function AdminUsersList() {
 
       const { data: profilesData } = await supabase
         .from("profiles")
-        .select("user_id, full_name");
+        .select("user_id, full_name, phone");
 
       const usersMap = new Map<string, AdminUser>();
       rolesData?.forEach((role: any) => {
@@ -70,6 +86,7 @@ export default function AdminUsersList() {
           user_id: role.user_id,
           full_name: profile?.full_name || "Sin nombre",
           email: "",
+          phone: profile?.phone ?? null,
           is_suspended: false,
         });
       });
@@ -153,6 +170,92 @@ export default function AdminUsersList() {
     }
   };
 
+  const openEditDialog = (user: AdminUser) => {
+    setUserToEdit(user);
+    setEditForm({
+      full_name: user.full_name === "Sin nombre" ? "" : user.full_name,
+      email: user.email ?? "",
+      password: "",
+      phone: user.phone ?? "",
+    });
+  };
+
+  useEffect(() => {
+    if (!userToEdit) return;
+    let cancelled = false;
+    const uid = userToEdit.user_id;
+
+    (async () => {
+      const patch: Partial<EditFormData> = {};
+      if (!userToEdit.email?.trim()) {
+        const { data } = await supabase.functions.invoke("get-user-emails", {
+          body: { user_ids: [uid] },
+        });
+        const row = data?.users?.find((u: { id: string }) => u.id === uid);
+        if (row?.email) patch.email = row.email;
+      }
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("user_id", uid)
+        .maybeSingle();
+      if (!cancelled && prof) {
+        if (prof.full_name && (userToEdit.full_name === "Sin nombre" || !userToEdit.full_name?.trim())) {
+          patch.full_name = prof.full_name;
+        }
+        if (prof.phone != null && prof.phone !== "" && !(userToEdit.phone ?? "").trim()) {
+          patch.phone = prof.phone;
+        }
+      }
+      if (!cancelled && Object.keys(patch).length > 0) {
+        setEditForm((f) => ({ ...f, ...patch }));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userToEdit]);
+
+  const handleEditSubmit = async () => {
+    if (!userToEdit) return;
+    if (!editForm.full_name?.trim() || !editForm.email?.trim()) {
+      toast.error("Nombre y correo son obligatorios");
+      return;
+    }
+    if (editForm.password.length > 0 && editForm.password.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+
+    setIsEditSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        user_id: userToEdit.user_id,
+        full_name: editForm.full_name.trim(),
+        email: editForm.email.trim(),
+        phone: editForm.phone.trim() || null,
+      };
+      if (editForm.password.length > 0) {
+        body.password = editForm.password;
+      }
+
+      const { data, error } = await supabase.functions.invoke("update-system-admin", { body });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success("Administrador actualizado");
+      setUserToEdit(null);
+      fetchUsers();
+    } catch (error: unknown) {
+      console.error("Error updating admin:", error);
+      const message = error instanceof Error ? error.message : "Error al actualizar el administrador";
+      toast.error(message);
+    } finally {
+      setIsEditSaving(false);
+    }
+  };
+
   const handleSuspendToggle = async (userId: string, suspended: boolean) => {
     try {
       const { data, error } = await supabase.functions.invoke("suspend-user", {
@@ -170,7 +273,8 @@ export default function AdminUsersList() {
   const filteredUsers = users.filter(
     (u) =>
       u.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+      u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.phone && u.phone.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   useEffect(() => { setCurrentPage(1); }, [searchTerm]);
@@ -244,6 +348,14 @@ export default function AdminUsersList() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Editar datos"
+                          onClick={() => openEditDialog(user)}
+                        >
+                          <Pencil className="h-4 w-4 text-muted-foreground" />
+                        </Button>
                         <Button
                           variant="ghost" size="icon"
                           title={user.is_suspended ? "Reactivar" : "Suspender"}
@@ -346,6 +458,67 @@ export default function AdminUsersList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={!!userToEdit}
+        onOpenChange={(open) => {
+          if (!open) setUserToEdit(null);
+        }}
+      >
+        <DialogContent key={userToEdit ? `edit-admin-${userToEdit.user_id}` : "edit-admin-closed"}>
+          <DialogHeader>
+            <DialogTitle>Editar administrador</DialogTitle>
+            <DialogDescription>
+              Actualiza nombre, correo, teléfono o contraseña. Deja la contraseña en blanco si no deseas cambiarla.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nombre completo</Label>
+              <Input
+                value={editForm.full_name}
+                onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
+                placeholder="Nombre y apellido"
+              />
+            </div>
+            <div>
+              <Label>Correo electrónico</Label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                placeholder="admin@example.com"
+              />
+            </div>
+            <div>
+              <Label>Teléfono (opcional)</Label>
+              <Input
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                placeholder="Opcional"
+              />
+            </div>
+            <div>
+              <Label>Nueva contraseña (opcional)</Label>
+              <Input
+                type="password"
+                value={editForm.password}
+                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                placeholder="Mínimo 8 caracteres si cambias"
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUserToEdit(null)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEditSubmit} disabled={isEditSaving}>
+              {isEditSaving ? "Guardando..." : "Guardar cambios"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

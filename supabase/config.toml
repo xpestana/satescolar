@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.suspend-user]
 verify_jwt = false
 
+[functions.update-system-admin]
+verify_jwt = false
+
 [functions.update-family-password]
 verify_jwt = false
 

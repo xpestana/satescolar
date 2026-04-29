@@ -35,9 +35,9 @@ apply_late_seeds() {
       echo "  🌱 late seed: $sb"
       psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
         -v ON_ERROR_STOP=1 \
-        -v admin_email="'${ADMIN_EMAIL}'" \
-        -v admin_password="'${ADMIN_PASSWORD}'" \
-        -v admin_name="'${ADMIN_NAME}'" \
+        -v admin_email="$ADMIN_EMAIL" \
+        -v admin_password="$ADMIN_PASSWORD" \
+        -v admin_name="$ADMIN_NAME" \
         -f "$seed"
     done
   fi

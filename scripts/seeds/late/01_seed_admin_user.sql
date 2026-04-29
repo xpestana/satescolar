@@ -21,28 +21,39 @@
 
 \set ON_ERROR_STOP on
 
--- Defaults si las variables no fueron pasadas con -v
+-- Defaults si las variables no fueron pasadas con -v (valores sin comillas extras: :'var' los escapa)
 \if :{?admin_email}
 \else
-  \set admin_email '\'admin@local.test\''
+  \set admin_email admin@local.test
 \endif
 \if :{?admin_password}
 \else
-  \set admin_password '\'ChangeMe123!\''
+  \set admin_password ChangeMe123!
 \endif
 \if :{?admin_name}
 \else
-  \set admin_name '\'Administrador Local\''
+  \set admin_name 'Administrador Local'
 \endif
+
+-- Los valores vienen de -v admin_email=... (run-migrations.sh). psql NO sustituye
+-- :variable dentro de DO $$...$$; hay que pasarlos en SQL normal (INSERT) y leerlos aquí.
+-- Sin ON COMMIT DROP: con autocommit, esa opción borraba la tabla al cerrar cada sentencia.
+DROP TABLE IF EXISTS _seed_admin CASCADE;
+CREATE TEMP TABLE _seed_admin (email text, pass text, full_name text);
+INSERT INTO _seed_admin VALUES (:'admin_email', :'admin_password', :'admin_name');
 
 DO $$
 DECLARE
-  v_email   text := :admin_email;
-  v_pass    text := :admin_password;
-  v_name    text := :admin_name;
+  v_email   text;
+  v_pass    text;
+  v_name    text;
   v_user_id uuid;
   v_existing uuid;
 BEGIN
+  SELECT s.email, s.pass, s.full_name
+  INTO v_email, v_pass, v_name
+  FROM _seed_admin AS s
+  LIMIT 1;
   -- Verifica que las tablas requeridas existan (auth.users + public.user_roles)
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
@@ -68,7 +79,8 @@ BEGIN
   ELSE
     v_user_id := gen_random_uuid();
 
-    -- 1. auth.users
+    -- 1. auth.users (columnas compatibles con esquema GoTrue embebido en supabase/postgres;
+    -- no todas las instalaciones tienen auth.identities ni email_confirmed_at).
     INSERT INTO auth.users (
       instance_id,
       id,
@@ -76,14 +88,14 @@ BEGIN
       role,
       email,
       encrypted_password,
-      email_confirmed_at,
+      confirmed_at,
       raw_app_meta_data,
       raw_user_meta_data,
       created_at,
       updated_at,
       confirmation_token,
       email_change,
-      email_change_token_new,
+      email_change_token,
       recovery_token
     ) VALUES (
       '00000000-0000-0000-0000-000000000000',
@@ -103,26 +115,31 @@ BEGIN
       ''
     );
 
-    -- 2. auth.identities (sin esto, GoTrue rechaza el login con "user not found")
-    INSERT INTO auth.identities (
-      id,
-      user_id,
-      provider_id,
-      identity_data,
-      provider,
-      last_sign_in_at,
-      created_at,
-      updated_at
-    ) VALUES (
-      gen_random_uuid(),
-      v_user_id,
-      v_user_id::text,
-      jsonb_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true),
-      'email',
-      now(),
-      now(),
-      now()
-    );
+    -- 2. auth.identities (solo en instalaciones nuevas / GoTrue con tabla identities)
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'auth' AND table_name = 'identities'
+    ) THEN
+      INSERT INTO auth.identities (
+        id,
+        user_id,
+        provider_id,
+        identity_data,
+        provider,
+        last_sign_in_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        v_user_id,
+        v_user_id::text,
+        jsonb_build_object('sub', v_user_id::text, 'email', v_email, 'email_verified', true),
+        'email',
+        now(),
+        now(),
+        now()
+      );
+    END IF;
 
     RAISE NOTICE 'Admin creado: % (id=%)', v_email, v_user_id;
   END IF;
@@ -139,7 +156,13 @@ BEGIN
   END IF;
 
   -- 4. public.user_roles → admin (school_id NULL para admin global)
-  INSERT INTO public.user_roles (user_id, role, school_id)
-  VALUES (v_user_id, 'admin'::app_role, NULL)
-  ON CONFLICT (user_id, role) DO NOTHING;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = v_user_id
+      AND ur.role = 'admin'::app_role
+      AND ur.school_id IS NULL
+  ) THEN
+    INSERT INTO public.user_roles (user_id, role, school_id)
+    VALUES (v_user_id, 'admin'::app_role, NULL);
+  END IF;
 END $$;

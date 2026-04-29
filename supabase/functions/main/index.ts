@@ -1,4 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import updateSystemAdmin from "../update-system-admin/index.ts";
+
+/** Rutas que el edge-runtime no resuelve bien con import() dinámico: deben quedar en el grafo estático. */
+const staticHandlers: Record<string, (req: Request) => Promise<Response>> = {
+  "update-system-admin": (req) => updateSystemAdmin(req),
+};
 
 serve(async (req: Request) => {
   const url = new URL(req.url);
@@ -12,9 +18,13 @@ serve(async (req: Request) => {
     });
   }
 
+  const staticFn = staticHandlers[functionName];
+  if (staticFn) {
+    return await staticFn(req);
+  }
+
   try {
     const module = await import(`../${functionName}/index.ts`);
-    // Edge runtime will call the default export or the served handler
     if (typeof module.default === "function") {
       return await module.default(req);
     }
