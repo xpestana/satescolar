@@ -9,12 +9,19 @@ function resolveSupabaseUrl(): string {
   try {
     const parsed = new URL(configured);
     const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-    if (!isLocalhost) return configured;
+    const pageProtocol = window.location.protocol; // "http:" | "https:"
+    const pageHost = window.location.hostname;
+    const pageIsLocalhost = pageHost === 'localhost' || pageHost === '127.0.0.1';
+
+    // Si la página corre en HTTPS, nunca intentes pegarle a HTTP (el browser lo bloquea por mixed content).
+    if (pageProtocol === 'https:' && parsed.protocol !== 'https:') {
+      parsed.protocol = 'https:';
+    }
+
+    if (!isLocalhost) return parsed.toString().replace(/\/$/, '');
 
     // Si la app no está corriendo en localhost, "localhost" apuntaría al PC del usuario.
     // En ese caso, usamos el mismo host desde donde se cargó la app, pero al puerto 8000.
-    const pageHost = window.location.hostname;
-    const pageIsLocalhost = pageHost === 'localhost' || pageHost === '127.0.0.1';
     if (pageIsLocalhost) return configured;
 
     parsed.hostname = pageHost;
