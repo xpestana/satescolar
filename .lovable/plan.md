@@ -1,34 +1,115 @@
-## Objetivo
 
-En `/admin/usuarios` actualmente solo se listan usuarios con rol `school`. Vamos a mostrar **todos** los usuarios no-admin (school, teacher, representative/family) de **todos los colegios**, y hacer que el botón "Iniciar sesión" (LogIn) funcione para los tres roles, redirigiendo a su dashboard correspondiente y respetando su colegio.
+## Problema
 
-## Cambios
+En tu VPS Ubuntu, **todas** las edge functions entran por `supabase/functions/main/index.ts`, que las carga con `import(\`../${functionName}/index.ts\`)` dinámico. El edge-runtime de Docker falla con ese import dinámico en muchas funciones, devolviendo:
 
-### 1. Edge Function `impersonate-user`
-Hoy solo acepta usuarios con rol `school` y lo bloquea si no lo es. Vamos a:
-- Permitir impersonar cualquier rol **excepto `admin`** (seguridad: un admin nunca puede suplantar a otro admin desde aquí).
-- Devolver el `role` del usuario suplantado en la respuesta, para que el frontend sepa a qué dashboard redirigir.
+```
+Function 'delete-user' not found: Module not found: ...
+```
 
-### 2. Página `src/pages/admin/UsersList.tsx`
-- **Carga de datos**: en vez de filtrar `user_roles` por `role = 'school'`, traer todas las filas con `role IN ('school','teacher','representative')`.
-- **Resolver nombre del colegio según el rol**:
-  - `school`: ya viene en `user_roles.school_id` → join a `schools`.
-  - `teacher`: buscar en `teachers` por `user_id` → `school_id` → nombre del colegio.
-  - `representative` (family): buscar en `families` por `user_id` → tabla puente `family_schools` → colegios asociados (puede ser más de uno; mostraremos los nombres separados por coma).
-- **Nueva columna "Rol"** (badge) para distinguir Colegio / Docente / Representante.
-- Mantener email/suspensión vía `get-user-emails`.
-- **Botón LogIn**: tras llamar `impersonate-user`, usar el `role` devuelto para redirigir:
-  - `school` → `/school/dashboard`
-  - `teacher` → `/teacher/dashboard`
-  - `representative` → `/representative/dashboard`
-- **Editar / Crear**: el modal actual está pensado solo para usuarios "school" (asignar un colegio). Lo dejamos así: el botón "Agregar Usuario" sigue creando solo cuentas de colegio (la creación de docentes y familias ya tiene sus propios módulos en cada colegio). El botón **Editar** se ocultará para teacher/representative en esta lista (su edición vive en sus módulos respectivos); seguirán visibles los botones **Iniciar sesión**, **Suspender** y **Eliminar**.
+Ya lo arreglamos para `create-system-admin` y `update-system-admin` con dos cambios:
+1. Reemplazar `serve(handler)` por `export default async function handler(req)`.
+2. Registrarlas en el `staticHandlers` de `main/index.ts` (import estático).
 
-### 3. Detalles técnicos
-- Para teachers: `select id, user_id, school_id, schools(name) from teachers where user_id in (...)`.
-- Para families: `select id, user_id from families where user_id in (...)` y luego `select family_id, schools(name) from family_schools where family_id in (...)`.
-- Reutilizamos `get-user-emails` para emails y estado de suspensión.
-- En `impersonate-user`: cambiar la verificación `role = 'school'` a `role != 'admin'`, e incluir `role` en el JSON de respuesta.
+Faltan **17 funciones** con el mismo problema:
 
-## Resultado
+```
+create-admin-user            resend-welcome-email
+create-family                s3-migrate-existing
+create-teacher               s3-sign-upload
+delete-user                  send-delinquency-reminders
+fetch-bcv-rates              send-email
+get-user-emails              suspend-user
+impersonate-user             update-family-email
+record-attendance            update-family-password
+                             update-teacher-password
+```
 
-La lista en `/admin/usuarios` mostrará todos los usuarios funcionales del sistema agrupados por colegio y rol, y el admin podrá entrar con un clic a la cuenta de cualquiera (school, docente o representante) llegando al dashboard correcto de su rol y colegio.
+## Cambios a aplicar
+
+### 1. Cada una de las 17 funciones (`supabase/functions/<name>/index.ts`)
+
+- Quitar `import { serve } from "https://deno.land/std@.../http/server.ts"`.
+- Cambiar `serve(async (req) => { ... })` por:
+  ```ts
+  export default async function handler(req: Request): Promise<Response> {
+    ...
+  }
+  ```
+- Si el handler ya estaba como función nombrada y se pasaba a `serve(handler)`, eliminar el `serve(...)` y exportar el handler como `default`.
+- No tocar la lógica interna (CORS, validación de JWT, queries, etc.).
+
+### 2. `supabase/functions/main/index.ts`
+
+Agregar imports estáticos y entradas en `staticHandlers` para las 17 funciones, manteniendo las dos ya registradas. Queda así (resumen):
+
+```ts
+import createAdminUser from "../create-admin-user/index.ts";
+import createFamily from "../create-family/index.ts";
+import createSystemAdmin from "../create-system-admin/index.ts";
+import createTeacher from "../create-teacher/index.ts";
+import deleteUser from "../delete-user/index.ts";
+import fetchBcvRates from "../fetch-bcv-rates/index.ts";
+import getUserEmails from "../get-user-emails/index.ts";
+import impersonateUser from "../impersonate-user/index.ts";
+import recordAttendance from "../record-attendance/index.ts";
+import resendWelcomeEmail from "../resend-welcome-email/index.ts";
+import s3MigrateExisting from "../s3-migrate-existing/index.ts";
+import s3SignUpload from "../s3-sign-upload/index.ts";
+import sendDelinquencyReminders from "../send-delinquency-reminders/index.ts";
+import sendEmail from "../send-email/index.ts";
+import suspendUser from "../suspend-user/index.ts";
+import updateFamilyEmail from "../update-family-email/index.ts";
+import updateFamilyPassword from "../update-family-password/index.ts";
+import updateSystemAdmin from "../update-system-admin/index.ts";
+import updateTeacherPassword from "../update-teacher-password/index.ts";
+
+const staticHandlers: Record<string, (req: Request) => Promise<Response>> = {
+  "create-admin-user": createAdminUser,
+  "create-family": createFamily,
+  "create-system-admin": createSystemAdmin,
+  "create-teacher": createTeacher,
+  "delete-user": deleteUser,
+  "fetch-bcv-rates": fetchBcvRates,
+  "get-user-emails": getUserEmails,
+  "impersonate-user": impersonateUser,
+  "record-attendance": recordAttendance,
+  "resend-welcome-email": resendWelcomeEmail,
+  "s3-migrate-existing": s3MigrateExisting,
+  "s3-sign-upload": s3SignUpload,
+  "send-delinquency-reminders": sendDelinquencyReminders,
+  "send-email": sendEmail,
+  "suspend-user": suspendUser,
+  "update-family-email": updateFamilyEmail,
+  "update-family-password": updateFamilyPassword,
+  "update-system-admin": updateSystemAdmin,
+  "update-teacher-password": updateTeacherPassword,
+};
+```
+
+El fallback dinámico `import(\`../${functionName}/index.ts\`)` se queda por compatibilidad (Lovable Cloud y futuras funciones), pero ya nada del repo dependerá de él.
+
+## Compatibilidad con Lovable Cloud
+
+El `export default` no rompe Lovable Cloud: la nube despliega cada función por su cuenta y solo necesita que el archivo levante un servidor **o** exporte un handler. Como además mantenemos `main/index.ts`, en local sigue todo enrutado por ahí.
+
+Si en algún caso Lovable Cloud requiriera un `serve()` explícito, lo agregamos al final del archivo así:
+```ts
+if (import.meta.main) Deno.serve(handler);
+```
+(Lo evaluamos por función si aparece algún warning al desplegar; por ahora el patrón actual ya probado en `create-system-admin` / `update-system-admin` funciona en ambos entornos.)
+
+## Pasos en tu VPS después del deploy
+
+```bash
+cd ~/satescolar
+git pull
+docker compose restart supabase-functions
+```
+
+Con eso quedan operativas todas las funciones (delete-user, impersonate-user, create-teacher, send-email, etc.) sin más errores de "Module not found".
+
+## Riesgos
+
+- Cambio mecánico y repetitivo → bajo riesgo de bugs lógicos.
+- Algunas funciones (`fetch-bcv-rates`, `send-delinquency-reminders`) podrían ejecutarse vía cron — el handler exportado sigue respondiendo igual a un `POST`, así que el cron las puede seguir invocando vía HTTP sin cambios.
