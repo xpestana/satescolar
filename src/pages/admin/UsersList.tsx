@@ -46,6 +46,8 @@ import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;
 
+type UserRole = "school" | "teacher" | "representative";
+
 interface SchoolUser {
   id: string;
   user_id: string;
@@ -53,7 +55,7 @@ interface SchoolUser {
   email: string;
   school_id: string | null;
   school_name: string | null;
-  role: string;
+  role: UserRole;
   is_suspended: boolean;
 }
 
@@ -90,7 +92,7 @@ export default function UsersList() {
 
   const fetchUsers = async () => {
     try {
-      // Fetch user roles with school role
+      // Fetch all non-admin user roles
       const { data: rolesData, error: rolesError } = await supabase
         .from("user_roles")
         .select(`
@@ -100,7 +102,7 @@ export default function UsersList() {
           school_id,
           schools(name)
         `)
-        .eq("role", "school");
+        .in("role", ["school", "teacher", "representative"]);
 
       if (rolesError) throw rolesError;
 
@@ -111,8 +113,6 @@ export default function UsersList() {
 
       if (profilesError) throw profilesError;
 
-      // We need to get emails from auth - will use an edge function for this
-      // For now, map the data we have
       const usersMap = new Map<string, SchoolUser>();
 
       rolesData?.forEach((role: any) => {
@@ -121,16 +121,65 @@ export default function UsersList() {
           id: role.id,
           user_id: role.user_id,
           full_name: profile?.full_name || "Sin nombre",
-          email: "", // Will be fetched
+          email: "",
           school_id: role.school_id,
           school_name: role.schools?.name || null,
-          role: role.role,
-          is_suspended: false, // Will be fetched
+          role: role.role as UserRole,
+          is_suspended: false,
         });
       });
 
-      // Fetch emails from edge function
       const userIds = Array.from(usersMap.keys());
+
+      // Resolve school names for teachers
+      const teacherUserIds = Array.from(usersMap.values())
+        .filter((u) => u.role === "teacher")
+        .map((u) => u.user_id);
+      if (teacherUserIds.length > 0) {
+        const { data: teachersData } = await supabase
+          .from("teachers")
+          .select("user_id, school_id, schools(name)")
+          .in("user_id", teacherUserIds);
+        teachersData?.forEach((t: any) => {
+          const u = usersMap.get(t.user_id);
+          if (u && !u.school_name) {
+            u.school_id = t.school_id;
+            u.school_name = t.schools?.name || null;
+          }
+        });
+      }
+
+      // Resolve school names for representatives (families M2M)
+      const repUserIds = Array.from(usersMap.values())
+        .filter((u) => u.role === "representative")
+        .map((u) => u.user_id);
+      if (repUserIds.length > 0) {
+        const { data: familiesData } = await supabase
+          .from("families")
+          .select("id, user_id")
+          .in("user_id", repUserIds);
+        const familyIds = familiesData?.map((f: any) => f.id) ?? [];
+        if (familyIds.length > 0) {
+          const { data: famSchools } = await supabase
+            .from("family_schools")
+            .select("family_id, school_id, schools(name)")
+            .in("family_id", familyIds);
+          familiesData?.forEach((f: any) => {
+            const u = usersMap.get(f.user_id);
+            if (!u) return;
+            const links = famSchools?.filter((fs: any) => fs.family_id === f.id) ?? [];
+            const names = links
+              .map((fs: any) => fs.schools?.name)
+              .filter(Boolean);
+            if (names.length > 0 && !u.school_name) {
+              u.school_name = names.join(", ");
+              u.school_id = links[0]?.school_id ?? null;
+            }
+          });
+        }
+      }
+
+      // Fetch emails from edge function
       if (userIds.length > 0) {
         const { data: emailsData } = await supabase.functions.invoke("get-user-emails", {
           body: { user_ids: userIds },
@@ -321,47 +370,40 @@ export default function UsersList() {
     }
   };
 
-  const handleImpersonate = async (userId: string, userName: string) => {
+  const handleImpersonate = async (userId: string, userName: string, role: UserRole) => {
     if (isImpersonating) return;
-    
+
     setIsImpersonating(true);
     toast.info(`Iniciando sesión como ${userName}...`);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke("impersonate-user", {
         body: { user_id: userId },
       });
 
-      console.log("Impersonate response:", { data, error });
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
       if (data?.session) {
-        console.log("Setting session with tokens...");
-        
-        // Set the new session directly (replaces current session)
         const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
 
-        console.log("setSession result:", { sessionData, sessionError });
+        if (sessionError) throw sessionError;
+        if (!sessionData.session) throw new Error("No se pudo establecer la sesión");
 
-        if (sessionError) {
-          console.error("Session error:", sessionError);
-          throw sessionError;
-        }
-
-        if (!sessionData.session) {
-          throw new Error("No se pudo establecer la sesión");
-        }
+        const targetRole = (data.role as UserRole) || role;
+        const dashboardByRole: Record<UserRole, string> = {
+          school: "/school/dashboard",
+          teacher: "/teacher/dashboard",
+          representative: "/representative/dashboard",
+        };
+        const redirectTo = dashboardByRole[targetRole] ?? "/login";
 
         toast.success(`Sesión iniciada como ${userName}`);
-        
-        // Small delay to ensure session is persisted, then redirect
         setTimeout(() => {
-          window.location.href = "/school/dashboard";
+          window.location.href = redirectTo;
         }, 100);
       } else {
         throw new Error("No se recibió la sesión del servidor");
@@ -431,6 +473,7 @@ export default function UsersList() {
             <TableRow>
               <TableHead>Nombre</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Rol</TableHead>
               <TableHead>Institución</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -438,7 +481,7 @@ export default function UsersList() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
+                <TableCell colSpan={5} className="text-center py-8">
                   <div className="flex items-center justify-center gap-2">
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                     Cargando...
@@ -447,14 +490,27 @@ export default function UsersList() {
               </TableRow>
             ) : paginatedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                   {searchTerm
                     ? "No se encontraron usuarios con ese criterio de búsqueda"
                     : "No hay usuarios registrados. ¡Crea el primero!"}
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedUsers.map((user) => (
+              paginatedUsers.map((user) => {
+                const roleLabel =
+                  user.role === "school"
+                    ? "Colegio"
+                    : user.role === "teacher"
+                    ? "Docente"
+                    : "Representante";
+                const roleBadgeClass =
+                  user.role === "school"
+                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                    : user.role === "teacher"
+                    ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20"
+                    : "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20";
+                return (
                 <TableRow key={user.id} className={user.is_suspended ? "opacity-60 bg-muted/30" : ""}>
                   <TableCell className="font-medium max-w-xs truncate">
                     <div className="flex items-center gap-2">
@@ -467,6 +523,9 @@ export default function UsersList() {
                     </div>
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
+                  <TableCell>
+                    <Badge className={roleBadgeClass}>{roleLabel}</Badge>
+                  </TableCell>
                   <TableCell>{user.school_name || "—"}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -474,7 +533,7 @@ export default function UsersList() {
                         variant="ghost"
                         size="icon"
                         title="Iniciar sesión como este usuario"
-                        onClick={() => handleImpersonate(user.user_id, user.full_name)}
+                        onClick={() => handleImpersonate(user.user_id, user.full_name, user.role)}
                         disabled={user.is_suspended || isImpersonating}
                       >
                         <LogIn className="h-4 w-4 text-primary" />
@@ -491,6 +550,7 @@ export default function UsersList() {
                           <Ban className="h-4 w-4 text-orange-500" />
                         )}
                       </Button>
+                      {user.role === "school" && (
                       <Button
                         variant="ghost"
                         size="icon"
@@ -499,6 +559,7 @@ export default function UsersList() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
+                      )}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" title="Eliminar">
@@ -527,7 +588,8 @@ export default function UsersList() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
