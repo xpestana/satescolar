@@ -51,8 +51,10 @@ export default async function handler(req: Request): Promise<Response> {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
+    console.log("[update-system-admin] verifying token");
     const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
     const requestingUserId = claimsData?.claims?.sub;
+    console.log("[update-system-admin] requestingUserId:", requestingUserId, "claimsError:", claimsError?.message);
     if (claimsError || !requestingUserId) {
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401,
