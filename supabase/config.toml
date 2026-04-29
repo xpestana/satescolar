@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.create-admin-user]
 verify_jwt = false
 
+[functions.create-system-admin]
+verify_jwt = false
+
 [functions.create-family]
 verify_jwt = false
 
