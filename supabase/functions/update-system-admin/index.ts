@@ -25,6 +25,7 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log("[update-system-admin] invoked", req.method);
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
