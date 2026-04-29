@@ -66,20 +66,28 @@ serve(async (req) => {
       );
     }
 
-    // Verify target user exists and is a school user
+    // Verify target user exists and is NOT an admin (admins cannot impersonate other admins here)
     const { data: targetRoleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", user_id)
-      .eq("role", "school")
       .maybeSingle();
 
     if (!targetRoleData) {
       return new Response(
-        JSON.stringify({ error: "El usuario no es un usuario escolar válido" }),
+        JSON.stringify({ error: "El usuario no tiene un rol asignado" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (targetRoleData.role === "admin") {
+      return new Response(
+        JSON.stringify({ error: "No se puede suplantar a otro administrador" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const targetRole = targetRoleData.role;
 
     // Get target user's email
     const { data: targetUser, error: targetUserError } = await supabaseAdmin.auth.admin.getUserById(user_id);
@@ -126,6 +134,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
+        role: targetRole,
         session: {
           access_token: sessionData.session.access_token,
           refresh_token: sessionData.session.refresh_token,
