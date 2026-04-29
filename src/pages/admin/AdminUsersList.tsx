@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Search, Trash2, Ban, CheckCircle, ShieldAlert, Pencil } from "lucide-react";
+import { Plus, Search, Trash2, Ban, CheckCircle, ShieldAlert, Pencil, Eye, EyeOff } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,8 @@ export default function AdminUsersList() {
     phone: "",
   });
   const [isEditSaving, setIsEditSaving] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -429,12 +431,24 @@ export default function AdminUsersList() {
             </div>
             <div>
               <Label>Contraseña</Label>
-              <Input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Mínimo 8 caracteres"
-              />
+              <div className="relative">
+                <Input
+                  type={showCreatePassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Mínimo 8 caracteres"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                  aria-label={showCreatePassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showCreatePassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -504,13 +518,25 @@ export default function AdminUsersList() {
             </div>
             <div>
               <Label>Nueva contraseña (opcional)</Label>
-              <Input
-                type="password"
-                value={editForm.password}
-                onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                placeholder="Mínimo 8 caracteres si cambias"
-                autoComplete="new-password"
-              />
+              <div className="relative">
+                <Input
+                  type={showEditPassword ? "text" : "password"}
+                  value={editForm.password}
+                  onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                  placeholder="Mínimo 8 caracteres si cambias"
+                  autoComplete="new-password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowEditPassword((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  tabIndex={-1}
+                  aria-label={showEditPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
+                  {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </div>
           <DialogFooter>
