@@ -22,7 +22,7 @@ function sanitize(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
 }
 
-Deno.serve(async (req) => {
+export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -256,4 +256,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
