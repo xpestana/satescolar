@@ -187,26 +187,30 @@ export default function AdminUsersList() {
 
     (async () => {
       const patch: Partial<EditFormData> = {};
-      if (!userToEdit.email?.trim()) {
+
+      // Siempre refrescar email desde Auth
+      try {
         const { data } = await supabase.functions.invoke("get-user-emails", {
           body: { user_ids: [uid] },
         });
         const row = data?.users?.find((u: { id: string }) => u.id === uid);
         if (row?.email) patch.email = row.email;
+      } catch (e) {
+        console.warn("No se pudo refrescar email:", e);
       }
+
+      // Siempre traer datos frescos del perfil
       const { data: prof } = await supabase
         .from("profiles")
         .select("full_name, phone")
         .eq("user_id", uid)
         .maybeSingle();
+
       if (!cancelled && prof) {
-        if (prof.full_name && (userToEdit.full_name === "Sin nombre" || !userToEdit.full_name?.trim())) {
-          patch.full_name = prof.full_name;
-        }
-        if (prof.phone != null && prof.phone !== "" && !(userToEdit.phone ?? "").trim()) {
-          patch.phone = prof.phone;
-        }
+        if (prof.full_name) patch.full_name = prof.full_name;
+        patch.phone = prof.phone ?? "";
       }
+
       if (!cancelled && Object.keys(patch).length > 0) {
         setEditForm((f) => ({ ...f, ...patch }));
       }

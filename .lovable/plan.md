@@ -1,69 +1,67 @@
-# Plan: arreglar migración rota + errores TS
+# Plan: Administradores + eliminar seeder admin local
 
-## Problema raíz
+## 1. Arreglar edge functions del módulo Administradores
 
-La migración `20260203180619_95aad131-1502-4e33-9e0d-e328b729d967.sql` hace `INSERT INTO form_fields` con `school_id = d743589d-6a26-474e-8cad-873909885851` (U. E. Colegio Santo Domingo de Guzmán), **pero nunca inserta primero la fila del colegio en `schools`**. En producción funcionó porque ese colegio ya existía. En cualquier BD nueva (tu Docker local) revienta con el FK violation que ves.
+Las funciones `create-system-admin`, `update-system-admin`, `delete-user` y `suspend-user` validan al usuario solicitante con `supabaseAdmin.auth.getUser(token)`. Ese método solo funciona con JWTs HS256 (legacy). El proyecto está en modo signing-keys (ES256), donde el patrón obligatorio es `supabaseUser.auth.getClaims(token)` (regla guardada en memoria del proyecto). Ese desfase explica por qué editar/crear/suspender/eliminar admins puede fallar con "Token inválido" o "No autorizado" en producción.
 
-Los fixes de TypeScript son un problema **separado** y no resuelven esto.
+**Cambio en las 4 funciones**:
+- Crear cliente `supabaseUser` con la `Authorization` header y `SUPABASE_ANON_KEY`.
+- Reemplazar `supabaseAdmin.auth.getUser(token)` por `supabaseUser.auth.getClaims(token)` y leer `claimsData.claims.sub` como `requestingUserId`.
+- Mantener el resto del flujo (verificación de rol admin con `supabaseAdmin`, operaciones de mutación) sin cambios.
 
-## Solución
+## 2. Modal de edición: mostrar datos guardados
 
-### 1. Crear nueva migración que pre-inserte el colegio (no datos personales)
+El modal hoy ya hace fetch de `profiles` y de email vía `get-user-emails` cuando se abre, pero el `useEffect` solo aplica los valores si los campos del usuario en la lista vienen vacíos. Si la fila ya trae `full_name` o `phone`, no se sobreescribe; el problema reportado ("no muestra los datos guardados") ocurre cuando `phone` viene `null` o el correo se pierde por el fallo de auth en `get-user-emails`.
 
-Nuevo archivo: `supabase/migrations/<timestamp>_seed_default_school.sql`
+**Cambios en `src/pages/admin/AdminUsersList.tsx`**:
+- En `openEditDialog`, usar siempre los valores del row como base (ya lo hace).
+- En el `useEffect` de hidratación, **siempre** aplicar los datos frescos de `profiles` (`full_name`, `phone`) y del `get-user-emails` (`email`), sin condicionar a "vacío". Esto garantiza que el modal refleje el último estado guardado en BD.
+- Como respaldo, si `get-user-emails` falla, usar `userToEdit.email` actual.
 
-Contenido — solo la fila del colegio con datos institucionales públicos (nombre, RIF, dirección, teléfono, email institucional). **Sin alumnos, familias, docentes, pagos ni notas.** Cero PII.
+Una vez que la edge function `get-user-emails` autentica bien (ya está OK con `getClaims`) y `update-system-admin` queda corregida, el ciclo "guardar → recargar lista → reabrir modal" mostrará los datos correctos.
 
-```sql
--- Seed: Colegio por defecto para que migraciones históricas
--- (form_fields, etc.) que referencian su id no fallen en BDs nuevas.
-INSERT INTO public.schools (
-  id, name, rif, address, phone, email, institution_type
-) VALUES (
-  'd743589d-6a26-474e-8cad-873909885851',
-  'U. E. Colegio Santo Domingo de Guzmán',
-  '<RIF>',
-  '<dirección>',
-  '<teléfono>',
-  '<email institucional>',
-  '<tipo>'
-) ON CONFLICT (id) DO NOTHING;
+## 3. Eliminar el seeder de admin local
+
+El seed automático de `admin@local.test` no se está aplicando bien al levantar Docker; el usuario lo creará a mano desde Studio.
+
+**Eliminar**:
+- Archivo `scripts/seeds/late/01_seed_admin_user.sql`.
+- Carpeta `scripts/seeds/late/` (queda vacía).
+- Variables `ADMIN_SEED_EMAIL`, `ADMIN_SEED_PASSWORD`, `ADMIN_SEED_NAME` y su sección "Primer admin" en `.env.example`.
+- Bloque `ADMIN_SEED_*` en `docker-compose.yml` (líneas 100-102 del servicio `sat-migrations`).
+- Función `apply_late_seeds` y sus llamadas en `scripts/run-migrations.sh` y `scripts/import-to-local.sh` (también la variable `LATE_DIR`).
+- Memoria `mem://project/local-seeds-bootstrap`: actualizar para reflejar que ya no hay late seeds y el admin se crea manualmente desde Studio. Actualizar la línea correspondiente en `mem://index.md`.
+
+Los **early seeds** (`scripts/seeds/early/00_seed_schools.sql`) se mantienen tal cual; solo se elimina la fase "late".
+
+## Detalles técnicos
+
+Patrón de auth correcto a aplicar en las 4 functions:
+
+```ts
+const supabaseUser = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+  { global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false } }
+);
+const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
+const requestingUserId = claimsData?.claims?.sub;
+if (claimsError || !requestingUserId) return 401;
 ```
 
-⚠️ **Importante**: el trigger `create_default_form_fields()` se dispara al insertar el colegio y crea automáticamente los 81 form_fields default. Como la migración vieja luego hace otro INSERT de form_fields para ese mismo `school_id`, podría chocar. Hay que verificar si la migración vieja usa `ON CONFLICT DO NOTHING` o si necesitamos:
-- Opción A: hacer la nueva migración con un `INSERT … ON CONFLICT DO NOTHING` y dejar que el trigger pueble. Luego eliminar/condicionar la migración vieja.
-- Opción B (más segura): insertar la fila de `schools` con un guard que **no dispare el trigger** (ej. `ALTER TABLE … DISABLE TRIGGER` durante el seed), y dejar que la migración vieja siga siendo la fuente de verdad de esos campos.
+Después se sigue usando `supabaseAdmin` (service role) para verificar el rol y ejecutar `auth.admin.*` y updates en `profiles`.
 
-Voy a inspeccionar la migración vieja completa antes de elegir y te lo confirmo al ejecutar.
+## Archivos afectados
 
-Necesito que me confirmes los **datos institucionales** del colegio para poner valores reales (no placeholders) en la migración:
-- RIF
-- Dirección
-- Teléfono
-- Email institucional
-- institution_type (privado / público / subvencionado)
-
-Si prefieres, pongo valores genéricos tipo `'PENDIENTE'` y los actualizas desde la UI luego.
-
-### 2. Arreglar los 7 errores de TypeScript de las Edge Functions
-
-- `supabase/functions/fetch-bcv-rates/index.ts:139` → `catch (error: any)`
-- `supabase/functions/get-user-emails/index.ts:113` → narrowing: `userResults.filter((u): u is NonNullable<typeof u> => u !== null)`
-- `supabase/functions/main/index.ts:27` → `catch (error: any)`
-- `supabase/functions/record-attendance/index.ts:263` → `catch (error: any)`
-- `supabase/functions/send-email/index.ts:96` → `await client.send(mailConfig as any)`
-- `supabase/functions/send-email/index.ts:106` → `catch (error: any)`
-
-### 3. Memoria del proyecto
-
-Guardar `mem://constraints/no-orphan-school-references` con la regla: cualquier migración que inserte filas con FK a `schools` debe primero asegurar que la fila del colegio existe (o usar el script `seed-from-production.sh`).
-
-## Lo que NO hago
-
-- No meto alumnos/familias/docentes/pagos en migraciones (PII, LOPNNA, repo bloat).
-- No toco el script `seed-from-production.sh` — sigue siendo la vía para datos reales en local.
-
-## Resultado esperado
-
-- `bash scripts/seed-from-production.sh` (o solo aplicar migraciones en Docker) corre limpio sin FK violation.
-- `supabase functions deploy` compila sin los 7 errores TS.
+- `supabase/functions/create-system-admin/index.ts` (auth)
+- `supabase/functions/update-system-admin/index.ts` (auth)
+- `supabase/functions/delete-user/index.ts` (auth)
+- `supabase/functions/suspend-user/index.ts` (auth)
+- `src/pages/admin/AdminUsersList.tsx` (hidratación del modal)
+- `scripts/seeds/late/01_seed_admin_user.sql` (eliminar)
+- `scripts/run-migrations.sh` (quitar late seeds)
+- `scripts/import-to-local.sh` (quitar late seeds)
+- `docker-compose.yml` (quitar env ADMIN_SEED_*)
+- `.env.example` (quitar sección Primer admin)
+- `mem://project/local-seeds-bootstrap` y `mem://index.md` (actualizar)

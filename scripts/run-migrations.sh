@@ -8,7 +8,6 @@ psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=
   "CREATE TABLE IF NOT EXISTS public._docker_migrations (filename text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now());"
 
 EARLY_DIR="/seeds/early"
-LATE_DIR="/seeds/late"
 EARLY_APPLIED=0
 
 apply_early_seeds() {
@@ -23,31 +22,10 @@ apply_early_seeds() {
   fi
 }
 
-apply_late_seeds() {
-  if [ -d "$LATE_DIR" ]; then
-    # Defaults para el admin (sobrescribibles por env del contenedor)
-    ADMIN_EMAIL="${ADMIN_SEED_EMAIL:-admin@local.test}"
-    ADMIN_PASSWORD="${ADMIN_SEED_PASSWORD:-ChangeMe123!}"
-    ADMIN_NAME="${ADMIN_SEED_NAME:-Administrador Local}"
-    for seed in "$LATE_DIR"/*.sql; do
-      [ -f "$seed" ] || continue
-      sb=$(basename "$seed")
-      echo "  🌱 late seed: $sb"
-      psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-        -v ON_ERROR_STOP=1 \
-        -v admin_email="$ADMIN_EMAIL" \
-        -v admin_password="$ADMIN_PASSWORD" \
-        -v admin_name="$ADMIN_NAME" \
-        -f "$seed"
-    done
-  fi
-}
-
 set -- /migrations/*.sql
 if [ ! -f "$1" ]; then
   echo "==> No hay .sql en /migrations/; nada que aplicar."
   apply_early_seeds
-  apply_late_seeds
   exit 0
 fi
 for f in /migrations/*.sql; do
@@ -66,10 +44,6 @@ for f in /migrations/*.sql; do
   # para que migraciones posteriores con FK a schools no fallen.
   apply_early_seeds
 done
-
-# Late seeds: corren al final, cuando todas las tablas, enums y triggers existen.
-# Aquí se crea el primer usuario admin del sistema.
-apply_late_seeds
 
 # PostgREST mantiene caché de esquema; sin esto, tablas nuevas no aparecen hasta reiniciar el servicio
 psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "NOTIFY pgrst, 'reload schema';" 2>/dev/null || true
