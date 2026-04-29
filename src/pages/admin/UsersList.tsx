@@ -370,47 +370,40 @@ export default function UsersList() {
     }
   };
 
-  const handleImpersonate = async (userId: string, userName: string) => {
+  const handleImpersonate = async (userId: string, userName: string, role: UserRole) => {
     if (isImpersonating) return;
-    
+
     setIsImpersonating(true);
     toast.info(`Iniciando sesión como ${userName}...`);
-    
+
     try {
       const { data, error } = await supabase.functions.invoke("impersonate-user", {
         body: { user_id: userId },
       });
 
-      console.log("Impersonate response:", { data, error });
-
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
       if (data?.session) {
-        console.log("Setting session with tokens...");
-        
-        // Set the new session directly (replaces current session)
         const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: data.session.access_token,
           refresh_token: data.session.refresh_token,
         });
 
-        console.log("setSession result:", { sessionData, sessionError });
+        if (sessionError) throw sessionError;
+        if (!sessionData.session) throw new Error("No se pudo establecer la sesión");
 
-        if (sessionError) {
-          console.error("Session error:", sessionError);
-          throw sessionError;
-        }
-
-        if (!sessionData.session) {
-          throw new Error("No se pudo establecer la sesión");
-        }
+        const targetRole = (data.role as UserRole) || role;
+        const dashboardByRole: Record<UserRole, string> = {
+          school: "/school/dashboard",
+          teacher: "/teacher/dashboard",
+          representative: "/representative/dashboard",
+        };
+        const redirectTo = dashboardByRole[targetRole] ?? "/login";
 
         toast.success(`Sesión iniciada como ${userName}`);
-        
-        // Small delay to ensure session is persisted, then redirect
         setTimeout(() => {
-          window.location.href = "/school/dashboard";
+          window.location.href = redirectTo;
         }, 100);
       } else {
         throw new Error("No se recibió la sesión del servidor");
