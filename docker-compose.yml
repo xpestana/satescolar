@@ -164,6 +164,7 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-SAT Escolar}
     volumes:
       - ./supabase/functions:/home/deno/functions
+      - ./docker/functions-main:/home/deno/functions/main
     command:
       - start
       - --main-service
