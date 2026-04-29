@@ -46,6 +46,8 @@ import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;
 
+type UserRole = "school" | "teacher" | "representative";
+
 interface SchoolUser {
   id: string;
   user_id: string;
@@ -53,7 +55,7 @@ interface SchoolUser {
   email: string;
   school_id: string | null;
   school_name: string | null;
-  role: string;
+  role: UserRole;
   is_suspended: boolean;
 }
 
@@ -90,7 +92,7 @@ export default function UsersList() {
 
   const fetchUsers = async () => {
     try {
-      // Fetch user roles with school role
+      // Fetch all non-admin user roles
       const { data: rolesData, error: rolesError } = await supabase
         .from("user_roles")
         .select(`
@@ -100,7 +102,7 @@ export default function UsersList() {
           school_id,
           schools(name)
         `)
-        .eq("role", "school");
+        .in("role", ["school", "teacher", "representative"]);
 
       if (rolesError) throw rolesError;
 
@@ -111,8 +113,6 @@ export default function UsersList() {
 
       if (profilesError) throw profilesError;
 
-      // We need to get emails from auth - will use an edge function for this
-      // For now, map the data we have
       const usersMap = new Map<string, SchoolUser>();
 
       rolesData?.forEach((role: any) => {
@@ -121,16 +121,65 @@ export default function UsersList() {
           id: role.id,
           user_id: role.user_id,
           full_name: profile?.full_name || "Sin nombre",
-          email: "", // Will be fetched
+          email: "",
           school_id: role.school_id,
           school_name: role.schools?.name || null,
-          role: role.role,
-          is_suspended: false, // Will be fetched
+          role: role.role as UserRole,
+          is_suspended: false,
         });
       });
 
-      // Fetch emails from edge function
       const userIds = Array.from(usersMap.keys());
+
+      // Resolve school names for teachers
+      const teacherUserIds = Array.from(usersMap.values())
+        .filter((u) => u.role === "teacher")
+        .map((u) => u.user_id);
+      if (teacherUserIds.length > 0) {
+        const { data: teachersData } = await supabase
+          .from("teachers")
+          .select("user_id, school_id, schools(name)")
+          .in("user_id", teacherUserIds);
+        teachersData?.forEach((t: any) => {
+          const u = usersMap.get(t.user_id);
+          if (u && !u.school_name) {
+            u.school_id = t.school_id;
+            u.school_name = t.schools?.name || null;
+          }
+        });
+      }
+
+      // Resolve school names for representatives (families M2M)
+      const repUserIds = Array.from(usersMap.values())
+        .filter((u) => u.role === "representative")
+        .map((u) => u.user_id);
+      if (repUserIds.length > 0) {
+        const { data: familiesData } = await supabase
+          .from("families")
+          .select("id, user_id")
+          .in("user_id", repUserIds);
+        const familyIds = familiesData?.map((f: any) => f.id) ?? [];
+        if (familyIds.length > 0) {
+          const { data: famSchools } = await supabase
+            .from("family_schools")
+            .select("family_id, school_id, schools(name)")
+            .in("family_id", familyIds);
+          familiesData?.forEach((f: any) => {
+            const u = usersMap.get(f.user_id);
+            if (!u) return;
+            const links = famSchools?.filter((fs: any) => fs.family_id === f.id) ?? [];
+            const names = links
+              .map((fs: any) => fs.schools?.name)
+              .filter(Boolean);
+            if (names.length > 0 && !u.school_name) {
+              u.school_name = names.join(", ");
+              u.school_id = links[0]?.school_id ?? null;
+            }
+          });
+        }
+      }
+
+      // Fetch emails from edge function
       if (userIds.length > 0) {
         const { data: emailsData } = await supabase.functions.invoke("get-user-emails", {
           body: { user_ids: userIds },
