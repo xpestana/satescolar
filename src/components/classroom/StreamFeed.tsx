@@ -245,7 +245,9 @@ export function StreamFeed({ assignmentId, schoolId, allowStudentPosts }: Props)
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <ListItemSkeleton count={4} />
+        {/* keep an empty spacer to preserve layout */}
+        <span className="hidden" />
       </div>
     );
   }
