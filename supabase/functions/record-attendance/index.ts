@@ -1,6 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
+// Prevent SMTP/TLS internal errors from crashing the edge worker.
+if (typeof addEventListener === "function") {
+  addEventListener("unhandledrejection", (e: any) => {
+    console.error("[record-attendance] unhandledrejection swallowed:", e?.reason ?? e);
+    e?.preventDefault?.();
+  });
+  addEventListener("error", (e: any) => {
+    console.error("[record-attendance] uncaught error swallowed:", e?.error ?? e?.message ?? e);
+    e?.preventDefault?.();
+  });
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
