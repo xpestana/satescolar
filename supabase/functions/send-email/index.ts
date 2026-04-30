@@ -1,3 +1,5 @@
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
   addEventListener("unhandledrejection", (e: any) => {
@@ -9,8 +11,6 @@ if (typeof addEventListener === "function") {
     e?.preventDefault?.();
   });
 }
-
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
