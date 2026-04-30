@@ -175,14 +175,7 @@ export default function SchoolsList() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    Cargando...
-                  </div>
-                </TableCell>
-              </TableRow>
+              <TableSkeleton rows={6} columns={6} />
             ) : paginatedSchools.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
