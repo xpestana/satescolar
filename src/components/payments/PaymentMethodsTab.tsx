@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Loader2, CreditCard, Building2, Phone, Mail, Banknote, Check, ChevronsUpDown } from "lucide-react";
 import { VENEZUELAN_BANKS, METHOD_TYPE_LABELS, METHOD_TYPES } from "@/lib/venezuelan-banks";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function BankCombobox({ value, onChange }: { value: string; onChange: (code: string, name: string) => void }) {
   const [open, setOpen] = useState(false);

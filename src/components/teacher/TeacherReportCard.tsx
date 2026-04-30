@@ -11,6 +11,7 @@ import { Loader2, Check, FileText, Info, Save } from "lucide-react";
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "@/components/grades/PrimaryFinalReportModal";
 import PreschoolFinalReportModal from "@/components/grades/PreschoolFinalReportModal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const PRIMARY_GRADES = new Set([
   "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado",

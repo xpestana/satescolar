@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const GRADES = [
   { value: "1", label: "1er Grado" },

@@ -14,6 +14,7 @@ import { Loader2, Save, User } from "lucide-react";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/utilities/RichTextEditor";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PreschoolFinalReportModalProps {
   open: boolean;
