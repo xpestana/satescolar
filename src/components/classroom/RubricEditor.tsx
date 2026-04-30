@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Trash2, Loader2, Save, GripVertical } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
+import { FormSkeleton } from "@/components/ui/loading-skeletons";
 
 interface RubricLevel {
   label: string;
@@ -176,9 +177,7 @@ export function RubricEditor({ open, onClose, activityId, schoolId, maxScore }: 
     return (
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
         <DialogContent>
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <FormSkeleton fields={4} />
         </DialogContent>
       </Dialog>
     );

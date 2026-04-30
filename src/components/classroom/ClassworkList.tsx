@@ -15,6 +15,7 @@ import { es } from "date-fns/locale";
 import { ActivityFormModal } from "@/components/classroom/ActivityFormModal";
 import { SubmissionReview } from "@/components/classroom/SubmissionReview";
 import { RubricEditor } from "@/components/classroom/RubricEditor";
+import { ListItemSkeleton } from "@/components/ui/loading-skeletons";
 
 interface Props {
   assignmentId: string;
@@ -80,11 +81,7 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
   const isLoading = topicsLoading || activitiesLoading;
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ListItemSkeleton count={4} />;
   }
 
   // Show submission review mode

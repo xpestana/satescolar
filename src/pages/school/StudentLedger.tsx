@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -170,7 +172,7 @@ export default function StudentLedger() {
     doc.save(`recibo_${payment.id.slice(0, 8)}.pdf`);
   };
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><Loader2 className="animate-spin h-8 w-8 mx-auto mt-12" /></DashboardLayout>;
+  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   return (
     <DashboardLayout>
@@ -186,7 +188,7 @@ export default function StudentLedger() {
           </div>
           <Card>
             <CardContent className="p-0">
-              {isLoading ? <Loader2 className="animate-spin mx-auto my-8" /> : (
+              {isLoading ? <div className="space-y-3 my-6">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
                 <Table>
                   <TableHeader><TableRow><TableHead>Estudiante</TableHead><TableHead>Cédula</TableHead><TableHead>Grado</TableHead><TableHead>Sección</TableHead><TableHead className="w-20"></TableHead></TableRow></TableHeader>
                   <TableBody>

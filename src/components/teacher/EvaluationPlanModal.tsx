@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Loader2, Save, X } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface EvaluationPlanModalProps {
   open: boolean;
@@ -161,7 +162,7 @@ export function EvaluationPlanModal({
 
         {/* Existing items */}
         {isLoading ? (
-          <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          <div className="space-y-2 py-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
         ) : items.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No hay evaluaciones agregadas aún.</p>
         ) : (

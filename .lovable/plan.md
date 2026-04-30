@@ -1,115 +1,84 @@
+# Reemplazo de spinners por skeletons contextuales
 
-## Problema
+## Objetivo
 
-En tu VPS Ubuntu, **todas** las edge functions entran por `supabase/functions/main/index.ts`, que las carga con `import(\`../${functionName}/index.ts\`)` dinámico. El edge-runtime de Docker falla con ese import dinámico en muchas funciones, devolviendo:
+Sustituir los ~93 usos de `animate-spin` que actúan como **placeholders de contenido** por skeletons que reflejen la forma de la pantalla (filas de tabla, tarjetas, formularios, dashboards). Conservar los spinners que cumplen un rol distinto (botones en estado pendiente, indicadores inline). Esto da una percepción de carga más fluida y profesional sin tocar lógica de negocio.
 
-```
-Function 'delete-user' not found: Module not found: ...
-```
+## Principios (SOLID aplicado)
 
-Ya lo arreglamos para `create-system-admin` y `update-system-admin` con dos cambios:
-1. Reemplazar `serve(handler)` por `export default async function handler(req)`.
-2. Registrarlas en el `staticHandlers` de `main/index.ts` (import estático).
+- **SRP**: cada skeleton vive como componente reutilizable con una sola responsabilidad visual.
+- **OCP**: los componentes existentes consumen un nuevo `LoadingState` sin reescribir queries ni lógica.
+- **DRY**: skeletons agrupados por patrón (tabla, tarjetas, dashboard, formulario) en una carpeta compartida.
+- **Sin cambios en backend**: cero modificaciones a Edge Functions, RLS, hooks de datos o contratos. Solo capa de presentación → riesgo cero en VPS.
 
-Faltan **17 funciones** con el mismo problema:
+## Qué se reemplaza vs. qué se conserva
 
-```
-create-admin-user            resend-welcome-email
-create-family                s3-migrate-existing
-create-teacher               s3-sign-upload
-delete-user                  send-delinquency-reminders
-fetch-bcv-rates              send-email
-get-user-emails              suspend-user
-impersonate-user             update-family-email
-record-attendance            update-family-password
-                             update-teacher-password
-```
+**Reemplazar por skeleton (carga de datos):**
+- Tablas/listas: `SchoolsList`, `UsersList` (admin), `TeachersList`, `SubjectsList`, `AdvancedSearch`, `EnrollmentsList`, `FamiliesList`, `DelinquentStudents`, `PaymentDashboard`, `PaymentRegistration`, `StudentLedger`, `GradeSheets`, `GradesConsultation`, `AttendanceList`, `ClassroomSupervision`.
+- Dashboards: `DashboardLayout` (carga inicial), `SchoolDashboard`, `TeacherDashboard`, `RepresentativeDashboard`, `ProtectedRoute`.
+- Vistas de aula: `ClassroomList`, `ClassroomDetail`, `TeacherSubjects`, `TeacherGrades`, `StreamFeed`, `ClassworkList`, `PeopleList`, `TopicsManager`, `StudentProgressView`, `StudentSubmissionPanel`, `SubmissionReview`.
+- Modales pesados con carga: `EvaluationPlanModal`, `TeacherReportCard`, `Preschool/PrimaryFinalReportModal`, `Preschool/PrimaryIndicatorsModal`, `FinalGradesTab`.
+- Configuración: `GradesSettings`, `PaymentConfig`, `DelinquencyConfig`, `EmailComposer`, `DocumentBuilder`, `PaymentMethodsTab`.
 
-## Cambios a aplicar
+**Conservar spinner (acción inline, no carga de contenido):**
+- Botones en `isPending` / `isLoading` (guardar, enviar, eliminar).
+- `S3AttachmentInput` durante upload (es feedback de progreso, no de carga de página).
+- `ExchangeRateWidget` mini-indicador inline.
+- `AttendanceScan` y `AttendanceScanner` (feedback de escaneo activo, no carga de datos).
+- `PaymentFormModal`, `ClassroomConfigModal`, `RubricEditor`, `ActivityFormModal` cuando el spinner está en un botón submit.
 
-### 1. Cada una de las 17 funciones (`supabase/functions/<name>/index.ts`)
+## Componentes nuevos a crear
 
-- Quitar `import { serve } from "https://deno.land/std@.../http/server.ts"`.
-- Cambiar `serve(async (req) => { ... })` por:
-  ```ts
-  export default async function handler(req: Request): Promise<Response> {
-    ...
-  }
-  ```
-- Si el handler ya estaba como función nombrada y se pasaba a `serve(handler)`, eliminar el `serve(...)` y exportar el handler como `default`.
-- No tocar la lógica interna (CORS, validación de JWT, queries, etc.).
+`src/components/ui/loading-skeletons.tsx` con primitivas reutilizables:
 
-### 2. `supabase/functions/main/index.ts`
+- `TableSkeleton` — props: `rows`, `columns`. Renderiza `<TableRow>` con `<Skeleton>` por celda.
+- `CardGridSkeleton` — props: `count`, `columns`. Para grids de tarjetas (familias, estudiantes, materias).
+- `DashboardSkeleton` — banner + grid de 4 metric cards + 2 charts.
+- `FormSkeleton` — props: `fields`. Bloques label + input.
+- `PageLoadingSkeleton` — fallback genérico para `DashboardLayout`/`ProtectedRoute`: barra superior + sidebar + contenido con bloques.
+- `ListItemSkeleton` — fila simple (avatar + dos líneas) para feeds, comentarios, personas.
+- `ChartSkeleton` — recuadro con barras grises animadas para placeholders de gráficos.
 
-Agregar imports estáticos y entradas en `staticHandlers` para las 17 funciones, manteniendo las dos ya registradas. Queda así (resumen):
+Todos basados en `<Skeleton>` ya existente (`src/components/ui/skeleton.tsx`).
 
-```ts
-import createAdminUser from "../create-admin-user/index.ts";
-import createFamily from "../create-family/index.ts";
-import createSystemAdmin from "../create-system-admin/index.ts";
-import createTeacher from "../create-teacher/index.ts";
-import deleteUser from "../delete-user/index.ts";
-import fetchBcvRates from "../fetch-bcv-rates/index.ts";
-import getUserEmails from "../get-user-emails/index.ts";
-import impersonateUser from "../impersonate-user/index.ts";
-import recordAttendance from "../record-attendance/index.ts";
-import resendWelcomeEmail from "../resend-welcome-email/index.ts";
-import s3MigrateExisting from "../s3-migrate-existing/index.ts";
-import s3SignUpload from "../s3-sign-upload/index.ts";
-import sendDelinquencyReminders from "../send-delinquency-reminders/index.ts";
-import sendEmail from "../send-email/index.ts";
-import suspendUser from "../suspend-user/index.ts";
-import updateFamilyEmail from "../update-family-email/index.ts";
-import updateFamilyPassword from "../update-family-password/index.ts";
-import updateSystemAdmin from "../update-system-admin/index.ts";
-import updateTeacherPassword from "../update-teacher-password/index.ts";
+## Plan de aplicación por fases
 
-const staticHandlers: Record<string, (req: Request) => Promise<Response>> = {
-  "create-admin-user": createAdminUser,
-  "create-family": createFamily,
-  "create-system-admin": createSystemAdmin,
-  "create-teacher": createTeacher,
-  "delete-user": deleteUser,
-  "fetch-bcv-rates": fetchBcvRates,
-  "get-user-emails": getUserEmails,
-  "impersonate-user": impersonateUser,
-  "record-attendance": recordAttendance,
-  "resend-welcome-email": resendWelcomeEmail,
-  "s3-migrate-existing": s3MigrateExisting,
-  "s3-sign-upload": s3SignUpload,
-  "send-delinquency-reminders": sendDelinquencyReminders,
-  "send-email": sendEmail,
-  "suspend-user": suspendUser,
-  "update-family-email": updateFamilyEmail,
-  "update-family-password": updateFamilyPassword,
-  "update-system-admin": updateSystemAdmin,
-  "update-teacher-password": updateTeacherPassword,
-};
-```
+**Fase 1 — Infraestructura**
+- Crear `loading-skeletons.tsx` con las primitivas listadas.
 
-El fallback dinámico `import(\`../${functionName}/index.ts\`)` se queda por compatibilidad (Lovable Cloud y futuras funciones), pero ya nada del repo dependerá de él.
+**Fase 2 — Layouts críticos**
+- `DashboardLayout`, `ProtectedRoute`: spinner full-screen → `PageLoadingSkeleton` (sidebar + topbar + contenido).
 
-## Compatibilidad con Lovable Cloud
+**Fase 3 — Tablas y listas (mayor impacto visual)**
+- Reemplazar bloques `<Loader2>` dentro de `<TableBody>` o `<div className="flex justify-center py-12">` por `<TableSkeleton>` o `<CardGridSkeleton>` según corresponda.
+- Cubre admin (`SchoolsList`, `UsersList`) y school (`TeachersList`, `SubjectsList`, `FamiliesList`, `EnrollmentsList`, `AdvancedSearch`, `DelinquentStudents`, `PaymentDashboard`, etc.).
 
-El `export default` no rompe Lovable Cloud: la nube despliega cada función por su cuenta y solo necesita que el archivo levante un servidor **o** exporte un handler. Como además mantenemos `main/index.ts`, en local sigue todo enrutado por ahí.
+**Fase 4 — Dashboards**
+- `SchoolDashboard`, `TeacherDashboard`, `RepresentativeDashboard`: las tarjetas métricas que muestran `"..."` mientras `loading` → mostrar `<Skeleton className="h-8 w-16">` dentro de `MetricCard`.
 
-Si en algún caso Lovable Cloud requiriera un `serve()` explícito, lo agregamos al final del archivo así:
-```ts
-if (import.meta.main) Deno.serve(handler);
-```
-(Lo evaluamos por función si aparece algún warning al desplegar; por ahora el patrón actual ya probado en `create-system-admin` / `update-system-admin` funciona en ambos entornos.)
+**Fase 5 — Aula virtual y módulos pesados**
+- `ClassroomList`, `ClassroomDetail`, feeds y listas internas.
+- Modales de grades/evaluation con carga inicial.
 
-## Pasos en tu VPS después del deploy
+**Fase 6 — Configuración**
+- Pantallas `GradesSettings`, `PaymentConfig`, `DelinquencyConfig`, `EmailComposer`, `DocumentBuilder` → `FormSkeleton`.
 
-```bash
-cd ~/satescolar
-git pull
-docker compose restart supabase-functions
-```
+## Detalles técnicos
 
-Con eso quedan operativas todas las funciones (delete-user, impersonate-user, create-teacher, send-email, etc.) sin más errores de "Module not found".
+- No se modifican hooks (`useQuery`, `useAuth`, `useSchoolId`, etc.) ni contratos de Edge Functions.
+- No se tocan archivos auto-generados (`integrations/supabase/*`).
+- Cambios 100% en capa de presentación → seguro para self-hosted en VPS, sin migraciones ni env nuevos.
+- Imports `Loader2` de `lucide-react` se eliminan solo cuando ya no se usan en el archivo (los botones que lo conservan lo siguen importando).
+- Animación: se reutiliza `animate-pulse` del `Skeleton` existente (Tailwind nativo), sin nuevas dependencias.
 
-## Riesgos
+## Verificación post-implementación
 
-- Cambio mecánico y repetitivo → bajo riesgo de bugs lógicos.
-- Algunas funciones (`fetch-bcv-rates`, `send-delinquency-reminders`) podrían ejecutarse vía cron — el handler exportado sigue respondiendo igual a un `POST`, así que el cron las puede seguir invocando vía HTTP sin cambios.
+- Build TS pasa sin warnings de imports no usados.
+- Recorrido visual de rutas clave: `/dashboard`, `/admin/users`, `/admin/schools`, `/school/teachers`, `/school/families`, `/school/payments`, `/representative/dashboard`, `/teacher/dashboard`.
+- Confirmar que botones de acción (guardar, enviar correo, registrar pago) siguen mostrando spinner inline durante mutaciones.
+
+## Fuera de alcance
+
+- Refactor de queries / paginación.
+- Cambios en Edge Functions o SMTP (no relacionado).
+- Cambios de diseño más allá del estado de carga.

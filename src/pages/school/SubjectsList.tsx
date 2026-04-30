@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Ban, CheckCircle, Loader2, BookOpen } from "lucide-react";
+import { TableSkeleton, DashboardSkeleton } from "@/components/ui/loading-skeletons";
 
 interface Subject {
   id: string;
@@ -167,7 +168,7 @@ export default function SubjectsList() {
   if (schoolLoading) {
     return (
       <DashboardLayout>
-        <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+        <DashboardSkeleton />
       </DashboardLayout>
     );
   }
@@ -195,8 +196,12 @@ export default function SubjectsList() {
         <Card>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="p-4">
+                <Table>
+                  <TableBody>
+                    <TableSkeleton rows={6} columns={4} />
+                  </TableBody>
+                </Table>
               </div>
             ) : displayed.length === 0 ? (
               <div className="text-center py-12">

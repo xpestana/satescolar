@@ -14,6 +14,7 @@ import { Loader2, Save, User } from "lucide-react";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/utilities/RichTextEditor";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface PrimaryFinalReportModalProps {
   open: boolean;
@@ -263,8 +264,15 @@ export default function PrimaryFinalReportModal({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="border rounded-md p-3 space-y-3">
+                <Skeleton className="h-5 w-32" />
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <Skeleton key={j} className="h-8 w-full" />
+                ))}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">

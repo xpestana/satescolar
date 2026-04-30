@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
@@ -53,7 +54,11 @@ export function MetricCard({ title, value, icon, variant, subtitle }: MetricCard
           {icon}
         </div>
         <p className={cn("text-sm font-medium mb-1", styles.title)}>{title}</p>
-        <p className="text-2xl font-bold text-foreground">{value}</p>
+        {value === "..." ? (
+          <Skeleton className="h-8 w-16 mt-1" />
+        ) : (
+          <p className="text-2xl font-bold text-foreground">{value}</p>
+        )}
         {subtitle && (
           <p className={cn("text-xs mt-1", styles.title)}>{subtitle}</p>
         )}

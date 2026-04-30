@@ -42,6 +42,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/data-pagination";
 import { supabase } from "@/integrations/supabase/client";
+import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;
@@ -480,14 +481,7 @@ export default function UsersList() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-8">
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    Cargando...
-                  </div>
-                </TableCell>
-              </TableRow>
+              <TableSkeleton rows={6} columns={5} />
             ) : paginatedUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">

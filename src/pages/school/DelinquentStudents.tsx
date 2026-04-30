@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DashboardSkeleton, TableSkeleton } from "@/components/ui/loading-skeletons";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -137,7 +138,7 @@ export default function DelinquentStudents() {
     return notifications.filter((n: any) => n.student_id === selectedStudentId);
   }, [selectedStudentId, notifications]);
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><Loader2 className="animate-spin h-8 w-8 mx-auto mt-12" /></DashboardLayout>;
+  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   return (
     <DashboardLayout>
@@ -159,7 +160,7 @@ export default function DelinquentStudents() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6" /></div> : (
+          {isLoading ? <div className="p-4"><Table><TableBody><TableSkeleton rows={5} columns={5} /></TableBody></Table></div> : (
             <Table>
               <TableHeader>
                 <TableRow>

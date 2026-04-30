@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { supabase } from "@/integrations/supabase/client";
+import { FormSkeleton } from "@/components/ui/loading-skeletons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Baby, BookOpen, GraduationCap, Plus, Trash2, Settings2 } from "lucide-react";
@@ -174,9 +175,7 @@ export default function GradesSettings() {
   if (schoolLoading || isLoading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <FormSkeleton fields={8} />
       </DashboardLayout>
     );
   }
