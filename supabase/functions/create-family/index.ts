@@ -352,3 +352,5 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 }
+
+if (import.meta.main) Deno.serve(handler);
