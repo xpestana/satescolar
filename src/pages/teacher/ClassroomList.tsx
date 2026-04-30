@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Users, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CardGridSkeleton } from "@/components/ui/loading-skeletons";
 import { ClassroomListTutorial } from "@/components/classroom/ClassroomTutorial";
 
 const GRADE_LABELS: Record<string, string> = {

@@ -6,6 +6,7 @@ import { useClassroomConfig, type ClassroomAssignment } from "@/hooks/useClassro
 import { useTeacherData } from "@/hooks/useTeacherData";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Settings, MessageSquare, BookOpen, Calendar, Users, Loader2 } from "lucide-react";

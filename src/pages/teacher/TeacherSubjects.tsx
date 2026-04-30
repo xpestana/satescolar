@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { useTeacherData } from "@/hooks/useTeacherData";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CardGridSkeleton } from "@/components/ui/loading-skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
