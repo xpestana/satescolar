@@ -242,8 +242,10 @@ export function PreschoolIndicatorsModal({ open, onOpenChange, schoolId, showInd
           </div>
 
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="space-y-2 py-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
           ) : (
             <div className="space-y-2">

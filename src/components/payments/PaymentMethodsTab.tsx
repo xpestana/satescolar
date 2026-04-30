@@ -266,7 +266,7 @@ export function PaymentMethodsTab({ schoolId }: { schoolId: string }) {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6" /></div>
+          <div className="space-y-3 py-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : Object.keys(grouped).length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No hay métodos de pago registrados. Agregue los métodos que el colegio acepta.</p>
         ) : (
