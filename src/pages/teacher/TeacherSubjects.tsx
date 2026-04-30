@@ -161,9 +161,7 @@ export default function TeacherSubjects() {
       <PageHeader title="Mis Materias" breadcrumbs={[{ label: "Inicio", href: "/teacher/dashboard" }, { label: "Mis Materias" }]} />
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
+        <CardGridSkeleton count={6} columns={3} />
       ) : assignments.length === 0 ? (
         <div className="text-center py-12">
           <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
