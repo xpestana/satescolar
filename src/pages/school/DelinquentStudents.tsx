@@ -160,7 +160,7 @@ export default function DelinquentStudents() {
 
       <Card>
         <CardContent className="p-0">
-          {isLoading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6" /></div> : (
+          {isLoading ? <div className="p-4"><Table><TableBody><TableSkeleton rows={5} columns={5} /></TableBody></Table></div> : (
             <Table>
               <TableHeader>
                 <TableRow>

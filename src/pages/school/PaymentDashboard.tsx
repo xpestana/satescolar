@@ -136,7 +136,7 @@ export default function PaymentDashboard() {
         <Card>
           <CardHeader><CardTitle className="text-sm">Últimos Pagos</CardTitle></CardHeader>
           <CardContent>
-            {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+            {isLoading ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
               <Table>
                 <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Estudiante</TableHead><TableHead>Monto</TableHead></TableRow></TableHeader>
                 <TableBody>

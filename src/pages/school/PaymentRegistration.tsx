@@ -227,7 +227,7 @@ export default function PaymentRegistration() {
           {/* Student Table */}
           <Card>
             <CardContent className="p-0">
-              {isLoading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6" /></div> : (
+              {isLoading ? <div className="space-y-3 py-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
                 <Table>
                   <TableHeader>
                     <TableRow>

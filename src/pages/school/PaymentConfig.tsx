@@ -89,7 +89,7 @@ function ConceptsTab({ schoolId }: { schoolId: string }) {
         <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Nuevo Concepto</Button>
       </CardHeader>
       <CardContent>
-        {isLoading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6" /></div> : (
+        {isLoading ? <div className="space-y-3 py-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -211,7 +211,7 @@ function PlansTab({ schoolId }: { schoolId: string }) {
           <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />Nuevo Plan</Button>
         </CardHeader>
         <CardContent>
-          {isLoading ? <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6" /></div> : (
+          {isLoading ? <div className="space-y-3 py-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -353,7 +353,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
             </Button>
           </div>
 
-          {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+          {isLoading ? <div className="space-y-3 py-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
             <Table>
               <TableHeader>
                 <TableRow>

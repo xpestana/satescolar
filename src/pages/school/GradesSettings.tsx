@@ -174,9 +174,7 @@ export default function GradesSettings() {
   if (schoolLoading || isLoading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <FormSkeleton fields={8} />
       </DashboardLayout>
     );
   }

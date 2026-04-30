@@ -187,7 +187,7 @@ export default function StudentLedger() {
           </div>
           <Card>
             <CardContent className="p-0">
-              {isLoading ? <Loader2 className="animate-spin mx-auto my-8" /> : (
+              {isLoading ? <div className="space-y-3 my-6">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
                 <Table>
                   <TableHeader><TableRow><TableHead>Estudiante</TableHead><TableHead>Cédula</TableHead><TableHead>Grado</TableHead><TableHead>Sección</TableHead><TableHead className="w-20"></TableHead></TableRow></TableHeader>
                   <TableBody>

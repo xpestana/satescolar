@@ -411,8 +411,10 @@ export default function GradesConsultation() {
           </p>
         </div>
       ) : loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="space-y-3 py-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
         </div>
       ) : !assignment ? (
         <div className="text-center py-12 border rounded-md bg-muted/20">
@@ -533,8 +535,10 @@ export default function GradesConsultation() {
               <p className="text-muted-foreground">Seleccione año escolar y sección para ver los estudiantes.</p>
             </div>
           ) : studentsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="space-y-3 py-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
           ) : (
             <>

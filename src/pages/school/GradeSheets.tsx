@@ -794,8 +794,10 @@ export default function GradeSheets() {
             </Card>
 
             {sectionsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <div className="space-y-3 py-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
               </div>
             ) : !sectionsData?.length ? (
               <Card>
