@@ -1,4 +1,4 @@
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { sendViaSmtp } from "../_shared/smtp-client.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
@@ -72,23 +72,10 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") ?? "587");
     const smtpUser = Deno.env.get("SMTP_USER") ?? "";
     const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
     const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
     const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtpHost,
-        port: smtpPort,
-        tls: smtpPort === 465,
-        auth: {
-          username: smtpUser,
-          password: smtpPass,
-        },
-      },
-    });
 
     const recipients = Array.isArray(to) ? to : to.split(",").map((e: string) => e.trim());
 
@@ -104,8 +91,7 @@ export default async function handler(req: Request): Promise<Response> {
       mailConfig.content = body;
     }
 
-    await client.send(mailConfig as any);
-    await client.close();
+    await sendViaSmtp(mailConfig as any);
 
     return new Response(
       JSON.stringify({ success: true, message: `Email enviado a ${recipients.length} destinatario(s)` }),

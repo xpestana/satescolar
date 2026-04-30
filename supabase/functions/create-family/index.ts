@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { sendViaSmtp } from "../_shared/smtp-client.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 // Without this, a failed sendWelcomeEmail (e.g. self-hosted SMTP misconfigured)
@@ -79,7 +79,6 @@ function buildWelcomeEmailHtml(
 
 async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
   const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-  const smtpPort = parseInt(Deno.env.get("SMTP_PORT") ?? "587");
   const smtpUser = Deno.env.get("SMTP_USER") ?? "";
   const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
   const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
@@ -90,21 +89,9 @@ async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
     return;
   }
 
-  let client: SMTPClient | null = null;
   try {
-    client = new SMTPClient({
-      connection: {
-        hostname: smtpHost,
-        port: smtpPort,
-        tls: smtpPort === 465,
-        auth: { username: smtpUser, password: smtpPass },
-      },
-    });
-
-    // Hard timeout so a hung TLS handshake cannot keep the connection open
-    // and emit a late BadResource that crashes the worker.
     await Promise.race([
-      client.send({
+      sendViaSmtp({
         from: `${fromName} <${fromEmail}>`,
         to: [to],
         subject: `Bienvenido a ${schoolName} - SAT Escolar`,
@@ -117,12 +104,6 @@ async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
     console.log(`Welcome email sent to ${to}`);
   } catch (err) {
     console.error("Failed to send welcome email:", err);
-  } finally {
-    try {
-      await client?.close();
-    } catch (closeErr) {
-      console.error("Error closing SMTP client:", closeErr);
-    }
   }
 }
 

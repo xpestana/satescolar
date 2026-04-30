@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { sendViaSmtp } from "../_shared/smtp-client.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
@@ -260,7 +260,6 @@ export default async function handler(req: Request): Promise<Response> {
     );
 
     const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") ?? "587");
     const smtpUser = Deno.env.get("SMTP_USER") ?? "";
     const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
     const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
@@ -273,16 +272,7 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtpHost,
-        port: smtpPort,
-        tls: smtpPort === 465,
-        auth: { username: smtpUser, password: smtpPass },
-      },
-    });
-
-    await client.send({
+    await sendViaSmtp({
       from: `${fromName} <${fromEmail}>`,
       to: [targetEmail],
       subject: `Bienvenido a ${schoolData.name} - SAT Escolar`,
@@ -293,7 +283,6 @@ export default async function handler(req: Request): Promise<Response> {
       },
       html,
     });
-    await client.close();
 
     console.log(`Welcome email resent to ${targetEmail}`);
 

@@ -100,12 +100,24 @@ export default async function handler(req: Request): Promise<Response> {
       key += `${folder}/${entityId}/${ts}-${fileName}`;
     }
 
-    // ---- Sign PUT URL ----
-    const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID")!;
-    const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY")!;
-    const region = Deno.env.get("AWS_REGION")!;
-    const bucket = Deno.env.get("AWS_S3_BUCKET")!;
+    // ---- Firmar PUT (requiere IAM con permisos S3 compatibles + bucket existe) ----
+    const accessKeyId = Deno.env.get("AWS_ACCESS_KEY_ID")?.trim() ?? "";
+    const secretAccessKey = Deno.env.get("AWS_SECRET_ACCESS_KEY")?.trim() ?? "";
+    const region = Deno.env.get("AWS_REGION")?.trim() ?? "";
+    const bucket = Deno.env.get("AWS_S3_BUCKET")?.trim() ?? "";
 
+    if (!accessKeyId || !secretAccessKey || !region || !bucket) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "S3/AWS no configurado en el servidor. Define AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION y AWS_S3_BUCKET en el .env y reconstruye el contenedor supabase-functions.",
+        }),
+        {
+          status: 503,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
     const aws = new AwsClient({
       accessKeyId,
       secretAccessKey,
