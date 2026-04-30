@@ -176,9 +176,7 @@ export function RubricEditor({ open, onClose, activityId, schoolId, maxScore }: 
     return (
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
         <DialogContent>
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <FormSkeleton fields={4} />
         </DialogContent>
       </Dialog>
     );

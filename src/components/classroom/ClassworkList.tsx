@@ -80,11 +80,7 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
   const isLoading = topicsLoading || activitiesLoading;
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <ListItemSkeleton count={4} />;
   }
 
   // Show submission review mode

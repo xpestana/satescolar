@@ -244,10 +244,8 @@ export function StreamFeed({ assignmentId, schoolId, allowStudentPosts }: Props)
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
+      <div className="max-w-3xl mx-auto py-4">
         <ListItemSkeleton count={4} />
-        {/* keep an empty spacer to preserve layout */}
-        <span className="hidden" />
       </div>
     );
   }
