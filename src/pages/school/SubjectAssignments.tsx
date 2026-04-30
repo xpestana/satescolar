@@ -21,6 +21,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 
 interface SchoolYear { id: string; year_range: string; is_active: boolean; }
 interface Subject { id: string; name: string; subject_type: string; is_suspended: boolean; }
