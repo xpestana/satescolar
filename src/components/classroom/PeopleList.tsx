@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Users, Search, Loader2, Eye, BarChart3 } from "lucide-react";
 import { StudentProgressView } from "@/components/classroom/StudentProgressView";
+import { ListItemSkeleton } from "@/components/ui/loading-skeletons";
 
 interface StudentInfo {
   id: string;

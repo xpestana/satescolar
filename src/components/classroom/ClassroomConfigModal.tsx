@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { useClassroomConfig, useUpsertClassroomConfig } from "@/hooks/useClassroomData";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { FormSkeleton } from "@/components/ui/loading-skeletons";
 
 interface Props {
   open: boolean;

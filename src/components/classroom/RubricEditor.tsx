@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { Plus, Trash2, Loader2, Save, GripVertical } from "lucide-react";
 import type { Json } from "@/integrations/supabase/types";
+import { FormSkeleton } from "@/components/ui/loading-skeletons";
 
 interface RubricLevel {
   label: string;
