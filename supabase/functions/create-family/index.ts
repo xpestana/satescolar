@@ -1,10 +1,26 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
+// Prevent SMTP/TLS internal errors from crashing the edge worker.
+// Without this, a failed sendWelcomeEmail (e.g. self-hosted SMTP misconfigured)
+// can escape the event loop and tear down the runtime, causing every
+// subsequent function (impersonate-user, get-user-emails, etc.) to 500.
+if (typeof addEventListener === "function") {
+  addEventListener("unhandledrejection", (e: any) => {
+    console.error("[create-family] unhandledrejection swallowed:", e?.reason ?? e);
+    e?.preventDefault?.();
+  });
+  addEventListener("error", (e: any) => {
+    console.error("[create-family] uncaught error swallowed:", e?.error ?? e?.message ?? e);
+    e?.preventDefault?.();
+  });
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
 
 function buildWelcomeEmailHtml(
   schoolName: string,
@@ -62,20 +78,21 @@ function buildWelcomeEmailHtml(
 }
 
 async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
+  const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
+  const smtpPort = parseInt(Deno.env.get("SMTP_PORT") ?? "587");
+  const smtpUser = Deno.env.get("SMTP_USER") ?? "";
+  const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
+  const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
+  const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
+
+  if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
+    console.log("SMTP not configured, skipping welcome email");
+    return;
+  }
+
+  let client: SMTPClient | null = null;
   try {
-    const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-    const smtpPort = parseInt(Deno.env.get("SMTP_PORT") ?? "587");
-    const smtpUser = Deno.env.get("SMTP_USER") ?? "";
-    const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      console.log("SMTP not configured, skipping welcome email");
-      return;
-    }
-
-    const client = new SMTPClient({
+    client = new SMTPClient({
       connection: {
         hostname: smtpHost,
         port: smtpPort,
@@ -84,18 +101,31 @@ async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
       },
     });
 
-    await client.send({
-      from: `${fromName} <${fromEmail}>`,
-      to: [to],
-      subject: `Bienvenido a ${schoolName} - SAT Escolar`,
-      html,
-    });
-    await client.close();
+    // Hard timeout so a hung TLS handshake cannot keep the connection open
+    // and emit a late BadResource that crashes the worker.
+    await Promise.race([
+      client.send({
+        from: `${fromName} <${fromEmail}>`,
+        to: [to],
+        subject: `Bienvenido a ${schoolName} - SAT Escolar`,
+        html,
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("SMTP send timeout (15s)")), 15000)
+      ),
+    ]);
     console.log(`Welcome email sent to ${to}`);
   } catch (err) {
     console.error("Failed to send welcome email:", err);
+  } finally {
+    try {
+      await client?.close();
+    } catch (closeErr) {
+      console.error("Error closing SMTP client:", closeErr);
+    }
   }
 }
+
 
 function generateRandomPassword(length = 16): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
