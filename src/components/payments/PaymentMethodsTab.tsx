@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Loader2, CreditCard, Building2, Phone, Mail, Banknote, Check, ChevronsUpDown } from "lucide-react";
 import { VENEZUELAN_BANKS, METHOD_TYPE_LABELS, METHOD_TYPES } from "@/lib/venezuelan-banks";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function BankCombobox({ value, onChange }: { value: string; onChange: (code: string, name: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -266,7 +267,7 @@ export function PaymentMethodsTab({ schoolId }: { schoolId: string }) {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6" /></div>
+          <div className="space-y-3 py-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
         ) : Object.keys(grouped).length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No hay métodos de pago registrados. Agregue los métodos que el colegio acepta.</p>
         ) : (

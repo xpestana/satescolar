@@ -13,6 +13,7 @@ import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText, Settings } f
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "./PrimaryFinalReportModal";
 import PreschoolFinalReportModal from "./PreschoolFinalReportModal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const NUMERIC_GRADES = new Set([
   "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
@@ -845,8 +846,10 @@ export default function FinalGradesTab({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="space-y-3 py-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
       </div>
     );
   }

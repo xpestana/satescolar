@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Users, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { CardGridSkeleton } from "@/components/ui/loading-skeletons";
 import { ClassroomListTutorial } from "@/components/classroom/ClassroomTutorial";
 
 const GRADE_LABELS: Record<string, string> = {
@@ -97,9 +98,7 @@ export default function ClassroomList() {
       <ClassroomListTutorial />
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        </div>
+        <CardGridSkeleton count={6} columns={3} />
       ) : assignments.length === 0 ? (
         <div className="text-center py-12">
           <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

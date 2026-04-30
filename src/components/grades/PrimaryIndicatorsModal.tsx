@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Trash2, Pencil, Check, X, ChevronDown, ChevronRight } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const GRADES = [
   { value: "1", label: "1er Grado" },
@@ -221,8 +222,10 @@ export function PrimaryIndicatorsModal({ open, onOpenChange, schoolId }: Props) 
           </Select>
 
           {isLoading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="space-y-2 py-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
           ) : (
             <div className="space-y-2">

@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { S3AttachmentInput, type PendingAttachment } from "./S3AttachmentInput";
+import { ListItemSkeleton } from "@/components/ui/loading-skeletons";
 
 interface Props {
   assignmentId: string;
@@ -244,8 +245,8 @@ export function StreamFeed({ assignmentId, schoolId, allowStudentPosts }: Props)
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="max-w-3xl mx-auto py-4">
+        <ListItemSkeleton count={4} />
       </div>
     );
   }

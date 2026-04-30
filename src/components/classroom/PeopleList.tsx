@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Users, Search, Loader2, Eye, BarChart3 } from "lucide-react";
 import { StudentProgressView } from "@/components/classroom/StudentProgressView";
+import { ListItemSkeleton } from "@/components/ui/loading-skeletons";
 
 interface StudentInfo {
   id: string;
@@ -73,8 +74,8 @@ export function PeopleList({ assignmentId, schoolId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="max-w-3xl mx-auto">
+        <ListItemSkeleton count={5} />
       </div>
     );
   }

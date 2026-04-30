@@ -21,6 +21,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 
 interface SchoolYear { id: string; year_range: string; is_active: boolean; }
 interface Subject { id: string; name: string; subject_type: string; is_suspended: boolean; }
@@ -435,7 +437,7 @@ export default function SubjectAssignments() {
   const allBrowseSelected = browseStudents.length > 0 && browseStudents.every((s: any) => gcrpSelectedStudents.has(s.student_id));
 
   if (schoolLoading) {
-    return <DashboardLayout><div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div></DashboardLayout>;
+    return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
   }
 
   return (
@@ -476,7 +478,7 @@ export default function SubjectAssignments() {
         {!selectedYearId ? (
           <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">Selecciona un año escolar para ver las asignaciones</p></CardContent></Card>
         ) : assignmentsLoading ? (
-          <Card><CardContent className="py-12 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></CardContent></Card>
+          <Card><CardContent className="py-6 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</CardContent></Card>
         ) : enrichedAssignments.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -678,7 +680,7 @@ export default function SubjectAssignments() {
                 {gcrpBrowseSection && (
                   <div className="border rounded-md max-h-[200px] overflow-y-auto">
                     {browseLoading ? (
-                      <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+                      <div className="space-y-2 p-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
                     ) : browseStudents.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">No hay estudiantes inscritos en esta sección.</p>
                     ) : (

@@ -11,6 +11,7 @@ import { Loader2, Check, FileText, Info, Save } from "lucide-react";
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "@/components/grades/PrimaryFinalReportModal";
 import PreschoolFinalReportModal from "@/components/grades/PreschoolFinalReportModal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const PRIMARY_GRADES = new Set([
   "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado",
@@ -255,8 +256,10 @@ export function TeacherReportCard({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-6">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-3 py-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
       </div>
     );
   }

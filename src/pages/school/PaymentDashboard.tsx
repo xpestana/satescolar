@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -71,7 +73,7 @@ export default function PaymentDashboard() {
     return Object.entries(map);
   }, [todayPayments]);
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><Loader2 className="animate-spin h-8 w-8 mx-auto mt-12" /></DashboardLayout>;
+  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   return (
     <DashboardLayout>
@@ -135,7 +137,7 @@ export default function PaymentDashboard() {
         <Card>
           <CardHeader><CardTitle className="text-sm">Últimos Pagos</CardTitle></CardHeader>
           <CardContent>
-            {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+            {isLoading ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
               <Table>
                 <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Estudiante</TableHead><TableHead>Monto</TableHead></TableRow></TableHeader>
                 <TableBody>

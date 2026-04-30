@@ -6,6 +6,7 @@ import { useClassroomConfig, type ClassroomAssignment } from "@/hooks/useClassro
 import { useTeacherData } from "@/hooks/useTeacherData";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Settings, MessageSquare, BookOpen, Calendar, Users, Loader2 } from "lucide-react";
@@ -58,9 +59,7 @@ export default function ClassroomDetail() {
   if (isLoading || !assignment) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <DashboardSkeleton />
       </DashboardLayout>
     );
   }

@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { useClassroomConfig, useUpsertClassroomConfig } from "@/hooks/useClassroomData";
 import { toast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { FormSkeleton } from "@/components/ui/loading-skeletons";
 
 interface Props {
   open: boolean;
@@ -68,9 +69,7 @@ export function ClassroomConfigModal({ open, onClose, assignmentId, schoolId, su
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <FormSkeleton fields={4} />
         ) : (
           <div className="space-y-5">
             <div>
