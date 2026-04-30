@@ -27,6 +27,7 @@ import {
 import { Pagination } from "@/components/ui/data-pagination";
 import { SchoolDetailsModal } from "@/components/admin/SchoolDetailsModal";
 import { supabase } from "@/integrations/supabase/client";
+import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;

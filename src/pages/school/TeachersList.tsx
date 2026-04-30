@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
+import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { useNavigate } from "react-router-dom";
 import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 import { toast } from "sonner";

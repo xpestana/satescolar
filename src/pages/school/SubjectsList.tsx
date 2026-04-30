@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Ban, CheckCircle, Loader2, BookOpen } from "lucide-react";
+import { TableSkeleton, DashboardSkeleton } from "@/components/ui/loading-skeletons";
 
 interface Subject {
   id: string;

@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
+import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { ViewTeacherModal } from "@/components/search/ViewTeacherModal";
 import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 import {

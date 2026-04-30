@@ -42,6 +42,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/data-pagination";
 import { supabase } from "@/integrations/supabase/client";
+import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { toast } from "sonner";
 
 const ITEMS_PER_PAGE = 10;
