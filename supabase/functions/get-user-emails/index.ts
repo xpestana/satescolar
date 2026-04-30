@@ -117,8 +117,9 @@ export default async function handler(req: Request): Promise<Response> {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error in get-user-emails:", error);
-    return new Response(JSON.stringify({ error: "Internal server error" }), {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[get-user-emails] Error:", message, error instanceof Error ? error.stack : undefined);
+    return new Response(JSON.stringify({ error: "Internal server error", detail: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
