@@ -1,3 +1,15 @@
+// Prevent SMTP/TLS internal errors from crashing the edge worker.
+if (typeof addEventListener === "function") {
+  addEventListener("unhandledrejection", (e: any) => {
+    console.error("[send-email] unhandledrejection swallowed:", e?.reason ?? e);
+    e?.preventDefault?.();
+  });
+  addEventListener("error", (e: any) => {
+    console.error("[send-email] uncaught error swallowed:", e?.error ?? e?.message ?? e);
+    e?.preventDefault?.();
+  });
+}
+
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
