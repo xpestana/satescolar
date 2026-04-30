@@ -71,7 +71,7 @@ export default function PaymentDashboard() {
     return Object.entries(map);
   }, [todayPayments]);
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><Loader2 className="animate-spin h-8 w-8 mx-auto mt-12" /></DashboardLayout>;
+  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   return (
     <DashboardLayout>

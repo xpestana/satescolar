@@ -170,7 +170,7 @@ export default function StudentLedger() {
     doc.save(`recibo_${payment.id.slice(0, 8)}.pdf`);
   };
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><Loader2 className="animate-spin h-8 w-8 mx-auto mt-12" /></DashboardLayout>;
+  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   return (
     <DashboardLayout>

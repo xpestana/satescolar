@@ -137,7 +137,7 @@ export default function DelinquentStudents() {
     return notifications.filter((n: any) => n.student_id === selectedStudentId);
   }, [selectedStudentId, notifications]);
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><Loader2 className="animate-spin h-8 w-8 mx-auto mt-12" /></DashboardLayout>;
+  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   return (
     <DashboardLayout>

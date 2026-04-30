@@ -421,7 +421,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
 export default function PaymentConfig() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><div className="flex justify-center py-12"><Loader2 className="animate-spin h-8 w-8" /></div></DashboardLayout>;
+  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   return (
     <DashboardLayout>
