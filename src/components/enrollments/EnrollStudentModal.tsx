@@ -196,20 +196,33 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!student.family_id,
   });
 
-  // Completeness check
-  const completeness = planillaSections.length > 0
-    ? checkStudentCompleteness(
-        planillaSections.map(s => ({ field_names: Array.isArray(s.field_names) ? s.field_names as string[] : [], section_type: s.section_type })),
-        student.form_data,
-        primaryRep?.form_data as Record<string, string> | null,
-        familyData as Record<string, any> | null,
-      )
-    : null;
+  // Completeness check based on required fields from saved forms
+  const isEmpty = (v: any) =>
+    v === null || v === undefined || (typeof v === "string" && !v.trim());
 
-  const hasStudentMissing = completeness ? completeness.missingStudentFields.length > 0 : false;
-  const hasRepMissing = completeness ? completeness.missingRepresentativeFields.length > 0 : false;
-  const hasFamilyMissing = completeness ? completeness.missingFamilyFields.length > 0 : false;
-  const isDataComplete = completeness ? completeness.isComplete : true;
+  const requiredStudent = allFormFields.filter(f => f.form_type === "student" && f.is_required && f.is_visible);
+  const requiredRep = allFormFields.filter(f => f.form_type === "representative" && f.is_required && f.is_visible);
+
+  const missingStudentFields = requiredStudent
+    .filter(f => isEmpty(student.form_data?.[f.field_name]))
+    .map(f => `student:${f.field_name}`);
+
+  const repFormData = (primaryRep?.form_data as Record<string, any> | null) || null;
+  const missingRepresentativeFields = primaryRep
+    ? requiredRep.filter(f => isEmpty(repFormData?.[f.field_name])).map(f => `representative:${f.field_name}`)
+    : [];
+
+  const completeness = {
+    isComplete: missingStudentFields.length === 0 && missingRepresentativeFields.length === 0,
+    missingStudentFields,
+    missingRepresentativeFields,
+    missingFamilyFields: [] as string[],
+  };
+
+  const hasStudentMissing = completeness.missingStudentFields.length > 0;
+  const hasRepMissing = completeness.missingRepresentativeFields.length > 0;
+  const hasFamilyMissing = false;
+  const isDataComplete = completeness.isComplete;
 
   const enrollMutation = useMutation({
     mutationFn: async () => {
