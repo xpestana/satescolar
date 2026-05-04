@@ -71,6 +71,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <InstallAppPrompt />
       <BrowserRouter>
         <AuthProvider>
           <SidebarProvider>
