@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { isEffectivelyRequired } from "@/lib/protected-fields";
 
 import { AlertTriangle, GraduationCap, Users, UserPen } from "lucide-react";
 
