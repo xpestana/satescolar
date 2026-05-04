@@ -2,21 +2,37 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Desregistrar cualquier service worker viejo (PWA) y limpiar cachés
-// para evitar que se sirva una versión desactualizada de la app.
-if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    registrations.forEach((registration) => {
-      registration.unregister().catch(() => {});
-    });
-  }).catch(() => {});
+// Limpieza agresiva de Service Workers / caches antiguos (PWA legacy).
+// Evita que la vista previa quede congelada en una versión vieja.
+if (typeof window !== "undefined") {
+  const RELOAD_FLAG = "__sw_cleanup_reloaded__";
 
-  if ("caches" in window) {
-    caches.keys().then((keys) => {
-      keys.forEach((key) => {
-        caches.delete(key).catch(() => {});
-      });
-    }).catch(() => {});
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker
+      .getRegistrations()
+      .then(async (registrations) => {
+        if (registrations.length === 0) return;
+        await Promise.all(
+          registrations.map((r) => r.unregister().catch(() => false))
+        );
+        if ("caches" in window) {
+          const keys = await caches.keys().catch(() => [] as string[]);
+          await Promise.all(keys.map((k) => caches.delete(k).catch(() => false)));
+        }
+        // Forzamos UNA recarga dura para soltar el bundle cacheado por el SW.
+        if (!sessionStorage.getItem(RELOAD_FLAG)) {
+          sessionStorage.setItem(RELOAD_FLAG, "1");
+          const url = new URL(window.location.href);
+          url.searchParams.set("sw-cleanup", Date.now().toString());
+          window.location.replace(url.toString());
+        }
+      })
+      .catch(() => {});
+  } else if ("caches" in window) {
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k).catch(() => false))))
+      .catch(() => {});
   }
 }
 
