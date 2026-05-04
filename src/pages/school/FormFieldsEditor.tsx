@@ -196,6 +196,11 @@ export default function FormFieldsEditor() {
     enabled: !!schoolId && isValidType,
   });
 
+  const displayFields = fields.map((field) => ({
+    ...field,
+    is_required: isEffectivelyRequired(formType, field.field_name, field.is_required),
+  }));
+
   // Fetch form field groups
   const { data: groups = [] } = useQuery({
     queryKey: ["form-field-groups", schoolId, formType],
@@ -351,13 +356,13 @@ export default function FormFieldsEditor() {
       return;
     }
 
-    const shouldPreserveRequiredValue = editingField && isProtectedField(formType, editingField.field_name);
+      const shouldPreserveRequiredValue = editingField && isProtectedField(formType, editingField.field_name);
     const fieldData = {
       field_name: fieldName.trim().toLowerCase().replace(/\s+/g, "_"),
       field_label: fieldLabel.trim(),
       field_type: fieldType,
       placeholder: placeholder.trim() || null,
-      is_required: shouldPreserveRequiredValue ? editingField.is_required : isRequired,
+      is_required: shouldPreserveRequiredValue ? fields.find((field) => field.id === editingField.id)?.is_required ?? false : isRequired,
       group_id: selectedGroupId,
     };
 
@@ -405,7 +410,7 @@ export default function FormFieldsEditor() {
   const editingFieldIsProtected = editingField ? isProtectedField(formType, editingField.field_name) : false;
 
   // Compute fields count per group
-  const fieldsCountByGroup = fields.reduce((acc, field) => {
+  const fieldsCountByGroup = displayFields.reduce((acc, field) => {
     if (field.group_id) {
       acc[field.group_id] = (acc[field.group_id] || 0) + 1;
     }
@@ -458,17 +463,16 @@ export default function FormFieldsEditor() {
                     Cargando...
                   </TableCell>
                 </TableRow>
-              ) : fields.length === 0 ? (
+              ) : displayFields.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No hay campos configurados. Haz clic en "Agregar Campo" para comenzar.
                   </TableCell>
                 </TableRow>
               ) : (
-                fields.map((field, index) => {
+                displayFields.map((field, index) => {
                   const TypeIcon = getFieldTypeIcon(field.field_type);
                   const isProtected = isProtectedField(formType, field.field_name);
-                  const isRequiredForUi = isEffectivelyRequired(formType, field.field_name, field.is_required);
                   return (
                     <TableRow key={field.id} className={!field.is_visible ? "opacity-50" : ""}>
                       <TableCell>
@@ -502,7 +506,7 @@ export default function FormFieldsEditor() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {isRequiredForUi ? (
+                        {field.is_required ? (
                           <Badge variant="default" className="bg-primary">Sí</Badge>
                         ) : (
                           <Badge variant="outline">No</Badge>
