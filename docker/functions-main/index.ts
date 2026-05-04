@@ -8,6 +8,7 @@ import deleteUser from "../delete-user/index.ts";
 import fetchBcvRates from "../fetch-bcv-rates/index.ts";
 import getUserEmails from "../get-user-emails/index.ts";
 import impersonateUser from "../impersonate-user/index.ts";
+import manageSchoolSubuser from "../manage-school-subuser/index.ts";
 import recordAttendance from "../record-attendance/index.ts";
 import resendWelcomeEmail from "../resend-welcome-email/index.ts";
 import s3MigrateExisting from "../s3-migrate-existing/index.ts";
@@ -29,6 +30,7 @@ const staticHandlers: Record<string, (req: Request) => Promise<Response>> = {
   "fetch-bcv-rates": (req) => fetchBcvRates(req),
   "get-user-emails": (req) => getUserEmails(req),
   "impersonate-user": (req) => impersonateUser(req),
+  "manage-school-subuser": (req) => manageSchoolSubuser(req),
   "record-attendance": (req) => recordAttendance(req),
   "resend-welcome-email": (req) => resendWelcomeEmail(req),
   "s3-migrate-existing": (req) => s3MigrateExisting(req),
