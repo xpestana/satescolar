@@ -351,12 +351,13 @@ export default function FormFieldsEditor() {
       return;
     }
 
+    const shouldPreserveRequiredValue = editingField && isProtectedField(formType, editingField.field_name);
     const fieldData = {
       field_name: fieldName.trim().toLowerCase().replace(/\s+/g, "_"),
       field_label: fieldLabel.trim(),
       field_type: fieldType,
       placeholder: placeholder.trim() || null,
-      is_required: isRequired,
+      is_required: shouldPreserveRequiredValue ? editingField.is_required : isRequired,
       group_id: selectedGroupId,
     };
 
@@ -401,6 +402,7 @@ export default function FormFieldsEditor() {
   ];
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const editingFieldIsProtected = editingField ? isProtectedField(formType, editingField.field_name) : false;
 
   // Compute fields count per group
   const fieldsCountByGroup = fields.reduce((acc, field) => {
@@ -612,7 +614,8 @@ export default function FormFieldsEditor() {
                   <div className="flex items-center gap-2 pt-8">
                     <Checkbox
                       id="is_required_edit"
-                      checked={isRequired}
+                      checked={editingFieldIsProtected || isRequired}
+                      disabled={editingFieldIsProtected}
                       onCheckedChange={(checked) => setIsRequired(checked as boolean)}
                     />
                     <Label htmlFor="is_required_edit" className="cursor-pointer">Requerido</Label>
