@@ -133,15 +133,15 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!schoolId,
   });
 
-  // Fetch student form fields to know labels
-  const { data: formFields = [] } = useQuery({
-    queryKey: ["student-form-fields", schoolId],
+  // Fetch ALL form fields (student + representative) — used for labels and required validation
+  const { data: allFormFields = [] } = useQuery({
+    queryKey: ["all-form-fields-enroll", schoolId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("form_fields")
-        .select("field_name, field_label")
+        .select("field_name, field_label, form_type, is_required, is_visible")
         .eq("school_id", schoolId)
-        .eq("form_type", "student")
+        .in("form_type", ["student", "representative"])
         .order("field_order");
       if (error) throw error;
       return data;
@@ -149,15 +149,16 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!schoolId,
   });
 
-  // Fetch planilla sections for completeness validation
+  const formFields = allFormFields.filter(f => f.form_type === "student");
+
+  // Fetch planilla sections only to detect "Observaciones" section visibility
   const { data: planillaSections = [] } = useQuery({
     queryKey: ["enrollment-planilla-sections", schoolId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("enrollment_planilla_sections")
-        .select("*")
-        .eq("school_id", schoolId)
-        .order("display_order");
+        .select("title")
+        .eq("school_id", schoolId);
       if (error) throw error;
       return data;
     },
