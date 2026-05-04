@@ -15,75 +15,105 @@ interface PageHeaderProps {
 }
 
 // Diccionario de descripciones persuasivas por título.
-// Se utiliza como fallback cuando una página no envía `description`.
-const DESCRIPTIONS: Record<string, string> = {
-  // Registros
-  "Docentes": "Gestiona tu equipo educativo, asigna materias y mantén toda la información de tus profesores en un solo lugar.",
-  "Mis Materias": "Accede rápidamente a todas tus materias asignadas y comienza a planificar clases en segundos.",
-  "Registro de Notas": "Califica con precisión y agilidad. Tus estudiantes y representantes verán los resultados al instante.",
-  "Mi Carnet": "Tu identificación digital institucional, siempre disponible y lista para descargar.",
-  "Mis Estudiantes": "Mantente al día con el progreso académico de tus representados desde un único panel.",
-  "Mis Representantes": "Administra los datos familiares y mantén la comunicación con el colegio fluida y centralizada.",
-  "Estudiantes": "Visualiza, organiza y actualiza la información de cada estudiante con total facilidad.",
-  "Familias": "Gestiona los núcleos familiares y mantén actualizada la información de contacto de cada hogar.",
-  "Inscripciones": "Centraliza el proceso de inscripción y haz seguimiento del estatus de cada estudiante en tiempo real.",
-  "Búsqueda Avanzada": "Encuentra cualquier dato del colegio en segundos con filtros inteligentes y precisos.",
+// Se evalúa en orden y aplica coincidencia parcial (title.includes(key)),
+// por eso las claves más específicas deben ir primero.
+const DESCRIPTIONS: Array<[string, string]> = [
+  // Registros y gestión académica
+  ["Agregar Docente", "Suma un nuevo docente a tu equipo y déjalo listo para impartir clases desde el primer día."],
+  ["Editar Docente", "Mantén actualizada la ficha profesional de cada docente para una gestión impecable."],
+  ["Docentes", "Gestiona tu equipo educativo, asigna materias y mantén toda la información de tus profesores en un solo lugar."],
+  ["Mis Materias Asignadas", "Resumen de las materias que tienes asignadas este período."],
+  ["Mis Materias", "Accede rápidamente a todas tus materias asignadas y comienza a planificar clases en segundos."],
+  ["Registro de Notas", "Califica con precisión y agilidad. Tus estudiantes y representantes verán los resultados al instante."],
+  ["Mi Carnet", "Tu identificación digital institucional, siempre disponible y lista para descargar."],
+  ["Mis Estudiantes", "Mantente al día con el progreso académico de tus representados desde un único panel."],
+  ["Mis Representantes", "Administra los datos familiares y mantén la comunicación con el colegio fluida y centralizada."],
+  ["Familias Registradas", "Total de familias activas en tu institución."],
+  ["Representantes Totales", "Cantidad de representantes vinculados a tus familias."],
+  ["Estudiantes Totales", "Cantidad total de estudiantes activos en el colegio."],
+  ["Estudiantes Inscritos", "Resumen de tu población estudiantil activa."],
+  ["Docentes Activos", "Equipo docente actualmente en funciones."],
+  ["Docentes Registrados", "Total histórico de docentes registrados en tu institución."],
+  ["Áreas Asignadas", "Materias actualmente asignadas a docentes y secciones."],
+  ["Alumnos en el Sistema", "Conteo global de alumnos registrados en la plataforma."],
+  ["Editar Familia", "Actualiza los datos del núcleo familiar y mantén la información siempre al día."],
+  ["Datos de Familia", "Revisa y actualiza tus datos familiares para mantener una comunicación efectiva con el colegio."],
+  ["Familia ", "Bienvenido a tu portal familiar. Toda la información de tus representados, en un solo lugar."],
+  ["Familia", "Gestiona los datos del núcleo familiar y mantén la información actualizada."],
+  ["Familias", "Gestiona los núcleos familiares y mantén actualizada la información de contacto de cada hogar."],
+  ["Agregar Representante", "Registra un nuevo representante y vincúlalo a su familia en pocos pasos."],
+  ["Editar Representante", "Actualiza la información del representante para mantener una comunicación efectiva."],
+  ["Agregar Estudiante", "Registra un nuevo estudiante y comienza su historia académica con buen pie."],
+  ["Editar Estudiante", "Actualiza los datos académicos y personales del estudiante con total seguridad."],
+  ["Estudiantes Morosos", "Detecta a tiempo los casos morosos y actúa con información financiera precisa."],
+  ["Estudiantes", "Visualiza, organiza y actualiza la información de cada estudiante con total facilidad."],
+  ["Inscripciones", "Centraliza el proceso de inscripción y haz seguimiento del estatus de cada estudiante en tiempo real."],
+  ["Búsqueda Avanzada", "Encuentra cualquier dato del colegio en segundos con filtros inteligentes y precisos."],
 
-  // Administrativo
-  "Dashboard de Pagos": "Visualiza la salud financiera del colegio con métricas claras y reportes en tiempo real.",
-  "Registro de Pagos": "Procesa pagos rápidamente y entrega comprobantes profesionales sin complicaciones.",
-  "Configuración de Pagos": "Define conceptos, planes y reglas que se adaptan al modelo financiero de tu institución.",
-  "Configuración de Morosidad": "Automatiza el seguimiento de cuentas vencidas y mantén la cobranza siempre al día.",
-  "Estudiantes Morosos": "Detecta a tiempo los casos morosos y actúa con información financiera precisa.",
-  "Estado de Cuenta": "Muestra de forma transparente el estado financiero de cada familia, pago a pago.",
+  // Administrativo / pagos
+  ["Dashboard de Pagos", "Visualiza la salud financiera del colegio con métricas claras y reportes en tiempo real."],
+  ["Registro de Pagos", "Procesa pagos rápidamente y entrega comprobantes profesionales sin complicaciones."],
+  ["Configuración de Pagos", "Define conceptos, planes y reglas que se adaptan al modelo financiero de tu institución."],
+  ["Configuración de Morosidad", "Automatiza el seguimiento de cuentas vencidas y mantén la cobranza siempre al día."],
+  ["Estado de Cuenta", "Muestra de forma transparente el estado financiero de cada familia, pago a pago."],
 
   // Académico
-  "Materias": "Diseña tu malla curricular y mantén ordenadas todas las áreas de conocimiento del colegio.",
-  "Asignación de Materias": "Asigna materias a docentes y secciones de manera ágil y sin errores.",
-  "Configuraciones": "Centraliza la configuración académica de tu institución en un panel intuitivo.",
-  "Ajustes de Evaluación": "Configura escalas, períodos y criterios de evaluación según el nivel educativo.",
-  "Sábana de Notas": "Visualiza el rendimiento global de cada sección y genera reportes oficiales en un clic.",
-  "Consulta de Notas": "Consulta rápidamente las calificaciones de cualquier estudiante o sección.",
-  "Supervisión de Aulas Virtuales": "Monitorea la actividad académica de tus aulas en tiempo real.",
+  ["Áreas / Materias", "Diseña tu malla curricular y mantén ordenadas todas las áreas de conocimiento del colegio."],
+  ["Asignación de Áreas", "Asigna áreas y materias a docentes y secciones de manera ágil y sin errores."],
+  ["Asignación de Materias", "Asigna materias a docentes y secciones de manera ágil y sin errores."],
+  ["Materias", "Diseña tu malla curricular y mantén ordenadas todas las áreas de conocimiento del colegio."],
+  ["Ajustes de Evaluación", "Configura escalas, períodos y criterios de evaluación según el nivel educativo."],
+  ["Ajustes de Notas", "Define la estructura de evaluación y calificaciones para cada nivel del colegio."],
+  ["Sábana de Notas", "Visualiza el rendimiento global de cada sección y genera reportes oficiales en un clic."],
+  ["Consulta de Notas y Boletas", "Consulta calificaciones, descarga boletas y comparte resultados oficiales en segundos."],
+  ["Consulta de Notas", "Consulta rápidamente las calificaciones de cualquier estudiante o sección."],
+  ["Supervisión de Aulas Virtuales", "Monitorea la actividad académica de tus aulas en tiempo real."],
 
   // Asistencia
-  "Escáner QR": "Registra la asistencia diaria al instante con la tecnología de escaneo QR.",
-  "Asistencia": "Lleva un control preciso de la asistencia y comparte reportes con representantes automáticamente.",
+  ["Escáner QR", "Registra la asistencia diaria al instante con la tecnología de escaneo QR."],
+  ["Asistencias", "Lleva un control preciso de la asistencia y comparte reportes con representantes automáticamente."],
+  ["Asistencia", "Lleva un control preciso de la asistencia y comparte reportes con representantes automáticamente."],
 
-  // Configuración
-  "Configuraciones - Formularios": "Personaliza los formularios del colegio para capturar exactamente la información que necesitas.",
-  "Constructor de Planillas": "Diseña planillas y certificados oficiales con un editor visual potente y flexible.",
-  "Usuarios y Permisos": "Crea usuarios escolares y otorga permisos granulares para que cada quien acceda solo a lo necesario.",
-  "Nuevo Usuario Escolar": "Suma a tu equipo y define exactamente lo que cada usuario podrá ver y hacer.",
-  "Editar Usuario": "Actualiza accesos, perfiles y permisos de tus usuarios escolares en cualquier momento.",
-  "Nuevo Perfil de Permiso": "Diseña perfiles de acceso a la medida de cada rol dentro del colegio.",
-  "Editar Perfil": "Ajusta los permisos del perfil para reflejar las responsabilidades reales de tu equipo.",
-  "Configuración de Inscripción": "Define qué campos verá cada familia durante el proceso de inscripción.",
-  "Utilidades": "Herramientas adicionales para potenciar la gestión diaria de tu institución.",
-  "Carnets": "Genera carnets institucionales profesionales para todo tu colegio en pocos pasos.",
+  // Configuración del colegio
+  ["Configuración de Planillas", "Personaliza qué información mostrar en las planillas oficiales de inscripción."],
+  ["Configuraciones - Formularios", "Personaliza los formularios del colegio para capturar exactamente la información que necesitas."],
+  ["Constructor de Planillas", "Diseña planillas y certificados oficiales con un editor visual potente y flexible."],
+  ["Planillas", "Genera planillas y certificados oficiales listos para imprimir o enviar."],
+  ["Usuarios y Permisos", "Crea usuarios escolares y otorga permisos granulares para que cada quien acceda solo a lo necesario."],
+  ["Nuevo Usuario Escolar", "Suma a tu equipo y define exactamente lo que cada usuario podrá ver y hacer."],
+  ["Editar Usuario", "Actualiza accesos, perfiles y permisos de tus usuarios escolares en cualquier momento."],
+  ["Nuevo Perfil de Permiso", "Diseña perfiles de acceso a la medida de cada rol dentro del colegio."],
+  ["Editar Perfil", "Ajusta los permisos del perfil para reflejar las responsabilidades reales de tu equipo."],
+  ["Utilidades", "Herramientas adicionales para potenciar la gestión diaria de tu institución."],
+  ["Carnets", "Genera carnets institucionales profesionales para todo tu colegio en pocos pasos."],
+  ["Correos Electrónicos", "Envía comunicaciones masivas y mantén informada a toda tu comunidad educativa."],
+  ["Configuraciones", "Centraliza la configuración académica y administrativa de tu institución."],
 
   // Admin general
-  "Colegios": "Administra todas las instituciones de la plataforma desde un único panel centralizado.",
-  "Crear Colegio": "Da de alta un nuevo colegio y déjalo listo para operar en minutos.",
-  "Editar Colegio": "Actualiza la información institucional y los datos clave del colegio.",
-  "Usuarios": "Gestiona todos los usuarios de la plataforma de forma segura y centralizada.",
-  "Administradores del Sistema": "Controla quién tiene acceso administrativo total a la plataforma.",
-  "Enviar Email": "Comunícate masivamente con familias, docentes o personal con plantillas profesionales.",
+  ["Crear Colegio", "Da de alta un nuevo colegio y déjalo listo para operar en minutos."],
+  ["Editar Colegio", "Actualiza la información institucional y los datos clave del colegio."],
+  ["Colegios", "Administra todas las instituciones de la plataforma desde un único panel centralizado."],
+  ["Administradores del Sistema", "Controla quién tiene acceso administrativo total a la plataforma."],
+  ["Usuarios", "Gestiona todos los usuarios de la plataforma de forma segura y centralizada."],
+  ["Eventos", "Resumen de actividad reciente registrada en la plataforma."],
+  ["Enviar Email", "Comunícate masivamente con familias, docentes o personal con plantillas profesionales."],
+  ["Prueba de subida a S3", "Herramienta interna para validar la subida de archivos al almacenamiento."],
+  ["Rol", "Tu rol activo dentro de la plataforma."],
 
   // Aula virtual
-  "Aula Virtual": "Espacio digital donde docentes, estudiantes y familias se conectan con el aprendizaje.",
+  ["Aula Virtual", "Espacio digital donde docentes, estudiantes y familias se conectan con el aprendizaje."],
+];
 
-  // Periodos
-  "Períodos y Secciones": "Organiza años escolares, niveles y secciones para mantener tu colegio operando con orden.",
-};
+function lookupDescription(title: string): string | undefined {
+  for (const [key, desc] of DESCRIPTIONS) {
+    if (title === key || title.includes(key)) return desc;
+  }
+  return undefined;
+}
 
 function getDescription(title: string, custom?: string) {
   if (custom) return custom;
-  // Coincidencia parcial por si el título incluye sufijos dinámicos
-  const exact = DESCRIPTIONS[title];
-  if (exact) return exact;
-  const partial = Object.keys(DESCRIPTIONS).find((k) => title.includes(k));
-  return partial ? DESCRIPTIONS[partial] : undefined;
+  return lookupDescription(title);
 }
 
 export function PageHeader({ title, breadcrumbs, imageUrl, description }: PageHeaderProps) {
