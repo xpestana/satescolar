@@ -196,7 +196,7 @@ export default function FormFieldsEditor() {
     enabled: !!schoolId && isValidType,
   });
 
-  const displayFields = fields.map((field) => ({
+  const displayFields: FormField[] = fields.map((field) => ({
     ...field,
     is_required: isEffectivelyRequired(formType, field.field_name, field.is_required),
   }));
@@ -328,12 +328,13 @@ export default function FormFieldsEditor() {
   };
 
   const openEditModal = (field: FormField) => {
+    const effectiveRequired = isEffectivelyRequired(formType, field.field_name, field.is_required);
     setEditingField(field);
     setFieldLabel(field.field_label);
     setFieldName(field.field_name);
     setFieldType(field.field_type);
     setPlaceholder(field.placeholder || "");
-    setIsRequired(field.is_required);
+    setIsRequired(effectiveRequired);
     setSelectedGroupId(field.group_id);
     setIsModalOpen(true);
   };
@@ -356,13 +357,14 @@ export default function FormFieldsEditor() {
       return;
     }
 
-      const shouldPreserveRequiredValue = editingField && isProtectedField(formType, editingField.field_name);
+    const normalizedFieldName = fieldName.trim().toLowerCase().replace(/\s+/g, "_");
+    const fieldIsProtected = isProtectedField(formType, normalizedFieldName);
     const fieldData = {
-      field_name: fieldName.trim().toLowerCase().replace(/\s+/g, "_"),
+      field_name: normalizedFieldName,
       field_label: fieldLabel.trim(),
       field_type: fieldType,
       placeholder: placeholder.trim() || null,
-      is_required: shouldPreserveRequiredValue ? fields.find((field) => field.id === editingField.id)?.is_required ?? false : isRequired,
+      is_required: fieldIsProtected || isRequired,
       group_id: selectedGroupId,
     };
 
