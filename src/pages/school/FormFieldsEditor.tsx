@@ -66,19 +66,10 @@ import {
   FolderOpen
 } from "lucide-react";
 import { FormGroupsManager } from "@/components/forms/FormGroupsManager";
+import { isEffectivelyRequired, isProtectedField } from "@/lib/protected-fields";
 
 type FormType = "representative" | "student" | "teacher";
 type FieldType = "text" | "email" | "phone" | "number" | "date" | "select" | "textarea" | "checkbox" | "file";
-
-// Core fields that cannot be deleted per form type
-const PROTECTED_FIELDS: { [key in FormType]: string[] } = {
-  representative: ["primer_nombre", "primer_apellido", "documento"],
-  student: ["primer_nombre", "primer_apellido", "documento", "fecha_nacimiento"],
-  teacher: [
-    "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
-    "documento", "fecha_nacimiento", "email", "correo_electronico",
-  ],
-};
 
 interface FormField {
   id: string;
@@ -360,12 +351,13 @@ export default function FormFieldsEditor() {
       return;
     }
 
+    const shouldPreserveRequiredValue = editingField && isProtectedField(formType, editingField.field_name);
     const fieldData = {
       field_name: fieldName.trim().toLowerCase().replace(/\s+/g, "_"),
       field_label: fieldLabel.trim(),
       field_type: fieldType,
       placeholder: placeholder.trim() || null,
-      is_required: isRequired,
+      is_required: shouldPreserveRequiredValue ? editingField.is_required : isRequired,
       group_id: selectedGroupId,
     };
 
@@ -410,6 +402,7 @@ export default function FormFieldsEditor() {
   ];
 
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const editingFieldIsProtected = editingField ? isProtectedField(formType, editingField.field_name) : false;
 
   // Compute fields count per group
   const fieldsCountByGroup = fields.reduce((acc, field) => {
@@ -474,7 +467,8 @@ export default function FormFieldsEditor() {
               ) : (
                 fields.map((field, index) => {
                   const TypeIcon = getFieldTypeIcon(field.field_type);
-                  const isProtected = PROTECTED_FIELDS[formType]?.includes(field.field_name);
+                  const isProtected = isProtectedField(formType, field.field_name);
+                  const isRequiredForUi = isEffectivelyRequired(formType, field.field_name, field.is_required);
                   return (
                     <TableRow key={field.id} className={!field.is_visible ? "opacity-50" : ""}>
                       <TableCell>
@@ -508,7 +502,7 @@ export default function FormFieldsEditor() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {field.is_required ? (
+                        {isRequiredForUi ? (
                           <Badge variant="default" className="bg-primary">Sí</Badge>
                         ) : (
                           <Badge variant="outline">No</Badge>
@@ -620,7 +614,8 @@ export default function FormFieldsEditor() {
                   <div className="flex items-center gap-2 pt-8">
                     <Checkbox
                       id="is_required_edit"
-                      checked={isRequired}
+                      checked={editingFieldIsProtected || isRequired}
+                      disabled={editingFieldIsProtected}
                       onCheckedChange={(checked) => setIsRequired(checked as boolean)}
                     />
                     <Label htmlFor="is_required_edit" className="cursor-pointer">Requerido</Label>
