@@ -196,6 +196,11 @@ export default function FormFieldsEditor() {
     enabled: !!schoolId && isValidType,
   });
 
+  const displayFields = fields.map((field) => ({
+    ...field,
+    is_required: isEffectivelyRequired(formType, field.field_name, field.is_required),
+  }));
+
   // Fetch form field groups
   const { data: groups = [] } = useQuery({
     queryKey: ["form-field-groups", schoolId, formType],
@@ -351,13 +356,13 @@ export default function FormFieldsEditor() {
       return;
     }
 
-    const shouldPreserveRequiredValue = editingField && isProtectedField(formType, editingField.field_name);
+      const shouldPreserveRequiredValue = editingField && isProtectedField(formType, editingField.field_name);
     const fieldData = {
       field_name: fieldName.trim().toLowerCase().replace(/\s+/g, "_"),
       field_label: fieldLabel.trim(),
       field_type: fieldType,
       placeholder: placeholder.trim() || null,
-      is_required: shouldPreserveRequiredValue ? editingField.is_required : isRequired,
+      is_required: shouldPreserveRequiredValue ? fields.find((field) => field.id === editingField.id)?.is_required ?? false : isRequired,
       group_id: selectedGroupId,
     };
 
