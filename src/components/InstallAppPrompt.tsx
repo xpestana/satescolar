@@ -68,20 +68,32 @@ export const InstallAppPrompt = () => {
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
             <Download className="h-6 w-6 text-primary" />
           </div>
-          <DialogTitle className="text-center">Instalar SAT Escolar</DialogTitle>
-          <DialogDescription className="text-center">
-            Instala la aplicación en tu dispositivo para acceder más rápido,
-            con un ícono propio y sin la barra del navegador.
+          <DialogTitle className="text-center text-xl">
+            ¡Lleva SAT Escolar contigo!
+          </DialogTitle>
+          <DialogDescription className="text-center space-y-2">
+            <span className="block">
+              Ahora puedes instalar la app en tu dispositivo y gestionar tu
+              colegio desde un solo toque, como una aplicación nativa.
+            </span>
+            <span className="block font-medium text-foreground">
+              Descárgala ahora y disfruta de:
+            </span>
+            <span className="block text-left mx-auto max-w-xs">
+              ⚡ Acceso instantáneo desde tu pantalla de inicio<br />
+              🚀 Mayor velocidad y mejor rendimiento<br />
+              🧭 Navegación sin distracciones del navegador<br />
+              🔔 Lista para futuras notificaciones
+            </span>
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="sm:justify-center gap-2">
           <Button variant="outline" onClick={handleDismiss}>
-            <X className="mr-2 h-4 w-4" />
-            Ahora no
+            Quizás luego
           </Button>
-          <Button onClick={handleInstall}>
+          <Button onClick={handleInstall} className="font-semibold">
             <Download className="mr-2 h-4 w-4" />
-            Instalar
+            Instalar ahora
           </Button>
         </DialogFooter>
       </DialogContent>
