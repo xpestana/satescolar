@@ -21,18 +21,6 @@ export default async function handler(req: Request): Promise<Response> {
 
     const token = authHeader.replace("Bearer ", "");
 
-    const supabaseUser = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: authHeader } },
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
-
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
@@ -44,12 +32,13 @@ export default async function handler(req: Request): Promise<Response> {
       }
     );
 
-    // ES256-compatible JWT validation for signing-keys projects
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-    const requestingUserId = claimsData?.claims?.sub;
+    // VPS-compatible JWT validation: getClaims() can fall back to session-based auth
+    // in self-hosted runtimes, which raises AuthSessionMissingError.
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+    const requestingUserId = userData?.user?.id;
 
-    if (claimsError || !requestingUserId) {
-      console.error("Invalid token claims", claimsError);
+    if (userError || !requestingUserId) {
+      console.error("Invalid token", userError);
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
