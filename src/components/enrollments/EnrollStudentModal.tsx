@@ -16,7 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { checkStudentCompleteness, ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
+
 import { AlertTriangle, GraduationCap, Users, UserPen } from "lucide-react";
 
 const GRADE_LABELS: Record<string, string> = {
@@ -133,15 +133,15 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!schoolId,
   });
 
-  // Fetch student form fields to know labels
-  const { data: formFields = [] } = useQuery({
-    queryKey: ["student-form-fields", schoolId],
+  // Fetch ALL form fields (student + representative) — used for labels and required validation
+  const { data: allFormFields = [] } = useQuery({
+    queryKey: ["all-form-fields-enroll", schoolId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("form_fields")
-        .select("field_name, field_label")
+        .select("field_name, field_label, form_type, is_required, is_visible")
         .eq("school_id", schoolId)
-        .eq("form_type", "student")
+        .in("form_type", ["student", "representative"])
         .order("field_order");
       if (error) throw error;
       return data;
@@ -149,15 +149,16 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!schoolId,
   });
 
-  // Fetch planilla sections for completeness validation
+  const formFields = allFormFields.filter(f => f.form_type === "student");
+
+  // Fetch planilla sections only to detect "Observaciones" section visibility
   const { data: planillaSections = [] } = useQuery({
     queryKey: ["enrollment-planilla-sections", schoolId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("enrollment_planilla_sections")
-        .select("*")
-        .eq("school_id", schoolId)
-        .order("display_order");
+        .select("title")
+        .eq("school_id", schoolId);
       if (error) throw error;
       return data;
     },
@@ -180,35 +181,34 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!student.family_id,
   });
 
-  // Fetch family data
-  const { data: familyData } = useQuery({
-    queryKey: ["family-data-modal", student.family_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("families")
-        .select("*")
-        .eq("id", student.family_id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!student.family_id,
-  });
 
-  // Completeness check
-  const completeness = planillaSections.length > 0
-    ? checkStudentCompleteness(
-        planillaSections.map(s => ({ field_names: Array.isArray(s.field_names) ? s.field_names as string[] : [], section_type: s.section_type })),
-        student.form_data,
-        primaryRep?.form_data as Record<string, string> | null,
-        familyData as Record<string, any> | null,
-      )
-    : null;
+  // Completeness check based on required fields from saved forms
+  const isEmpty = (v: any) =>
+    v === null || v === undefined || (typeof v === "string" && !v.trim());
 
-  const hasStudentMissing = completeness ? completeness.missingStudentFields.length > 0 : false;
-  const hasRepMissing = completeness ? completeness.missingRepresentativeFields.length > 0 : false;
-  const hasFamilyMissing = completeness ? completeness.missingFamilyFields.length > 0 : false;
-  const isDataComplete = completeness ? completeness.isComplete : true;
+  const requiredStudent = allFormFields.filter(f => f.form_type === "student" && f.is_required && f.is_visible);
+  const requiredRep = allFormFields.filter(f => f.form_type === "representative" && f.is_required && f.is_visible);
+
+  const missingStudentFields = requiredStudent
+    .filter(f => isEmpty(student.form_data?.[f.field_name]))
+    .map(f => `student:${f.field_name}`);
+
+  const repFormData = (primaryRep?.form_data as Record<string, any> | null) || null;
+  const missingRepresentativeFields = primaryRep
+    ? requiredRep.filter(f => isEmpty(repFormData?.[f.field_name])).map(f => `representative:${f.field_name}`)
+    : [];
+
+  const completeness = {
+    isComplete: missingStudentFields.length === 0 && missingRepresentativeFields.length === 0,
+    missingStudentFields,
+    missingRepresentativeFields,
+    missingFamilyFields: [] as string[],
+  };
+
+  const hasStudentMissing = completeness.missingStudentFields.length > 0;
+  const hasRepMissing = completeness.missingRepresentativeFields.length > 0;
+  const hasFamilyMissing = false;
+  const isDataComplete = completeness.isComplete;
 
   const enrollMutation = useMutation({
     mutationFn: async () => {
@@ -279,11 +279,9 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
   const resolveLabel = (prefixed: string) => {
     const [type, ...rest] = prefixed.split(":");
     const name = rest.join(":");
-    if (type === "student") return formFields.find(f => f.field_name === name)?.field_label || name;
-    if (type === "custom") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    if (type === "representative") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    if (type === "family") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    return name;
+    const match = allFormFields.find(f => f.form_type === type && f.field_name === name);
+    if (match?.field_label) return match.field_label;
+    return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   };
 
   return (
