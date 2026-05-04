@@ -465,7 +465,8 @@ export default function FormFieldsEditor() {
               ) : (
                 fields.map((field, index) => {
                   const TypeIcon = getFieldTypeIcon(field.field_type);
-                  const isProtected = PROTECTED_FIELDS[formType]?.includes(field.field_name);
+                  const isProtected = isProtectedField(formType, field.field_name);
+                  const isRequiredForUi = isEffectivelyRequired(formType, field.field_name, field.is_required);
                   return (
                     <TableRow key={field.id} className={!field.is_visible ? "opacity-50" : ""}>
                       <TableCell>
@@ -499,7 +500,7 @@ export default function FormFieldsEditor() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {field.is_required ? (
+                        {isRequiredForUi ? (
                           <Badge variant="default" className="bg-primary">Sí</Badge>
                         ) : (
                           <Badge variant="outline">No</Badge>
