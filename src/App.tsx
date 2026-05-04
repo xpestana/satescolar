@@ -60,6 +60,7 @@ import StudentLedger from "./pages/school/StudentLedger";
 import DelinquentStudents from "./pages/school/DelinquentStudents";
 import DelinquencyConfig from "./pages/school/DelinquencyConfig";
 import NotFound from "./pages/NotFound";
+import { InstallAppPrompt } from "@/components/InstallAppPrompt";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1 } },
