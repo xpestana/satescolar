@@ -66,19 +66,10 @@ import {
   FolderOpen
 } from "lucide-react";
 import { FormGroupsManager } from "@/components/forms/FormGroupsManager";
+import { isEffectivelyRequired, isProtectedField } from "@/lib/protected-fields";
 
 type FormType = "representative" | "student" | "teacher";
 type FieldType = "text" | "email" | "phone" | "number" | "date" | "select" | "textarea" | "checkbox" | "file";
-
-// Core fields that cannot be deleted per form type
-const PROTECTED_FIELDS: { [key in FormType]: string[] } = {
-  representative: ["primer_nombre", "primer_apellido", "documento"],
-  student: ["primer_nombre", "primer_apellido", "documento", "fecha_nacimiento"],
-  teacher: [
-    "primer_nombre", "segundo_nombre", "primer_apellido", "segundo_apellido",
-    "documento", "fecha_nacimiento", "email", "correo_electronico",
-  ],
-};
 
 interface FormField {
   id: string;
