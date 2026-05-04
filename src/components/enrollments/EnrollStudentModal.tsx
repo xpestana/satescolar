@@ -181,20 +181,6 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!student.family_id,
   });
 
-  // Fetch family data
-  const { data: familyData } = useQuery({
-    queryKey: ["family-data-modal", student.family_id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("families")
-        .select("*")
-        .eq("id", student.family_id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!student.family_id,
-  });
 
   // Completeness check based on required fields from saved forms
   const isEmpty = (v: any) =>
