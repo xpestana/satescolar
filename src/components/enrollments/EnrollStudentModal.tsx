@@ -432,35 +432,30 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          {completeness && !isDataComplete ? (
-            <div className="flex gap-2">
-              {hasStudentMissing && (
-                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/estudiante/${student.id}/editar`; }}>
-                  <GraduationCap className="h-4 w-4" />
-                  Modificar Estudiante
-                </Button>
-              )}
-              {hasRepMissing && (
-                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/representante/${primaryRep?.id}/editar`; }}>
-                  <UserPen className="h-4 w-4" />
-                  Modificar Representante
-                </Button>
-              )}
-              {hasFamilyMissing && (
-                <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/editar`; }}>
-                  <Users className="h-4 w-4" />
-                  Modificar Familia
-                </Button>
-              )}
-            </div>
-          ) : (
-            <Button
-              onClick={() => enrollMutation.mutate()}
-              disabled={!selectedSectionId || !enrollmentType || enrollMutation.isPending}
-            >
-              {enrollMutation.isPending ? "Inscribiendo..." : student.isEnrolled ? "Actualizar Inscripción" : "Inscribir"}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/estudiante/${student.id}/editar`; }}>
+              <GraduationCap className="h-4 w-4" />
+              Modificar Estudiante
             </Button>
-          )}
+            {primaryRep && (
+              <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/representante/${primaryRep.id}/editar`; }}>
+                <UserPen className="h-4 w-4" />
+                Modificar Representante
+              </Button>
+            )}
+            <Button variant="secondary" size="sm" className="gap-1" onClick={() => { onOpenChange(false); window.location.href = `/registros/familias/${student.family_id}/editar`; }}>
+              <Users className="h-4 w-4" />
+              Modificar Familia
+            </Button>
+            {isDataComplete && (
+              <Button
+                onClick={() => enrollMutation.mutate()}
+                disabled={!selectedSectionId || !enrollmentType || enrollMutation.isPending}
+              >
+                {enrollMutation.isPending ? "Inscribiendo..." : student.isEnrolled ? "Actualizar Inscripción" : "Inscribir"}
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
