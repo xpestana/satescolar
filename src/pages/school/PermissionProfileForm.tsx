@@ -20,7 +20,7 @@ interface PermKey {
   supports_scope: boolean;
 }
 
-interface SchoolYear { id: string; name: string; }
+interface SchoolYear { id: string; year_range: string; }
 
 const GRADE_LEVELS = [
   "I Nivel", "II Nivel", "III Nivel",
@@ -57,8 +57,8 @@ export default function PermissionProfileForm() {
       setItems(initial);
 
       if (schoolId) {
-        const { data: sy } = await supabase.from("school_years").select("id, name").eq("school_id", schoolId).order("start_date", { ascending: false });
-        setYears(sy ?? []);
+        const { data: sy } = await supabase.from("school_years").select("id, year_range").eq("school_id", schoolId).order("year_range", { ascending: false });
+        setYears((sy as any) ?? []);
       }
 
       if (isEdit && profileId) {
@@ -204,7 +204,7 @@ export default function PermissionProfileForm() {
                                 {years.map((y) => (
                                   <button type="button" key={y.id} onClick={() => toggleYear(k.key, y.id)}
                                     className={`text-xs px-2 py-1 rounded border ${it.school_year_ids.includes(y.id) ? "bg-primary text-primary-foreground border-primary" : "bg-background"}`}>
-                                    {y.name}
+                                    {y.year_range}
                                   </button>
                                 ))}
                               </div>
