@@ -67,14 +67,8 @@
               .catch(function () {});
           }
         }
-
-        var script = document.createElement("script");
-        script.type = "module";
-        script.src = isPreviewHost || isInIframe
-          ? "/src/main.tsx?preview-cache-bust=" + Date.now()
-          : "/src/main.tsx";
-        document.body.appendChild(script);
       })();
     </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
