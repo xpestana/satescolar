@@ -1,41 +1,53 @@
-## Cambio en `src/pages/school/EnrollmentsList.tsx` (línea ~830-836)
+## Reactivar la app como instalable (sin service worker)
 
-Actualmente el color de fondo de cada fila depende sólo de `completeness.isComplete` (campos requeridos llenos). Como muchos campos no son `required`, casi todos terminan en verde aunque el estudiante esté "Pendiente" de inscribir.
+Vamos a usar la **Opción A: solo manifest**. Esto devuelve el botón "Instalar app" en Chrome/Edge desktop y "Agregar a pantalla de inicio" en móvil, sin reintroducir el bug de caché que tuvimos antes.
 
-### Nueva lógica de color de fila
+### Qué se hace
 
-Combinar dos señales: estado de inscripción + completitud de datos.
+1. **Crear `public/manifest.webmanifest`** con:
+   - `name`: "SAT Escolar"
+   - `short_name`: "SAT Escolar"
+   - `description`: gestión escolar
+   - `start_url`: "/"
+   - `scope`: "/"
+   - `display`: "standalone"
+   - `background_color`: "#01051e"
+   - `theme_color`: "#01051e"
+   - `icons`: referencias a 192x192 y 512x512 (PNG) + uno `maskable` para Android
 
-| Inscrito | Datos completos | Color fila |
-|----------|----------------|------------|
-| Sí       | Sí             | Verde (`bg-green-50/60`) |
-| Sí       | No             | Ámbar (`bg-amber-50/60 hover:bg-amber-100/60`) — inscrito pero faltan datos |
-| No       | Sí             | Ámbar — datos listos pero falta inscribir |
-| No       | No             | Rojo (`bg-red-50/60`) — pendiente y con datos faltantes |
+2. **Generar los iconos PNG** a partir de `src/assets/logo.svg` (o `Simbolo_4.webp` que ya se usa en og:image):
+   - `public/icons/icon-192.png`
+   - `public/icons/icon-512.png`
+   - `public/icons/icon-512-maskable.png` (con padding seguro ~10%)
+   - `public/apple-touch-icon.png` (180x180, para iOS)
 
-Es decir: **verde sólo cuando ambas condiciones se cumplen**. Pendiente nunca es verde.
+3. **Editar `index.html`** para enlazar el manifest e iconos:
+   ```html
+   <link rel="manifest" href="/manifest.webmanifest" />
+   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+   <meta name="apple-mobile-web-app-capable" content="yes" />
+   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+   <meta name="apple-mobile-web-app-title" content="SAT Escolar" />
+   ```
+   El `theme-color` ya existe.
 
-### Implementación
+4. **NO tocar** los kill-switches (`public/sw.js`, `public/service-worker.js`) ni el código de des-registro en `src/main.tsx`. Se quedan tal cual para que sigan limpiando SW viejos en navegadores que aún los tengan registrados.
 
-Reemplazar el bloque:
+5. **NO instalar** `vite-plugin-pwa` ni añadir ningún service worker nuevo.
 
-```ts
-const rowBg = completeness
-  ? completeness.isComplete
-    ? "bg-green-50/60 hover:bg-green-100/60"
-    : "bg-red-50/60 hover:bg-red-100/60"
-  : "";
-```
+### Por qué esto NO repite el problema anterior
 
-por:
+El bug anterior era 100% del **service worker** cacheando HTML viejo dentro del iframe del editor de Lovable. Sin service worker no hay caché propia de la app: el navegador usa su caché normal HTTP, que respeta los headers que ya envía nginx/Lovable. El manifest es un archivo estático JSON que el navegador lee solo para mostrar el prompt de instalación; no intercepta requests ni guarda nada.
 
-```ts
-const isComplete = completeness?.isComplete ?? true;
-const rowBg = student.isEnrolled && isComplete
-  ? "bg-green-50/60 hover:bg-green-100/60"
-  : !student.isEnrolled && !isComplete
-    ? "bg-red-50/60 hover:bg-red-100/60"
-    : "bg-amber-50/60 hover:bg-amber-100/60";
-```
+### Limitaciones a conocer
 
-No se tocan otras tablas/badges; el badge "Pendiente" / "Inscrito" sigue igual.
+- **No hay modo offline.** Si el usuario pierde internet, la app no carga (igual que cualquier web normal). Para un sistema escolar online esto está bien.
+- **iOS** muestra el ícono y abre standalone, pero no tiene "prompt de instalación" automático; el usuario debe usar "Compartir → Agregar a pantalla de inicio" manualmente. Es limitación de Safari, no nuestra.
+- En el **editor preview de Lovable** el botón de instalar puede no aparecer porque está en iframe. Aparece correctamente en el dominio publicado y en tu VPS.
+
+### Archivos a tocar
+
+- Crear: `public/manifest.webmanifest`, `public/icons/icon-192.png`, `public/icons/icon-512.png`, `public/icons/icon-512-maskable.png`, `public/apple-touch-icon.png`
+- Editar: `index.html` (añadir 4-5 líneas en `<head>`)
+
+Sin migraciones, sin cambios en backend, sin nuevas dependencias.
