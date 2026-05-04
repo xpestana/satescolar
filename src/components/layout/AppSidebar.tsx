@@ -30,6 +30,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useSidebarState } from "@/hooks/useSidebarState";
+import { usePermissions } from "@/hooks/usePermissions";
+import { ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,8 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   requiredRole?: "admin" | "school" | "representative" | "teacher";
+  permission?: string; // si está y el school user no es owner ni lo tiene, se oculta
+  ownerOnly?: boolean;
 }
 
 interface NavSection {
