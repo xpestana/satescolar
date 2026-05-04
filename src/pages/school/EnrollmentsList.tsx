@@ -800,6 +800,23 @@ export default function EnrollmentsList() {
             </DropdownMenu>
           </div>
 
+          {/* Leyenda de colores de fila */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-3 px-3 py-2 rounded-md border bg-muted/30 text-xs">
+            <span className="font-medium text-muted-foreground">Leyenda:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-3 rounded-sm border border-green-300 bg-green-100" />
+              <span>Inscrito y datos completos</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-3 rounded-sm border border-amber-300 bg-amber-100" />
+              <span>Falta una acción (inscribir o completar datos)</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-3 rounded-sm border border-red-300 bg-red-100" />
+              <span>Pendiente y datos incompletos</span>
+            </div>
+          </div>
+
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <Table>
               <TableHeader>
