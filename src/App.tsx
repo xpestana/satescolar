@@ -138,6 +138,11 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route path="/school/configuraciones/usuarios" element={<ProtectedRoute requiredRole="school"><SchoolUsersList /></ProtectedRoute>} />
+              <Route path="/school/configuraciones/usuarios/nuevo" element={<ProtectedRoute requiredRole="school"><SchoolUserForm /></ProtectedRoute>} />
+              <Route path="/school/configuraciones/usuarios/:userId/editar" element={<ProtectedRoute requiredRole="school"><SchoolUserForm /></ProtectedRoute>} />
+              <Route path="/school/configuraciones/usuarios/perfiles/nuevo" element={<ProtectedRoute requiredRole="school"><PermissionProfileForm /></ProtectedRoute>} />
+              <Route path="/school/configuraciones/usuarios/perfiles/:profileId/editar" element={<ProtectedRoute requiredRole="school"><PermissionProfileForm /></ProtectedRoute>} />
               <Route
                 path="/school/configuraciones/ajustes-notas"
                 element={
