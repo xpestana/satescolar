@@ -174,6 +174,7 @@ export function AppSidebar() {
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
   const { familyName } = useRepresentativeFamily();
+  const { isOwner, has, loading: permLoading } = usePermissions();
 
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -247,15 +248,23 @@ export function AppSidebar() {
           {navSections.map((section, sectionIndex) => {
             if (section.requiredRole && userRole !== section.requiredRole) return null;
 
-            const visibleItems = section.items.filter(
-              (item) => !item.requiredRole || item.requiredRole === userRole
-            );
-            if (visibleItems.length === 0 && !section.title) return null;
+            const filterByPermission = (item: NavItem) => {
+              if (item.requiredRole && item.requiredRole !== userRole) return false;
+              if (userRole !== "school") return true;
+              if (permLoading) return true;
+              if (item.ownerOnly) return isOwner;
+              if (isOwner) return true;
+              if (item.permission && !has(item.permission)) return false;
+              return true;
+            };
 
-            // Check if this is the first visible section for this role
+            const visibleItems = section.items.filter(filterByPermission);
+            if (visibleItems.length === 0 && !section.title) return null;
+            if (visibleItems.length === 0) return null;
+
             const previousSections = navSections.slice(0, sectionIndex);
             const hasPreviousVisible = previousSections.some(
-              (s) => (!s.requiredRole || s.requiredRole === userRole) && s.items.some((i) => !i.requiredRole || i.requiredRole === userRole)
+              (s) => (!s.requiredRole || s.requiredRole === userRole) && s.items.some(filterByPermission)
             );
 
             return (
