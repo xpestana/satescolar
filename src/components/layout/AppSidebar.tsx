@@ -30,6 +30,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useSidebarState } from "@/hooks/useSidebarState";
+import { usePermissions } from "@/hooks/usePermissions";
+import { ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,8 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   requiredRole?: "admin" | "school" | "representative" | "teacher";
+  permission?: string; // si está y el school user no es owner ni lo tiene, se oculta
+  ownerOnly?: boolean;
 }
 
 interface NavSection {
@@ -75,10 +79,10 @@ const navSections: NavSection[] = [
     title: "Registros",
     requiredRole: "school",
     items: [
-      { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school" },
-      { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school" },
-      { label: "Áreas", href: "/registros/areas", icon: GraduationCap, requiredRole: "school" },
-      { label: "Asignación de Áreas", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school" },
+      { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school", permission: "families.view" },
+      { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school", permission: "teachers.view" },
+      { label: "Áreas", href: "/registros/areas", icon: GraduationCap, requiredRole: "school", permission: "subjects.view" },
+      { label: "Asignación de Áreas", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school", permission: "subjects.manage" },
       { label: "Búsqueda Avanzada", href: "/registros/busqueda-avanzada", icon: Search, requiredRole: "school" },
     ],
   },
@@ -86,49 +90,49 @@ const navSections: NavSection[] = [
     title: "Utilidades",
     requiredRole: "school",
     items: [
-      { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school" },
-      { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school" },
-      { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school" },
-      { label: "Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school" },
-      { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school" },
+      { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school", permission: "emails.send" },
+      { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school", permission: "planillas.config" },
+      { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school", permission: "attendance.scan" },
+      { label: "Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school", permission: "attendance.view" },
+      { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school", permission: "classroom.supervise" },
     ],
   },
   {
     title: "Inscripciones",
     requiredRole: "school",
     items: [
-      { label: "Inscripciones", href: "/inscripciones", icon: ClipboardCheck, requiredRole: "school" },
+      { label: "Inscripciones", href: "/inscripciones", icon: ClipboardCheck, requiredRole: "school", permission: "enrollments.view" },
     ],
   },
   {
     title: "Notas y Boletas",
     requiredRole: "school",
     items: [
-      { label: "Notas y Boletas", href: "/notas/consulta", icon: Search, requiredRole: "school" },
+      { label: "Notas y Boletas", href: "/notas/consulta", icon: Search, requiredRole: "school", permission: "grades.view" },
     ],
   },
   {
     title: "Administrativo",
     requiredRole: "school",
     items: [
-      { label: "Dashboard Pagos", href: "/pagos", icon: CreditCard, requiredRole: "school" },
-      { label: "Registro de Pagos", href: "/pagos/registro", icon: CreditCard, requiredRole: "school" },
-      { label: "Estado de Cuenta", href: "/pagos/estado-cuenta", icon: FileText, requiredRole: "school" },
-      { label: "Morosos", href: "/pagos/morosos", icon: Users, requiredRole: "school" },
+      { label: "Dashboard Pagos", href: "/pagos", icon: CreditCard, requiredRole: "school", permission: "payments.view" },
+      { label: "Registro de Pagos", href: "/pagos/registro", icon: CreditCard, requiredRole: "school", permission: "payments.register" },
+      { label: "Estado de Cuenta", href: "/pagos/estado-cuenta", icon: FileText, requiredRole: "school", permission: "payments.view" },
+      { label: "Morosos", href: "/pagos/morosos", icon: Users, requiredRole: "school", permission: "payments.delinquency" },
     ],
   },
   {
     title: "Ajustes del Colegio",
     requiredRole: "school",
     items: [
-      { label: "Años y Secciones", href: "/school/configuraciones/anos-secciones", icon: SlidersHorizontal, requiredRole: "school" },
-      { label: "Formularios", href: "/school/configuraciones/formularios", icon: FileText, requiredRole: "school" },
-      { label: "Planillas", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school" },
-      { label: "Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school" },
-      { label: "Carnet", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school" },
-      { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school" },
-      { label: "Config. Morosidad", href: "/pagos/morosidad", icon: Bell, requiredRole: "school" },
-      
+      { label: "Años y Secciones", href: "/school/configuraciones/anos-secciones", icon: SlidersHorizontal, requiredRole: "school", permission: "settings.school" },
+      { label: "Formularios", href: "/school/configuraciones/formularios", icon: FileText, requiredRole: "school", permission: "forms.config" },
+      { label: "Planillas", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school", permission: "planillas.config" },
+      { label: "Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school", permission: "settings.school" },
+      { label: "Carnet", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school", permission: "settings.school" },
+      { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school", permission: "payments.config" },
+      { label: "Config. Morosidad", href: "/pagos/morosidad", icon: Bell, requiredRole: "school", permission: "payments.delinquency" },
+      { label: "Usuarios y Permisos", href: "/school/configuraciones/usuarios", icon: ShieldCheck, requiredRole: "school", ownerOnly: true },
     ],
   },
   // Representative
@@ -170,6 +174,7 @@ export function AppSidebar() {
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
   const { familyName } = useRepresentativeFamily();
+  const { isOwner, has, loading: permLoading } = usePermissions();
 
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -243,15 +248,23 @@ export function AppSidebar() {
           {navSections.map((section, sectionIndex) => {
             if (section.requiredRole && userRole !== section.requiredRole) return null;
 
-            const visibleItems = section.items.filter(
-              (item) => !item.requiredRole || item.requiredRole === userRole
-            );
-            if (visibleItems.length === 0 && !section.title) return null;
+            const filterByPermission = (item: NavItem) => {
+              if (item.requiredRole && item.requiredRole !== userRole) return false;
+              if (userRole !== "school") return true;
+              if (permLoading) return true;
+              if (item.ownerOnly) return isOwner;
+              if (isOwner) return true;
+              if (item.permission && !has(item.permission)) return false;
+              return true;
+            };
 
-            // Check if this is the first visible section for this role
+            const visibleItems = section.items.filter(filterByPermission);
+            if (visibleItems.length === 0 && !section.title) return null;
+            if (visibleItems.length === 0) return null;
+
             const previousSections = navSections.slice(0, sectionIndex);
             const hasPreviousVisible = previousSections.some(
-              (s) => (!s.requiredRole || s.requiredRole === userRole) && s.items.some((i) => !i.requiredRole || i.requiredRole === userRole)
+              (s) => (!s.requiredRole || s.requiredRole === userRole) && s.items.some(filterByPermission)
             );
 
             return (
