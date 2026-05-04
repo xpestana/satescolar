@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { SidebarProvider } from "@/hooks/useSidebarState";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { InstallPWAPrompt } from "@/components/layout/InstallPWAPrompt";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
@@ -360,7 +359,6 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-            <InstallPWAPrompt />
           </SidebarProvider>
         </AuthProvider>
       </BrowserRouter>
