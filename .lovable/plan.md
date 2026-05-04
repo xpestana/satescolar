@@ -1,107 +1,49 @@
-# Gestor de Usuarios Escolares con Permisos Granulares
+# Descripciones persuasivas en todos los breadcrumbs
 
-Crear un módulo dentro de **Ajustes del Colegio** donde el usuario `school` dueño del colegio pueda crear, editar y desactivar otros sub-usuarios escolares del mismo colegio, asignándoles **perfiles de permisos personalizables** que controlan qué áreas/acciones pueden ver y ejecutar.
+## Objetivo
+El componente `PageHeader` ya soporta descripciones, pero el diccionario actual cubre solo una parte de las páginas. La idea es extenderlo para que **todas** las pantallas que usan `PageHeader` (admin, school, teacher, representative) muestren una descripción persuasiva debajo del breadcrumb.
 
----
+## Alcance
+Un único archivo a modificar: `src/components/layout/PageHeader.tsx`.
 
-## 1. Modelo de datos
+No es necesario tocar las pantallas individualmente: el `PageHeader` resuelve la descripción automáticamente a partir del `title`. Cualquier pantalla podrá seguir sobreescribiendo con la prop opcional `description`.
 
-### `permission_keys` (catálogo global, seedeado)
-Lista maestra de permisos disponibles.
-- `key` text PK — ej: `families.view`, `families.edit`, `grades.edit`, `payments.register`
-- `module` text — agrupador UI (Familias, Notas, Pagos, Inscripciones, Ajustes…)
-- `label` text — descripción legible
-- `supports_scope` bool — si admite restricción por grado / año escolar
+## Cambios
 
-### `permission_profiles` (perfiles por colegio)
-Plantillas creadas por el dueño del colegio (ej: "Coordinador Académico", "Secretaria", "Cobranzas").
-- `id` uuid PK, `school_id` FK, `name`, `description`, timestamps
+### 1. Reemplazar el diccionario por una lista ordenada con coincidencia parcial
+Hoy es un `Record<string, string>` con coincidencia parcial vía `Object.keys().find(...)`, pero el orden de claves no está garantizado. Se cambia a `Array<[string, string]>` para que las coincidencias más específicas aparezcan primero (por ejemplo "Editar Familia" antes que "Familia").
 
-### `permission_profile_items`
-Permisos asignados a cada perfil, con scope opcional.
-- `id`, `profile_id` FK, `permission_key` FK
-- `scope` jsonb — null = sin restricción; ej `{"grade_levels":["1er Grado"], "school_year_ids":["..."]}`
+### 2. Cobertura completa de títulos
+Añadir entradas para todas las páginas detectadas con `PageHeader title=`:
 
-### `school_user_profiles`
-Asignación de perfiles a cada sub-usuario.
-- `user_id`, `school_id`, `profile_id` — PK compuesta
+- **Admin**: Colegios, Crear/Editar Colegio, Usuarios, Administradores del Sistema, Enviar Email, Prueba de subida a S3.
+- **School / Registros**: Docentes, Agregar/Editar Docente, Familias, Editar Familia, Agregar/Editar Representante, Agregar/Editar Estudiante, Estudiantes, Inscripciones, Búsqueda Avanzada.
+- **School / Académico**: Áreas / Materias, Asignación de Áreas, Ajustes de Notas, Ajustes de Evaluación, Sábana de Notas, Consulta de Notas y Boletas, Supervisión de Aulas Virtuales, Configuraciones (Períodos y Secciones).
+- **School / Administrativo**: Dashboard de Pagos, Registro de Pagos, Configuración de Pagos, Configuración de Morosidad, Estudiantes Morosos, Estado de Cuenta.
+- **School / Asistencia**: Escáner QR, Asistencias.
+- **School / Configuración**: Configuraciones - Formularios, Configuración de Planillas, Constructor de Planillas, Planillas, Usuarios y Permisos, Nuevo Usuario Escolar, Editar Usuario, Nuevo Perfil de Permiso, Editar Perfil, Utilidades, Carnets, Correos Electrónicos.
+- **Teacher**: Mis Materias, Registro de Notas, Mi Carnet, Aula Virtual.
+- **Representative**: Mis Estudiantes, Mis Representantes, Datos de Familia, Familia {nombre}, Aula Virtual — {estudiante}, Agregar/Editar Representante, Agregar/Editar Estudiante.
 
-### Cambio en `user_roles`
-Agregar `is_owner` boolean default false. El primer `school` por colegio = owner (todos los permisos, no editable). Sub-usuarios = `is_owner=false`.
+### 3. Coincidencia parcial robusta
+La función `lookupDescription(title)` itera la lista en orden y devuelve la primera entrada cuyo key esté contenido en el `title`. Esto cubre títulos dinámicos como:
+- `"Editar Familia - González"` → "Editar Familia".
+- `"Aula Virtual — Juan Pérez"` → "Aula Virtual".
+- `"Agregar Estudiante - Familia X"` → "Agregar Estudiante".
+- `"Familia González"` → "Familia ".
 
----
+### 4. Sin cambios visuales adicionales
+- Se mantiene la imagen tecnológica de redes ya integrada.
+- Se mantiene la prop opcional `description` por si una pantalla puntual quiere un copy distinto.
+- Layout y estilos del header no cambian.
 
-## 2. RLS y seguridad
+## Detalles técnicos
+Archivo único: `src/components/layout/PageHeader.tsx`
+- Cambiar `DESCRIPTIONS` de `Record<string,string>` a `Array<[string,string]>`.
+- Reemplazar `getDescription` por `lookupDescription` con iteración ordenada (`title === key || title.includes(key)`).
+- Añadir las entradas faltantes listadas arriba.
+- No se modifican otros archivos del proyecto.
 
-- `permission_profiles`, `permission_profile_items`, `school_user_profiles`: solo owner del colegio (o admin) puede CRUD; sub-usuarios pueden SELECT lo propio.
-- Función `public.has_permission(_user_id uuid, _key text, _scope jsonb default null)` SECURITY DEFINER:
-  - admin → true
-  - school owner del colegio → true
-  - sub-usuario con perfil que contenga el key (y scope compatible) → true
-- Mutations sensibles (ej. UPDATE en `grades`) validan vía trigger que `has_permission` autorice también el scope (grado del estudiante).
-
----
-
-## 3. Edge Functions
-
-- **`create-school-subuser`** — owner envía email + nombre + perfiles → crea `auth.users` con password aleatorio, `user_roles` (role=school, is_owner=false), `school_user_profiles`, dispara welcome email (reutiliza `smtp-client` existente).
-- **`update-school-subuser`** — editar nombre/perfiles.
-- **`reset-school-subuser-password`** — owner regenera contraseña y reenvía credenciales.
-- **`suspend-school-subuser`** — desactivar (no borrar, conserva auditoría).
-
-Todas con `verify_jwt=false` y validación de identidad vía `auth.getClaims(token)` + chequeo de owner.
-
----
-
-## 4. Frontend
-
-### Rutas nuevas (todas `requiredRole="school"`, solo owner)
-- `/school/configuraciones/usuarios` — tabs **Usuarios** / **Perfiles de Permiso**
-- `/school/configuraciones/usuarios/nuevo` y `/:userId/editar`
-- `/school/configuraciones/usuarios/perfiles/nuevo` y `/:profileId/editar`
-
-### Páginas
-1. **SchoolUsersList** — tabla nombre, email, perfiles, estado, acciones (editar / resetear contraseña / suspender).
-2. **SchoolUserForm** — datos básicos + multi-select de perfiles.
-3. **PermissionProfilesList** — listado de perfiles con conteo de usuarios.
-4. **PermissionProfileForm** — checkbox tree agrupado por `module`. Para keys con `supports_scope=true` se muestra panel adicional con multi-select de grados y de años escolares (se guarda en `scope`).
-
-### Sidebar
-Agregar **"Usuarios y Permisos"** en sección **Ajustes del Colegio**, visible solo si `is_owner`.
-
-### Hook + control de acceso
-- `usePermissions()` — carga (React Query) los permission_keys efectivos del usuario con sus scopes. Owner = todos.
-- `<RequirePermission permission="grades.edit" scope={{grade_level:"3er Grado"}}>` para envolver botones / secciones.
-- `ProtectedRoute` extendido con `requiredPermission` opcional.
-- `AppSidebar` — filtra items por permisos además de por rol.
-
-### Catálogo inicial de permission_keys (seed)
-- Familias: `families.view`, `families.edit`, `families.create`, `families.delete`
-- Estudiantes: `students.view`, `students.edit`
-- Docentes: `teachers.view`, `teachers.manage`
-- Áreas/Materias: `subjects.view`, `subjects.manage`
-- Notas: `grades.view` *(scope)*, `grades.edit` *(scope)*
-- Inscripciones: `enrollments.view`, `enrollments.manage`
-- Pagos: `payments.view`, `payments.register`, `payments.config`, `payments.delinquency`
-- Asistencias: `attendance.scan`, `attendance.view`
-- Utilidades: `emails.send`, `forms.config`, `planillas.config`
-- Ajustes: `settings.school`, `settings.users` (solo owner)
-
----
-
-## 5. Flujo del usuario
-
-1. Owner entra a **Ajustes del Colegio → Usuarios y Permisos**.
-2. Crea perfil "Coordinador 1er Grado" con `grades.view`+`grades.edit` scope `{grade_levels:["1er Grado"]}` y `families.view`.
-3. Crea sub-usuario `coord1@colegio.com` con ese perfil → recibe email con credenciales.
-4. Al iniciar sesión ve un sidebar reducido: Inicio, Familias (lectura), Notas (solo 1er grado).
-
----
-
-## Notas técnicas
-
-- Owner se determina con `user_roles.is_owner=true`; migración marca como owner al primer `user_roles` por `school_id` ya existente.
-- `usePermissions` cachea con React Query; se invalida al cambiar perfil del usuario.
-- RLS de tablas existentes ya filtra por `school_id`; el scope adicional (grado/año) se aplica en queries del front + validación server-side en mutations sensibles.
-- Reutiliza la infraestructura de welcome emails (`smtp-client`, plantillas existentes).
-- Sub-usuarios y owner comparten `role='school'` → los hooks/queries existentes siguen funcionando sin cambios estructurales.
+## Validación
+- Recorrer mentalmente las rutas principales (`/registros/familias`, `/registros/docentes`, `/pagos`, `/configuraciones/usuarios`, `/teacher/materias`, `/representative/estudiantes`, etc.) y confirmar que cada `title` mapea a una descripción.
+- Las páginas dashboard que usan `PageHeader` con títulos de tarjetas (StatCard) NO se ven afectadas porque ese componente es distinto a `PageHeader`.
