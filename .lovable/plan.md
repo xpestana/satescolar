@@ -1,17 +1,20 @@
-## Contexto
+## Problema
 
-El formulario de **Familia** (`EditFamily.tsx`) es estático y no tiene campos marcados como `required` configurables (a diferencia de Estudiante y Representante, que sí los tienen en `form_fields`). Por eso no podemos validar "faltantes" de Familia desde la base de datos.
+El `index.html` actual contiene un loader inline que inyecta `/src/main.tsx?preview-cache-bust=...`. En el preview publicado esa URL devuelve 404 y la pantalla queda en blanco. Además `main.tsx` tiene una rutina con `sessionStorage` que fuerza un reload duro y puede causar parpadeos.
 
-Pero la familia debe poder editarse siempre desde el modal de inscripción.
+Ya verifiqué con el navegador remoto que la app funciona (login + `/inscripciones` se ven bien). Lo que falla en tu navegador es cache local: el HTML viejo sigue cacheado por un Service Worker registrado antes.
 
-## Cambio
+## Cambios
 
-En `src/components/enrollments/EnrollStudentModal.tsx`, ajustar el `DialogFooter`:
+1. **`index.html`** — quitar el script inline. Dejar solo `<script type="module" src="/src/main.tsx"></script>`.
+2. **`src/main.tsx`** — reemplazar el bloque de cleanup + reload por una sola llamada `navigator.serviceWorker.getRegistrations().then(...unregister)`. Sin `caches.delete`, sin `sessionStorage`, sin reload.
+3. **Conservar** `public/sw.js` y `public/service-worker.js` como kill-switches (ya se auto-desregistran).
 
-- **Siempre mostrar** los tres botones: "Modificar Estudiante", "Modificar Representante" y "Modificar Familia" (este último ya no condicionado a `hasFamilyMissing`).
-- El botón **"Inscribir"** (o "Actualizar Inscripción") solo aparece cuando `isDataComplete` es `true` (ningún required de Estudiante/Representante vacío).
-- La alerta naranja "Faltan datos…" sigue mostrando solamente Estudiante y Representante (los únicos con `required` real). La sección Familia ya no se lista como faltante.
+## Acción manual de tu lado (una sola vez)
 
-Esto deja:
-- Validación: solo campos `is_required = true` de `form_fields` (Estudiante + Representante).
-- Acceso: el usuario siempre puede entrar a editar Estudiante, Representante **o Familia** desde el modal.
+Para soltar el SW viejo cacheado en tu navegador actual:
+- DevTools → Application → Service Workers → Unregister todos
+- Application → Storage → Clear site data
+- Ctrl+Shift+R
+
+A partir de ahí no vuelve a aparecer el problema.

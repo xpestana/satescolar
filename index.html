@@ -4,14 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.ico" type="image/x-icon" />
-    <!-- TODO: Set the document title to the name of your application -->
     <title>SAT Escolar – Automatización de Gestión Escolar</title>
     <meta name="description" content="Sistema de gestión escolar para colegios públicos y privados. Automatiza notas, alumnos, reportes y procesos administrativos en una sola plataforma.">
     <meta name="author" content="Lovable" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    
-    
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/r0As29GVCWOGJsTdZ9k7gdZFgKj2/social-images/social-1773427613997-Simbolo_4.webp">
 
@@ -22,53 +18,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <meta name="theme-color" content="#01051e" />
-  
-  
-  
-  <meta property="og:title" content="SAT Escolar – Automatización de Gestión Escolar">
-  <meta name="twitter:title" content="SAT Escolar – Automatización de Gestión Escolar">
-  <meta property="og:description" content="Sistema de gestión escolar para colegios públicos y privados. Automatiza notas, alumnos, reportes y procesos administrativos en una sola plataforma.">
-  <meta name="twitter:description" content="Sistema de gestión escolar para colegios públicos y privados. Automatiza notas, alumnos, reportes y procesos administrativos en una sola plataforma.">
-</head>
+
+    <meta property="og:title" content="SAT Escolar – Automatización de Gestión Escolar">
+    <meta name="twitter:title" content="SAT Escolar – Automatización de Gestión Escolar">
+    <meta property="og:description" content="Sistema de gestión escolar para colegios públicos y privados. Automatiza notas, alumnos, reportes y procesos administrativos en una sola plataforma.">
+    <meta name="twitter:description" content="Sistema de gestión escolar para colegios públicos y privados. Automatiza notas, alumnos, reportes y procesos administrativos en una sola plataforma.">
+  </head>
 
   <body>
     <div id="root"></div>
-    <script>
-      (function () {
-        var host = window.location.hostname;
-        var isPreviewHost =
-          host.indexOf("lovable.app") !== -1 ||
-          host.indexOf("lovableproject.com") !== -1 ||
-          host === "localhost" ||
-          host === "127.0.0.1";
-        var isInIframe = false;
-        try {
-          isInIframe = window.self !== window.top;
-        } catch (error) {
-          isInIframe = true;
-        }
-
-        if (isPreviewHost || isInIframe) {
-          if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.getRegistrations()
-              .then(function (registrations) {
-                return Promise.all(registrations.map(function (registration) {
-                  return registration.unregister();
-                }));
-              })
-              .catch(function () {});
-          }
-
-          if ("caches" in window) {
-            caches.keys()
-              .then(function (keys) {
-                return Promise.all(keys.map(function (key) { return caches.delete(key); }));
-              })
-              .catch(function () {});
-          }
-        }
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
