@@ -1,20 +1,41 @@
-## Problema
+## Cambio en `src/pages/school/EnrollmentsList.tsx` (línea ~830-836)
 
-El `index.html` actual contiene un loader inline que inyecta `/src/main.tsx?preview-cache-bust=...`. En el preview publicado esa URL devuelve 404 y la pantalla queda en blanco. Además `main.tsx` tiene una rutina con `sessionStorage` que fuerza un reload duro y puede causar parpadeos.
+Actualmente el color de fondo de cada fila depende sólo de `completeness.isComplete` (campos requeridos llenos). Como muchos campos no son `required`, casi todos terminan en verde aunque el estudiante esté "Pendiente" de inscribir.
 
-Ya verifiqué con el navegador remoto que la app funciona (login + `/inscripciones` se ven bien). Lo que falla en tu navegador es cache local: el HTML viejo sigue cacheado por un Service Worker registrado antes.
+### Nueva lógica de color de fila
 
-## Cambios
+Combinar dos señales: estado de inscripción + completitud de datos.
 
-1. **`index.html`** — quitar el script inline. Dejar solo `<script type="module" src="/src/main.tsx"></script>`.
-2. **`src/main.tsx`** — reemplazar el bloque de cleanup + reload por una sola llamada `navigator.serviceWorker.getRegistrations().then(...unregister)`. Sin `caches.delete`, sin `sessionStorage`, sin reload.
-3. **Conservar** `public/sw.js` y `public/service-worker.js` como kill-switches (ya se auto-desregistran).
+| Inscrito | Datos completos | Color fila |
+|----------|----------------|------------|
+| Sí       | Sí             | Verde (`bg-green-50/60`) |
+| Sí       | No             | Ámbar (`bg-amber-50/60 hover:bg-amber-100/60`) — inscrito pero faltan datos |
+| No       | Sí             | Ámbar — datos listos pero falta inscribir |
+| No       | No             | Rojo (`bg-red-50/60`) — pendiente y con datos faltantes |
 
-## Acción manual de tu lado (una sola vez)
+Es decir: **verde sólo cuando ambas condiciones se cumplen**. Pendiente nunca es verde.
 
-Para soltar el SW viejo cacheado en tu navegador actual:
-- DevTools → Application → Service Workers → Unregister todos
-- Application → Storage → Clear site data
-- Ctrl+Shift+R
+### Implementación
 
-A partir de ahí no vuelve a aparecer el problema.
+Reemplazar el bloque:
+
+```ts
+const rowBg = completeness
+  ? completeness.isComplete
+    ? "bg-green-50/60 hover:bg-green-100/60"
+    : "bg-red-50/60 hover:bg-red-100/60"
+  : "";
+```
+
+por:
+
+```ts
+const isComplete = completeness?.isComplete ?? true;
+const rowBg = student.isEnrolled && isComplete
+  ? "bg-green-50/60 hover:bg-green-100/60"
+  : !student.isEnrolled && !isComplete
+    ? "bg-red-50/60 hover:bg-red-100/60"
+    : "bg-amber-50/60 hover:bg-amber-100/60";
+```
+
+No se tocan otras tablas/badges; el badge "Pendiente" / "Inscrito" sigue igual.

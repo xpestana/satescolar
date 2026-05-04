@@ -829,11 +829,12 @@ export default function EnrollmentsList() {
                   </TableRow>
                 ) : paginated.map(student => {
                   const completeness = planillaSections.length > 0 ? getCompleteness(student) : null;
-                  const rowBg = completeness
-                    ? completeness.isComplete
-                      ? "bg-green-50/60 hover:bg-green-100/60"
-                      : "bg-red-50/60 hover:bg-red-100/60"
-                    : "";
+                  const isComplete = completeness?.isComplete ?? true;
+                  const rowBg = student.isEnrolled && isComplete
+                    ? "bg-green-50/60 hover:bg-green-100/60"
+                    : !student.isEnrolled && !isComplete
+                      ? "bg-red-50/60 hover:bg-red-100/60"
+                      : "bg-amber-50/60 hover:bg-amber-100/60";
 
                   return (
                     <TableRow key={student.id} className={rowBg}>
