@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -19,12 +19,9 @@ import {
   LinkIcon,
   Menu,
   PanelRightClose,
-  Download,
-  Smartphone,
   QrCode,
   ClipboardList,
   Bell,
-  Key,
   ShieldAlert,
   Upload,
 } from "lucide-react";
