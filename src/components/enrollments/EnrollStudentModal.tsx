@@ -293,11 +293,9 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
   const resolveLabel = (prefixed: string) => {
     const [type, ...rest] = prefixed.split(":");
     const name = rest.join(":");
-    if (type === "student") return formFields.find(f => f.field_name === name)?.field_label || name;
-    if (type === "custom") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    if (type === "representative") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    if (type === "family") return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    return name;
+    const match = allFormFields.find(f => f.form_type === type && f.field_name === name);
+    if (match?.field_label) return match.field_label;
+    return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
   };
 
   return (
