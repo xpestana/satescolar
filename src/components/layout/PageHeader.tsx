@@ -113,11 +113,7 @@ function lookupDescription(title: string): string | undefined {
 
 function getDescription(title: string, custom?: string) {
   if (custom) return custom;
-  // Coincidencia parcial por si el título incluye sufijos dinámicos
-  const exact = DESCRIPTIONS[title];
-  if (exact) return exact;
-  const partial = Object.keys(DESCRIPTIONS).find((k) => title.includes(k));
-  return partial ? DESCRIPTIONS[partial] : undefined;
+  return lookupDescription(title);
 }
 
 export function PageHeader({ title, breadcrumbs, imageUrl, description }: PageHeaderProps) {
