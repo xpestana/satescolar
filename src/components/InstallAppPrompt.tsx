@@ -89,12 +89,11 @@ export const InstallAppPrompt = () => {
         </DialogHeader>
         <DialogFooter className="sm:justify-center gap-2">
           <Button variant="outline" onClick={handleDismiss}>
-            <X className="mr-2 h-4 w-4" />
-            Ahora no
+            Quizás luego
           </Button>
-          <Button onClick={handleInstall}>
+          <Button onClick={handleInstall} className="font-semibold">
             <Download className="mr-2 h-4 w-4" />
-            Instalar
+            Instalar ahora
           </Button>
         </DialogFooter>
       </DialogContent>
