@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.fetch-bcv-rates]
 verify_jwt = false
+
+[functions.manage-school-subuser]
+verify_jwt = false
