@@ -16,7 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { checkStudentCompleteness, ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
+
 import { AlertTriangle, GraduationCap, Users, UserPen } from "lucide-react";
 
 const GRADE_LABELS: Record<string, string> = {
