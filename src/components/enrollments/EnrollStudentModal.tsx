@@ -186,8 +186,8 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
   const isEmpty = (v: any) =>
     v === null || v === undefined || (typeof v === "string" && !v.trim());
 
-  const requiredStudent = allFormFields.filter(f => f.form_type === "student" && f.is_required && f.is_visible);
-  const requiredRep = allFormFields.filter(f => f.form_type === "representative" && f.is_required && f.is_visible);
+  const requiredStudent = allFormFields.filter(f => f.form_type === "student" && f.is_visible && isEffectivelyRequired("student", f.field_name, f.is_required));
+  const requiredRep = allFormFields.filter(f => f.form_type === "representative" && f.is_visible && isEffectivelyRequired("representative", f.field_name, f.is_required));
 
   const missingStudentFields = requiredStudent
     .filter(f => isEmpty(student.form_data?.[f.field_name]))
