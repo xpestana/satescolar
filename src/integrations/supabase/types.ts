@@ -2335,6 +2335,104 @@ export type Database = {
           },
         ]
       }
+      permission_keys: {
+        Row: {
+          display_order: number
+          key: string
+          label: string
+          module: string
+          supports_scope: boolean
+        }
+        Insert: {
+          display_order?: number
+          key: string
+          label: string
+          module: string
+          supports_scope?: boolean
+        }
+        Update: {
+          display_order?: number
+          key?: string
+          label?: string
+          module?: string
+          supports_scope?: boolean
+        }
+        Relationships: []
+      }
+      permission_profile_items: {
+        Row: {
+          created_at: string
+          id: string
+          permission_key: string
+          profile_id: string
+          scope: Json | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          permission_key: string
+          profile_id: string
+          scope?: Json | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          permission_key?: string
+          profile_id?: string
+          scope?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_profile_items_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permission_keys"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "permission_profile_items_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "permission_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      permission_profiles: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_profiles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planilla_general_config: {
         Row: {
           created_at: string
@@ -3079,6 +3177,42 @@ export type Database = {
           },
         ]
       }
+      school_user_profiles: {
+        Row: {
+          created_at: string
+          profile_id: string
+          school_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+          school_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+          school_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_user_profiles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "permission_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_user_profiles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_years: {
         Row: {
           created_at: string
@@ -3660,6 +3794,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_owner: boolean
           role: Database["public"]["Enums"]["app_role"]
           school_id: string | null
           user_id: string
@@ -3667,6 +3802,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_owner?: boolean
           role: Database["public"]["Enums"]["app_role"]
           school_id?: string | null
           user_id: string
@@ -3674,6 +3810,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_owner?: boolean
           role?: Database["public"]["Enums"]["app_role"]
           school_id?: string | null
           user_id?: string
@@ -3693,6 +3830,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_permission: {
+        Args: { _key: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3701,6 +3842,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      is_school_owner: {
+        Args: { _school_id: string; _user_id: string }
+        Returns: boolean
+      }
       populate_default_primary_indicators: {
         Args: { p_school_id: string }
         Returns: undefined
@@ -3726,6 +3871,7 @@ export type Database = {
         Returns: boolean
       }
       user_is_student: { Args: { _user_id: string }; Returns: string }
+      user_school_id: { Args: { _user_id: string }; Returns: string }
       user_shares_school: {
         Args: { requesting_user_id: string; target_school_id: string }
         Returns: boolean
