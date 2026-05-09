@@ -1,58 +1,74 @@
 ## Problema
 
-El sidebar es `fixed right-0` con su propio `overflow-y-auto`. Como además el documento entero hace scroll (porque `<main>` solo controla el alto mínimo, no el alto máximo), el navegador pinta la barra de scroll del documento en el borde derecho de la ventana — justo al lado de la barra de scroll interna del sidebar. Eso produce las "dos barras juntas" que se ven raras.
+Hoy se ven dos barras de scroll pegadas al borde derecho del sidebar:
+
+1. La de `<main>` (`h-screen overflow-y-auto` dentro del wrapper con `paddingRight: SIDEBAR_WIDTH`) — esa **sí** está bien posicionada (al borde izquierdo del sidebar, que es lo que pide el usuario).
+2. La de `<nav>` interno del sidebar (`overflow-y-auto`) — esta es la que se ve "extra" justo al lado, y el usuario la percibe como que el scroll de la página está pegado al del sidebar.
+
+Además:
+- En móvil, `paddingRight: 20rem` deja el contenido aplastado contra el borde izquierdo y el sidebar fijo cubre casi toda la pantalla.
+- Varias páginas largas (EditFamily, AddStudent, AddRepresentative, dashboards, etc.) repiten patrones de contenedor (`max-w-*`, `mx-auto`, `space-y-6`) en cada archivo — viola DRY.
 
 ## Objetivo
 
-- Mantener el sidebar fijo a la derecha (sin moverlo).
-- Que la barra de scroll del contenido principal aparezca en el borde derecho del área de contenido (es decir, pegada al borde izquierdo del sidebar), no al final de la ventana.
-- Aprovechar para limpiar el layout y dejarlo más mantenible.
+- **Una sola barra de scroll visible**, en el borde derecho del área de contenido (pegada al borde izquierdo del sidebar).
+- El sidebar conserva su scroll interno **funcional** pero **sin barra visible**.
+- Layout responsive: en móvil el sidebar se oculta por defecto y el contenido usa todo el ancho.
+- Eliminar duplicación de wrappers de página con un único `PageContainer`.
 
 ## Cambios
 
-### 1. `src/components/layout/DashboardLayout.tsx`
-- Convertir el root en un contenedor de altura fija sin scroll del documento: `h-screen overflow-hidden`.
-- Que `<main>` sea el único elemento con scroll vertical: `h-screen overflow-y-auto` con `padding-top` para el TopBar.
-- Reservar el ancho del sidebar con `paddingRight` (en vez de `marginRight`) en un wrapper, así el scrollbar del `<main>` queda exactamente en el borde derecho del área de contenido, junto al borde izquierdo del sidebar — no al final de la ventana.
-- Extraer el ancho del sidebar (`20rem`) a una constante compartida (`SIDEBAR_WIDTH`) para no repetirlo en 3 archivos.
+### 1. Ocultar la barra del sidebar (`src/index.css`)
+Agregar utilidad `.scrollbar-hidden` (Firefox / IE / WebKit) en `@layer utilities`. El nav sigue scrolleando con rueda/touch, solo desaparece la barra visual.
 
-Estructura resultante (simplificada):
+### 2. `src/components/layout/AppSidebar.tsx`
+- Aplicar `scrollbar-hidden` al `<nav>` interno.
+- Sin cambios funcionales.
 
-```text
-<div class="h-screen overflow-hidden bg-background">
-  <TopBar />
-  <AppSidebar />            // fixed right-0
-  <div style="paddingRight: sidebar reservado">
-    <main class="h-screen overflow-y-auto pt-16 p-6"> ... </main>
-  </div>
-</div>
+### 3. Layout responsive (`src/components/layout/DashboardLayout.tsx` + `useSidebarState`)
+- Detectar móvil (`useIsMobile` ya existe en `src/hooks/use-mobile.tsx`).
+- En móvil: forzar `collapsed=true` por defecto, el sidebar aparece como overlay (ya es `fixed`, basta con no reservar `paddingRight`).
+- En desktop: comportamiento actual.
+- El wrapper solo aplica `paddingRight: SIDEBAR_WIDTH` cuando **no es móvil y no está colapsado**.
+- TopBar idéntico tratamiento para `right`.
+
+### 4. Nuevo `src/components/layout/PageContainer.tsx` (DRY)
+Componente único que estandariza el ancho/espaciado de cualquier página:
+
+```tsx
+<PageContainer> ...contenido... </PageContainer>
+// = <div class="max-w-7xl mx-auto space-y-6 pb-8"> ... </div>
 ```
 
-### 2. `src/components/layout/TopBar.tsx`
-- Usar la misma constante `SIDEBAR_WIDTH` para el `right` dinámico.
-- Pequeña limpieza: extraer `getInitials` y `getRoleLabel` a un util compartido (`src/lib/user-display.ts`) ya que se duplican con `AppSidebar`.
+Variantes opcionales: `size="full" | "wide" | "narrow"`.
 
-### 3. `src/components/layout/AppSidebar.tsx`
-- Reemplazar el `w-80` hardcodeado por la constante `SIDEBAR_WIDTH` (manteniendo Tailwind con `style={{ width: SIDEBAR_WIDTH }}` o un token equivalente).
-- Reutilizar `getInitials` / `getRoleLabel` desde el util compartido.
-- Sin cambios funcionales en navegación, colapso ni hover.
+### 5. Migrar páginas largas al `PageContainer`
+Aplicar a las páginas con formularios largos / dashboards donde hoy se repite el patrón:
+- `src/pages/school/EditFamily.tsx`
+- `src/pages/school/AddStudent.tsx`
+- `src/pages/school/AddRepresentative.tsx`
+- `src/pages/representative/EditFamilyData.tsx`
+- `src/pages/representative/RepAddStudent.tsx`
+- `src/pages/representative/RepAddRepresentative.tsx`
+- `src/pages/Dashboard.tsx`
+- `src/pages/school/SchoolDashboard.tsx`
+- `src/pages/representative/RepresentativeDashboard.tsx`
 
-### 4. Nuevo archivo `src/lib/layout-constants.ts`
-```ts
-export const SIDEBAR_WIDTH = "20rem";
-```
+**Solo se reemplaza el wrapper exterior**; no se toca lógica, queries, formularios ni validaciones.
 
-### 5. Nuevo archivo `src/lib/user-display.ts`
-- `getInitials(email?: string)` y `getRoleLabel(role: string | null)` centralizados.
+### 6. Verificación móvil
+Ajustar padding del `<main>` (`p-4 md:p-6`) y del header del TopBar para que no se desborden a 375px. Probar a 375 y 768 CSS px.
 
 ## Qué NO se toca
 
-- Comportamiento del sidebar (colapso, hover edge, permisos, secciones).
-- Estilos visuales del sidebar y TopBar.
-- Rutas, auth ni lógica de negocio.
+- Lógica de auth, permisos, queries, mutaciones.
+- Comportamiento de colapsar/hover del sidebar en desktop.
+- Estilos de tarjetas, inputs, modales.
+- Edge functions ni base de datos.
 
 ## Resultado esperado
 
-- Una sola barra de scroll vertical visible: la del contenido, pegada al borde izquierdo del sidebar.
-- El sidebar conserva su propio scroll interno cuando hace falta, pero ya no aparece "duplicado" junto al del documento.
-- Menos duplicación entre `TopBar`, `AppSidebar` y `DashboardLayout`.
+- Una sola barra de scroll visible, exactamente al borde izquierdo del sidebar.
+- Sidebar sigue scrolleando internamente sin mostrar barra.
+- En móvil el sidebar se oculta y el contenido ocupa el ancho completo.
+- Páginas largas comparten el mismo wrapper (`PageContainer`) — menos duplicación, más consistencia.
