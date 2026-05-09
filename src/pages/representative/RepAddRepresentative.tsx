@@ -75,7 +75,7 @@ export default function RepAddRepresentative() {
     if (existingRep && !formDataInitialized) { setFormData(existingRep.form_data as Record<string, any> || {}); setFormDataInitialized(true); }
   }, [existingRep, formDataInitialized]);
 
-  const isRepDataReady = !isEditing || (!!existingRep && formDataInitialized);
+  const isRepDataReady = (!isEditing || (!!existingRep && formDataInitialized)) && formFields.length > 0;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
