@@ -297,7 +297,6 @@ export default function AdminUsersList() {
           { label: "Dashboard", href: "/dashboard" },
           { label: "Administradores" },
         ]}
-        imageUrl="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=300&h=200&fit=crop"
       />
 
       <div className="bg-card rounded-xl shadow-sm border">

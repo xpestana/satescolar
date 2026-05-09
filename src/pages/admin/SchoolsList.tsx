@@ -114,7 +114,6 @@ export default function SchoolsList() {
           { label: "Dashboard", href: "/dashboard" },
           { label: "Colegios" },
         ]}
-        imageUrl="https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=300&h=200&fit=crop"
       />
 
       <div className="bg-card rounded-xl shadow-sm border">
