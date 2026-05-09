@@ -1,53 +1,27 @@
-## Diagnóstico
+## Problema
 
-En el último cambio metí dos cosas que ahora estorban:
+El bloque de breadcrumb (PageHeader) muestra imágenes distintas según la página/rol:
 
-1. **Oculté la barra del sidebar** (`scrollbar-hidden` en el `<nav>`). Tú quieres que **se vea**: tanto el scroll del contenido como el del sidebar deben estar presentes. Hay que revertir esto.
-
-2. **Puse `h-screen` en el wrapper intermedio** (el div con `paddingRight`) además del `h-screen` del `<main>`. Tener dos elementos en cascada con altura fija de viewport, uno con `padding-right`, hace que el navegador en algunos casos pinte una barra de scroll extra en el wrapper (ese es el "tercer scroll" que ves, vacío y que baja más allá del contenido). El root ya está en `h-screen overflow-hidden`, así que el wrapper no necesita altura propia: basta con que `<main>` sea el único elemento dimensionado y scrolleable.
-
-El sidebar (aside fixed) ya tiene su propio `h-screen` y es independiente del flujo, no influye.
+- La mayoría de páginas usan la imagen por defecto `@/assets/network-tech.png` (la isométrica azul correcta).
+- 3 páginas de admin pasan un `imageUrl` propio con fotos de Unsplash, lo que hace que el header se vea diferente:
+  - `src/pages/admin/UsersList.tsx` (línea 444) — foto de libros
+  - `src/pages/admin/SchoolsList.tsx` (línea 117) — foto de libros
+  - `src/pages/admin/AdminUsersList.tsx` (línea 300) — foto de escritorio
 
 ## Cambios
 
-### 1. `src/index.css`
-- Mantener la utilidad `.scrollbar-hidden` (es genérica y útil) **pero dejar de usarla en el sidebar**. No se borra, simplemente queda disponible para popovers/listas.
+1. Eliminar la prop `imageUrl="..."` de esas 3 páginas para que caigan al default `network-tech.png`. Así todos los roles (admin, colegio, representante, docente) verán exactamente la misma imagen en el breadcrumb.
 
-### 2. `src/components/layout/AppSidebar.tsx`
-- En el `<nav>` quitar `scrollbar-hidden`. Vuelve a verse la barra del sidebar como antes.
+2. No se modifica `PageHeader.tsx` (sigue aceptando `imageUrl` opcional por compatibilidad, simplemente nadie lo sobreescribe).
 
-### 3. `src/components/layout/DashboardLayout.tsx`
-- Quitar `h-screen` del div wrapper intermedio. Queda solo con `transition-[padding]` y el `paddingRight` reservado.
-- Mantener `<main>` como único elemento scrolleable (`h-screen overflow-y-auto pt-16 px-4 pb-6 md:px-6`).
-- Mantener el root `h-screen overflow-hidden` (eso evita que el documento mismo haga scroll).
+3. No se tocan títulos, descripciones, ni layout.
 
-Estructura resultante:
+## Sobre el preview en blanco
 
-```text
-<div h-screen overflow-hidden>          // root: bloquea scroll del documento
-  <TopBar />                            // fixed
-  <AppSidebar />                        // fixed, scroll interno propio (visible)
-  <div paddingRight=sidebar>            // wrapper sin altura propia
-    <main h-screen overflow-y-auto>    // único scroll de contenido visible
-      ...contenido...
-    </main>
-  </div>
-</div>
-```
+El replay muestra que la sesión está en `/login` y no hay logs ni errores de consola registrados, así que no hay evidencia de un crash real. El preview en blanco suele deberse al proxy `lovable.js` interfiriendo con requests de auth en el iframe de preview. Recomendación: probar en la URL publicada / hacer hard reload. Si tras el cambio sigue en blanco con errores reales, lo revisamos con logs concretos — pero no haré cambios especulativos al runtime sin una señal de error.
 
-### 4. Mobile
-- Sin cambios respecto a la última versión: en móvil `reserveSidebar=false`, el sidebar overlay, `<main>` ocupa todo el ancho.
+## Archivos a editar
 
-## Qué NO se toca
-
-- `PageContainer.tsx` (queda disponible para uso futuro, no rompe nada).
-- Lógica del sidebar, hover, colapso, permisos.
-- TopBar.
-- Páginas individuales.
-
-## Resultado esperado
-
-- **Scroll del contenido** visible, pegado al borde izquierdo del sidebar (como ya estaba).
-- **Scroll del sidebar** visible cuando el menú es más alto que la pantalla (revertido).
-- **Sin tercer scroll fantasma** — desaparece el scroll extra del wrapper que bajaba más allá del contenido.
-- El documento sigue sin scrollear (root mantiene `overflow-hidden`).
+- `src/pages/admin/UsersList.tsx`
+- `src/pages/admin/SchoolsList.tsx`
+- `src/pages/admin/AdminUsersList.tsx`
