@@ -1,4 +1,5 @@
 import { useRef, useCallback } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -179,28 +180,33 @@ export function AppSidebar() {
   const { isOwner, has, loading: permLoading } = usePermissions();
 
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
+  const isMobile = useIsMobile();
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // On mobile, treat the sidebar as collapsed by default so it overlays
+  // and doesn't steal screen real estate. Desktop behavior is unchanged.
+  const effectiveCollapsed = collapsed || isMobile;
+
   const handleMouseEnter = useCallback(() => {
-    if (!collapsed) return;
+    if (!effectiveCollapsed) return;
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setHovering(true);
-  }, [collapsed, setHovering]);
+  }, [effectiveCollapsed, setHovering]);
 
   const handleMouseLeave = useCallback(() => {
-    if (!collapsed) return;
+    if (!effectiveCollapsed) return;
     hoverTimeoutRef.current = setTimeout(() => setHovering(false), 300);
-  }, [collapsed, setHovering]);
+  }, [effectiveCollapsed, setHovering]);
 
   const handleEdgeEnter = useCallback(() => {
-    if (!collapsed) return;
+    if (!effectiveCollapsed) return;
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setHovering(true);
-  }, [collapsed, setHovering]);
+  }, [effectiveCollapsed, setHovering]);
 
   return (
     <>
-      {collapsed && !hovering && (
+      {effectiveCollapsed && !hovering && (
         <div
           className="fixed right-0 top-0 z-40 h-screen w-4 cursor-pointer"
           onMouseEnter={handleEdgeEnter}
@@ -210,12 +216,11 @@ export function AppSidebar() {
       <aside
         className={cn(
           "fixed right-0 top-0 z-40 flex h-screen flex-col transition-transform duration-300 ease-in-out",
-          collapsed && !hovering && "translate-x-full"
+          effectiveCollapsed && !hovering && "translate-x-full"
         )}
-        style={{ width: SIDEBAR_WIDTH, ...(collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : {}) }}
+        style={{ width: SIDEBAR_WIDTH, ...(effectiveCollapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : {}) }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        
       >
         {/* Logo Section */}
         <div className="flex items-center justify-between py-6 px-4 bg-[#01051e]">
@@ -232,7 +237,7 @@ export function AppSidebar() {
         </div>
 
         {/* Navigation - Grid Layout */}
-        <nav className="flex-1 overflow-y-auto px-4 py-4 bg-white border-l border-border">
+        <nav className="flex-1 overflow-y-auto scrollbar-hidden px-4 py-4 bg-white border-l border-border">
           {navSections.map((section, sectionIndex) => {
             if (section.requiredRole && userRole !== section.requiredRole) return null;
 

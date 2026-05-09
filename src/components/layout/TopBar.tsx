@@ -15,19 +15,22 @@ import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.svg";
 import { SIDEBAR_WIDTH } from "@/lib/layout-constants";
 import { getInitials, getRoleLabel } from "@/lib/user-display";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export function TopBar() {
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
   const { collapsed, toggleCollapsed } = useSidebarState();
+  const isMobile = useIsMobile();
 
   const displayLogo = userRole === "school" && school?.logo_url ? school.logo_url : logo;
   const isSchoolLogo = userRole === "school" && !!school?.logo_url;
+  const reserveSidebar = !isMobile && !collapsed;
 
   return (
     <header
-      className="fixed top-0 left-0 z-30 h-16 bg-transparent flex items-center justify-between px-6 transition-[right] duration-300 ease-in-out"
-      style={{ right: collapsed ? 0 : SIDEBAR_WIDTH }}
+      className="fixed top-0 left-0 z-30 h-16 bg-transparent flex items-center justify-between px-4 md:px-6 transition-[right] duration-300 ease-in-out"
+      style={{ right: reserveSidebar ? SIDEBAR_WIDTH : 0 }}
     >
       <div className="flex items-center gap-4">
         <DropdownMenu>
