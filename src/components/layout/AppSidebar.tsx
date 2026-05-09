@@ -215,7 +215,7 @@ export function AppSidebar() {
         style={{ width: SIDEBAR_WIDTH, ...(collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : {}) }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : undefined}
+        
       >
         {/* Logo Section */}
         <div className="flex items-center justify-between py-6 px-4 bg-[#01051e]">
