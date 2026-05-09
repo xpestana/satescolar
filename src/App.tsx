@@ -370,7 +370,8 @@ const App = () => (
               <Route path="/school/aula-virtual/supervision" element={<ProtectedRoute requiredRole="school"><ClassroomSupervision /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
+              </Routes>
+            </ErrorBoundary>
           </SidebarProvider>
         </AuthProvider>
       </BrowserRouter>
