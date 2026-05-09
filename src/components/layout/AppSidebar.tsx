@@ -209,9 +209,10 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          "fixed right-0 top-0 z-40 flex h-screen w-80 flex-col transition-transform duration-300 ease-in-out",
+          "fixed right-0 top-0 z-40 flex h-screen flex-col transition-transform duration-300 ease-in-out",
           collapsed && !hovering && "translate-x-full"
         )}
+        style={{ width: SIDEBAR_WIDTH, ...(collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : {}) }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         style={collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : undefined}
@@ -310,7 +311,7 @@ export function AppSidebar() {
                 {userRole === "school" && school?.name ? school.name : userRole === "representative" ? `Familia ${familyName}` : "Colegio"}
               </p>
               <p className="text-xs text-white/70">
-                {getRoleLabel(userRole)}
+                {getRoleLabelShort(userRole)}
               </p>
             </div>
             <Button
