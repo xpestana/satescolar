@@ -188,21 +188,21 @@ export function AppSidebar() {
   const effectiveCollapsed = collapsed || isMobile;
 
   const handleMouseEnter = useCallback(() => {
-    if (!collapsed) return;
+    if (!effectiveCollapsed) return;
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setHovering(true);
-  }, [collapsed, setHovering]);
+  }, [effectiveCollapsed, setHovering]);
 
   const handleMouseLeave = useCallback(() => {
-    if (!collapsed) return;
+    if (!effectiveCollapsed) return;
     hoverTimeoutRef.current = setTimeout(() => setHovering(false), 300);
-  }, [collapsed, setHovering]);
+  }, [effectiveCollapsed, setHovering]);
 
   const handleEdgeEnter = useCallback(() => {
-    if (!collapsed) return;
+    if (!effectiveCollapsed) return;
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setHovering(true);
-  }, [collapsed, setHovering]);
+  }, [effectiveCollapsed, setHovering]);
 
   return (
     <>
