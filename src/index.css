@@ -130,3 +130,16 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+
+@layer utilities {
+  /* Hide scrollbar visually while keeping the element scrollable.
+     Use for internal scroll containers (e.g. sidebar nav) where a visible
+     bar would conflict with the main content scrollbar. */
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+}
