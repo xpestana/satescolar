@@ -1,50 +1,58 @@
-## Diagnóstico
+## Problema
 
-Tras el cambio del scroll del documento al `<main>`, en esta vista quedan dos barras visibles a la derecha:
+El sidebar es `fixed right-0` con su propio `overflow-y-auto`. Como además el documento entero hace scroll (porque `<main>` solo controla el alto mínimo, no el alto máximo), el navegador pinta la barra de scroll del documento en el borde derecho de la ventana — justo al lado de la barra de scroll interna del sidebar. Eso produce las "dos barras juntas" que se ven raras.
 
-1. La del **`<main>`** (contenido de la página) — correcta y deseada.
-2. La del **`<nav>` interno del sidebar** (`overflow-y-auto`) — aparece porque el menú lateral, con todas las secciones de "Registros / Utilidades / Inscripciones / Notas / …", excede la altura disponible.
+## Objetivo
 
-No es un problema de las páginas hijas: el barrido del repo confirma que ningún `pages/*` crea su propio contenedor scrollable a pantalla completa. Todos los `overflow-y-auto` restantes son popovers, tablas o listas acotadas (`max-h-*`), lo cual está bien.
-
-El "desorden" real es visual: dos barras compitiendo a la derecha. La solución limpia es **mantener un solo scrollbar visible** (el del contenido) y dejar el del sidebar funcional pero oculto, además de blindar el patrón para que ninguna página futura introduzca un tercer scroll.
+- Mantener el sidebar fijo a la derecha (sin moverlo).
+- Que la barra de scroll del contenido principal aparezca en el borde derecho del área de contenido (es decir, pegada al borde izquierdo del sidebar), no al final de la ventana.
+- Aprovechar para limpiar el layout y dejarlo más mantenible.
 
 ## Cambios
 
-### 1. Ocultar la barra del sidebar (sigue siendo scrollable)
-- Agregar utilidad reutilizable `.scrollbar-hidden` en `src/index.css`:
+### 1. `src/components/layout/DashboardLayout.tsx`
+- Convertir el root en un contenedor de altura fija sin scroll del documento: `h-screen overflow-hidden`.
+- Que `<main>` sea el único elemento con scroll vertical: `h-screen overflow-y-auto` con `padding-top` para el TopBar.
+- Reservar el ancho del sidebar con `paddingRight` (en vez de `marginRight`) en un wrapper, así el scrollbar del `<main>` queda exactamente en el borde derecho del área de contenido, junto al borde izquierdo del sidebar — no al final de la ventana.
+- Extraer el ancho del sidebar (`20rem`) a una constante compartida (`SIDEBAR_WIDTH`) para no repetirlo en 3 archivos.
 
-```css
-@layer utilities {
-  .scrollbar-hidden {
-    scrollbar-width: none;            /* Firefox */
-    -ms-overflow-style: none;         /* IE/Edge legacy */
-  }
-  .scrollbar-hidden::-webkit-scrollbar { /* Chrome / Safari */
-    display: none;
-  }
-}
+Estructura resultante (simplificada):
+
+```text
+<div class="h-screen overflow-hidden bg-background">
+  <TopBar />
+  <AppSidebar />            // fixed right-0
+  <div style="paddingRight: sidebar reservado">
+    <main class="h-screen overflow-y-auto pt-16 p-6"> ... </main>
+  </div>
+</div>
 ```
 
-- Aplicar `scrollbar-hidden` al `<nav>` del sidebar en `src/components/layout/AppSidebar.tsx` (sigue desplazándose con la rueda / touch / teclado).
+### 2. `src/components/layout/TopBar.tsx`
+- Usar la misma constante `SIDEBAR_WIDTH` para el `right` dinámico.
+- Pequeña limpieza: extraer `getInitials` y `getRoleLabel` a un util compartido (`src/lib/user-display.ts`) ya que se duplican con `AppSidebar`.
 
-Resultado: una sola barra visible, la del contenido principal, pegada al borde izquierdo del sidebar.
+### 3. `src/components/layout/AppSidebar.tsx`
+- Reemplazar el `w-80` hardcodeado por la constante `SIDEBAR_WIDTH` (manteniendo Tailwind con `style={{ width: SIDEBAR_WIDTH }}` o un token equivalente).
+- Reutilizar `getInitials` / `getRoleLabel` desde el util compartido.
+- Sin cambios funcionales en navegación, colapso ni hover.
 
-### 2. Reforzar el principio "solo `<main>` hace scroll de página"
-- En `src/components/layout/DashboardLayout.tsx` añadir un comentario corto que documente la regla y que las páginas **no** deben usar `min-h-screen`, `h-screen` ni `overflow-y-auto` a nivel raíz.
-- Crear un wrapper opcional `PageContainer` (`src/components/layout/PageContainer.tsx`) con clases estándar (`space-y-6`, ancho máximo, etc.) para que las páginas lo usen en lugar de repetir clases — DRY. Adoptarlo solo donde sea trivial (no migración masiva en este turno).
+### 4. Nuevo archivo `src/lib/layout-constants.ts`
+```ts
+export const SIDEBAR_WIDTH = "20rem";
+```
 
-### 3. Auditoría rápida (sin cambios funcionales)
-Ya verificado por búsqueda: ninguna página actual rompe la regla. Los `overflow-y-auto` restantes son válidos (popovers, listas con `max-h-*`, tablas con scroll horizontal). No se tocan.
+### 5. Nuevo archivo `src/lib/user-display.ts`
+- `getInitials(email?: string)` y `getRoleLabel(role: string | null)` centralizados.
 
 ## Qué NO se toca
 
-- Comportamiento, estilos visuales ni rutas del sidebar.
-- Lógica de las páginas existentes.
-- Modales y popovers con `overflow-y-auto` propios (correctos).
+- Comportamiento del sidebar (colapso, hover edge, permisos, secciones).
+- Estilos visuales del sidebar y TopBar.
+- Rutas, auth ni lógica de negocio.
 
 ## Resultado esperado
 
-- Una única barra de scroll visible en cualquier vista del dashboard, justo al borde izquierdo del sidebar.
-- El menú lateral sigue siendo desplazable con rueda/touch aunque su barra ya no se vea.
-- Una utilidad y un wrapper documentados que evitan que futuras páginas reintroduzcan scrolls dobles.
+- Una sola barra de scroll vertical visible: la del contenido, pegada al borde izquierdo del sidebar.
+- El sidebar conserva su propio scroll interno cuando hace falta, pero ya no aparece "duplicado" junto al del documento.
+- Menos duplicación entre `TopBar`, `AppSidebar` y `DashboardLayout`.

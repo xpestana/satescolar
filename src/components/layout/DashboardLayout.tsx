@@ -31,9 +31,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    // Layout rule: the document never scrolls. Only `<main>` below scrolls.
-    // Pages rendered as `children` must NOT use `min-h-screen`, `h-screen`
-    // nor `overflow-y-auto` at their root — that creates a second scrollbar.
     <div className="h-screen overflow-hidden bg-background">
       <TopBar />
       <AppSidebar />
