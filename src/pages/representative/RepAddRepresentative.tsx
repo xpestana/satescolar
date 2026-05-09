@@ -75,7 +75,7 @@ export default function RepAddRepresentative() {
     if (existingRep && !formDataInitialized) { setFormData(existingRep.form_data as Record<string, any> || {}); setFormDataInitialized(true); }
   }, [existingRep, formDataInitialized]);
 
-  const isRepDataReady = !isEditing || (!!existingRep && formDataInitialized);
+  const isRepDataReady = (!isEditing || (!!existingRep && formDataInitialized)) && formFields.length > 0;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -94,8 +94,12 @@ export default function RepAddRepresentative() {
       const documentType = formData.tipo_documento || "";
       const documentNum = formData.documento || "";
       const documentId = documentType && documentNum ? `${documentType}-${documentNum}` : documentNum || null;
+      // Preserve previously saved fields not present in current form (e.g. fields removed from builder)
+      const mergedFormData = isEditing
+        ? { ...((existingRep?.form_data as Record<string, any>) || {}), ...formData }
+        : formData;
       const repData = {
-        family_id: familyId, photo_url: photoUrl, form_data: formData, document_id: documentId,
+        family_id: familyId, photo_url: photoUrl, form_data: mergedFormData, document_id: documentId,
         phone: formData.numero_contacto || formData.telefono || null,
         email: formData.email || formData.correo || formData.correo_electronico || null,
       };
