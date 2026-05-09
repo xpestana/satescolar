@@ -37,12 +37,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="h-screen overflow-hidden bg-background">
       <TopBar />
       <AppSidebar />
-      <main
-        className="h-screen overflow-y-auto pt-16 p-6 transition-[padding] duration-300 ease-in-out"
-        style={{ paddingRight: collapsed ? undefined : `calc(${SIDEBAR_WIDTH} + 1.5rem)` }}
+      <div
+        className="h-screen transition-[padding] duration-300 ease-in-out"
+        style={{ paddingRight: collapsed ? 0 : SIDEBAR_WIDTH }}
       >
-        {children}
-      </main>
+        <main className="h-screen overflow-y-auto pt-16 p-6">{children}</main>
+      </div>
     </div>
   );
 }
