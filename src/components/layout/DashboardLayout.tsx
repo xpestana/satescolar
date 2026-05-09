@@ -5,6 +5,7 @@ import { TopBar } from "./TopBar";
 import { useAuth } from "@/hooks/useAuth";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { PageLoadingSkeleton } from "@/components/ui/loading-skeletons";
+import { SIDEBAR_WIDTH } from "@/lib/layout-constants";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -30,15 +31,15 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-hidden bg-background">
       <TopBar />
       <AppSidebar />
-      <main
-        className="min-h-screen pt-16 p-6 transition-[margin] duration-300 ease-in-out"
-        style={{ marginRight: collapsed ? 0 : "20rem" }}
+      <div
+        className="h-screen transition-[padding] duration-300 ease-in-out"
+        style={{ paddingRight: collapsed ? 0 : SIDEBAR_WIDTH }}
       >
-        {children}
-      </main>
+        <main className="h-screen overflow-y-auto pt-16 p-6">{children}</main>
+      </div>
     </div>
   );
 }

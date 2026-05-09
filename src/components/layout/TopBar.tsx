@@ -13,6 +13,8 @@ import {
 import { LogOut, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.svg";
+import { SIDEBAR_WIDTH } from "@/lib/layout-constants";
+import { getInitials, getRoleLabel } from "@/lib/user-display";
 
 export function TopBar() {
   const { user, signOut, userRole } = useAuth();
@@ -22,25 +24,10 @@ export function TopBar() {
   const displayLogo = userRole === "school" && school?.logo_url ? school.logo_url : logo;
   const isSchoolLogo = userRole === "school" && !!school?.logo_url;
 
-  const getInitials = (email?: string) => {
-    if (!email) return "U";
-    return email.charAt(0).toUpperCase();
-  };
-
-  const getRoleLabel = (role: string | null) => {
-    switch (role) {
-      case "admin": return "Administrador";
-      case "school": return "Usuario Escolar";
-      case "representative": return "Representante";
-      case "teacher": return "Docente";
-      default: return "Usuario";
-    }
-  };
-
   return (
     <header
       className="fixed top-0 left-0 z-30 h-16 bg-transparent flex items-center justify-between px-6 transition-[right] duration-300 ease-in-out"
-      style={{ right: collapsed ? 0 : "20rem" }}
+      style={{ right: collapsed ? 0 : SIDEBAR_WIDTH }}
     >
       <div className="flex items-center gap-4">
         <DropdownMenu>

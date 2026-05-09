@@ -35,6 +35,8 @@ import { ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { SIDEBAR_WIDTH } from "@/lib/layout-constants";
+import { getInitials, getRoleLabelShort } from "@/lib/user-display";
 
 interface NavItem {
   label: string;
@@ -196,21 +198,6 @@ export function AppSidebar() {
     setHovering(true);
   }, [collapsed, setHovering]);
 
-  const getInitials = (email?: string) => {
-    if (!email) return "U";
-    return email.charAt(0).toUpperCase();
-  };
-
-  const getRoleLabel = (role: string | null) => {
-    switch (role) {
-      case "admin": return "Admin";
-      case "school": return "Escolar";
-      case "representative": return "Representante";
-      case "teacher": return "Docente";
-      default: return "Usuario";
-    }
-  };
-
   return (
     <>
       {collapsed && !hovering && (
@@ -222,12 +209,13 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          "fixed right-0 top-0 z-40 flex h-screen w-80 flex-col transition-transform duration-300 ease-in-out",
+          "fixed right-0 top-0 z-40 flex h-screen flex-col transition-transform duration-300 ease-in-out",
           collapsed && !hovering && "translate-x-full"
         )}
+        style={{ width: SIDEBAR_WIDTH, ...(collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : {}) }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        style={collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : undefined}
+        
       >
         {/* Logo Section */}
         <div className="flex items-center justify-between py-6 px-4 bg-[#01051e]">
@@ -323,7 +311,7 @@ export function AppSidebar() {
                 {userRole === "school" && school?.name ? school.name : userRole === "representative" ? `Familia ${familyName}` : "Colegio"}
               </p>
               <p className="text-xs text-white/70">
-                {getRoleLabel(userRole)}
+                {getRoleLabelShort(userRole)}
               </p>
             </div>
             <Button
