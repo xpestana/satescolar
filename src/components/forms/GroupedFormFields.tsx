@@ -339,8 +339,13 @@ export function GroupedFormFields({
             onChange={(e) => onFieldChange(field.field_name, e.target.value)}
           />
         );
-      case "select":
-        const options = Array.isArray(field.options) ? field.options : [];
+      case "select": {
+        const rawOptions = Array.isArray(field.options) ? field.options : [];
+        // Radix Select crashes if an item has an empty string value, so we
+        // filter out empty/null/undefined options defensively.
+        const options = rawOptions
+          .map((opt: any) => (opt == null ? "" : String(opt)))
+          .filter((opt: string) => opt.trim().length > 0);
         return (
           <Select
             value={value || undefined}
@@ -350,14 +355,15 @@ export function GroupedFormFields({
               <SelectValue placeholder={field.placeholder || field.field_label} />
             </SelectTrigger>
             <SelectContent>
-              {options.map((opt: any, idx: number) => (
-                <SelectItem key={idx} value={String(opt)}>
-                  {String(opt)}
+              {options.map((opt, idx) => (
+                <SelectItem key={`${idx}-${opt}`} value={opt}>
+                  {opt}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         );
+      }
       case "checkbox":
         return (
           <div className="flex items-center space-x-2">
