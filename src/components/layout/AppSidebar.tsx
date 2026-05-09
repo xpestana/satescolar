@@ -232,7 +232,7 @@ export function AppSidebar() {
         </div>
 
         {/* Navigation - Grid Layout */}
-        <nav className="flex-1 overflow-y-auto px-4 py-4 bg-white border-l border-border">
+        <nav className="flex-1 overflow-y-auto scrollbar-hidden px-4 py-4 bg-white border-l border-border">
           {navSections.map((section, sectionIndex) => {
             if (section.requiredRole && userRole !== section.requiredRole) return null;
 
