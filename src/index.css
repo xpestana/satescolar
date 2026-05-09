@@ -109,6 +109,18 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* When the dashboard shell is mounted, lock the document scroll so only
+     <main> scrolls. Auth/public pages keep natural body scroll. */
+  body.dashboard-locked,
+  body.dashboard-locked #root {
+    height: 100%;
+    overflow: hidden;
+  }
+  html:has(body.dashboard-locked) {
+    height: 100%;
+    overflow: hidden;
+  }
 }
 
 /* Custom scrollbar */
