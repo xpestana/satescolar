@@ -50,7 +50,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <TopBar />
       <AppSidebar />
       <div
-        className="h-screen transition-[padding] duration-300 ease-in-out"
+        className="transition-[padding] duration-300 ease-in-out"
         style={{ paddingRight: reserveSidebar ? SIDEBAR_WIDTH : 0 }}
       >
         <main className="h-screen overflow-y-auto pt-16 px-4 pb-6 md:px-6">
