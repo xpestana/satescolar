@@ -1,4 +1,5 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -179,7 +180,12 @@ export function AppSidebar() {
   const { isOwner, has, loading: permLoading } = usePermissions();
 
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
+  const isMobile = useIsMobile();
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // On mobile, treat the sidebar as collapsed by default so it overlays
+  // and doesn't steal screen real estate. Desktop behavior is unchanged.
+  const effectiveCollapsed = collapsed || isMobile;
 
   const handleMouseEnter = useCallback(() => {
     if (!collapsed) return;
@@ -200,7 +206,7 @@ export function AppSidebar() {
 
   return (
     <>
-      {collapsed && !hovering && (
+      {effectiveCollapsed && !hovering && (
         <div
           className="fixed right-0 top-0 z-40 h-screen w-4 cursor-pointer"
           onMouseEnter={handleEdgeEnter}
@@ -210,12 +216,11 @@ export function AppSidebar() {
       <aside
         className={cn(
           "fixed right-0 top-0 z-40 flex h-screen flex-col transition-transform duration-300 ease-in-out",
-          collapsed && !hovering && "translate-x-full"
+          effectiveCollapsed && !hovering && "translate-x-full"
         )}
-        style={{ width: SIDEBAR_WIDTH, ...(collapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : {}) }}
+        style={{ width: SIDEBAR_WIDTH, ...(effectiveCollapsed && hovering ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : {}) }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        
       >
         {/* Logo Section */}
         <div className="flex items-center justify-between py-6 px-4 bg-[#01051e]">
