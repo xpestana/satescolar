@@ -1,49 +1,58 @@
-# Descripciones persuasivas en todos los breadcrumbs
+## Problema
+
+El sidebar es `fixed right-0` con su propio `overflow-y-auto`. Como además el documento entero hace scroll (porque `<main>` solo controla el alto mínimo, no el alto máximo), el navegador pinta la barra de scroll del documento en el borde derecho de la ventana — justo al lado de la barra de scroll interna del sidebar. Eso produce las "dos barras juntas" que se ven raras.
 
 ## Objetivo
-El componente `PageHeader` ya soporta descripciones, pero el diccionario actual cubre solo una parte de las páginas. La idea es extenderlo para que **todas** las pantallas que usan `PageHeader` (admin, school, teacher, representative) muestren una descripción persuasiva debajo del breadcrumb.
 
-## Alcance
-Un único archivo a modificar: `src/components/layout/PageHeader.tsx`.
-
-No es necesario tocar las pantallas individualmente: el `PageHeader` resuelve la descripción automáticamente a partir del `title`. Cualquier pantalla podrá seguir sobreescribiendo con la prop opcional `description`.
+- Mantener el sidebar fijo a la derecha (sin moverlo).
+- Que la barra de scroll del contenido principal aparezca en el borde derecho del área de contenido (es decir, pegada al borde izquierdo del sidebar), no al final de la ventana.
+- Aprovechar para limpiar el layout y dejarlo más mantenible.
 
 ## Cambios
 
-### 1. Reemplazar el diccionario por una lista ordenada con coincidencia parcial
-Hoy es un `Record<string, string>` con coincidencia parcial vía `Object.keys().find(...)`, pero el orden de claves no está garantizado. Se cambia a `Array<[string, string]>` para que las coincidencias más específicas aparezcan primero (por ejemplo "Editar Familia" antes que "Familia").
+### 1. `src/components/layout/DashboardLayout.tsx`
+- Convertir el root en un contenedor de altura fija sin scroll del documento: `h-screen overflow-hidden`.
+- Que `<main>` sea el único elemento con scroll vertical: `h-screen overflow-y-auto` con `padding-top` para el TopBar.
+- Reservar el ancho del sidebar con `paddingRight` (en vez de `marginRight`) en un wrapper, así el scrollbar del `<main>` queda exactamente en el borde derecho del área de contenido, junto al borde izquierdo del sidebar — no al final de la ventana.
+- Extraer el ancho del sidebar (`20rem`) a una constante compartida (`SIDEBAR_WIDTH`) para no repetirlo en 3 archivos.
 
-### 2. Cobertura completa de títulos
-Añadir entradas para todas las páginas detectadas con `PageHeader title=`:
+Estructura resultante (simplificada):
 
-- **Admin**: Colegios, Crear/Editar Colegio, Usuarios, Administradores del Sistema, Enviar Email, Prueba de subida a S3.
-- **School / Registros**: Docentes, Agregar/Editar Docente, Familias, Editar Familia, Agregar/Editar Representante, Agregar/Editar Estudiante, Estudiantes, Inscripciones, Búsqueda Avanzada.
-- **School / Académico**: Áreas / Materias, Asignación de Áreas, Ajustes de Notas, Ajustes de Evaluación, Sábana de Notas, Consulta de Notas y Boletas, Supervisión de Aulas Virtuales, Configuraciones (Períodos y Secciones).
-- **School / Administrativo**: Dashboard de Pagos, Registro de Pagos, Configuración de Pagos, Configuración de Morosidad, Estudiantes Morosos, Estado de Cuenta.
-- **School / Asistencia**: Escáner QR, Asistencias.
-- **School / Configuración**: Configuraciones - Formularios, Configuración de Planillas, Constructor de Planillas, Planillas, Usuarios y Permisos, Nuevo Usuario Escolar, Editar Usuario, Nuevo Perfil de Permiso, Editar Perfil, Utilidades, Carnets, Correos Electrónicos.
-- **Teacher**: Mis Materias, Registro de Notas, Mi Carnet, Aula Virtual.
-- **Representative**: Mis Estudiantes, Mis Representantes, Datos de Familia, Familia {nombre}, Aula Virtual — {estudiante}, Agregar/Editar Representante, Agregar/Editar Estudiante.
+```text
+<div class="h-screen overflow-hidden bg-background">
+  <TopBar />
+  <AppSidebar />            // fixed right-0
+  <div style="paddingRight: sidebar reservado">
+    <main class="h-screen overflow-y-auto pt-16 p-6"> ... </main>
+  </div>
+</div>
+```
 
-### 3. Coincidencia parcial robusta
-La función `lookupDescription(title)` itera la lista en orden y devuelve la primera entrada cuyo key esté contenido en el `title`. Esto cubre títulos dinámicos como:
-- `"Editar Familia - González"` → "Editar Familia".
-- `"Aula Virtual — Juan Pérez"` → "Aula Virtual".
-- `"Agregar Estudiante - Familia X"` → "Agregar Estudiante".
-- `"Familia González"` → "Familia ".
+### 2. `src/components/layout/TopBar.tsx`
+- Usar la misma constante `SIDEBAR_WIDTH` para el `right` dinámico.
+- Pequeña limpieza: extraer `getInitials` y `getRoleLabel` a un util compartido (`src/lib/user-display.ts`) ya que se duplican con `AppSidebar`.
 
-### 4. Sin cambios visuales adicionales
-- Se mantiene la imagen tecnológica de redes ya integrada.
-- Se mantiene la prop opcional `description` por si una pantalla puntual quiere un copy distinto.
-- Layout y estilos del header no cambian.
+### 3. `src/components/layout/AppSidebar.tsx`
+- Reemplazar el `w-80` hardcodeado por la constante `SIDEBAR_WIDTH` (manteniendo Tailwind con `style={{ width: SIDEBAR_WIDTH }}` o un token equivalente).
+- Reutilizar `getInitials` / `getRoleLabel` desde el util compartido.
+- Sin cambios funcionales en navegación, colapso ni hover.
 
-## Detalles técnicos
-Archivo único: `src/components/layout/PageHeader.tsx`
-- Cambiar `DESCRIPTIONS` de `Record<string,string>` a `Array<[string,string]>`.
-- Reemplazar `getDescription` por `lookupDescription` con iteración ordenada (`title === key || title.includes(key)`).
-- Añadir las entradas faltantes listadas arriba.
-- No se modifican otros archivos del proyecto.
+### 4. Nuevo archivo `src/lib/layout-constants.ts`
+```ts
+export const SIDEBAR_WIDTH = "20rem";
+```
 
-## Validación
-- Recorrer mentalmente las rutas principales (`/registros/familias`, `/registros/docentes`, `/pagos`, `/configuraciones/usuarios`, `/teacher/materias`, `/representative/estudiantes`, etc.) y confirmar que cada `title` mapea a una descripción.
-- Las páginas dashboard que usan `PageHeader` con títulos de tarjetas (StatCard) NO se ven afectadas porque ese componente es distinto a `PageHeader`.
+### 5. Nuevo archivo `src/lib/user-display.ts`
+- `getInitials(email?: string)` y `getRoleLabel(role: string | null)` centralizados.
+
+## Qué NO se toca
+
+- Comportamiento del sidebar (colapso, hover edge, permisos, secciones).
+- Estilos visuales del sidebar y TopBar.
+- Rutas, auth ni lógica de negocio.
+
+## Resultado esperado
+
+- Una sola barra de scroll vertical visible: la del contenido, pegada al borde izquierdo del sidebar.
+- El sidebar conserva su propio scroll interno cuando hace falta, pero ya no aparece "duplicado" junto al del documento.
+- Menos duplicación entre `TopBar`, `AppSidebar` y `DashboardLayout`.

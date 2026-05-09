@@ -35,6 +35,8 @@ import { ShieldCheck } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { SIDEBAR_WIDTH } from "@/lib/layout-constants";
+import { getInitials, getRoleLabelShort } from "@/lib/user-display";
 
 interface NavItem {
   label: string;
@@ -195,21 +197,6 @@ export function AppSidebar() {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setHovering(true);
   }, [collapsed, setHovering]);
-
-  const getInitials = (email?: string) => {
-    if (!email) return "U";
-    return email.charAt(0).toUpperCase();
-  };
-
-  const getRoleLabel = (role: string | null) => {
-    switch (role) {
-      case "admin": return "Admin";
-      case "school": return "Escolar";
-      case "representative": return "Representante";
-      case "teacher": return "Docente";
-      default: return "Usuario";
-    }
-  };
 
   return (
     <>
