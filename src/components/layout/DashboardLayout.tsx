@@ -35,6 +35,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [user, loading, navigate]);
 
+  // Lock document scroll only while the dashboard shell is mounted.
+  useEffect(() => {
+    document.body.classList.add("dashboard-locked");
+    return () => document.body.classList.remove("dashboard-locked");
+  }, []);
+
   if (loading) {
     return <PageLoadingSkeleton />;
   }
