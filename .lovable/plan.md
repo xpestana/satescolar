@@ -1,53 +1,24 @@
 ## Diagnóstico
 
-En el último cambio metí dos cosas que ahora estorban:
+El header con breadcrumb (`PageHeader`) usa por defecto una misma imagen (`@/assets/network-tech.png`) — la del icono isométrico azul que ves en casi todos los roles.
 
-1. **Oculté la barra del sidebar** (`scrollbar-hidden` en el `<nav>`). Tú quieres que **se vea**: tanto el scroll del contenido como el del sidebar deben estar presentes. Hay que revertir esto.
+El cambio que detectaste viene de **3 páginas del rol admin** que están sobreescribiendo ese default con una URL de Unsplash distinta (las fotos de libros / escritorio):
 
-2. **Puse `h-screen` en el wrapper intermedio** (el div con `paddingRight`) además del `h-screen` del `<main>`. Tener dos elementos en cascada con altura fija de viewport, uno con `padding-right`, hace que el navegador en algunos casos pinte una barra de scroll extra en el wrapper (ese es el "tercer scroll" que ves, vacío y que baja más allá del contenido). El root ya está en `h-screen overflow-hidden`, así que el wrapper no necesita altura propia: basta con que `<main>` sea el único elemento dimensionado y scrolleable.
+- `src/pages/admin/UsersList.tsx` (línea 444) — foto de libros
+- `src/pages/admin/AdminUsersList.tsx` (línea 300) — foto distinta
+- `src/pages/admin/SchoolsList.tsx` (línea 117) — foto de libros
 
-El sidebar (aside fixed) ya tiene su propio `h-screen` y es independiente del flujo, no influye.
+El resto de páginas (school, representative, teacher) no pasan `imageUrl`, por eso muestran siempre el mismo icono.
 
-## Cambios
+## Cambio
 
-### 1. `src/index.css`
-- Mantener la utilidad `.scrollbar-hidden` (es genérica y útil) **pero dejar de usarla en el sidebar**. No se borra, simplemente queda disponible para popovers/listas.
+Eliminar el prop `imageUrl="..."` de esas 3 páginas para que caigan en el default y todos los roles vean **la misma imagen** en el header.
 
-### 2. `src/components/layout/AppSidebar.tsx`
-- En el `<nav>` quitar `scrollbar-hidden`. Vuelve a verse la barra del sidebar como antes.
-
-### 3. `src/components/layout/DashboardLayout.tsx`
-- Quitar `h-screen` del div wrapper intermedio. Queda solo con `transition-[padding]` y el `paddingRight` reservado.
-- Mantener `<main>` como único elemento scrolleable (`h-screen overflow-y-auto pt-16 px-4 pb-6 md:px-6`).
-- Mantener el root `h-screen overflow-hidden` (eso evita que el documento mismo haga scroll).
-
-Estructura resultante:
-
-```text
-<div h-screen overflow-hidden>          // root: bloquea scroll del documento
-  <TopBar />                            // fixed
-  <AppSidebar />                        // fixed, scroll interno propio (visible)
-  <div paddingRight=sidebar>            // wrapper sin altura propia
-    <main h-screen overflow-y-auto>    // único scroll de contenido visible
-      ...contenido...
-    </main>
-  </div>
-</div>
-```
-
-### 4. Mobile
-- Sin cambios respecto a la última versión: en móvil `reserveSidebar=false`, el sidebar overlay, `<main>` ocupa todo el ancho.
-
-## Qué NO se toca
-
-- `PageContainer.tsx` (queda disponible para uso futuro, no rompe nada).
-- Lógica del sidebar, hover, colapso, permisos.
-- TopBar.
-- Páginas individuales.
+No se toca:
+- `PageHeader.tsx` (sigue aceptando `imageUrl` por si en el futuro alguna página específica lo necesita).
+- Títulos, descripciones, ni breadcrumbs de esas páginas.
+- Ninguna otra página.
 
 ## Resultado esperado
 
-- **Scroll del contenido** visible, pegado al borde izquierdo del sidebar (como ya estaba).
-- **Scroll del sidebar** visible cuando el menú es más alto que la pantalla (revertido).
-- **Sin tercer scroll fantasma** — desaparece el scroll extra del wrapper que bajaba más allá del contenido.
-- El documento sigue sin scrollear (root mantiene `overflow-hidden`).
+El bloque azul de breadcrumb se ve idéntico para admin, colegio, representante y docente: mismo icono isométrico a la derecha, mismas tipografías y colores.
