@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useLocation } from "react-router-dom";
 import {
