@@ -78,11 +78,11 @@ export function TopBar() {
       </div>
 
       {/* Hamburger toggle - visible when sidebar is collapsed */}
-      {collapsed && (
+      {showHamburger && (
         <Button
           variant="outline"
           size="icon"
-          onClick={toggleCollapsed}
+          onClick={handleHamburger}
           className="bg-white/90 hover:bg-white shadow-md"
           title="Abrir menú"
         >
