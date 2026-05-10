@@ -206,10 +206,17 @@ export function AppSidebar() {
 
   return (
     <>
-      {effectiveCollapsed && !hovering && (
+      {effectiveCollapsed && !hovering && !isMobile && (
         <div
           className="fixed right-0 top-0 z-40 h-screen w-4 cursor-pointer"
           onMouseEnter={handleEdgeEnter}
+        />
+      )}
+
+      {isMobile && hovering && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40"
+          onClick={() => setHovering(false)}
         />
       )}
 
