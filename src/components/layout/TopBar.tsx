@@ -20,8 +20,13 @@ import { useIsMobile } from "@/hooks/use-mobile";
 export function TopBar() {
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
-  const { collapsed, toggleCollapsed } = useSidebarState();
+  const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const isMobile = useIsMobile();
+  const showHamburger = collapsed || (isMobile && !hovering);
+  const handleHamburger = () => {
+    if (isMobile) setHovering(true);
+    else toggleCollapsed();
+  };
 
   const displayLogo = userRole === "school" && school?.logo_url ? school.logo_url : logo;
   const isSchoolLogo = userRole === "school" && !!school?.logo_url;
@@ -73,11 +78,11 @@ export function TopBar() {
       </div>
 
       {/* Hamburger toggle - visible when sidebar is collapsed */}
-      {collapsed && (
+      {showHamburger && (
         <Button
           variant="outline"
           size="icon"
-          onClick={toggleCollapsed}
+          onClick={handleHamburger}
           className="bg-white/90 hover:bg-white shadow-md"
           title="Abrir menú"
         >

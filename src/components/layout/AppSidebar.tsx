@@ -206,10 +206,17 @@ export function AppSidebar() {
 
   return (
     <>
-      {effectiveCollapsed && !hovering && (
+      {effectiveCollapsed && !hovering && !isMobile && (
         <div
           className="fixed right-0 top-0 z-40 h-screen w-4 cursor-pointer"
           onMouseEnter={handleEdgeEnter}
+        />
+      )}
+
+      {isMobile && hovering && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40"
+          onClick={() => setHovering(false)}
         />
       )}
 
@@ -278,6 +285,7 @@ export function AppSidebar() {
                       <Link
                         key={item.href}
                         to={item.href}
+                        onClick={() => { if (isMobile) setHovering(false); }}
                         className={cn(
                           "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors",
                           isActive
