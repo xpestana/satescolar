@@ -20,8 +20,13 @@ import { useIsMobile } from "@/hooks/use-mobile";
 export function TopBar() {
   const { user, signOut, userRole } = useAuth();
   const { school } = useSchoolData();
-  const { collapsed, toggleCollapsed } = useSidebarState();
+  const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const isMobile = useIsMobile();
+  const showHamburger = collapsed || (isMobile && !hovering);
+  const handleHamburger = () => {
+    if (isMobile) setHovering(true);
+    else toggleCollapsed();
+  };
 
   const displayLogo = userRole === "school" && school?.logo_url ? school.logo_url : logo;
   const isSchoolLogo = userRole === "school" && !!school?.logo_url;
