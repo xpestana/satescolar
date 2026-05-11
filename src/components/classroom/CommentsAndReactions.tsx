@@ -11,6 +11,22 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
+const ROLE_LABEL: Record<string, string> = {
+  teacher: "Docente",
+  representative: "Representante",
+  school: "Colegio",
+  admin: "Admin",
+  user: "",
+};
+
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() ?? "")
+    .join("") || "U";
+
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "🎉", "👏", "🔥", "😮", "😢"];
 
 interface Props {
