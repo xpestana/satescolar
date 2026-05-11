@@ -286,7 +286,7 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
             <p className="text-xs text-muted-foreground py-1">Sé el primero en comentar.</p>
           )}
           {comments.map((c) => {
-            const info = labelFor(c.author_id);
+            const info = labelFor(c.author_id, c.as_student_id);
             return (
               <div key={c.id} className="flex items-start gap-2">
                 <Avatar className="h-6 w-6">
