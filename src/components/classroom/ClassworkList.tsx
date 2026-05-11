@@ -16,6 +16,7 @@ import { ActivityFormModal } from "@/components/classroom/ActivityFormModal";
 import { SubmissionReview } from "@/components/classroom/SubmissionReview";
 import { RubricEditor } from "@/components/classroom/RubricEditor";
 import { ListItemSkeleton } from "@/components/ui/loading-skeletons";
+import { CommentsAndReactions } from "./CommentsAndReactions";
 
 interface Props {
   assignmentId: string;
@@ -171,6 +172,7 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
               )}
             </div>
           </div>
+          <CommentsAndReactions schoolId={schoolId} activityId={activity.id} />
         </CardContent>
       </Card>
     );

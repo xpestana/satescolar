@@ -13,6 +13,7 @@ import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { AccessCodeGate } from "@/components/classroom/AccessCodeGate";
 import { ChildClassroomTutorial } from "@/components/classroom/ClassroomTutorial";
 import { StudentSubmissionPanel } from "@/components/classroom/StudentSubmissionPanel";
+import { CommentsAndReactions } from "@/components/classroom/CommentsAndReactions";
 import { formatGradeLevel } from "@/lib/utils";
 
 export default function ChildClassroom() {
@@ -306,6 +307,13 @@ export default function ChildClassroom() {
                           minute: "2-digit",
                         })}
                       </p>
+                      {schoolId && (
+                        <CommentsAndReactions
+                          schoolId={schoolId}
+                          postId={post.id}
+                          allowComments={post.allow_comments !== false}
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 ))
@@ -358,6 +366,13 @@ export default function ChildClassroom() {
                           }}
                           studentId={studentId}
                           classroomId={selectedAssignment}
+                        />
+                      )}
+
+                      {act.school_id && (
+                        <CommentsAndReactions
+                          schoolId={act.school_id}
+                          activityId={act.id}
                         />
                       )}
                     </CardContent>

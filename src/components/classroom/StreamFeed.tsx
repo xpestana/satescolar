@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { S3AttachmentInput, type PendingAttachment } from "./S3AttachmentInput";
 import { ListItemSkeleton } from "@/components/ui/loading-skeletons";
+import { CommentsAndReactions } from "./CommentsAndReactions";
 
 interface Props {
   assignmentId: string;
@@ -423,74 +424,12 @@ export function StreamFeed({ assignmentId, schoolId, allowStudentPosts }: Props)
                 </div>
               )}
 
-              {/* Comments toggle */}
-              {post.allow_comments && (
-                <div className="border-t pt-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-muted-foreground"
-                    onClick={() => toggleComments(post.id)}
-                  >
-                    <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                    {isExpanded ? "Ocultar comentarios" : "Comentarios"}
-                  </Button>
-
-                  {isExpanded && (
-                    <div className="space-y-2 mt-2">
-                      {postComments.map((c) => (
-                        <div key={c.id} className="flex items-start gap-2 pl-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-[10px] bg-muted">
-                              {c.author_id === user?.id ? "T" : "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium">
-                                {c.author_id === user?.id ? "Tú" : "Usuario"}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground">
-                                {format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}
-                              </span>
-                            </div>
-                            <p className="text-xs text-foreground/90">{c.content}</p>
-                          </div>
-                        </div>
-                      ))}
-
-                      <div className="flex gap-2 pl-2">
-                        <Input
-                          placeholder="Escribe un comentario..."
-                          value={commentText}
-                          onChange={(e) =>
-                            setCommentTexts(prev => ({ ...prev, [post.id]: e.target.value }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && commentText.trim()) {
-                              createComment.mutate({ postId: post.id, text: commentText });
-                            }
-                          }}
-                          className="text-xs h-8"
-                        />
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2"
-                          disabled={!commentText.trim() || createComment.isPending}
-                          onClick={() => {
-                            if (commentText.trim()) {
-                              createComment.mutate({ postId: post.id, text: commentText });
-                            }
-                          }}
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Reactions + comments */}
+              <CommentsAndReactions
+                schoolId={schoolId}
+                postId={post.id}
+                allowComments={post.allow_comments}
+              />
             </CardContent>
           </Card>
         );
