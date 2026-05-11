@@ -827,6 +827,58 @@ export type Database = {
           },
         ]
       }
+      classroom_reactions: {
+        Row: {
+          activity_id: string | null
+          author_id: string
+          created_at: string
+          emoji: string
+          id: string
+          post_id: string | null
+          school_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          author_id: string
+          created_at?: string
+          emoji: string
+          id?: string
+          post_id?: string | null
+          school_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          author_id?: string
+          created_at?: string
+          emoji?: string
+          id?: string
+          post_id?: string | null
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_reactions_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_reactions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "classroom_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_reactions_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classroom_rubric_criteria: {
         Row: {
           created_at: string
