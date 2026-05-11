@@ -173,20 +173,24 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     <div className="border-t pt-2 mt-2 space-y-2">
       {/* Reactions row */}
       <div className="flex items-center gap-1 flex-wrap">
-        {Object.entries(grouped).map(([emoji, list]) => (
-          <Button
-            key={emoji}
-            type="button"
-            variant={myReacted(emoji) ? "default" : "outline"}
-            size="sm"
-            className="h-7 px-2 text-xs gap-1"
-            onClick={() => toggleReaction.mutate(emoji)}
-            disabled={toggleReaction.isPending}
-          >
-            <span className="text-sm leading-none">{emoji}</span>
-            <span className="font-medium">{list.length}</span>
-          </Button>
-        ))}
+        {Object.entries(grouped).map(([emoji, list]) => {
+          const names = list.map((r) => labelFor(r.author_id).name).join(", ");
+          return (
+            <Button
+              key={emoji}
+              type="button"
+              variant={myReacted(emoji) ? "default" : "outline"}
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => toggleReaction.mutate(emoji)}
+              disabled={toggleReaction.isPending}
+              title={names}
+            >
+              <span className="text-sm leading-none">{emoji}</span>
+              <span className="font-medium">{list.length}</span>
+            </Button>
+          );
+        })}
         <Popover>
           <PopoverTrigger asChild>
             <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs">
