@@ -66,13 +66,32 @@ interface Reaction {
   as_student_id: string | null;
 }
 
-export function CommentsAndReactions({ schoolId, postId, activityId, allowComments = true, actingStudentId }: Props) {
+export function CommentsAndReactions({ schoolId, postId, activityId, allowComments = true, actingStudentId, assignmentId }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const targetKey = postId ? ["post", postId] : ["activity", activityId];
+
+  // Detect if current user is the teacher owner of the assignment (can delete any comment)
+  const { data: isTeacherOwner = false } = useQuery({
+    queryKey: ["cr-is-teacher-owner", assignmentId, user?.id],
+    queryFn: async () => {
+      if (!assignmentId || !user?.id) return false;
+      const { data, error } = await supabase
+        .from("subject_teacher_assignments")
+        .select("id, teacher:teacher_id!inner(user_id)")
+        .eq("id", assignmentId)
+        .maybeSingle();
+      if (error) return false;
+      return (data as any)?.teacher?.user_id === user.id;
+    },
+    enabled: !!assignmentId && !!user?.id,
+  });
 
   // Comments
   const { data: comments = [] } = useQuery({
