@@ -69,7 +69,7 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     queryFn: async () => {
       const q = supabase
         .from("classroom_comments")
-        .select("id, author_id, content, created_at")
+        .select("id, author_id, content, created_at, as_student_id")
         .order("created_at", { ascending: true });
       const { data, error } = postId
         ? await q.eq("post_id", postId)
@@ -86,7 +86,7 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     queryFn: async () => {
       const q = supabase
         .from("classroom_reactions")
-        .select("id, author_id, emoji");
+        .select("id, author_id, emoji, as_student_id");
       const { data, error } = postId
         ? await q.eq("post_id", postId)
         : await q.eq("activity_id", activityId!);
