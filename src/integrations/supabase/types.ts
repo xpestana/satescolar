@@ -3906,6 +3906,14 @@ export type Database = {
         Args: { _assignment_id: string; _user_id: string }
         Returns: boolean
       }
+      resolve_user_display_names: {
+        Args: { _school_id: string; _user_ids: string[] }
+        Returns: {
+          display_name: string
+          role: string
+          user_id: string
+        }[]
+      }
       student_in_assignment: {
         Args: { _assignment_id: string; _student_id: string }
         Returns: boolean
