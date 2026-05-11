@@ -346,6 +346,9 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
           )}
           {comments.map((c) => {
             const info = labelFor(c.author_id, c.as_student_id);
+            const isAuthor = c.author_id === user?.id;
+            const canDelete = isAuthor || isTeacherOwner;
+            const isEditing = editingId === c.id;
             return (
               <div key={c.id} className="flex items-start gap-2">
                 <Avatar className="h-6 w-6">
@@ -365,8 +368,63 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
                       {format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}
                     </span>
                   </div>
-                  <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
+                  {isEditing ? (
+                    <div className="mt-1 space-y-1">
+                      <Textarea
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        rows={2}
+                        className="text-xs"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() => { setEditingId(null); setEditingText(""); }}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={!editingText.trim() || updateComment.isPending}
+                          onClick={() => updateComment.mutate({ id: c.id, content: editingText.trim() })}
+                        >
+                          {updateComment.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
+                  )}
                 </div>
+                {(isAuthor || canDelete) && !isEditing && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isAuthor && (
+                        <DropdownMenuItem
+                          onClick={() => { setEditingId(c.id); setEditingText(c.content); }}
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+                        </DropdownMenuItem>
+                      )}
+                      {canDelete && (
+                        <DropdownMenuItem
+                          onClick={() => setDeleteId(c.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             );
           })}
