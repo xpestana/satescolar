@@ -172,7 +172,7 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
               )}
             </div>
           </div>
-          <CommentsAndReactions schoolId={schoolId} activityId={activity.id} />
+          <CommentsAndReactions schoolId={schoolId} activityId={activity.id} assignmentId={assignmentId} />
         </CardContent>
       </Card>
     );
