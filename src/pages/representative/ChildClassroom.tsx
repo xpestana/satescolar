@@ -13,6 +13,7 @@ import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { AccessCodeGate } from "@/components/classroom/AccessCodeGate";
 import { ChildClassroomTutorial } from "@/components/classroom/ClassroomTutorial";
 import { StudentSubmissionPanel } from "@/components/classroom/StudentSubmissionPanel";
+import { CommentsAndReactions } from "@/components/classroom/CommentsAndReactions";
 import { formatGradeLevel } from "@/lib/utils";
 
 export default function ChildClassroom() {
