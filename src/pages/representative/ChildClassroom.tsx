@@ -368,6 +368,13 @@ export default function ChildClassroom() {
                           classroomId={selectedAssignment}
                         />
                       )}
+
+                      {act.school_id && (
+                        <CommentsAndReactions
+                          schoolId={act.school_id}
+                          activityId={act.id}
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 ))
