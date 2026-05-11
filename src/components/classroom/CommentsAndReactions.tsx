@@ -11,6 +11,22 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
 
+const ROLE_LABEL: Record<string, string> = {
+  teacher: "Docente",
+  representative: "Representante",
+  school: "Colegio",
+  admin: "Admin",
+  user: "",
+};
+
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() ?? "")
+    .join("") || "U";
+
 const REACTION_EMOJIS = ["👍", "❤️", "😂", "🎉", "👏", "🔥", "😮", "😢"];
 
 interface Props {
@@ -75,6 +91,34 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     enabled: !!(postId || activityId),
   });
 
+  // Resolve display names for all author ids (comments + reactions)
+  const authorIds = Array.from(
+    new Set([...comments.map((c) => c.author_id), ...reactions.map((r) => r.author_id)])
+  );
+  const { data: nameMap = {} } = useQuery({
+    queryKey: ["cr-names", schoolId, authorIds.sort().join(",")],
+    queryFn: async () => {
+      if (authorIds.length === 0) return {};
+      const { data, error } = await supabase.rpc("resolve_user_display_names", {
+        _user_ids: authorIds,
+        _school_id: schoolId,
+      });
+      if (error) throw error;
+      const map: Record<string, { name: string; role: string }> = {};
+      for (const row of (data || []) as Array<{ user_id: string; display_name: string; role: string }>) {
+        map[row.user_id] = { name: row.display_name || "Usuario", role: row.role || "user" };
+      }
+      return map;
+    },
+    enabled: authorIds.length > 0,
+  });
+
+  const labelFor = (uid: string) => {
+    if (uid === user?.id) return { name: "Tú", role: "" };
+    const r = nameMap[uid];
+    return r ? { name: r.name, role: ROLE_LABEL[r.role] ?? "" } : { name: "Usuario", role: "" };
+  };
+
   const addComment = useMutation({
     mutationFn: async () => {
       if (!text.trim()) return;
@@ -129,20 +173,24 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     <div className="border-t pt-2 mt-2 space-y-2">
       {/* Reactions row */}
       <div className="flex items-center gap-1 flex-wrap">
-        {Object.entries(grouped).map(([emoji, list]) => (
-          <Button
-            key={emoji}
-            type="button"
-            variant={myReacted(emoji) ? "default" : "outline"}
-            size="sm"
-            className="h-7 px-2 text-xs gap-1"
-            onClick={() => toggleReaction.mutate(emoji)}
-            disabled={toggleReaction.isPending}
-          >
-            <span className="text-sm leading-none">{emoji}</span>
-            <span className="font-medium">{list.length}</span>
-          </Button>
-        ))}
+        {Object.entries(grouped).map(([emoji, list]) => {
+          const names = list.map((r) => labelFor(r.author_id).name).join(", ");
+          return (
+            <Button
+              key={emoji}
+              type="button"
+              variant={myReacted(emoji) ? "default" : "outline"}
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => toggleReaction.mutate(emoji)}
+              disabled={toggleReaction.isPending}
+              title={names}
+            >
+              <span className="text-sm leading-none">{emoji}</span>
+              <span className="font-medium">{list.length}</span>
+            </Button>
+          );
+        })}
         <Popover>
           <PopoverTrigger asChild>
             <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs">
@@ -184,26 +232,32 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
           {comments.length === 0 && (
             <p className="text-xs text-muted-foreground py-1">Sé el primero en comentar.</p>
           )}
-          {comments.map((c) => (
-            <div key={c.id} className="flex items-start gap-2">
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className="text-[10px] bg-muted">
-                  {c.author_id === user?.id ? "T" : "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">
-                    {c.author_id === user?.id ? "Tú" : "Usuario"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}
-                  </span>
+          {comments.map((c) => {
+            const info = labelFor(c.author_id);
+            return (
+              <div key={c.id} className="flex items-start gap-2">
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className="text-[10px] bg-muted">
+                    {initialsOf(info.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium">{info.name}</span>
+                    {info.role && (
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {info.role}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">
+                      {format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
                 </div>
-                <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {allowComments && (
             <div className="flex gap-2 pt-1">
