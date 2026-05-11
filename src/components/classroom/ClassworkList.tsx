@@ -172,6 +172,7 @@ export function ClassworkList({ assignmentId, schoolId }: Props) {
               )}
             </div>
           </div>
+          <CommentsAndReactions schoolId={schoolId} activityId={activity.id} />
         </CardContent>
       </Card>
     );
