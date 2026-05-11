@@ -6,10 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, GraduationCap, AlertCircle, School, BookOpen } from "lucide-react";
+import { Users, GraduationCap, AlertCircle, School, BookOpen, Key, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
+import { toast } from "sonner";
 
 export default function RepresentativeDashboard() {
   const navigate = useNavigate();
@@ -42,6 +43,28 @@ export default function RepresentativeDashboard() {
     },
     enabled: !!familyId,
   });
+
+  const { data: accessCodes = [] } = useQuery({
+    queryKey: ["classroom-access-codes-dashboard", familyId],
+    queryFn: async () => {
+      const studentIds = students.map((s) => s.id);
+      if (!studentIds.length) return [];
+      const { data } = await supabase
+        .from("classroom_access_codes")
+        .select("student_id, access_code, is_active")
+        .in("student_id", studentIds)
+        .eq("is_active", true);
+      return data || [];
+    },
+    enabled: !!familyId && students.length > 0,
+  });
+
+  const getAccessCode = (studentId: string) => accessCodes.find((c) => c.student_id === studentId);
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast.success("Código copiado al portapapeles");
+  };
 
   const getRepName = (rep: any) => {
     const fd = (rep.form_data as Record<string, any>) || {};
@@ -189,6 +212,16 @@ export default function RepresentativeDashboard() {
                       </Badge>
                     </div>
                   </div>
+                  {getAccessCode(student.id) && (
+                    <div className="flex items-center gap-2 mb-3 p-2 bg-muted/50 rounded-md">
+                      <Key className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      <span className="text-xs text-muted-foreground">Código Aula:</span>
+                      <code className="text-xs font-mono font-semibold tracking-wider">{getAccessCode(student.id)!.access_code}</code>
+                      <Button size="icon" variant="ghost" className="h-5 w-5 ml-auto" onClick={() => copyCode(getAccessCode(student.id)!.access_code)}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
