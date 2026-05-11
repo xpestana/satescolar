@@ -227,7 +227,7 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
       {/* Reactions row */}
       <div className="flex items-center gap-1 flex-wrap">
         {Object.entries(grouped).map(([emoji, list]) => {
-          const names = list.map((r) => labelFor(r.author_id).name).join(", ");
+          const names = list.map((r) => labelFor(r.author_id, r.as_student_id).name).join(", ");
           return (
             <Button
               key={emoji}
