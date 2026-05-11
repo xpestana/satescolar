@@ -91,6 +91,34 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     enabled: !!(postId || activityId),
   });
 
+  // Resolve display names for all author ids (comments + reactions)
+  const authorIds = Array.from(
+    new Set([...comments.map((c) => c.author_id), ...reactions.map((r) => r.author_id)])
+  );
+  const { data: nameMap = {} } = useQuery({
+    queryKey: ["cr-names", schoolId, authorIds.sort().join(",")],
+    queryFn: async () => {
+      if (authorIds.length === 0) return {};
+      const { data, error } = await supabase.rpc("resolve_user_display_names", {
+        _user_ids: authorIds,
+        _school_id: schoolId,
+      });
+      if (error) throw error;
+      const map: Record<string, { name: string; role: string }> = {};
+      for (const row of (data || []) as Array<{ user_id: string; display_name: string; role: string }>) {
+        map[row.user_id] = { name: row.display_name || "Usuario", role: row.role || "user" };
+      }
+      return map;
+    },
+    enabled: authorIds.length > 0,
+  });
+
+  const labelFor = (uid: string) => {
+    if (uid === user?.id) return { name: "Tú", role: "" };
+    const r = nameMap[uid];
+    return r ? { name: r.name, role: ROLE_LABEL[r.role] ?? "" } : { name: "Usuario", role: "" };
+  };
+
   const addComment = useMutation({
     mutationFn: async () => {
       if (!text.trim()) return;
