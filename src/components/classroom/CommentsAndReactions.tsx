@@ -35,6 +35,9 @@ interface Props {
   activityId?: string;
   /** Whether comments input is allowed (defaults to true). */
   allowComments?: boolean;
+  /** When set, comments/reactions are recorded as being posted by this student
+   *  (e.g. representative entered the classroom via the student's access code). */
+  actingStudentId?: string;
 }
 
 interface Comment {
@@ -42,15 +45,17 @@ interface Comment {
   author_id: string;
   content: string;
   created_at: string;
+  as_student_id: string | null;
 }
 
 interface Reaction {
   id: string;
   author_id: string;
   emoji: string;
+  as_student_id: string | null;
 }
 
-export function CommentsAndReactions({ schoolId, postId, activityId, allowComments = true }: Props) {
+export function CommentsAndReactions({ schoolId, postId, activityId, allowComments = true, actingStudentId }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
