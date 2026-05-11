@@ -374,6 +374,7 @@ export default function ChildClassroom() {
                         <CommentsAndReactions
                           schoolId={act.school_id}
                           activityId={act.id}
+                          actingStudentId={studentId}
                         />
                       )}
                     </CardContent>
