@@ -209,6 +209,35 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     onError: (e: any) => toast.error(e?.message || "Error al comentar"),
   });
 
+  const updateComment = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const { error } = await supabase
+        .from("classroom_comments")
+        .update({ content })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      setEditingText("");
+      queryClient.invalidateQueries({ queryKey: ["cr-comments", ...targetKey] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Error al editar el comentario"),
+  });
+
+  const deleteComment = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("classroom_comments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ["cr-comments", ...targetKey] });
+      toast.success("Comentario eliminado");
+    },
+    onError: (e: any) => toast.error(e?.message || "Error al eliminar"),
+  });
+
   const toggleReaction = useMutation({
     mutationFn: async (emoji: string) => {
       // Match my own reaction taking acting student into account
