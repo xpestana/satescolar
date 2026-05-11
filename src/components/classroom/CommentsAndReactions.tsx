@@ -46,6 +46,9 @@ interface Props {
   /** When set, comments/reactions are recorded as being posted by this student
    *  (e.g. representative entered the classroom via the student's access code). */
   actingStudentId?: string;
+  /** Assignment id; used to detect if the current user is the teacher owner
+   *  so they can delete any comment on this post/activity. */
+  assignmentId?: string;
 }
 
 interface Comment {
