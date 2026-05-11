@@ -232,26 +232,32 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
           {comments.length === 0 && (
             <p className="text-xs text-muted-foreground py-1">Sé el primero en comentar.</p>
           )}
-          {comments.map((c) => (
-            <div key={c.id} className="flex items-start gap-2">
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className="text-[10px] bg-muted">
-                  {c.author_id === user?.id ? "T" : "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">
-                    {c.author_id === user?.id ? "Tú" : "Usuario"}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}
-                  </span>
+          {comments.map((c) => {
+            const info = labelFor(c.author_id);
+            return (
+              <div key={c.id} className="flex items-start gap-2">
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className="text-[10px] bg-muted">
+                    {initialsOf(info.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium">{info.name}</span>
+                    {info.role && (
+                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {info.role}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">
+                      {format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
                 </div>
-                <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {allowComments && (
             <div className="flex gap-2 pt-1">
