@@ -212,6 +212,16 @@ export default function RepresentativeDashboard() {
                       </Badge>
                     </div>
                   </div>
+                  {getAccessCode(student.id) && (
+                    <div className="flex items-center gap-2 mb-3 p-2 bg-muted/50 rounded-md">
+                      <Key className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      <span className="text-xs text-muted-foreground">Código Aula:</span>
+                      <code className="text-xs font-mono font-semibold tracking-wider">{getAccessCode(student.id)!.access_code}</code>
+                      <Button size="icon" variant="ghost" className="h-5 w-5 ml-auto" onClick={() => copyCode(getAccessCode(student.id)!.access_code)}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
