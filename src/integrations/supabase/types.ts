@@ -467,6 +467,7 @@ export type Database = {
       classroom_comments: {
         Row: {
           activity_id: string | null
+          as_student_id: string | null
           author_id: string
           content: string
           created_at: string
@@ -479,6 +480,7 @@ export type Database = {
         }
         Insert: {
           activity_id?: string | null
+          as_student_id?: string | null
           author_id: string
           content?: string
           created_at?: string
@@ -491,6 +493,7 @@ export type Database = {
         }
         Update: {
           activity_id?: string | null
+          as_student_id?: string | null
           author_id?: string
           content?: string
           created_at?: string
@@ -507,6 +510,13 @@ export type Database = {
             columns: ["activity_id"]
             isOneToOne: false
             referencedRelation: "classroom_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_comments_as_student_id_fkey"
+            columns: ["as_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
           {
@@ -830,6 +840,7 @@ export type Database = {
       classroom_reactions: {
         Row: {
           activity_id: string | null
+          as_student_id: string | null
           author_id: string
           created_at: string
           emoji: string
@@ -839,6 +850,7 @@ export type Database = {
         }
         Insert: {
           activity_id?: string | null
+          as_student_id?: string | null
           author_id: string
           created_at?: string
           emoji: string
@@ -848,6 +860,7 @@ export type Database = {
         }
         Update: {
           activity_id?: string | null
+          as_student_id?: string | null
           author_id?: string
           created_at?: string
           emoji?: string
@@ -861,6 +874,13 @@ export type Database = {
             columns: ["activity_id"]
             isOneToOne: false
             referencedRelation: "classroom_activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_reactions_as_student_id_fkey"
+            columns: ["as_student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
             referencedColumns: ["id"]
           },
           {
@@ -3905,6 +3925,13 @@ export type Database = {
       representative_child_in_assignment: {
         Args: { _assignment_id: string; _user_id: string }
         Returns: boolean
+      }
+      resolve_student_display_names: {
+        Args: { _school_id: string; _student_ids: string[] }
+        Returns: {
+          display_name: string
+          student_id: string
+        }[]
       }
       resolve_user_display_names: {
         Args: { _school_id: string; _user_ids: string[] }

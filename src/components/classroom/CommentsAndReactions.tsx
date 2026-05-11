@@ -35,6 +35,9 @@ interface Props {
   activityId?: string;
   /** Whether comments input is allowed (defaults to true). */
   allowComments?: boolean;
+  /** When set, comments/reactions are recorded as being posted by this student
+   *  (e.g. representative entered the classroom via the student's access code). */
+  actingStudentId?: string;
 }
 
 interface Comment {
@@ -42,15 +45,17 @@ interface Comment {
   author_id: string;
   content: string;
   created_at: string;
+  as_student_id: string | null;
 }
 
 interface Reaction {
   id: string;
   author_id: string;
   emoji: string;
+  as_student_id: string | null;
 }
 
-export function CommentsAndReactions({ schoolId, postId, activityId, allowComments = true }: Props) {
+export function CommentsAndReactions({ schoolId, postId, activityId, allowComments = true, actingStudentId }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -64,7 +69,7 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     queryFn: async () => {
       const q = supabase
         .from("classroom_comments")
-        .select("id, author_id, content, created_at")
+        .select("id, author_id, content, created_at, as_student_id")
         .order("created_at", { ascending: true });
       const { data, error } = postId
         ? await q.eq("post_id", postId)
@@ -81,7 +86,7 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     queryFn: async () => {
       const q = supabase
         .from("classroom_reactions")
-        .select("id, author_id, emoji");
+        .select("id, author_id, emoji, as_student_id");
       const { data, error } = postId
         ? await q.eq("post_id", postId)
         : await q.eq("activity_id", activityId!);
@@ -113,8 +118,42 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     enabled: authorIds.length > 0,
   });
 
-  const labelFor = (uid: string) => {
-    if (uid === user?.id) return { name: "Tú", role: "" };
+  // Resolve student names for "as_student_id" markers
+  const studentIds = Array.from(
+    new Set(
+      [
+        ...comments.map((c) => c.as_student_id),
+        ...reactions.map((r) => r.as_student_id),
+      ].filter((x): x is string => !!x)
+    )
+  );
+  const { data: studentMap = {} } = useQuery({
+    queryKey: ["cr-student-names", schoolId, studentIds.sort().join(",")],
+    queryFn: async () => {
+      if (studentIds.length === 0) return {};
+      const { data, error } = await supabase.rpc("resolve_student_display_names", {
+        _student_ids: studentIds,
+        _school_id: schoolId,
+      });
+      if (error) throw error;
+      const map: Record<string, string> = {};
+      for (const row of (data || []) as Array<{ student_id: string; display_name: string }>) {
+        map[row.student_id] = row.display_name || "Estudiante";
+      }
+      return map;
+    },
+    enabled: studentIds.length > 0,
+  });
+
+  const labelFor = (uid: string, asStudentId?: string | null) => {
+    if (asStudentId && studentMap[asStudentId]) {
+      return { name: studentMap[asStudentId], role: "Estudiante" };
+    }
+    if (asStudentId && actingStudentId && asStudentId === actingStudentId) {
+      // Fallback while name is loading
+      return { name: "Estudiante", role: "Estudiante" };
+    }
+    if (uid === user?.id && !actingStudentId) return { name: "Tú", role: "" };
     const r = nameMap[uid];
     return r ? { name: r.name, role: ROLE_LABEL[r.role] ?? "" } : { name: "Usuario", role: "" };
   };
@@ -129,7 +168,8 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
         post_id: postId ?? null,
         activity_id: activityId ?? null,
         is_private: false,
-      });
+        as_student_id: actingStudentId ?? null,
+      } as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -141,7 +181,13 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
 
   const toggleReaction = useMutation({
     mutationFn: async (emoji: string) => {
-      const existing = reactions.find((r) => r.author_id === user!.id && r.emoji === emoji);
+      // Match my own reaction taking acting student into account
+      const existing = reactions.find(
+        (r) =>
+          r.author_id === user!.id &&
+          r.emoji === emoji &&
+          (r.as_student_id ?? null) === (actingStudentId ?? null)
+      );
       if (existing) {
         const { error } = await supabase.from("classroom_reactions").delete().eq("id", existing.id);
         if (error) throw error;
@@ -152,7 +198,8 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
           emoji,
           post_id: postId ?? null,
           activity_id: activityId ?? null,
-        });
+          as_student_id: actingStudentId ?? null,
+        } as any);
         if (error) throw error;
       }
     },
@@ -167,14 +214,20 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     return acc;
   }, {});
 
-  const myReacted = (emoji: string) => reactions.some((r) => r.author_id === user!.id && r.emoji === emoji);
+  const myReacted = (emoji: string) =>
+    reactions.some(
+      (r) =>
+        r.author_id === user!.id &&
+        r.emoji === emoji &&
+        (r.as_student_id ?? null) === (actingStudentId ?? null)
+    );
 
   return (
     <div className="border-t pt-2 mt-2 space-y-2">
       {/* Reactions row */}
       <div className="flex items-center gap-1 flex-wrap">
         {Object.entries(grouped).map(([emoji, list]) => {
-          const names = list.map((r) => labelFor(r.author_id).name).join(", ");
+          const names = list.map((r) => labelFor(r.author_id, r.as_student_id).name).join(", ");
           return (
             <Button
               key={emoji}
@@ -233,7 +286,7 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
             <p className="text-xs text-muted-foreground py-1">Sé el primero en comentar.</p>
           )}
           {comments.map((c) => {
-            const info = labelFor(c.author_id);
+            const info = labelFor(c.author_id, c.as_student_id);
             return (
               <div key={c.id} className="flex items-start gap-2">
                 <Avatar className="h-6 w-6">

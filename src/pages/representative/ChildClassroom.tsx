@@ -312,6 +312,7 @@ export default function ChildClassroom() {
                           schoolId={schoolId}
                           postId={post.id}
                           allowComments={post.allow_comments !== false}
+                          actingStudentId={studentId}
                         />
                       )}
                     </CardContent>
@@ -373,6 +374,7 @@ export default function ChildClassroom() {
                         <CommentsAndReactions
                           schoolId={act.school_id}
                           activityId={act.id}
+                          actingStudentId={studentId}
                         />
                       )}
                     </CardContent>
