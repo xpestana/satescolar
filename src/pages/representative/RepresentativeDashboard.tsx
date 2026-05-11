@@ -6,10 +6,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, GraduationCap, AlertCircle, School, BookOpen } from "lucide-react";
+import { Users, GraduationCap, AlertCircle, School, BookOpen, Key, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
+import { toast } from "sonner";
 
 export default function RepresentativeDashboard() {
   const navigate = useNavigate();
