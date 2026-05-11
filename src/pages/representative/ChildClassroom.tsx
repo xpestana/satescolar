@@ -307,6 +307,13 @@ export default function ChildClassroom() {
                           minute: "2-digit",
                         })}
                       </p>
+                      {schoolId && (
+                        <CommentsAndReactions
+                          schoolId={schoolId}
+                          postId={post.id}
+                          allowComments={post.allow_comments !== false}
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 ))
