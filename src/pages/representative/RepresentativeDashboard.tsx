@@ -44,6 +44,28 @@ export default function RepresentativeDashboard() {
     enabled: !!familyId,
   });
 
+  const { data: accessCodes = [] } = useQuery({
+    queryKey: ["classroom-access-codes-dashboard", familyId],
+    queryFn: async () => {
+      const studentIds = students.map((s) => s.id);
+      if (!studentIds.length) return [];
+      const { data } = await supabase
+        .from("classroom_access_codes")
+        .select("student_id, access_code, is_active")
+        .in("student_id", studentIds)
+        .eq("is_active", true);
+      return data || [];
+    },
+    enabled: !!familyId && students.length > 0,
+  });
+
+  const getAccessCode = (studentId: string) => accessCodes.find((c) => c.student_id === studentId);
+
+  const copyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast.success("Código copiado al portapapeles");
+  };
+
   const getRepName = (rep: any) => {
     const fd = (rep.form_data as Record<string, any>) || {};
     return `${fd.primer_nombre || ""} ${fd.segundo_nombre || ""} ${fd.primer_apellido || ""} ${fd.segundo_apellido || ""}`.replace(/\s+/g, " ").trim() || "Sin nombre";
