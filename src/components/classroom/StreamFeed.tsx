@@ -429,6 +429,7 @@ export function StreamFeed({ assignmentId, schoolId, allowStudentPosts }: Props)
                 schoolId={schoolId}
                 postId={post.id}
                 allowComments={post.allow_comments}
+                assignmentId={assignmentId}
               />
             </CardContent>
           </Card>
