@@ -6,10 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MessageSquare, Send, Smile, Loader2 } from "lucide-react";
+import { MessageSquare, Send, Smile, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 const ROLE_LABEL: Record<string, string> = {
   teacher: "Docente",
@@ -38,6 +46,9 @@ interface Props {
   /** When set, comments/reactions are recorded as being posted by this student
    *  (e.g. representative entered the classroom via the student's access code). */
   actingStudentId?: string;
+  /** Assignment id; used to detect if the current user is the teacher owner
+   *  so they can delete any comment on this post/activity. */
+  assignmentId?: string;
 }
 
 interface Comment {
@@ -55,13 +66,32 @@ interface Reaction {
   as_student_id: string | null;
 }
 
-export function CommentsAndReactions({ schoolId, postId, activityId, allowComments = true, actingStudentId }: Props) {
+export function CommentsAndReactions({ schoolId, postId, activityId, allowComments = true, actingStudentId, assignmentId }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const targetKey = postId ? ["post", postId] : ["activity", activityId];
+
+  // Detect if current user is the teacher owner of the assignment (can delete any comment)
+  const { data: isTeacherOwner = false } = useQuery({
+    queryKey: ["cr-is-teacher-owner", assignmentId, user?.id],
+    queryFn: async () => {
+      if (!assignmentId || !user?.id) return false;
+      const { data, error } = await supabase
+        .from("subject_teacher_assignments")
+        .select("id, teacher:teacher_id!inner(user_id)")
+        .eq("id", assignmentId)
+        .maybeSingle();
+      if (error) return false;
+      return (data as any)?.teacher?.user_id === user.id;
+    },
+    enabled: !!assignmentId && !!user?.id,
+  });
 
   // Comments
   const { data: comments = [] } = useQuery({
@@ -179,6 +209,35 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
     onError: (e: any) => toast.error(e?.message || "Error al comentar"),
   });
 
+  const updateComment = useMutation({
+    mutationFn: async ({ id, content }: { id: string; content: string }) => {
+      const { error } = await supabase
+        .from("classroom_comments")
+        .update({ content })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      setEditingText("");
+      queryClient.invalidateQueries({ queryKey: ["cr-comments", ...targetKey] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Error al editar el comentario"),
+  });
+
+  const deleteComment = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("classroom_comments").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ["cr-comments", ...targetKey] });
+      toast.success("Comentario eliminado");
+    },
+    onError: (e: any) => toast.error(e?.message || "Error al eliminar"),
+  });
+
   const toggleReaction = useMutation({
     mutationFn: async (emoji: string) => {
       // Match my own reaction taking acting student into account
@@ -287,6 +346,9 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
           )}
           {comments.map((c) => {
             const info = labelFor(c.author_id, c.as_student_id);
+            const isAuthor = c.author_id === user?.id;
+            const canDelete = isAuthor || isTeacherOwner;
+            const isEditing = editingId === c.id;
             return (
               <div key={c.id} className="flex items-start gap-2">
                 <Avatar className="h-6 w-6">
@@ -306,8 +368,63 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
                       {format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}
                     </span>
                   </div>
-                  <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
+                  {isEditing ? (
+                    <div className="mt-1 space-y-1">
+                      <Textarea
+                        value={editingText}
+                        onChange={(e) => setEditingText(e.target.value)}
+                        rows={2}
+                        className="text-xs"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          onClick={() => { setEditingId(null); setEditingText(""); }}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          disabled={!editingText.trim() || updateComment.isPending}
+                          onClick={() => updateComment.mutate({ id: c.id, content: editingText.trim() })}
+                        >
+                          {updateComment.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
+                  )}
                 </div>
+                {(isAuthor || canDelete) && !isEditing && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {isAuthor && (
+                        <DropdownMenuItem
+                          onClick={() => { setEditingId(c.id); setEditingText(c.content); }}
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+                        </DropdownMenuItem>
+                      )}
+                      {canDelete && (
+                        <DropdownMenuItem
+                          onClick={() => setDeleteId(c.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             );
           })}
@@ -342,6 +459,23 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
           )}
         </div>
       )}
+
+      <AlertDialog open={!!deleteId} onOpenChange={(v) => !v && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar comentario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && deleteComment.mutate(deleteId)}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
