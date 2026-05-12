@@ -130,7 +130,7 @@ function ConceptsTab({ schoolId }: { schoolId: string }) {
           <div className="grid gap-4 py-2">
             <div className="space-y-1"><Label>Nombre *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
             <div className="space-y-1"><Label>Descripción</Label><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} /></div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label>Tipo</Label>
                 <Select value={form.concept_type} onValueChange={(v) => setForm({ ...form, concept_type: v })}>
@@ -140,7 +140,19 @@ function ConceptsTab({ schoolId }: { schoolId: string }) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>Monto por defecto (VES)</Label><Input type="number" step="0.01" value={form.default_amount} onChange={(e) => setForm({ ...form, default_amount: e.target.value })} /></div>
+              <div className="space-y-1">
+                <Label>Moneda</Label>
+                <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="VES">VES (Bs.)</SelectItem>
+                    <SelectItem value="USD">USD ($)</SelectItem>
+                    <SelectItem value="EUR">EUR (€)</SelectItem>
+                    <SelectItem value="COP">COP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1"><Label>Monto por defecto ({form.currency})</Label><Input type="number" step="0.01" value={form.default_amount} onChange={(e) => setForm({ ...form, default_amount: e.target.value })} /></div>
             </div>
             <div className="flex items-center gap-2"><Switch checked={form.is_active} onCheckedChange={(v) => setForm({ ...form, is_active: v })} /><Label>Activo</Label></div>
           </div>
