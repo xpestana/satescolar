@@ -41,12 +41,12 @@ export default function SchoolDashboard() {
   const { data: enrolledStudents = 0, isLoading: l1 } = useQuery({
     queryKey: ["metric-enrolled", schoolId, activeSchoolYear?.id],
     queryFn: async () => {
-      const { count } = await supabase
+      const { data, count } = await supabase
         .from("enrollments")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact" })
         .eq("school_id", schoolId!)
         .eq("school_year_id", activeSchoolYear!.id);
-      return count ?? 0;
+      return count ?? data?.length ?? 0;
     },
     enabled: !!schoolId && !!activeSchoolYear?.id,
     ...freshOpts,
@@ -56,11 +56,11 @@ export default function SchoolDashboard() {
   const { data: totalStudents = 0, isLoading: l2 } = useQuery({
     queryKey: ["metric-total-students", schoolId],
     queryFn: async () => {
-      const { count } = await supabase
+      const { data, count } = await supabase
         .from("student_schools")
-        .select("*", { count: "exact", head: true })
+        .select("student_id", { count: "exact" })
         .eq("school_id", schoolId!);
-      return count ?? 0;
+      return count ?? data?.length ?? 0;
     },
     enabled: !!schoolId,
     ...freshOpts,
@@ -70,12 +70,12 @@ export default function SchoolDashboard() {
   const { data: activeTeachers = 0, isLoading: l3 } = useQuery({
     queryKey: ["metric-active-teachers", schoolId],
     queryFn: async () => {
-      const { count } = await supabase
+      const { data, count } = await supabase
         .from("teachers")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact" })
         .eq("school_id", schoolId!)
         .eq("is_suspended", false);
-      return count ?? 0;
+      return count ?? data?.length ?? 0;
     },
     enabled: !!schoolId,
     ...freshOpts,
@@ -85,11 +85,11 @@ export default function SchoolDashboard() {
   const { data: totalTeachers = 0, isLoading: l4 } = useQuery({
     queryKey: ["metric-total-teachers", schoolId],
     queryFn: async () => {
-      const { count } = await supabase
+      const { data, count } = await supabase
         .from("teachers")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact" })
         .eq("school_id", schoolId!);
-      return count ?? 0;
+      return count ?? data?.length ?? 0;
     },
     enabled: !!schoolId,
     ...freshOpts,
@@ -134,12 +134,12 @@ export default function SchoolDashboard() {
   const { data: subjectsCount = 0, isLoading: l6 } = useQuery({
     queryKey: ["metric-subjects", schoolId],
     queryFn: async () => {
-      const { count } = await supabase
+      const { data, count } = await supabase
         .from("school_subjects")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact" })
         .eq("school_id", schoolId!)
         .eq("is_suspended", false);
-      return count ?? 0;
+      return count ?? data?.length ?? 0;
     },
     enabled: !!schoolId,
     ...freshOpts,
@@ -149,13 +149,13 @@ export default function SchoolDashboard() {
   const { data: assignedSubjects = 0, isLoading: l7 } = useQuery({
     queryKey: ["metric-assigned-subjects", schoolId, activeSchoolYear?.id],
     queryFn: async () => {
-      const { count } = await supabase
+      const { data, count } = await supabase
         .from("subject_teacher_assignments")
-        .select("*", { count: "exact", head: true })
+        .select("id", { count: "exact" })
         .eq("school_id", schoolId!)
         .eq("school_year_id", activeSchoolYear!.id)
         .eq("is_suspended", false);
-      return count ?? 0;
+      return count ?? data?.length ?? 0;
     },
     enabled: !!schoolId && !!activeSchoolYear?.id,
     ...freshOpts,
