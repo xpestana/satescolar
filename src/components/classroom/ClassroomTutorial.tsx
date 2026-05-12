@@ -118,12 +118,12 @@ export function ClassroomDetailTutorial() {
 export function ChildClassroomTutorial() {
   const [open, setOpen] = useState(true);
   const steps: TutorialStep[] = [
-    { icon: <BookOpen className="h-4 w-4 text-primary" />, title: "Seleccionar Materia", description: "Haz clic en la tarjeta de cualquier materia para acceder al aula virtual. Verás el profesor asignado y la sección correspondiente." },
+    { icon: <BookOpen className="h-4 w-4 text-primary" />, title: "Seleccionar Área", description: "Haz clic en la tarjeta de cualquier área para acceder al aula virtual. Verás el profesor asignado y la sección correspondiente." },
     { icon: <MessageSquare className="h-4 w-4 text-primary" />, title: "Muro", description: "Revisa los anuncios y publicaciones del profesor. Las publicaciones fijadas (📌) son las más importantes." },
     { icon: <FileText className="h-4 w-4 text-primary" />, title: "Actividades", description: "Consulta las tareas, evaluaciones y material publicado. Verás las fechas de entrega, la puntuación máxima y el estado de cada actividad." },
     { icon: <CheckCircle2 className="h-4 w-4 text-primary" />, title: "Calificaciones", description: "En esta pestaña puedes ver las notas obtenidas en cada actividad evaluable, junto con el estado de entrega." },
     { icon: <Eye className="h-4 w-4 text-primary" />, title: "Estado de Entregas", description: "Cada actividad muestra un indicador: ✅ Calificado, 🕐 Entregado, ⚠️ Pendiente o 🔴 Atrasado. Revísalos periódicamente." },
-    { icon: <Calendar className="h-4 w-4 text-primary" />, title: "Volver a Materias", description: "Usa el botón \"Volver a materias\" en la esquina superior para regresar a la lista de materias y seleccionar otra." },
+    { icon: <Calendar className="h-4 w-4 text-primary" />, title: "Volver a Áreas", description: "Usa el botón \"Volver a áreas\" en la esquina superior para regresar a la lista de áreas y seleccionar otra." },
   ];
   return (
     <TutorialWrapper title="Guía: ¿Cómo navegar el Aula Virtual de mi representado?" open={open} setOpen={setOpen}>

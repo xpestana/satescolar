@@ -159,7 +159,7 @@ export default function TeacherSubjects() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Mis Materias" breadcrumbs={[{ label: "Inicio", href: "/teacher/dashboard" }, { label: "Mis Materias" }]} />
+      <PageHeader title="Mis Áreas" breadcrumbs={[{ label: "Inicio", href: "/teacher/dashboard" }, { label: "Mis Áreas" }]} />
 
       {loading ? (
         <CardGridSkeleton count={6} columns={3} />

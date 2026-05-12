@@ -196,7 +196,7 @@ export default function ClassroomSupervision() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Materia</TableHead>
+                <TableHead>Área</TableHead>
                 <TableHead>Sección</TableHead>
                 <TableHead>Docente</TableHead>
                 <TableHead className="text-center">Configurada</TableHead>

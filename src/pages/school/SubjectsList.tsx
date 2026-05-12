@@ -176,7 +176,7 @@ export default function SubjectsList() {
   return (
     <DashboardLayout>
       <PageHeader
-        title="Áreas / Materias"
+        title="Áreas"
         breadcrumbs={[{ label: "Registros" }, { label: "Áreas" }]}
       />
 
