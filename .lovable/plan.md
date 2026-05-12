@@ -1,43 +1,35 @@
-## Diagnóstico
-
-### 1) Morosos no muestra estudiantes
-La función `isOverdue` (en `src/lib/delinquency.ts`) y el filtro en `DelinquentStudents.tsx` exigen que el concepto tenga `due_day` o `due_month`. Hoy en la BD:
-- Conceptos no recurrentes (matrícula, mes de agosto, etc.) tienen `due_day` y `due_month` en NULL → `isOverdue` retorna `false`.
-- Conceptos recurrentes (mensualidades) tienen sólo `due_day=15` sin `due_month` → calcula vencimiento del mes actual (15 mayo) y como hoy es 12 mayo, tampoco está vencido.
-
-Resultado: ningún balance entra al listado.
-
-### 2) Estado de Cuenta muestra UUID en "Métodos"
-En `payment_method_entries.method` se guarda el `id` del método configurado en el colegio (`school_payment_methods.id`). `StudentLedger.tsx` y `PaymentHistoryModal.tsx` lo pintan tal cual (`m.method`) en lugar de resolver el `label` del método.
-
----
-
 ## Plan
 
-### A) Restaurar la morosidad
+1. Crear una migración nueva que agregue una función SQL idempotente para reconstruir saldos faltantes de morosidad.
+   - La función llenará `student_concept_balances` para todo estudiante con plan asignado en el año escolar activo.
+   - Solo insertará balances que no existan; no duplicará saldos ni tocará pagos ya registrados.
+   - La fecha de morosidad se calculará por `due_month` + `due_day` dentro del año escolar activo: por ejemplo, si hoy es 12/05 y el vencimiento fue 05/01 del año escolar actual, debe contar como moroso.
+   - Para conceptos sin `due_month`, se mantendrá compatibilidad con el cálculo existente.
 
-1. **Ajustar `isOverdue` (`src/lib/delinquency.ts`):**
-   - Si el concepto **no** tiene `due_day` ni `due_month` → considerar **vencido** si hay saldo (compatibilidad con conceptos legacy / sin vencimiento configurado). Esto restaura el comportamiento previo.
-   - Para recurrentes con `due_day` pero sin `due_month` → considerar vencido si **cualquier mes anterior** del año escolar ya pasó la fecha de corte (no solo el mes actual). Es decir: revisar desde el mes de inicio del año escolar (agosto) hasta hoy y marcar vencido si al menos un mes calendario ya completó su `due_day`.
-   - Mantener la lógica actual para conceptos con `due_month` explícito.
+2. Cambiar la pantalla `/pagos/morosos` para consultar morosos desde una función RPC estable del backend, no desde lógica dependiente del navegador/PostgREST embeds.
+   - Esto evita diferencias entre Lovable y VPS.
+   - La consulta devolverá estudiantes con saldo mayor a 0 y conceptos vencidos después de la fecha de vencimiento del año escolar activo.
+   - Seguirá mostrando grado, sección, conceptos pendientes y total adeudado.
 
-2. **No tocar la UI** de `DelinquentStudents.tsx` — sólo cambia la utilidad.
+3. Agregar un servicio de cron en `docker-compose.yml` para VPS.
+   - Usará una imagen liviana de Postgres/Alpine.
+   - Ejecutará todos los días a las 3:00 AM dentro del contenedor.
+   - Llamará la función SQL de reconstrucción de balances para mantener morosidad actualizada aunque algún trigger o migración previa no haya corrido.
+   - Montará un script nuevo desde `scripts/cron/`.
 
-### B) Mostrar nombre del método de pago
+4. Ajustar la función `send-delinquency-reminders` para usar el mismo criterio de morosidad del backend.
+   - Así los correos y la lista de morosos usarán exactamente la misma regla.
+   - Evita que la función de recordatorios dependa de relaciones anidadas que en el VPS pueden fallar por caché/esquema.
 
-3. **`StudentLedger.tsx`**: cargar `school_payment_methods` (id, label) del colegio y resolver `m.method` → `label`. Si no se encuentra (método legacy con string fijo como `"transferencia"`), usar el valor crudo capitalizado.
+5. Añadir comandos de despliegue/verificación para VPS.
+   - `docker compose build --no-cache app`
+   - `docker compose up -d supabase-migrations`
+   - `docker compose up -d delinquency-cron supabase-functions app`
+   - Verificación con `docker logs sat-delinquency-cron` y una consulta SQL para confirmar que el concepto vencido de enero aparece como moroso.
 
-4. **`PaymentHistoryModal.tsx`**: mismo tratamiento — pasar `schoolId` ya disponible y mapear el id al label.
+## Detalles técnicos
 
-### C) Validación
-- Verificar que la lista de morosos ahora muestra estudiantes con saldos vencidos.
-- Verificar que en estado de cuenta y en historial de pagos el método aparece como "Transferencia BNC", "Pago Móvil Banesco", etc., en lugar del UUID.
-
----
-
-## Archivos a editar
-- `src/lib/delinquency.ts`
-- `src/pages/school/StudentLedger.tsx`
-- `src/components/payments/PaymentHistoryModal.tsx`
-
-Sin cambios de schema ni de migraciones.
+- No se usará `pg_cron` porque en este VPS el stack corre por Docker Compose y no hay ningún servicio cron configurado actualmente.
+- El cron vivirá en Docker para que funcione igual en el servidor, sin depender del sistema operativo host.
+- La función SQL será `SECURITY DEFINER`, con permisos revocados a usuarios públicos, y será invocada solo por el cron/migración con credenciales internas del contenedor.
+- El cálculo central será en base a `school_years.is_active`, `payment_plan_concepts.due_month`, `payment_plan_concepts.due_day`, `student_payment_plans` y `student_concept_balances.balance > 0`.
