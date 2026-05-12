@@ -130,15 +130,6 @@ export default async function handler(req: Request): Promise<Response> {
       );
     }
 
-    if (!usdRaw || !eurRaw) {
-      throw new Error(
-        "Could not extract exchange rates from BCV page. USD match: " +
-          !!usdRaw +
-          ", EUR match: " +
-          !!eurRaw
-      );
-    }
-
     const usdRate = parseRate(usdRaw);
     const eurRate = parseRate(eurRaw);
     const publishedDate = extractPublishedDate(html);
