@@ -445,6 +445,19 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                 <div className="space-y-1"><Label>Día de vencimiento</Label><Input type="number" min="1" max="31" value={addForm.due_day} onChange={(e) => setAddForm({ ...addForm, due_day: e.target.value })} placeholder="ej: 15" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Mes de vencimiento</Label>
+                  <Select value={addForm.due_month || "none"} onValueChange={(v) => setAddForm({ ...addForm, due_month: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="Sin mes específico" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin mes específico</SelectItem>
+                      {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
+                        <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Si recurrente, indica el primer mes de obligación.</p>
+                </div>
                 <div className="space-y-1"><Label>Orden</Label><Input type="number" value={addForm.display_order} onChange={(e) => setAddForm({ ...addForm, display_order: e.target.value })} /></div>
               </div>
               <div className="flex gap-6">
