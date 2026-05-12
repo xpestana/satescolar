@@ -48,11 +48,11 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Extract USD rate from id="dolar" block
     const usdMatch = html.match(
-      /id="dolar"[\s\S]*?<strong>\s*([\d.,]+)\s*<\/strong>/
+      /id="dolar"[\s\S]*?<strong[^>]*>\s*([\d.,]+)\s*<\/strong>/
     );
     // Extract EUR rate from id="euro" block
     const eurMatch = html.match(
-      /id="euro"[\s\S]*?<strong>\s*([\d.,]+)\s*<\/strong>/
+      /id="euro"[\s\S]*?<strong[^>]*>\s*([\d.,]+)\s*<\/strong>/
     );
     // Extract published date from content attribute
     const dateMatch = html.match(
