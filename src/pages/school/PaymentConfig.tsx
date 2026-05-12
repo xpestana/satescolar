@@ -348,6 +348,19 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
     },
   });
 
+  const updateConcept = useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Record<string, any> }) => {
+      const { error } = await supabase.from("payment_plan_concepts").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plan-concepts", plan.id] });
+      qc.invalidateQueries({ queryKey: ["payment-plans"] });
+      toast({ title: "Vencimiento actualizado" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const existingConceptIds = new Set(planConcepts.map((pc: any) => pc.concept_id));
   const availableConcepts = allConcepts.filter((c) => !existingConceptIds.has(c.id));
   const totalsByCurrency = planConcepts.reduce((acc: Record<string, number>, pc: any) => {
@@ -402,8 +415,36 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                       <TableCell>{pc.amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur}</TableCell>
                       <TableCell>{pc.is_mandatory ? "Sí" : "No"}</TableCell>
                       <TableCell>{pc.is_recurring ? "Sí" : "No"}</TableCell>
-                      <TableCell>{pc.due_month ? monthNames[pc.due_month - 1] : "—"}</TableCell>
-                      <TableCell>{pc.due_day || "—"}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={pc.due_month ? String(pc.due_month) : "none"}
+                          onValueChange={(v) => updateConcept.mutate({ id: pc.id, patch: { due_month: v === "none" ? null : parseInt(v) } })}
+                        >
+                          <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">—</SelectItem>
+                            {["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"].map((m, i) => (
+                              <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="31"
+                          defaultValue={pc.due_day ?? ""}
+                          className="h-8 w-16"
+                          onBlur={(e) => {
+                            const v = e.target.value;
+                            const newVal = v ? parseInt(v) : null;
+                            if (newVal !== (pc.due_day ?? null)) {
+                              updateConcept.mutate({ id: pc.id, patch: { due_day: newVal } });
+                            }
+                          }}
+                        />
+                      </TableCell>
                       <TableCell><Button size="icon" variant="ghost" onClick={() => removeConcept.mutate(pc.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
                   );
