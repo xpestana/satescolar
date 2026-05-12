@@ -6,6 +6,72 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const BCV_URL = "https://www.bcv.org.ve/";
+
+const parseRate = (raw: string) =>
+  parseFloat(raw.replace(/\s/g, "").replace(/\./g, "").replace(",", "."));
+
+const stripTags = (value: string) => value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim();
+
+const extractRateFromHtml = (html: string, id: "dolar" | "euro", currency: "USD" | "EUR") => {
+  const idMatch = html.match(
+    new RegExp(`id=["']${id}["'][\\s\\S]{0,1800}?<strong[^>]*>([\\s\\S]*?)<\\/strong>`, "i")
+  );
+  if (idMatch) return stripTags(idMatch[1]);
+
+  const currencyMatch = html.match(
+    new RegExp(`\\b${currency}\\b[\\s\\S]{0,800}?<strong[^>]*>([\\s\\S]*?[\\d][\\d.,\\s]*?)<\\/strong>`, "i")
+  );
+  return currencyMatch ? stripTags(currencyMatch[1]) : null;
+};
+
+const extractPublishedDate = (html: string) => {
+  const dateMatch = html.match(/Fecha\s+Valor:[\s\S]{0,500}?content=["'](\d{4}-\d{2}-\d{2})/i);
+  if (dateMatch) return dateMatch[1];
+
+  const fallbackDateMatch = html.match(/content=["'](\d{4}-\d{2}-\d{2})T00:00:00-04:00["'][\s\S]{0,300}?Fecha\s+Valor/i);
+  return fallbackDateMatch ? fallbackDateMatch[1] : new Date().toISOString().slice(0, 10);
+};
+
+const scrapeBcvPage = async (firecrawlKey: string) => {
+  const payload = {
+    url: BCV_URL,
+    formats: ["rawHtml", "html", "markdown"],
+    onlyMainContent: false,
+    waitFor: 1000,
+  };
+
+  const endpoints = ["https://api.firecrawl.dev/v2/scrape", "https://api.firecrawl.dev/v1/scrape"];
+  let lastError = "Unknown Firecrawl error";
+
+  for (const endpoint of endpoints) {
+    const fcRes = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${firecrawlKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const fcData = await fcRes.json().catch(() => null);
+    if (!fcRes.ok || !fcData?.success) {
+      lastError = fcData?.error || `${endpoint} returned ${fcRes.status}`;
+      continue;
+    }
+
+    const data = fcData.data || fcData;
+    const html = [data.rawHtml, data.html, data.markdown].filter(Boolean).join("\n");
+    if (html) {
+      console.log(`Fetched BCV via Firecrawl ${endpoint.includes("/v2/") ? "v2" : "v1"}, length: ${html.length}`);
+      return html;
+    }
+    lastError = `${endpoint} returned empty content`;
+  }
+
+  throw new Error(`Firecrawl error: ${lastError}`);
+};
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -16,65 +82,28 @@ export default async function handler(req: Request): Promise<Response> {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Fetch BCV page via Firecrawl API
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
     if (!firecrawlKey) {
       throw new Error("FIRECRAWL_API_KEY not configured");
     }
 
-    const fcRes = await fetch("https://api.firecrawl.dev/v1/scrape", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${firecrawlKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        url: "https://www.bcv.org.ve/",
-        formats: ["html"],
-        onlyMainContent: false,
-      }),
-    });
+    const html = await scrapeBcvPage(firecrawlKey);
 
-    const fcData = await fcRes.json();
-    if (!fcRes.ok || !fcData.success) {
-      throw new Error(`Firecrawl error: ${fcData.error || fcRes.status}`);
-    }
+    const usdRaw = extractRateFromHtml(html, "dolar", "USD");
+    const eurRaw = extractRateFromHtml(html, "euro", "EUR");
 
-    const html = fcData.data?.html || "";
-    if (!html) {
-      throw new Error("Firecrawl returned empty HTML");
-    }
-    console.log("Fetched BCV via Firecrawl");
-
-    // Extract USD rate from id="dolar" block
-    const usdMatch = html.match(
-      /id="dolar"[\s\S]*?<strong[^>]*>\s*([\d.,]+)\s*<\/strong>/
-    );
-    // Extract EUR rate from id="euro" block
-    const eurMatch = html.match(
-      /id="euro"[\s\S]*?<strong[^>]*>\s*([\d.,]+)\s*<\/strong>/
-    );
-    // Extract published date from content attribute
-    const dateMatch = html.match(
-      /Fecha Valor:[\s\S]*?content="(\d{4}-\d{2}-\d{2})/
-    );
-
-    if (!usdMatch || !eurMatch) {
+    if (!usdRaw || !eurRaw) {
       throw new Error(
         "Could not extract exchange rates from BCV page. USD match: " +
-          !!usdMatch +
+          !!usdRaw +
           ", EUR match: " +
-          !!eurMatch
+          !!eurRaw
       );
     }
 
-    // Parse rates: BCV uses comma as decimal separator (e.g. "473,87020000")
-    const parseRate = (raw: string) =>
-      parseFloat(raw.replace(/\./g, "").replace(",", "."));
-
-    const usdRate = parseRate(usdMatch[1]);
-    const eurRate = parseRate(eurMatch[1]);
-    const publishedDate = dateMatch ? dateMatch[1] : new Date().toISOString().slice(0, 10);
+    const usdRate = parseRate(usdRaw);
+    const eurRate = parseRate(eurRaw);
+    const publishedDate = extractPublishedDate(html);
 
     console.log(`BCV rates - USD: ${usdRate}, EUR: ${eurRate}, Date: ${publishedDate}`);
 
