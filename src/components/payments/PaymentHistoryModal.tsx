@@ -31,8 +31,8 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
       const { data, error } = await supabase.from("payments")
         .select(`
           *,
-          payment_items(id, plan_concept_id, amount_ves, is_partial, payment_plan_concepts(payment_concepts(name))),
-          payment_method_entries(id, method, currency, amount_original, exchange_rate, amount_ves, reference_code, bank_name, payment_date)
+          payment_items!payment_items_payment_id_fkey(id, plan_concept_id, amount_ves, is_partial, payment_plan_concepts(payment_concepts(name))),
+          payment_method_entries!payment_method_entries_payment_id_fkey(id, method, currency, amount_original, exchange_rate, amount_ves, reference_code, bank_name, payment_date)
         `)
         .eq("student_id", studentId)
         .eq("school_year_id", schoolYearId)
