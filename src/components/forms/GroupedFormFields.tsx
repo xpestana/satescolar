@@ -185,20 +185,31 @@ export function GroupedFormFields({
     }
   };
 
-  // Auto-persist "pais" fields that are hardcoded to "Venezuela"
-  const paisFields = useMemo(() => 
-    fields.filter(f => getGeoBase(f.field_name) === "pais"), 
-    [fields]
+  // País efectivo en el formData (controla si los demás campos son selects o inputs libres)
+  const paisKey = geoKey("pais");
+  const paisValue: string = formData[paisKey] || "";
+  // Si no hay país guardado pero existen IDs geográficos (estado/municipio/ciudad/parroquia)
+  // o el formulario es nuevo, asumimos Venezuela como en el comportamiento previo.
+  const hasVenezuelanContext =
+    !!effectiveStateId || !!effectiveMunicipalityId || !!effectiveCityId || !!effectiveParishId;
+  const isVzla = paisValue ? isVenezuela(paisValue) : true; // por defecto Venezuela (compat)
+
+  // Auto-persistir "Venezuela" cuando es el valor por defecto implícito,
+  // para que se guarde en el form_data como antes.
+  const paisFields = useMemo(
+    () => fields.filter((f) => getGeoBase(f.field_name) === "pais"),
+    [fields],
   );
-  
-  // On mount / when formData changes, ensure pais fields have "Venezuela" persisted
   useMemo(() => {
-    paisFields.forEach(f => {
-      if (!formData[f.field_name]) {
-        setTimeout(() => onFieldChange(f.field_name, "Venezuela"), 0);
-      }
-    });
-  }, [paisFields, formData, onFieldChange]);
+    if (!paisValue && (hasVenezuelanContext || paisFields.length > 0)) {
+      paisFields.forEach((f) => {
+        if (!formData[f.field_name]) {
+          setTimeout(() => onFieldChange(f.field_name, "Venezuela"), 0);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paisFields, paisValue, hasVenezuelanContext]);
 
   // Auto-persist geographic initial values into formData when they exist but aren't saved yet
   useMemo(() => {
@@ -216,17 +227,54 @@ export function GroupedFormFields({
     });
   }, [initialStateId, initialMunicipalityId, initialCityId, initialParishId, geoKey, formData, onFieldChange]);
 
+  // Cambio de país: si cruza la frontera Venezuela <-> otro país, limpiar dependientes
+  // para no mezclar UUIDs con texto libre.
+  const handlePaisChange = (newValue: string) => {
+    const wasVzla = isVenezuela(paisValue) || (!paisValue);
+    const willBeVzla = isVenezuela(newValue);
+    onFieldChange(paisKey, newValue);
+    if (wasVzla !== willBeVzla) {
+      onFieldChange(geoKey("estado"), "");
+      onFieldChange(geoKey("municipio"), "");
+      onFieldChange(geoKey("ciudad"), "");
+      onFieldChange(geoKey("parroquia"), "");
+    }
+  };
+
   const renderGeographicField = (field: FormField, base: GeoBase) => {
     if (base === "pais") {
+      const rawOptions = Array.isArray(field.options) ? field.options : [];
+      const countryOptions = rawOptions
+        .map((opt: any) => (opt == null ? "" : String(opt)))
+        .filter((opt: string) => opt.trim().length > 0);
+      // Fallback mínimo si por alguna razón no llegaron opciones
+      const options = countryOptions.length > 0 ? countryOptions : ["Venezuela"];
       return (
-        <Select value={formData[field.field_name] || "Venezuela"} disabled>
+        <Select value={paisValue || "Venezuela"} onValueChange={handlePaisChange}>
           <SelectTrigger>
-            <SelectValue placeholder="Venezuela" />
+            <SelectValue placeholder="Seleccione país" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Venezuela">Venezuela</SelectItem>
+          <SelectContent className="max-h-72">
+            {options.map((opt, idx) => (
+              <SelectItem key={`${idx}-${opt}`} value={opt}>
+                {opt}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
+      );
+    }
+
+    // Si NO es Venezuela (país extranjero), renderizar input libre que escribe
+    // directo en la misma clave (estado_nacimiento, municipio_nacimiento, etc.)
+    if (!isVzla) {
+      return (
+        <Input
+          type="text"
+          placeholder={field.placeholder || field.field_label}
+          value={formData[field.field_name] || ""}
+          onChange={(e) => onFieldChange(field.field_name, e.target.value)}
+        />
       );
     }
 
