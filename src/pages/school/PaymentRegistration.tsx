@@ -318,9 +318,22 @@ export default function PaymentRegistration() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button size="sm" variant="outline" onClick={() => handlePayClick(e)}>
-                              <CreditCard className="h-3 w-3 mr-1" />{hasPlan ? "Pagar" : "Asignar Plan"}
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="outline" onClick={() => handlePayClick(e)}>
+                                <CreditCard className="h-3 w-3 mr-1" />{hasPlan ? "Pagar" : "Asignar"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Historial de pagos"
+                                onClick={() => {
+                                  setHistoryStudent({ id: e.students.id, name: fullName || "Estudiante" });
+                                  setHistoryOpen(true);
+                                }}
+                              >
+                                <History className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
