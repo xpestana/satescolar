@@ -29,6 +29,7 @@ export default function PaymentRegistration() {
   const [sectionFilter, setSectionFilter] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedEnrollment, setSelectedEnrollment] = useState<any>(null);
+  const [selectedStudentPlan, setSelectedStudentPlan] = useState<any>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
 
   // Assign plan state
@@ -69,7 +70,9 @@ export default function PaymentRegistration() {
       const { data } = await supabase.from("student_payment_plans")
         .select("*, payment_plans(name)")
         .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear!.id);
+        .eq("school_year_id", activeYear!.id)
+        .order("assigned_at", { ascending: false })
+        .order("created_at", { ascending: false });
       return data || [];
     },
     enabled: !!schoolId && !!activeYear?.id,
@@ -113,8 +116,10 @@ export default function PaymentRegistration() {
   });
 
   const planMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    studentPlans.forEach((sp: any) => { map[sp.student_id] = sp.payment_plans?.name || "—"; });
+    const map: Record<string, any> = {};
+    studentPlans.forEach((sp: any) => {
+      if (!map[sp.student_id]) map[sp.student_id] = sp;
+    });
     return map;
   }, [studentPlans]);
 
