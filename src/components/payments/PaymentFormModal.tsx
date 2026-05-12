@@ -288,6 +288,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   const sectionName = enrollment?.sections?.name || "";
   const gradeName = formatGradeLevel(enrollment?.sections?.grade_level);
+  const resolvedStudentPlan = studentPlan || initialStudentPlan;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -302,7 +303,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                 <div><span className="text-muted-foreground">Estudiante:</span><p className="font-medium">{studentName}</p></div>
                 <div><span className="text-muted-foreground">Cédula:</span><p className="font-medium">{student?.document_id || "—"}</p></div>
                 <div><span className="text-muted-foreground">Grado/Sección:</span><p className="font-medium">{gradeName} - {sectionName}</p></div>
-                <div><span className="text-muted-foreground">Plan:</span><p className="font-medium">{studentPlan?.payment_plans?.name || <Badge variant="destructive">Sin plan</Badge>}</p></div>
+                <div><span className="text-muted-foreground">Plan:</span><p className="font-medium">{resolvedStudentPlan?.payment_plans?.name || <Badge variant="destructive">Sin plan</Badge>}</p></div>
               </div>
             </CardContent>
           </Card>
