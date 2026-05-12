@@ -33,6 +33,28 @@ const extractPublishedDate = (html: string) => {
   return fallbackDateMatch ? fallbackDateMatch[1] : new Date().toISOString().slice(0, 10);
 };
 
+const fetchBcvDirect = async (): Promise<string | null> => {
+  try {
+    const res = await fetch(BCV_URL, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-VE,es;q=0.9,en;q=0.8",
+      },
+    });
+    if (!res.ok) {
+      console.warn(`Direct BCV fetch returned ${res.status}`);
+      return null;
+    }
+    const html = await res.text();
+    console.log(`Fetched BCV directly, length: ${html.length}`);
+    return html;
+  } catch (e) {
+    console.warn("Direct BCV fetch failed:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+};
+
 const scrapeBcvPage = async (firecrawlKey: string) => {
   const payload = {
     url: BCV_URL,
