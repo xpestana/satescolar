@@ -61,12 +61,12 @@ export function ExchangeRateWidget({ schoolId, floating = true }: ExchangeRateWi
 
   const fetchBcv = useMutation({
     mutationFn: async () => {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       
       const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/fetch-bcv-rates`,
+        `${baseUrl}/functions/v1/fetch-bcv-rates`,
         {
           method: "POST",
           headers: {
