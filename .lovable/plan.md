@@ -1,55 +1,43 @@
 ## Diagnóstico
 
-El error sigue porque el cambio anterior solo ajustó el `select` del frontend con `!payment_items_payment_id_fkey`, pero en el VPS esa llave foránea no existe realmente en PostgreSQL o no está en el cache de PostgREST.
+### 1) Morosos no muestra estudiantes
+La función `isOverdue` (en `src/lib/delinquency.ts`) y el filtro en `DelinquentStudents.tsx` exigen que el concepto tenga `due_day` o `due_month`. Hoy en la BD:
+- Conceptos no recurrentes (matrícula, mes de agosto, etc.) tienen `due_day` y `due_month` en NULL → `isOverdue` retorna `false`.
+- Conceptos recurrentes (mensualidades) tienen sólo `due_day=15` sin `due_month` → calcula vencimiento del mes actual (15 mayo) y como hoy es 12 mayo, tampoco está vencido.
 
-Al revisar el repositorio, ya existe una migración canónica para varias relaciones del módulo de pagos, pero solo cubre:
+Resultado: ningún balance entra al listado.
 
-- `payment_plan_concepts`
-- `student_payment_plans`
-- `student_concept_balances`
+### 2) Estado de Cuenta muestra UUID en "Métodos"
+En `payment_method_entries.method` se guarda el `id` del método configurado en el colegio (`school_payment_methods.id`). `StudentLedger.tsx` y `PaymentHistoryModal.tsx` lo pintan tal cual (`m.method`) en lugar de resolver el `label` del método.
 
-No incluye las relaciones nuevas que necesita el historial de pagos:
+---
 
-- `payment_items.payment_id -> payments.id`
-- `payment_items.plan_concept_id -> payment_plan_concepts.id`
-- `payment_method_entries.payment_id -> payments.id`
-- relaciones base de `payments` hacia estudiante/colegio/año escolar
+## Plan
 
-Por eso en Lovable Cloud puede funcionar, pero en VPS falla: el esquema local quedó incompleto igual que las veces pasadas.
+### A) Restaurar la morosidad
 
-## Plan de corrección
+1. **Ajustar `isOverdue` (`src/lib/delinquency.ts`):**
+   - Si el concepto **no** tiene `due_day` ni `due_month` → considerar **vencido** si hay saldo (compatibilidad con conceptos legacy / sin vencimiento configurado). Esto restaura el comportamiento previo.
+   - Para recurrentes con `due_day` pero sin `due_month` → considerar vencido si **cualquier mes anterior** del año escolar ya pasó la fecha de corte (no solo el mes actual). Es decir: revisar desde el mes de inicio del año escolar (agosto) hasta hoy y marcar vencido si al menos un mes calendario ya completó su `due_day`.
+   - Mantener la lógica actual para conceptos con `due_month` explícito.
 
-1. Crear una nueva migración idempotente para completar la integridad del historial de pagos en VPS:
-   - Verificar que existan claves únicas/primarias en `payments.id`, `payment_items.id`, `payment_method_entries.id`.
-   - Crear, si faltan, las FK:
-     - `payments_school_id_fkey`
-     - `payments_school_year_id_fkey`
-     - `payments_student_id_fkey`
-     - `payment_items_payment_id_fkey`
-     - `payment_items_plan_concept_id_fkey`
-     - `payment_method_entries_payment_id_fkey`
-   - Usar `ON DELETE CASCADE` en las relaciones hijas para que al eliminar un pago se eliminen sus conceptos y métodos.
-   - Fallar explícitamente si existen datos huérfanos, para no crear relaciones inválidas silenciosamente.
-   - Enviar `NOTIFY pgrst, 'reload schema'` al final.
+2. **No tocar la UI** de `DelinquentStudents.tsx` — sólo cambia la utilidad.
 
-2. Actualizar `scripts/run-migrations.sh` para que el VPS valide también estas FK críticas después de migrar:
-   - Si falta una FK del historial de pagos, `sat-migrations` debe fallar con un mensaje claro.
-   - Esto evita que el despliegue quede “verde” pero PostgREST siga sin poder resolver el historial.
+### B) Mostrar nombre del método de pago
 
-3. Mantener el frontend como está:
-   - La consulta con `payment_items!payment_items_payment_id_fkey` es correcta.
-   - No conviene reemplazarla por consultas manuales porque ocultaría el problema real del esquema.
+3. **`StudentLedger.tsx`**: cargar `school_payment_methods` (id, label) del colegio y resolver `m.method` → `label`. Si no se encuentra (método legacy con string fijo como `"transferencia"`), usar el valor crudo capitalizado.
 
-4. Al aplicar en VPS:
-   - Ejecutar el runner de migraciones.
-   - Reiniciar `supabase-rest` si el cache no recarga inmediatamente.
+4. **`PaymentHistoryModal.tsx`**: mismo tratamiento — pasar `schoolId` ya disponible y mapear el id al label.
 
-## Validación esperada
+### C) Validación
+- Verificar que la lista de morosos ahora muestra estudiantes con saldos vencidos.
+- Verificar que en estado de cuenta y en historial de pagos el método aparece como "Transferencia BNC", "Pago Móvil Banesco", etc., en lugar del UUID.
 
-Después de migrar en VPS, esta relación debe existir:
+---
 
-```sql
-payment_items(payment_id) -> payments(id)
-```
+## Archivos a editar
+- `src/lib/delinquency.ts`
+- `src/pages/school/StudentLedger.tsx`
+- `src/components/payments/PaymentHistoryModal.tsx`
 
-y la URL del historial debe dejar de devolver `PGRST200`.
+Sin cambios de schema ni de migraciones.
