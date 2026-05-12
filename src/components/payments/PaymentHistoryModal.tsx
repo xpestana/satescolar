@@ -123,7 +123,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
               </TableHeader>
               <TableBody>
                 {payments.map((p: any) => (
-                  <>
+                  <Fragment key={p.id}>
                     <TableRow key={p.id}>
                       <TableCell>
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => toggle(p.id)}>
