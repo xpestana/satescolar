@@ -14,10 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, CreditCard, AlertTriangle } from "lucide-react";
+import { Loader2, Search, CreditCard, AlertTriangle, History } from "lucide-react";
 import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
 import { formatGradeLevel } from "@/lib/utils";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
+import { PaymentHistoryModal } from "@/components/payments/PaymentHistoryModal";
 import { useToast } from "@/hooks/use-toast";
 
 export default function PaymentRegistration() {
@@ -31,6 +32,8 @@ export default function PaymentRegistration() {
   const [selectedEnrollment, setSelectedEnrollment] = useState<any>(null);
   const [selectedStudentPlan, setSelectedStudentPlan] = useState<any>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyStudent, setHistoryStudent] = useState<{ id: string; name: string } | null>(null);
 
   // Assign plan state
   const [assignOpen, setAssignOpen] = useState(false);
@@ -287,7 +290,7 @@ export default function PaymentRegistration() {
                       <TableHead>Sección</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Saldo Pendiente</TableHead>
-                      <TableHead className="w-24">Acción</TableHead>
+                      <TableHead className="w-44">Acción</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -315,9 +318,22 @@ export default function PaymentRegistration() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Button size="sm" variant="outline" onClick={() => handlePayClick(e)}>
-                              <CreditCard className="h-3 w-3 mr-1" />{hasPlan ? "Pagar" : "Asignar Plan"}
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="outline" onClick={() => handlePayClick(e)}>
+                                <CreditCard className="h-3 w-3 mr-1" />{hasPlan ? "Pagar" : "Asignar"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Historial de pagos"
+                                onClick={() => {
+                                  setHistoryStudent({ id: e.students.id, name: fullName || "Estudiante" });
+                                  setHistoryOpen(true);
+                                }}
+                              >
+                                <History className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -377,6 +393,18 @@ export default function PaymentRegistration() {
               schoolId={schoolId}
               schoolYearId={activeYear.id}
               initialStudentPlan={selectedStudentPlan}
+            />
+          )}
+
+          {/* Payment History Modal */}
+          {historyStudent && activeYear && (
+            <PaymentHistoryModal
+              open={historyOpen}
+              onOpenChange={setHistoryOpen}
+              studentId={historyStudent.id}
+              studentName={historyStudent.name}
+              schoolId={schoolId}
+              schoolYearId={activeYear.id}
             />
           )}
         </>
