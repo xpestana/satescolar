@@ -173,7 +173,7 @@ export default function StudentLedger() {
     autoTable(doc, { startY: 65, head: [["Concepto", "Monto", "Tipo"]], body: conceptRows, theme: "grid" });
 
     const methodRows = (payment.payment_method_entries || []).map((m: any) => [
-      m.method, m.currency, m.amount_original?.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+      methodLabel(m.method), m.currency, m.amount_original?.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
       m.exchange_rate, `${m.amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`,
       m.reference_code || "—",
     ]);
