@@ -29,6 +29,7 @@ export default function PaymentRegistration() {
   const [sectionFilter, setSectionFilter] = useState("all");
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedEnrollment, setSelectedEnrollment] = useState<any>(null);
+  const [selectedStudentPlan, setSelectedStudentPlan] = useState<any>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
 
   // Assign plan state
@@ -69,7 +70,9 @@ export default function PaymentRegistration() {
       const { data } = await supabase.from("student_payment_plans")
         .select("*, payment_plans(name)")
         .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear!.id);
+        .eq("school_year_id", activeYear!.id)
+        .order("assigned_at", { ascending: false })
+        .order("created_at", { ascending: false });
       return data || [];
     },
     enabled: !!schoolId && !!activeYear?.id,
@@ -113,8 +116,10 @@ export default function PaymentRegistration() {
   });
 
   const planMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    studentPlans.forEach((sp: any) => { map[sp.student_id] = sp.payment_plans?.name || "—"; });
+    const map: Record<string, any> = {};
+    studentPlans.forEach((sp: any) => {
+      if (!map[sp.student_id]) map[sp.student_id] = sp;
+    });
     return map;
   }, [studentPlans]);
 
@@ -209,6 +214,7 @@ export default function PaymentRegistration() {
       if (assignEnrollment) {
         setSelectedStudent(assignEnrollment.students);
         setSelectedEnrollment(assignEnrollment);
+        setSelectedStudentPlan(null);
         setPaymentOpen(true);
       }
       setAssignPlanId("");
@@ -223,6 +229,7 @@ export default function PaymentRegistration() {
     if (hasPlan) {
       setSelectedStudent(enrollment.students);
       setSelectedEnrollment(enrollment);
+      setSelectedStudentPlan(planMap[enrollment.students?.id]);
       setPaymentOpen(true);
     } else {
       // Open assign plan dialog
@@ -296,7 +303,7 @@ export default function PaymentRegistration() {
                           <TableCell>{formatGradeLevel(e.sections?.grade_level)}</TableCell>
                           <TableCell>{e.sections?.name || "—"}</TableCell>
                           <TableCell className="text-center">
-                            {hasPlan ? <Badge variant="outline">{planMap[e.students?.id]}</Badge> : <Badge variant="destructive" className="text-xs">Sin plan</Badge>}
+                            {hasPlan ? <Badge variant="outline">{planMap[e.students?.id]?.payment_plans?.name || "—"}</Badge> : <Badge variant="destructive" className="text-xs">Sin plan</Badge>}
                           </TableCell>
                           <TableCell>
                             {pending > 0 ? (
@@ -369,6 +376,7 @@ export default function PaymentRegistration() {
               enrollment={selectedEnrollment}
               schoolId={schoolId}
               schoolYearId={activeYear.id}
+              initialStudentPlan={selectedStudentPlan}
             />
           )}
         </>

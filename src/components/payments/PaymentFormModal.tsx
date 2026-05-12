@@ -45,9 +45,10 @@ interface Props {
   enrollment: any;
   schoolId: string;
   schoolYearId: string;
+  initialStudentPlan?: any;
 }
 
-export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId }: Props) {
+export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId, initialStudentPlan }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -85,17 +86,20 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   // Load student plan + balances
   const { data: studentPlan } = useQuery({
-    queryKey: ["student-payment-plan", student?.id, schoolYearId],
+    queryKey: ["student-payment-plan", student?.id, schoolId, schoolYearId],
     queryFn: async () => {
       const { data, error } = await supabase.from("student_payment_plans")
         .select("*, payment_plans(name)")
         .eq("student_id", student.id)
         .eq("school_year_id", schoolYearId)
         .eq("school_id", schoolId)
-        .maybeSingle();
+        .order("assigned_at", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(1);
       if (error) throw error;
-      return data;
+      return data?.[0] || null;
     },
+    initialData: initialStudentPlan || undefined,
     enabled: open && !!student?.id,
   });
 
@@ -284,6 +288,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   const sectionName = enrollment?.sections?.name || "";
   const gradeName = formatGradeLevel(enrollment?.sections?.grade_level);
+  const resolvedStudentPlan = studentPlan || initialStudentPlan;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -298,7 +303,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                 <div><span className="text-muted-foreground">Estudiante:</span><p className="font-medium">{studentName}</p></div>
                 <div><span className="text-muted-foreground">Cédula:</span><p className="font-medium">{student?.document_id || "—"}</p></div>
                 <div><span className="text-muted-foreground">Grado/Sección:</span><p className="font-medium">{gradeName} - {sectionName}</p></div>
-                <div><span className="text-muted-foreground">Plan:</span><p className="font-medium">{studentPlan?.payment_plans?.name || <Badge variant="destructive">Sin plan</Badge>}</p></div>
+                <div><span className="text-muted-foreground">Plan:</span><p className="font-medium">{resolvedStudentPlan?.payment_plans?.name || <Badge variant="destructive">Sin plan</Badge>}</p></div>
               </div>
             </CardContent>
           </Card>
