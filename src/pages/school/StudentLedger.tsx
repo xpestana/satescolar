@@ -81,6 +81,21 @@ export default function StudentLedger() {
     enabled: !!selectedStudentId && !!activeYear?.id,
   });
 
+  const { data: schoolMethods = [] } = useQuery({
+    queryKey: ["school-payment-methods-ledger", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_payment_methods").select("id, label").eq("school_id", schoolId!);
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+  const methodLabel = (raw: string) => {
+    const found = schoolMethods.find((sm: any) => sm.id === raw);
+    if (found) return found.label;
+    if (!raw) return "—";
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  };
+
   const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const filtered = useMemo(() => {
@@ -158,7 +173,7 @@ export default function StudentLedger() {
     autoTable(doc, { startY: 65, head: [["Concepto", "Monto", "Tipo"]], body: conceptRows, theme: "grid" });
 
     const methodRows = (payment.payment_method_entries || []).map((m: any) => [
-      m.method, m.currency, m.amount_original?.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+      methodLabel(m.method), m.currency, m.amount_original?.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
       m.exchange_rate, `${m.amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`,
       m.reference_code || "—",
     ]);
@@ -265,7 +280,7 @@ export default function StudentLedger() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {(p.payment_method_entries || []).map((m: any, i: number) => (
-                            <Badge key={i} variant="secondary" className="text-xs">{m.method} ({m.currency})</Badge>
+                            <Badge key={i} variant="secondary" className="text-xs">{methodLabel(m.method)} ({m.currency})</Badge>
                           ))}
                         </div>
                       </TableCell>

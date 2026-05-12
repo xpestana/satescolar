@@ -53,14 +53,44 @@ function lastDayOfMonth(year: number, month: number): number {
 
 /**
  * Indica si un balance pendiente está vencido a la fecha de referencia.
- * Si no hay vencimiento definido, NO se considera moroso.
+ * - Sin due_day ni due_month definidos: se considera vencido si hay saldo (legacy).
+ * - Recurrente con due_day y sin due_month: vencido si al menos un mes del año
+ *   escolar (desde agosto del año de inicio) ya completó su día de corte.
+ * - Con due_month explícito: usa computeDueDate.
  */
 export function isOverdue(
   planConcept: { due_day?: number | null; due_month?: number | null; is_recurring?: boolean | null } | null | undefined,
   yearRange?: string | null,
   reference: Date = new Date(),
 ): boolean {
+  if (!planConcept) return true;
+  const day = planConcept.due_day ?? null;
+  const month = planConcept.due_month ?? null;
+
+  // Legacy / sin vencimiento definido: tratar como vencido para no ocultar deudas.
+  if (!day && !month) return true;
+
+  // Recurrente sin mes específico: revisar todos los meses del año escolar hasta hoy.
+  if (planConcept.is_recurring && day && !month) {
+    const range = parseYearRange(yearRange);
+    const startYear = range?.startYear ?? reference.getFullYear();
+    const endYear = range?.endYear ?? reference.getFullYear();
+    // Recorre desde agosto del startYear hasta el mes/año de la fecha de referencia.
+    let y = startYear;
+    let m = SCHOOL_YEAR_START_MONTH;
+    const refY = reference.getFullYear();
+    const refM = reference.getMonth() + 1;
+    while (y < refY || (y === refY && m <= refM)) {
+      const cutoff = new Date(y, m - 1, day, 23, 59, 59);
+      if (reference.getTime() > cutoff.getTime()) return true;
+      m += 1;
+      if (m > 12) { m = 1; y += 1; }
+      if (y > endYear + 1) break; // safeguard
+    }
+    return false;
+  }
+
   const due = computeDueDate(planConcept, yearRange, reference);
-  if (!due) return false;
+  if (!due) return true;
   return reference.getTime() > due.getTime();
 }

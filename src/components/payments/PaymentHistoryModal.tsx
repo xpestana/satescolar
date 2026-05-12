@@ -45,6 +45,21 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
     enabled: open && !!studentId,
   });
 
+  const { data: schoolMethods = [] } = useQuery({
+    queryKey: ["school-payment-methods-history", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_payment_methods").select("id, label").eq("school_id", schoolId);
+      return data || [];
+    },
+    enabled: open && !!schoolId,
+  });
+  const methodLabel = (raw: string) => {
+    const found = schoolMethods.find((sm: any) => sm.id === raw);
+    if (found) return found.label;
+    if (!raw) return "—";
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  };
+
   const deleteMut = useMutation({
     mutationFn: async (paymentId: string) => {
       const payment = payments.find((p: any) => p.id === paymentId);
@@ -164,7 +179,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                               {(p.payment_method_entries || []).map((m: any) => (
                                 <div key={m.id} className="border-b py-1">
                                   <div className="flex justify-between">
-                                    <span>{m.method} {m.bank_name ? `· ${m.bank_name}` : ""}</span>
+                                    <span>{methodLabel(m.method)} {m.bank_name ? `· ${m.bank_name}` : ""}</span>
                                     <span className="font-medium">{Number(m.amount_original).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {m.currency}</span>
                                   </div>
                                   {m.reference_code && <div className="text-muted-foreground">Ref: {m.reference_code}</div>}
