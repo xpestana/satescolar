@@ -387,18 +387,33 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {isSelected && (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                className="h-7 w-28 text-xs"
-                                value={selectedConcepts[b.id]}
-                                onChange={(e) => {
-                                  const val = Math.min(parseFloat(e.target.value) || 0, b.balance);
-                                  setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
-                                }}
-                              />
-                            )}
+                            <div className="flex items-center gap-2">
+                              {isSelected && (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="h-7 w-28 text-xs"
+                                  value={selectedConcepts[b.id]}
+                                  onChange={(e) => {
+                                    const val = Math.min(parseFloat(e.target.value) || 0, b.balance);
+                                    setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
+                                  }}
+                                />
+                              )}
+                              {b.paid_amount > 0 && b.balance > 0 && b.balance < (b.total_amount * 0.05) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1"
+                                  title="Cerrar saldo residual por diferencia cambiaria"
+                                  disabled={closeBalanceMut.isPending}
+                                  onClick={() => closeBalanceMut.mutate(b)}
+                                >
+                                  <CheckCheck className="h-3 w-3" />
+                                  Marcar completo
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
