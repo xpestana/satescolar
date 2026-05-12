@@ -290,7 +290,7 @@ export default function PaymentRegistration() {
                       <TableHead>Sección</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Saldo Pendiente</TableHead>
-                      <TableHead className="w-24">Acción</TableHead>
+                      <TableHead className="w-44">Acción</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
