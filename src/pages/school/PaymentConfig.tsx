@@ -176,7 +176,7 @@ function PlansTab({ schoolId }: { schoolId: string }) {
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ["payment-plans", schoolId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payment_plans").select("*, payment_plan_concepts(id, amount, currency, display_order, is_mandatory, is_recurring, due_day, concept_id, payment_concepts(name, concept_type, currency))").eq("school_id", schoolId).order("name");
+      const { data, error } = await supabase.from("payment_plans").select("*, payment_plan_concepts(id, amount, currency, display_order, is_mandatory, is_recurring, due_day, due_month, concept_id, payment_concepts(name, concept_type, currency))").eq("school_id", schoolId).order("name");
       if (error) throw error;
       return data;
     },
