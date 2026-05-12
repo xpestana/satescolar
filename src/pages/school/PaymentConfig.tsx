@@ -48,6 +48,7 @@ function ConceptsTab({ schoolId }: { schoolId: string }) {
         description: form.description.trim() || null,
         concept_type: form.concept_type,
         default_amount: parseFloat(form.default_amount) || 0,
+        currency: form.currency,
         is_active: form.is_active,
       };
       if (editId) {
