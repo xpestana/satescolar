@@ -48,4 +48,49 @@ done
 # PostgREST mantiene caché de esquema; sin esto, tablas nuevas no aparecen hasta reiniciar el servicio
 psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "NOTIFY pgrst, 'reload schema';" 2>/dev/null || true
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Verificación post-migración: relaciones críticas que PostgREST debe poder
+# resolver para los embeds del frontend. Si alguna falta, abortamos para que
+# el despliegue no quede "verde" con el cache de PostgREST roto.
+# ──────────────────────────────────────────────────────────────────────────────
+echo "==> Verificando relaciones críticas del módulo de pagos..."
+REQUIRED_FKS="
+public.payment_plan_concepts:plan_id:public.payment_plans:id
+public.payment_plan_concepts:concept_id:public.payment_concepts:id
+public.student_payment_plans:plan_id:public.payment_plans:id
+public.student_payment_plans:student_id:public.students:id
+public.student_payment_plans:school_id:public.schools:id
+public.student_payment_plans:school_year_id:public.school_years:id
+public.student_concept_balances:plan_concept_id:public.payment_plan_concepts:id
+public.student_concept_balances:student_id:public.students:id
+public.student_concept_balances:school_id:public.schools:id
+public.student_concept_balances:school_year_id:public.school_years:id
+"
+MISSING=0
+for spec in $REQUIRED_FKS; do
+  [ -z "$spec" ] && continue
+  TBL=$(echo "$spec" | cut -d: -f1)
+  COL=$(echo "$spec" | cut -d: -f2)
+  RTBL=$(echo "$spec" | cut -d: -f3)
+  RCOL=$(echo "$spec" | cut -d: -f4)
+  found=$(psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A -c "
+    SELECT 1 FROM pg_constraint c
+    JOIN pg_attribute a  ON a.attrelid  = c.conrelid  AND a.attnum  = c.conkey[1]
+    JOIN pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[1]
+    WHERE c.contype='f'
+      AND c.conrelid='${TBL}'::regclass
+      AND c.confrelid='${RTBL}'::regclass
+      AND a.attname='${COL}' AND ra.attname='${RCOL}'
+    LIMIT 1;" 2>/dev/null || true)
+  if [ "$found" != "1" ]; then
+    echo "  ❌ FALTA FK: ${TBL}(${COL}) -> ${RTBL}(${RCOL})"
+    MISSING=$((MISSING+1))
+  fi
+done
+if [ "$MISSING" -gt 0 ]; then
+  echo "==> ERROR: faltan $MISSING relaciones críticas. Aborta el despliegue."
+  exit 2
+fi
+echo "==> Relaciones críticas verificadas."
+
 echo "==> Migraciones completadas."
