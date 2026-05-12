@@ -385,6 +385,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                   <TableHead>Monto</TableHead>
                   <TableHead>Obligatorio</TableHead>
                   <TableHead>Recurrente</TableHead>
+                  <TableHead>Mes venc.</TableHead>
                   <TableHead>Día venc.</TableHead>
                   <TableHead className="w-16"></TableHead>
                 </TableRow>
@@ -392,6 +393,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
               <TableBody>
                 {planConcepts.map((pc: any) => {
                   const cur = pc.currency || pc.payment_concepts?.currency || "VES";
+                  const monthNames = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
                   return (
                     <TableRow key={pc.id}>
                       <TableCell className="font-medium">{pc.payment_concepts?.name}</TableCell>
@@ -400,12 +402,13 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                       <TableCell>{pc.amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur}</TableCell>
                       <TableCell>{pc.is_mandatory ? "Sí" : "No"}</TableCell>
                       <TableCell>{pc.is_recurring ? "Sí" : "No"}</TableCell>
+                      <TableCell>{pc.due_month ? monthNames[pc.due_month - 1] : "—"}</TableCell>
                       <TableCell>{pc.due_day || "—"}</TableCell>
                       <TableCell><Button size="icon" variant="ghost" onClick={() => removeConcept.mutate(pc.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
                   );
                 })}
-                {planConcepts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Sin conceptos asociados</TableCell></TableRow>}
+                {planConcepts.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">Sin conceptos asociados</TableCell></TableRow>}
               </TableBody>
             </Table>
           )}
