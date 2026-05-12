@@ -150,6 +150,8 @@ export default function PaymentRegistration() {
   const assignPlanMut = useMutation({
     mutationFn: async () => {
       if (!assignStudentId || !assignPlanId || !activeYear?.id) throw new Error("Datos incompletos");
+
+      // 1) Insert assignment
       const { error } = await supabase.from("student_payment_plans").insert({
         student_id: assignStudentId,
         plan_id: assignPlanId,
@@ -157,6 +159,46 @@ export default function PaymentRegistration() {
         school_year_id: activeYear.id,
       });
       if (error) throw error;
+
+      // 2) Load plan concepts (with currency) and current exchange rates
+      const { data: planConcepts, error: pcErr } = await supabase
+        .from("payment_plan_concepts")
+        .select("id, amount, currency, payment_concepts(currency)")
+        .eq("plan_id", assignPlanId);
+      if (pcErr) throw pcErr;
+
+      const { data: rates } = await supabase
+        .from("exchange_rates")
+        .select("currency, rate_to_ves")
+        .eq("school_id", schoolId!);
+      const rateMap: Record<string, number> = { VES: 1 };
+      (rates || []).forEach((r: any) => { rateMap[r.currency] = Number(r.rate_to_ves) || 0; });
+
+      // 3) Snapshot balances per concept (frozen in VES at assignment time)
+      const balances = (planConcepts || []).map((pc: any) => {
+        const currency = pc.currency || pc.payment_concepts?.currency || "VES";
+        const rate = rateMap[currency] ?? 1;
+        const original = Number(pc.amount) || 0;
+        const totalVes = original * rate;
+        return {
+          school_id: schoolId!,
+          student_id: assignStudentId,
+          school_year_id: activeYear.id,
+          plan_concept_id: pc.id,
+          currency,
+          original_amount: original,
+          exchange_rate_snapshot: rate,
+          total_amount: totalVes,
+          paid_amount: 0,
+          balance: totalVes,
+          status: "pending",
+        };
+      });
+
+      if (balances.length > 0) {
+        const { error: balErr } = await supabase.from("student_concept_balances").insert(balances);
+        if (balErr) throw balErr;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["all-student-plans"] });
