@@ -97,17 +97,19 @@ function ConceptsTab({ schoolId }: { schoolId: string }) {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Tipo</TableHead>
-                <TableHead>Monto por defecto (VES)</TableHead>
+                <TableHead>Moneda</TableHead>
+                <TableHead>Monto por defecto</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="w-24">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {concepts.map((c) => (
+              {concepts.map((c: any) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.name}</TableCell>
                   <TableCell><Badge variant="outline">{typeLabels[c.concept_type] || c.concept_type}</Badge></TableCell>
-                  <TableCell>{c.default_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell><Badge variant="secondary">{c.currency || "VES"}</Badge></TableCell>
+                  <TableCell>{c.default_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} {c.currency || "VES"}</TableCell>
                   <TableCell><Badge variant={c.is_active ? "default" : "secondary"}>{c.is_active ? "Activo" : "Inactivo"}</Badge></TableCell>
                   <TableCell>
                     <div className="flex gap-1">
@@ -117,7 +119,7 @@ function ConceptsTab({ schoolId }: { schoolId: string }) {
                   </TableCell>
                 </TableRow>
               ))}
-              {concepts.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No hay conceptos registrados</TableCell></TableRow>}
+              {concepts.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No hay conceptos registrados</TableCell></TableRow>}
             </TableBody>
           </Table>
         )}
