@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, Receipt, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Loader2, Receipt, AlertTriangle, CheckCheck } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
 
 interface PaymentMethodLine {
