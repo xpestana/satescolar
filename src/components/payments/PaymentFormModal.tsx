@@ -188,6 +188,25 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     });
   };
 
+  // Cierra un saldo residual (típicamente diferencia por tasa de cambio) marcándolo como pagado
+  const closeBalanceMut = useMutation({
+    mutationFn: async (bal: any) => {
+      const { error } = await supabase.from("student_concept_balances").update({
+        paid_amount: bal.total_amount,
+        balance: 0,
+        status: "paid",
+        last_payment_date: today(),
+      }).eq("id", bal.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["student-balances"] });
+      qc.invalidateQueries({ queryKey: ["all-student-balances"] });
+      toast({ title: "Concepto marcado como completo", description: "El saldo residual fue ajustado por diferencia cambiaria." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const totalConcepts = useMemo(() =>
     Object.values(selectedConcepts).reduce((s, v) => s + (parseFloat(v) || 0), 0), [selectedConcepts]);
 
