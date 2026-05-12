@@ -40,7 +40,7 @@ export default function TeacherDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <MetricCard
-            title="Mis Materias Asignadas"
+            title="Mis Áreas Asignadas"
             value={loading ? "..." : assignmentsCount}
             icon={<BookOpen className="h-10 w-10" />}
             variant="blue"

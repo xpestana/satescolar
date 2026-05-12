@@ -284,7 +284,7 @@ export default function GradesConsultation() {
         </div>
 
         <div>
-          <label className="text-sm font-medium text-foreground mb-1.5 block">Área / Materia</label>
+          <label className="text-sm font-medium text-foreground mb-1.5 block">Área</label>
           <Popover open={openSubject} onOpenChange={setOpenSubject}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" aria-expanded={openSubject} className="w-full justify-between font-normal">

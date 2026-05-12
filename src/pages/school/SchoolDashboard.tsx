@@ -32,6 +32,12 @@ export default function SchoolDashboard() {
   });
 
   // Enrolled students (in active school year)
+  const freshOpts = {
+    staleTime: 30_000,
+    refetchOnMount: "always" as const,
+    refetchOnWindowFocus: true,
+  };
+
   const { data: enrolledStudents = 0, isLoading: l1 } = useQuery({
     queryKey: ["metric-enrolled", schoolId, activeSchoolYear?.id],
     queryFn: async () => {
@@ -43,6 +49,7 @@ export default function SchoolDashboard() {
       return count ?? 0;
     },
     enabled: !!schoolId && !!activeSchoolYear?.id,
+    ...freshOpts,
   });
 
   // Total students in system (via student_schools)
@@ -56,6 +63,7 @@ export default function SchoolDashboard() {
       return count ?? 0;
     },
     enabled: !!schoolId,
+    ...freshOpts,
   });
 
   // Active teachers (not suspended)
@@ -70,6 +78,7 @@ export default function SchoolDashboard() {
       return count ?? 0;
     },
     enabled: !!schoolId,
+    ...freshOpts,
   });
 
   // Total teachers
@@ -83,6 +92,7 @@ export default function SchoolDashboard() {
       return count ?? 0;
     },
     enabled: !!schoolId,
+    ...freshOpts,
   });
 
   // Families (only those whose user has the 'representative' role)
@@ -117,6 +127,7 @@ export default function SchoolDashboard() {
       return repRoles?.length ?? 0;
     },
     enabled: !!schoolId,
+    ...freshOpts,
   });
 
   // Subjects (not suspended)
@@ -131,6 +142,7 @@ export default function SchoolDashboard() {
       return count ?? 0;
     },
     enabled: !!schoolId,
+    ...freshOpts,
   });
 
   // Assigned subjects in active school year
@@ -146,6 +158,7 @@ export default function SchoolDashboard() {
       return count ?? 0;
     },
     enabled: !!schoolId && !!activeSchoolYear?.id,
+    ...freshOpts,
   });
 
   const loading = l1 || l2 || l3 || l4 || l5 || l6 || l7;
@@ -190,7 +203,7 @@ export default function SchoolDashboard() {
             variant="orange"
           />
           <MetricCard
-            title="Materias"
+            title="Áreas"
             value={loading ? "..." : subjectsCount}
             icon={<BookOpen className="h-10 w-10" />}
             variant="purple"

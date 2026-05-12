@@ -217,7 +217,7 @@ export default function TeacherGrades() {
         title="Registro de Notas"
         breadcrumbs={[
           { label: "Inicio", href: "/teacher/dashboard" },
-          { label: "Mis Materias", href: "/teacher/materias" },
+          { label: "Mis Áreas", href: "/teacher/materias" },
           { label: "Notas" },
         ]}
       />
@@ -254,8 +254,8 @@ export default function TeacherGrades() {
         </div>
       ) : planItems.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-muted-foreground">No hay plan de evaluación definido para esta materia.</p>
-          <p className="text-sm text-muted-foreground mt-1">Primero debes agregar un plan de evaluación desde "Mis Materias".</p>
+          <p className="text-muted-foreground">No hay plan de evaluación definido para esta área.</p>
+          <p className="text-sm text-muted-foreground mt-1">Primero debes agregar un plan de evaluación desde "Mis Áreas".</p>
         </div>
       ) : students.length === 0 ? (
         <div className="text-center py-12">

@@ -500,7 +500,7 @@ export default function SubjectAssignments() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Área / Materia</TableHead>
+                      <TableHead>Área</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Docente</TableHead>
                       <TableHead>Sección / Estudiantes</TableHead>
@@ -597,7 +597,7 @@ export default function SubjectAssignments() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Área / Materia *</Label>
+              <Label>Área *</Label>
               <Select value={formSubjectId} onValueChange={(v) => { setFormSubjectId(v); setGcrpSelectedStudents(new Map()); setGcrpBrowseGrade(""); setGcrpBrowseSection(""); }}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar área" /></SelectTrigger>
                 <SelectContent>

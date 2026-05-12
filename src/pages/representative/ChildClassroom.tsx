@@ -233,7 +233,7 @@ export default function ChildClassroom() {
                   onClick={() => setSelectedAssignment(subj.id)}
                 >
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base">{subj.subject?.name || "Materia"}</CardTitle>
+                    <CardTitle className="text-base">{subj.subject?.name || "Área"}</CardTitle>
                     <p className="text-sm text-muted-foreground">
                       {subj.section ? `${formatGradeLevel(subj.section.grade_level)} — ${subj.section.name}` : "General"}
                     </p>
