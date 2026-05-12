@@ -308,7 +308,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
   });
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "" });
+  const [addForm, setAddForm] = useState({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "", due_month: "" });
 
   const addConcept = useMutation({
     mutationFn: async () => {
@@ -322,6 +322,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
         is_mandatory: addForm.is_mandatory,
         is_recurring: addForm.is_recurring,
         due_day: addForm.due_day ? parseInt(addForm.due_day) : null,
+        due_month: addForm.due_month ? parseInt(addForm.due_month) : null,
       });
       if (error) throw error;
     },
@@ -330,7 +331,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
       qc.invalidateQueries({ queryKey: ["payment-plans"] });
       toast({ title: "Concepto agregado al plan" });
       setAddOpen(false);
-      setAddForm({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "" });
+      setAddForm({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "", due_month: "" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
