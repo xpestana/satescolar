@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,13 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MessageSquare, Send, Smile, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MessageSquare, Send, Smile, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -74,6 +71,16 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (editingId && editTextareaRef.current) {
+      const ta = editTextareaRef.current;
+      ta.focus();
+      const len = ta.value.length;
+      ta.setSelectionRange(len, len);
+    }
+  }, [editingId]);
 
   const targetKey = postId ? ["post", postId] : ["activity", activityId];
 
@@ -350,81 +357,92 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
             const canDelete = isAuthor || isTeacherOwner;
             const isEditing = editingId === c.id;
             return (
-              <div key={c.id} className="flex items-start gap-2">
-                <Avatar className="h-6 w-6">
-                  <AvatarFallback className="text-[10px] bg-muted">
+              <div key={c.id} className="group flex items-start gap-2 animate-fade-in">
+                <Avatar className="h-8 w-8 mt-0.5 shrink-0">
+                  <AvatarFallback className="text-[11px] bg-primary/10 text-primary font-semibold">
                     {initialsOf(info.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-medium">{info.name}</span>
-                    {info.role && (
-                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                        {info.role}
-                      </span>
-                    )}
-                    <span className="text-[10px] text-muted-foreground">
-                      {format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}
-                    </span>
-                  </div>
                   {isEditing ? (
-                    <div className="mt-1 space-y-1">
+                    <div className="space-y-1.5">
                       <Textarea
+                        ref={editTextareaRef}
                         value={editingText}
                         onChange={(e) => setEditingText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setEditingId(null);
+                            setEditingText("");
+                          }
+                          if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && editingText.trim()) {
+                            e.preventDefault();
+                            updateComment.mutate({ id: c.id, content: editingText.trim() });
+                          }
+                        }}
                         rows={2}
-                        className="text-xs"
+                        className="text-xs rounded-2xl bg-muted/60 border-muted resize-none focus-visible:ring-1"
                       />
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs"
+                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground px-1">
+                        <button
+                          type="button"
+                          className="hover:text-foreground transition-colors"
                           onClick={() => { setEditingId(null); setEditingText(""); }}
                         >
                           Cancelar
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs"
+                        </button>
+                        <span>·</span>
+                        <button
+                          type="button"
                           disabled={!editingText.trim() || updateComment.isPending}
+                          className="font-medium text-primary hover:underline disabled:opacity-50 disabled:no-underline"
                           onClick={() => updateComment.mutate({ id: c.id, content: editingText.trim() })}
                         >
-                          {updateComment.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
-                        </Button>
+                          {updateComment.isPending ? "Guardando..." : "Guardar"}
+                        </button>
+                        <span className="ml-auto text-muted-foreground/70 hidden sm:inline">
+                          Esc para cancelar · ⌘/Ctrl + Enter para guardar
+                        </span>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words">{c.content}</p>
+                    <>
+                      <div className="inline-block max-w-full bg-muted/70 rounded-2xl px-3 py-2">
+                        <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                          <span className="text-xs font-semibold text-foreground">{info.name}</span>
+                          {info.role && (
+                            <span className="text-[10px] text-muted-foreground">· {info.role}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
+                          {c.content}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5 px-3 text-[10px] text-muted-foreground">
+                        <span>{format(new Date(c.created_at), "d MMM, HH:mm", { locale: es })}</span>
+                        {isAuthor && (
+                          <button
+                            type="button"
+                            className="font-medium hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            onClick={() => { setEditingId(c.id); setEditingText(c.content); }}
+                          >
+                            Editar
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            className="font-medium hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            onClick={() => setDeleteId(c.id)}
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
-                {(isAuthor || canDelete) && !isEditing && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                        <MoreVertical className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {isAuthor && (
-                        <DropdownMenuItem
-                          onClick={() => { setEditingId(c.id); setEditingText(c.content); }}
-                        >
-                          <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
-                        </DropdownMenuItem>
-                      )}
-                      {canDelete && (
-                        <DropdownMenuItem
-                          onClick={() => setDeleteId(c.id)}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Eliminar
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
               </div>
             );
           })}
