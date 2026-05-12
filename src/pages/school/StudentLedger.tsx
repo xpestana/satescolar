@@ -280,7 +280,7 @@ export default function StudentLedger() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {(p.payment_method_entries || []).map((m: any, i: number) => (
-                            <Badge key={i} variant="secondary" className="text-xs">{m.method} ({m.currency})</Badge>
+                            <Badge key={i} variant="secondary" className="text-xs">{methodLabel(m.method)} ({m.currency})</Badge>
                           ))}
                         </div>
                       </TableCell>
