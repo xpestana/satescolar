@@ -176,7 +176,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
