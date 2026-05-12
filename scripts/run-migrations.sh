@@ -65,6 +65,12 @@ public.student_concept_balances:plan_concept_id:public.payment_plan_concepts:id
 public.student_concept_balances:student_id:public.students:id
 public.student_concept_balances:school_id:public.schools:id
 public.student_concept_balances:school_year_id:public.school_years:id
+public.payments:school_id:public.schools:id
+public.payments:school_year_id:public.school_years:id
+public.payments:student_id:public.students:id
+public.payment_items:payment_id:public.payments:id
+public.payment_items:plan_concept_id:public.payment_plan_concepts:id
+public.payment_method_entries:payment_id:public.payments:id
 "
 MISSING=0
 for spec in $REQUIRED_FKS; do
