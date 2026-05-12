@@ -214,6 +214,7 @@ export default function PaymentRegistration() {
       if (assignEnrollment) {
         setSelectedStudent(assignEnrollment.students);
         setSelectedEnrollment(assignEnrollment);
+        setSelectedStudentPlan(null);
         setPaymentOpen(true);
       }
       setAssignPlanId("");
@@ -228,6 +229,7 @@ export default function PaymentRegistration() {
     if (hasPlan) {
       setSelectedStudent(enrollment.students);
       setSelectedEnrollment(enrollment);
+      setSelectedStudentPlan(planMap[enrollment.students?.id]);
       setPaymentOpen(true);
     } else {
       // Open assign plan dialog
@@ -301,7 +303,7 @@ export default function PaymentRegistration() {
                           <TableCell>{formatGradeLevel(e.sections?.grade_level)}</TableCell>
                           <TableCell>{e.sections?.name || "—"}</TableCell>
                           <TableCell className="text-center">
-                            {hasPlan ? <Badge variant="outline">{planMap[e.students?.id]}</Badge> : <Badge variant="destructive" className="text-xs">Sin plan</Badge>}
+                            {hasPlan ? <Badge variant="outline">{planMap[e.students?.id]?.payment_plans?.name || "—"}</Badge> : <Badge variant="destructive" className="text-xs">Sin plan</Badge>}
                           </TableCell>
                           <TableCell>
                             {pending > 0 ? (
@@ -374,6 +376,7 @@ export default function PaymentRegistration() {
               enrollment={selectedEnrollment}
               schoolId={schoolId}
               schoolYearId={activeYear.id}
+              initialStudentPlan={selectedStudentPlan}
             />
           )}
         </>
