@@ -424,8 +424,20 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1"><Label>Monto (VES) *</Label><Input type="number" step="0.01" value={addForm.amount} onChange={(e) => setAddForm({ ...addForm, amount: e.target.value })} /></div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label>Moneda *</Label>
+                  <Select value={addForm.currency} onValueChange={(v) => setAddForm({ ...addForm, currency: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="VES">VES</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="COP">COP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1"><Label>Monto ({addForm.currency}) *</Label><Input type="number" step="0.01" value={addForm.amount} onChange={(e) => setAddForm({ ...addForm, amount: e.target.value })} /></div>
                 <div className="space-y-1"><Label>Día de vencimiento</Label><Input type="number" min="1" max="31" value={addForm.due_day} onChange={(e) => setAddForm({ ...addForm, due_day: e.target.value })} placeholder="ej: 15" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
