@@ -3920,6 +3920,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_missing_student_concept_balances_for_assignment: {
+        Args: { _student_payment_plan_id: string }
+        Returns: undefined
+      }
+      create_missing_student_concept_balances_for_plan_concept: {
+        Args: { _plan_concept_id: string }
+        Returns: undefined
+      }
       has_permission: {
         Args: { _key: string; _user_id: string }
         Returns: boolean
