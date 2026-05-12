@@ -32,6 +32,8 @@ export default function PaymentRegistration() {
   const [selectedEnrollment, setSelectedEnrollment] = useState<any>(null);
   const [selectedStudentPlan, setSelectedStudentPlan] = useState<any>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyStudent, setHistoryStudent] = useState<{ id: string; name: string } | null>(null);
 
   // Assign plan state
   const [assignOpen, setAssignOpen] = useState(false);
