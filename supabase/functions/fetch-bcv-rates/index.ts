@@ -33,6 +33,28 @@ const extractPublishedDate = (html: string) => {
   return fallbackDateMatch ? fallbackDateMatch[1] : new Date().toISOString().slice(0, 10);
 };
 
+const fetchBcvDirect = async (): Promise<string | null> => {
+  try {
+    const res = await fetch(BCV_URL, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "es-VE,es;q=0.9,en;q=0.8",
+      },
+    });
+    if (!res.ok) {
+      console.warn(`Direct BCV fetch returned ${res.status}`);
+      return null;
+    }
+    const html = await res.text();
+    console.log(`Fetched BCV directly, length: ${html.length}`);
+    return html;
+  } catch (e) {
+    console.warn("Direct BCV fetch failed:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+};
+
 const scrapeBcvPage = async (firecrawlKey: string) => {
   const payload = {
     url: BCV_URL,
@@ -82,15 +104,22 @@ export default async function handler(req: Request): Promise<Response> {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
-    if (!firecrawlKey) {
-      throw new Error("FIRECRAWL_API_KEY not configured");
+    // Try direct fetch first (no Firecrawl credits, freshest data); fall back to Firecrawl
+    let html = await fetchBcvDirect();
+    let usdRaw = html ? extractRateFromHtml(html, "dolar", "USD") : null;
+    let eurRaw = html ? extractRateFromHtml(html, "euro", "EUR") : null;
+
+    if (!usdRaw || !eurRaw) {
+      const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
+      if (!firecrawlKey) {
+        throw new Error(
+          "Direct BCV fetch incomplete and FIRECRAWL_API_KEY not configured"
+        );
+      }
+      html = await scrapeBcvPage(firecrawlKey);
+      usdRaw = extractRateFromHtml(html, "dolar", "USD");
+      eurRaw = extractRateFromHtml(html, "euro", "EUR");
     }
-
-    const html = await scrapeBcvPage(firecrawlKey);
-
-    const usdRaw = extractRateFromHtml(html, "dolar", "USD");
-    const eurRaw = extractRateFromHtml(html, "euro", "EUR");
 
     if (!usdRaw || !eurRaw) {
       throw new Error(
@@ -103,7 +132,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     const usdRate = parseRate(usdRaw);
     const eurRate = parseRate(eurRaw);
-    const publishedDate = extractPublishedDate(html);
+    const publishedDate = extractPublishedDate(html!);
 
     console.log(`BCV rates - USD: ${usdRate}, EUR: ${eurRate}, Date: ${publishedDate}`);
 
