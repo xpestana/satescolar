@@ -74,6 +74,16 @@ export function CommentsAndReactions({ schoolId, postId, activityId, allowCommen
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (editingId && editTextareaRef.current) {
+      const ta = editTextareaRef.current;
+      ta.focus();
+      const len = ta.value.length;
+      ta.setSelectionRange(len, len);
+    }
+  }, [editingId]);
 
   const targetKey = postId ? ["post", postId] : ["activity", activityId];
 
