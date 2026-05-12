@@ -81,6 +81,21 @@ export default function StudentLedger() {
     enabled: !!selectedStudentId && !!activeYear?.id,
   });
 
+  const { data: schoolMethods = [] } = useQuery({
+    queryKey: ["school-payment-methods-ledger", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_payment_methods").select("id, label").eq("school_id", schoolId!);
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+  const methodLabel = (raw: string) => {
+    const found = schoolMethods.find((sm: any) => sm.id === raw);
+    if (found) return found.label;
+    if (!raw) return "—";
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  };
+
   const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const filtered = useMemo(() => {
