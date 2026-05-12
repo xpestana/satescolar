@@ -339,13 +339,21 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {balances.filter((b) => b.balance > 0).map((b) => {
+                    {balances.filter((b) => b.balance > 0).map((b: any) => {
                       const conceptName = (b.payment_plan_concepts as any)?.payment_concepts?.name || "—";
+                      const cur = b.currency || "VES";
                       const isSelected = b.id in selectedConcepts;
                       return (
                         <TableRow key={b.id} className={isSelected ? "bg-primary/5" : ""}>
                           <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, b.balance)} /></TableCell>
-                          <TableCell className="font-medium">{conceptName}</TableCell>
+                          <TableCell className="font-medium">
+                            {conceptName}
+                            {cur !== "VES" && (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                ({Number(b.original_amount || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur} @ {Number(b.exchange_rate_snapshot || 1).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell>{b.total_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell className="font-medium">{b.balance?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
