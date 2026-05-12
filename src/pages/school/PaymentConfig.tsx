@@ -348,6 +348,19 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
     },
   });
 
+  const updateConcept = useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Record<string, any> }) => {
+      const { error } = await supabase.from("payment_plan_concepts").update(patch).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["plan-concepts", plan.id] });
+      qc.invalidateQueries({ queryKey: ["payment-plans"] });
+      toast({ title: "Vencimiento actualizado" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const existingConceptIds = new Set(planConcepts.map((pc: any) => pc.concept_id));
   const availableConcepts = allConcepts.filter((c) => !existingConceptIds.has(c.id));
   const totalsByCurrency = planConcepts.reduce((acc: Record<string, number>, pc: any) => {
