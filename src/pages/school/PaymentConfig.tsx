@@ -28,7 +28,7 @@ function ConceptsTab({ schoolId }: { schoolId: string }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", description: "", concept_type: "mensualidad", default_amount: "", is_active: true });
+  const [form, setForm] = useState({ name: "", description: "", concept_type: "mensualidad", default_amount: "", currency: "VES", is_active: true });
 
   const { data: concepts = [], isLoading } = useQuery({
     queryKey: ["payment-concepts", schoolId],
