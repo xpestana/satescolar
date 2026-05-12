@@ -3928,6 +3928,14 @@ export type Database = {
         Args: { _plan_concept_id: string }
         Returns: undefined
       }
+      get_delinquent_students: {
+        Args: { _school_id: string; _school_year_id: string }
+        Returns: {
+          concepts: Json
+          student_id: string
+          total_owed: number
+        }[]
+      }
       has_permission: {
         Args: { _key: string; _user_id: string }
         Returns: boolean
@@ -3947,6 +3955,10 @@ export type Database = {
       populate_default_primary_indicators: {
         Args: { p_school_id: string }
         Returns: undefined
+      }
+      rebuild_student_concept_balances_for_active_year: {
+        Args: never
+        Returns: number
       }
       representative_child_in_assignment: {
         Args: { _assignment_id: string; _user_id: string }

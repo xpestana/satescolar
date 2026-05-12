@@ -107,6 +107,28 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # ─── Cron diario para reconstruir saldos de morosidad (3:00 AM) ───
+  delinquency-cron:
+    image: alpine:3.19
+    container_name: sat-delinquency-cron
+    environment:
+      POSTGRES_HOST: supabase-db
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-supabase_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Caracas
+    volumes:
+      - ./scripts/cron/delinquency-cron.sh:/usr/local/bin/delinquency-cron.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "apk add --no-cache postgresql15-client tzdata >/dev/null && cp /usr/share/zoneinfo/America/Caracas /etc/localtime && echo America/Caracas > /etc/timezone && /bin/sh /usr/local/bin/delinquency-cron.sh"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-migrations:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   # ─── GoTrue (Auth) ───
   supabase-auth:
     image: supabase/gotrue:v2.158.1
