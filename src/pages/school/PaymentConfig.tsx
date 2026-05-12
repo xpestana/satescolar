@@ -349,11 +349,15 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
 
   const existingConceptIds = new Set(planConcepts.map((pc: any) => pc.concept_id));
   const availableConcepts = allConcepts.filter((c) => !existingConceptIds.has(c.id));
-  const totalPlan = planConcepts.reduce((sum: number, pc: any) => sum + (pc.amount || 0), 0);
+  const totalsByCurrency = planConcepts.reduce((acc: Record<string, number>, pc: any) => {
+    const cur = pc.currency || pc.payment_concepts?.currency || "VES";
+    acc[cur] = (acc[cur] || 0) + (pc.amount || 0);
+    return acc;
+  }, {});
 
   const handleConceptSelect = (conceptId: string) => {
     const concept = allConcepts.find((c) => c.id === conceptId);
-    setAddForm({ ...addForm, concept_id: conceptId, amount: concept?.default_amount?.toString() || "0" });
+    setAddForm({ ...addForm, concept_id: conceptId, amount: concept?.default_amount?.toString() || "0", currency: concept?.currency || "VES" });
   };
 
   return (
@@ -364,7 +368,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
         </DialogHeader>
         <div className="space-y-4 overflow-y-auto flex-1 pr-2">
           <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">Total del plan: <span className="font-bold text-foreground">{totalPlan.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span></p>
+            <p className="text-sm text-muted-foreground">Total del plan: <span className="font-bold text-foreground">{Object.entries(totalsByCurrency).map(([cur, amt]) => `${(amt as number).toLocaleString("es-VE", { minimumFractionDigits: 2 })} ${cur}`).join(" + ") || "0,00 VES"}</span></p>
             <Button size="sm" onClick={() => setAddOpen(true)} disabled={availableConcepts.length === 0}>
               <Plus className="h-4 w-4 mr-1" />Agregar Concepto
             </Button>
@@ -376,7 +380,8 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                 <TableRow>
                   <TableHead>Concepto</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Monto (VES)</TableHead>
+                  <TableHead>Moneda</TableHead>
+                  <TableHead>Monto</TableHead>
                   <TableHead>Obligatorio</TableHead>
                   <TableHead>Recurrente</TableHead>
                   <TableHead>Día venc.</TableHead>
@@ -384,18 +389,22 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {planConcepts.map((pc: any) => (
-                  <TableRow key={pc.id}>
-                    <TableCell className="font-medium">{pc.payment_concepts?.name}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-xs">{pc.payment_concepts?.concept_type}</Badge></TableCell>
-                    <TableCell>{pc.amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                    <TableCell>{pc.is_mandatory ? "Sí" : "No"}</TableCell>
-                    <TableCell>{pc.is_recurring ? "Sí" : "No"}</TableCell>
-                    <TableCell>{pc.due_day || "—"}</TableCell>
-                    <TableCell><Button size="icon" variant="ghost" onClick={() => removeConcept.mutate(pc.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
-                  </TableRow>
-                ))}
-                {planConcepts.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">Sin conceptos asociados</TableCell></TableRow>}
+                {planConcepts.map((pc: any) => {
+                  const cur = pc.currency || pc.payment_concepts?.currency || "VES";
+                  return (
+                    <TableRow key={pc.id}>
+                      <TableCell className="font-medium">{pc.payment_concepts?.name}</TableCell>
+                      <TableCell><Badge variant="outline" className="text-xs">{pc.payment_concepts?.concept_type}</Badge></TableCell>
+                      <TableCell><Badge variant="secondary">{cur}</Badge></TableCell>
+                      <TableCell>{pc.amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur}</TableCell>
+                      <TableCell>{pc.is_mandatory ? "Sí" : "No"}</TableCell>
+                      <TableCell>{pc.is_recurring ? "Sí" : "No"}</TableCell>
+                      <TableCell>{pc.due_day || "—"}</TableCell>
+                      <TableCell><Button size="icon" variant="ghost" onClick={() => removeConcept.mutate(pc.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
+                    </TableRow>
+                  );
+                })}
+                {planConcepts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Sin conceptos asociados</TableCell></TableRow>}
               </TableBody>
             </Table>
           )}
