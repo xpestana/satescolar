@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, Receipt, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Loader2, Receipt, AlertTriangle, CheckCheck } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
 
 interface PaymentMethodLine {
@@ -187,6 +187,25 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
       return next;
     });
   };
+
+  // Cierra un saldo residual (típicamente diferencia por tasa de cambio) marcándolo como pagado
+  const closeBalanceMut = useMutation({
+    mutationFn: async (bal: any) => {
+      const { error } = await supabase.from("student_concept_balances").update({
+        paid_amount: bal.total_amount,
+        balance: 0,
+        status: "paid",
+        last_payment_date: today(),
+      }).eq("id", bal.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["student-balances"] });
+      qc.invalidateQueries({ queryKey: ["all-student-balances"] });
+      toast({ title: "Concepto marcado como completo", description: "El saldo residual fue ajustado por diferencia cambiaria." });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
 
   const totalConcepts = useMemo(() =>
     Object.values(selectedConcepts).reduce((s, v) => s + (parseFloat(v) || 0), 0), [selectedConcepts]);
@@ -368,18 +387,33 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {isSelected && (
-                              <Input
-                                type="number"
-                                step="0.01"
-                                className="h-7 w-28 text-xs"
-                                value={selectedConcepts[b.id]}
-                                onChange={(e) => {
-                                  const val = Math.min(parseFloat(e.target.value) || 0, b.balance);
-                                  setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
-                                }}
-                              />
-                            )}
+                            <div className="flex items-center gap-2">
+                              {isSelected && (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="h-7 w-28 text-xs"
+                                  value={selectedConcepts[b.id]}
+                                  onChange={(e) => {
+                                    const val = Math.min(parseFloat(e.target.value) || 0, b.balance);
+                                    setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
+                                  }}
+                                />
+                              )}
+                              {b.paid_amount > 0 && b.balance > 0 && b.balance < (b.total_amount * 0.05) && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1"
+                                  title="Cerrar saldo residual por diferencia cambiaria"
+                                  disabled={closeBalanceMut.isPending}
+                                  onClick={() => closeBalanceMut.mutate(b)}
+                                >
+                                  <CheckCheck className="h-3 w-3" />
+                                  Marcar completo
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
