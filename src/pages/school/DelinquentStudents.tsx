@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Search, AlertTriangle, Mail, Eye } from "lucide-react";
-import { isOverdue } from "@/lib/delinquency";
 
 export default function DelinquentStudents() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -31,40 +30,18 @@ export default function DelinquentStudents() {
     enabled: !!schoolId,
   });
 
-  // All balances with pending amounts
-  const { data: pendingBalances = [], isLoading } = useQuery({
-    queryKey: ["delinquent-balances", schoolId, activeYear?.id],
+  // Delinquent students from server-side RPC (works identically in Lovable y VPS).
+  const { data: delinquentRows = [], isLoading } = useQuery({
+    queryKey: ["delinquent-rpc", schoolId, activeYear?.id],
     queryFn: async () => {
-      const { data: balances, error } = await supabase.from("student_concept_balances")
-        .select("*")
-        .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear!.id)
-        .gt("balance", 0)
-        .order("student_id");
+      // Asegurar que existan los saldos para todos los planes asignados antes de calcular morosos.
+      await supabase.rpc("rebuild_student_concept_balances_for_active_year");
+      const { data, error } = await supabase.rpc("get_delinquent_students", {
+        _school_id: schoolId!,
+        _school_year_id: activeYear!.id,
+      });
       if (error) throw error;
-      if (!balances?.length) return [];
-
-      // VPS/PostgREST puede no tener el cache de relaciones FK actualizado; por eso
-      // resolvemos conceptos en consultas separadas y no con embeds anidados.
-      const planConceptIds = [...new Set(balances.map((b: any) => b.plan_concept_id).filter(Boolean))];
-      const { data: planConcepts, error: planConceptsError } = await supabase.from("payment_plan_concepts")
-        .select("id, concept_id, due_day, due_month, is_recurring")
-        .in("id", planConceptIds);
-      if (planConceptsError) throw planConceptsError;
-
-      const conceptIds = [...new Set((planConcepts || []).map((pc: any) => pc.concept_id).filter(Boolean))];
-      const { data: concepts, error: conceptsError } = conceptIds.length
-        ? await supabase.from("payment_concepts").select("id, name, concept_type").in("id", conceptIds)
-        : { data: [], error: null };
-      if (conceptsError) throw conceptsError;
-
-      const conceptMap = new Map((concepts || []).map((c: any) => [c.id, c]));
-      const planConceptMap = new Map((planConcepts || []).map((pc: any) => [pc.id, { ...pc, payment_concepts: conceptMap.get(pc.concept_id) }]));
-      const data = balances.map((b: any) => ({ ...b, payment_plan_concepts: planConceptMap.get(b.plan_concept_id) || null }));
-
-      const today = new Date();
-      // Filtrar SOLO balances cuyo concepto ya esté vencido a la fecha de hoy
-      return data.filter((b: any) => isOverdue(b.payment_plan_concepts, activeYear?.year_range, today));
+      return (data || []) as Array<{ student_id: string; total_owed: number; concepts: any[] }>;
     },
     enabled: !!schoolId && !!activeYear?.id,
   });
