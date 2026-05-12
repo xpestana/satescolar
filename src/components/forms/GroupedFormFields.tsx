@@ -55,6 +55,12 @@ interface GroupedFormFieldsProps {
 const GEO_BASES = ["pais", "estado", "municipio", "ciudad", "parroquia"] as const;
 type GeoBase = typeof GEO_BASES[number];
 
+// Considera Venezuela (case-insensitive, también acepta variantes con tilde)
+function isVenezuela(value: unknown): boolean {
+  if (!value || typeof value !== "string") return false;
+  return value.trim().toLowerCase() === "venezuela";
+}
+
 /**
  * Detects whether a field_name corresponds to a geographic base.
  * Matches both "estado" and "estado_nacimiento" (or any suffix like "estado_residencia").
