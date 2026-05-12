@@ -300,7 +300,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
   const { data: planConcepts = [], isLoading } = useQuery({
     queryKey: ["plan-concepts", plan.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payment_plan_concepts").select("*, payment_concepts(name, concept_type, default_amount)").eq("plan_id", plan.id).order("display_order");
+      const { data, error } = await supabase.from("payment_plan_concepts").select("*, payment_concepts(name, concept_type, default_amount, currency)").eq("plan_id", plan.id).order("display_order");
       if (error) throw error;
       return data;
     },
@@ -308,7 +308,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
   });
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ concept_id: "", amount: "", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "" });
+  const [addForm, setAddForm] = useState({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "" });
 
   const addConcept = useMutation({
     mutationFn: async () => {
@@ -317,6 +317,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
         plan_id: plan.id,
         concept_id: addForm.concept_id,
         amount: parseFloat(addForm.amount) || 0,
+        currency: addForm.currency,
         display_order: parseInt(addForm.display_order) || 0,
         is_mandatory: addForm.is_mandatory,
         is_recurring: addForm.is_recurring,
@@ -329,7 +330,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
       qc.invalidateQueries({ queryKey: ["payment-plans"] });
       toast({ title: "Concepto agregado al plan" });
       setAddOpen(false);
-      setAddForm({ concept_id: "", amount: "", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "" });
+      setAddForm({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
