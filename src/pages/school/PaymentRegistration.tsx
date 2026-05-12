@@ -395,6 +395,18 @@ export default function PaymentRegistration() {
               initialStudentPlan={selectedStudentPlan}
             />
           )}
+
+          {/* Payment History Modal */}
+          {historyStudent && activeYear && (
+            <PaymentHistoryModal
+              open={historyOpen}
+              onOpenChange={setHistoryOpen}
+              studentId={historyStudent.id}
+              studentName={historyStudent.name}
+              schoolId={schoolId}
+              schoolYearId={activeYear.id}
+            />
+          )}
         </>
       )}
     </DashboardLayout>
