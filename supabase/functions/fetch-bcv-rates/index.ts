@@ -132,7 +132,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     const usdRate = parseRate(usdRaw);
     const eurRate = parseRate(eurRaw);
-    const publishedDate = extractPublishedDate(html);
+    const publishedDate = extractPublishedDate(html!);
 
     console.log(`BCV rates - USD: ${usdRate}, EUR: ${eurRate}, Date: ${publishedDate}`);
 
