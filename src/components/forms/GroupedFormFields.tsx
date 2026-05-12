@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Json } from "@/integrations/supabase/types";
+import { COUNTRIES, isVenezuela } from "@/lib/countries";
 
 interface FormField {
   id: string;
