@@ -35,16 +35,36 @@ export default function DelinquentStudents() {
   const { data: pendingBalances = [], isLoading } = useQuery({
     queryKey: ["delinquent-balances", schoolId, activeYear?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("student_concept_balances")
-        .select("*, payment_plan_concepts(payment_concepts(name, concept_type), due_day, due_month, is_recurring)")
+      const { data: balances, error } = await supabase.from("student_concept_balances")
+        .select("*")
         .eq("school_id", schoolId!)
         .eq("school_year_id", activeYear!.id)
         .gt("balance", 0)
         .order("student_id");
       if (error) throw error;
+      if (!balances?.length) return [];
+
+      // VPS/PostgREST puede no tener el cache de relaciones FK actualizado; por eso
+      // resolvemos conceptos en consultas separadas y no con embeds anidados.
+      const planConceptIds = [...new Set(balances.map((b: any) => b.plan_concept_id).filter(Boolean))];
+      const { data: planConcepts, error: planConceptsError } = await supabase.from("payment_plan_concepts")
+        .select("id, concept_id, due_day, due_month, is_recurring")
+        .in("id", planConceptIds);
+      if (planConceptsError) throw planConceptsError;
+
+      const conceptIds = [...new Set((planConcepts || []).map((pc: any) => pc.concept_id).filter(Boolean))];
+      const { data: concepts, error: conceptsError } = conceptIds.length
+        ? await supabase.from("payment_concepts").select("id, name, concept_type").in("id", conceptIds)
+        : { data: [], error: null };
+      if (conceptsError) throw conceptsError;
+
+      const conceptMap = new Map((concepts || []).map((c: any) => [c.id, c]));
+      const planConceptMap = new Map((planConcepts || []).map((pc: any) => [pc.id, { ...pc, payment_concepts: conceptMap.get(pc.concept_id) }]));
+      const data = balances.map((b: any) => ({ ...b, payment_plan_concepts: planConceptMap.get(b.plan_concept_id) || null }));
+
       const today = new Date();
       // Filtrar SOLO balances cuyo concepto ya esté vencido a la fecha de hoy
-      return (data || []).filter((b: any) => isOverdue(b.payment_plan_concepts, activeYear?.year_range, today));
+      return data.filter((b: any) => isOverdue(b.payment_plan_concepts, activeYear?.year_range, today));
     },
     enabled: !!schoolId && !!activeYear?.id,
   });
