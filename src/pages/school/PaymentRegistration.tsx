@@ -14,10 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, CreditCard, AlertTriangle } from "lucide-react";
+import { Loader2, Search, CreditCard, AlertTriangle, History } from "lucide-react";
 import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
 import { formatGradeLevel } from "@/lib/utils";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
+import { PaymentHistoryModal } from "@/components/payments/PaymentHistoryModal";
 import { useToast } from "@/hooks/use-toast";
 
 export default function PaymentRegistration() {
