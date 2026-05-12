@@ -1,61 +1,60 @@
-## Diagnóstico
+# Conceptos de Pago multi-moneda
 
-El error no tiene relación con migraciones. En el VPS se está ejecutando una versión vieja de `fetch-bcv-rates`:
+Hoy los `payment_concepts` y `payment_plan_concepts` solo manejan VES. Vamos a permitir que cada concepto se cree en la moneda que el colegio prefiera (VES, USD, EUR, COP) y la conversión a VES (moneda contable) ocurre con la tasa BCV vigente al momento de asignar el plan al estudiante.
 
-- Log del VPS: `Fetched BCV via Firecrawl`
-- Código actual en Lovable: `Fetched BCV via Firecrawl v2/v1, length: ...`
-- En el código actual, la línea 51 es el header `Authorization`, pero en el stack del VPS la línea 51 cae en el `throw` viejo. Eso confirma que el contenedor no está leyendo el archivo actualizado.
+## Cambio de base de datos
 
-## Plan para resolverlo
+Migración nueva `add_currency_to_payment_concepts`:
 
-1. Verificar en el VPS que el archivo montado tenga el código nuevo:
+- `payment_concepts`
+  - Añadir `currency text NOT NULL DEFAULT 'VES'` con CHECK en (`VES`,`USD`,`EUR`,`COP`).
+- `payment_plan_concepts`
+  - Añadir `currency text` (nullable → hereda del concepto).
+  - El `amount` existente se interpreta en esa moneda.
+- `student_concept_balances` (snapshot al asignar el plan)
+  - `currency text NOT NULL DEFAULT 'VES'`
+  - `original_amount numeric` — monto en la moneda del concepto.
+  - `exchange_rate_snapshot numeric NOT NULL DEFAULT 1` — tasa usada para convertir a VES.
+  - `total_amount` sigue en VES (= `original_amount * exchange_rate_snapshot`).
 
-```bash
-cd ~/satescolar
-sed -n '1,130p' supabase/functions/fetch-bcv-rates/index.ts | grep -E "Fetched BCV|v2|length|rawHtml"
-```
+Datos existentes: todos quedan en `VES` con `exchange_rate_snapshot = 1`, sin pérdida.
 
-2. Verificar dentro del contenedor si ve el mismo archivo:
+## Cambios de UI
 
-```bash
-docker exec -it sat-functions sh -lc 'sed -n "1,130p" /home/deno/functions/fetch-bcv-rates/index.ts | grep -E "Fetched BCV|v2|length|rawHtml"'
-```
+### `PaymentConfig.tsx` – Conceptos
+- Modal "Editar/Crear Concepto": agregar `Select` de Moneda (VES/USD/EUR/COP) junto al campo "Tipo".
+- Cambiar label "Monto por defecto (VES)" → "Monto por defecto ({currency})".
+- Tabla de conceptos: nueva columna **Moneda**; el monto se muestra con su símbolo/sufijo correcto.
 
-3. Si ambos comandos no muestran `Fetched BCV via Firecrawl v2/v1, length: ...`, actualizar el repo del VPS con los cambios actuales y reiniciar solo funciones:
+### `PaymentConfig.tsx` – Planes (sub-conceptos del plan)
+- Al añadir un concepto a un plan: precarga `currency` del concepto y permite override opcional.
+- Listado de conceptos del plan: muestra `monto + moneda` y, si no es VES, el equivalente VES estimado a tasa actual.
 
-```bash
-cd ~/satescolar
-git pull
-```
+### `PaymentRegistration.tsx` – Asignación de plan
+- En `assignPlanMut`, además de insertar `student_payment_plans`, insertar las filas de `student_concept_balances` haciendo snapshot:
+  - Tomar la tasa BCV actual de `exchange_rates` para la moneda de cada concepto.
+  - Guardar `currency`, `original_amount`, `exchange_rate_snapshot`, `total_amount` (= original × tasa), `paid_amount = 0`, `balance = total_amount`, `status = 'pending'`.
+- Esto fija el monto en bolívares al momento de asignar el plan y el alumno no se ve afectado por fluctuaciones posteriores.
 
-4. Reiniciar recreando el contenedor de funciones para cortar cualquier caché del edge-runtime:
+### `PaymentFormModal.tsx`, `StudentLedger.tsx`, `PaymentDashboard.tsx`, `DelinquentStudents.tsx`
+- En cada fila de balance mostrar: `original_amount {currency}` y entre paréntesis el `total_amount VES` cuando difiere.
+- La cobranza, items de pago y métodos siguen exactamente igual (todo en VES contable).
 
-```bash
-cd ~/satescolar
-docker compose stop supabase-functions
-docker compose rm -f supabase-functions
-docker compose up -d supabase-functions
-```
+## Notas técnicas
 
-5. Probar la función y revisar logs:
+- Memoria del proyecto ya establece: "DB strict in VES, multi-currency UI uses snapshots." Esta solución respeta esa regla — VES sigue siendo la única moneda contable; el concepto solo guarda en qué moneda fue **denominado**, y al momento de asignarlo a un estudiante se congela su valor en VES.
+- No hay triggers actuales que creen `student_concept_balances`; la creación explícita queda dentro de `assignPlanMut` (front-end).
+- `exchange_rates` ya contiene USD/EUR/COP, no requiere cambios.
+- No se modifican Edge Functions de cobranza ni morosidad: siguen leyendo `balance` en VES.
 
-```bash
-curl -i -X POST https://api.satescolar.com/functions/v1/fetch-bcv-rates
-
-docker logs -f sat-functions
-```
-
-## Ajuste recomendado si aún falla
-
-Agregaré un fallback directo al BCV además de Firecrawl. Así, aunque Firecrawl devuelva markdown/html incompleto o cacheado, la función intentará leer directamente `https://www.bcv.org.ve/` desde el VPS y extraerá USD/EUR con el parser nuevo.
-
-## Resultado esperado
-
-Los logs deberían cambiar a algo como:
+## Archivos a tocar
 
 ```text
-Fetched BCV via Firecrawl v2, length: ...
-BCV rates - USD: 504.9146, EUR: 595.05195439, Date: 2026-05-12
+supabase/migrations/<timestamp>_add_currency_to_payment_concepts.sql   (nuevo)
+src/pages/school/PaymentConfig.tsx                                     (UI conceptos + planes)
+src/pages/school/PaymentRegistration.tsx                               (snapshot al asignar plan)
+src/components/payments/PaymentFormModal.tsx                           (mostrar moneda original)
+src/pages/school/StudentLedger.tsx                                     (mostrar moneda original)
+src/pages/school/PaymentDashboard.tsx                                  (opcional: mostrar moneda)
+src/pages/school/DelinquentStudents.tsx                                (opcional: mostrar moneda)
 ```
-
-Si el VPS no tiene el código nuevo, el problema se resuelve con sincronizar/recrear `sat-functions`. Si sí lo tiene pero Firecrawl entrega contenido distinto, el fallback directo corrige la extracción.

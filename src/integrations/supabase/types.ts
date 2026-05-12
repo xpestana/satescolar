@@ -2098,6 +2098,7 @@ export type Database = {
         Row: {
           concept_type: string
           created_at: string
+          currency: string
           default_amount: number
           description: string | null
           id: string
@@ -2109,6 +2110,7 @@ export type Database = {
         Insert: {
           concept_type?: string
           created_at?: string
+          currency?: string
           default_amount?: number
           description?: string | null
           id?: string
@@ -2120,6 +2122,7 @@ export type Database = {
         Update: {
           concept_type?: string
           created_at?: string
+          currency?: string
           default_amount?: number
           description?: string | null
           id?: string
@@ -2238,6 +2241,7 @@ export type Database = {
           amount: number
           concept_id: string
           created_at: string
+          currency: string | null
           display_order: number
           due_day: number | null
           id: string
@@ -2249,6 +2253,7 @@ export type Database = {
           amount?: number
           concept_id: string
           created_at?: string
+          currency?: string | null
           display_order?: number
           due_day?: number | null
           id?: string
@@ -2260,6 +2265,7 @@ export type Database = {
           amount?: number
           concept_id?: string
           created_at?: string
+          currency?: string | null
           display_order?: number
           due_day?: number | null
           id?: string
@@ -3474,8 +3480,11 @@ export type Database = {
       student_concept_balances: {
         Row: {
           balance: number
+          currency: string
+          exchange_rate_snapshot: number
           id: string
           last_payment_date: string | null
+          original_amount: number | null
           paid_amount: number
           plan_concept_id: string
           school_id: string
@@ -3487,8 +3496,11 @@ export type Database = {
         }
         Insert: {
           balance?: number
+          currency?: string
+          exchange_rate_snapshot?: number
           id?: string
           last_payment_date?: string | null
+          original_amount?: number | null
           paid_amount?: number
           plan_concept_id: string
           school_id: string
@@ -3500,8 +3512,11 @@ export type Database = {
         }
         Update: {
           balance?: number
+          currency?: string
+          exchange_rate_snapshot?: number
           id?: string
           last_payment_date?: string | null
+          original_amount?: number | null
           paid_amount?: number
           plan_concept_id?: string
           school_id?: string
