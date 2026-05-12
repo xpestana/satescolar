@@ -14,7 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Json } from "@/integrations/supabase/types";
-import { COUNTRIES, isVenezuela } from "@/lib/countries";
 
 interface FormField {
   id: string;
@@ -211,52 +210,17 @@ export function GroupedFormFields({
     });
   }, [initialStateId, initialMunicipalityId, initialCityId, initialParishId, geoKey, formData, onFieldChange]);
 
-  const paisValue: string = formData[geoKey("pais")] || "Venezuela";
-  const isVE = isVenezuela(paisValue);
-
-  const handlePaisChange = (value: string) => {
-    onFieldChange(geoKey("pais"), value);
-    // Limpiar dependientes para evitar arrastrar UUIDs/strings entre modos
-    if (geoKeyMap["estado"]) onFieldChange(geoKey("estado"), "");
-    if (geoKeyMap["municipio"]) onFieldChange(geoKey("municipio"), "");
-    if (geoKeyMap["ciudad"]) onFieldChange(geoKey("ciudad"), "");
-    if (geoKeyMap["parroquia"]) onFieldChange(geoKey("parroquia"), "");
-  };
-
   const renderGeographicField = (field: FormField, base: GeoBase) => {
     if (base === "pais") {
       return (
-        <Select value={paisValue} onValueChange={handlePaisChange}>
-          <SelectTrigger translate="no">
-            <SelectValue placeholder="Seleccione país" />
+        <Select value={formData[field.field_name] || "Venezuela"} disabled>
+          <SelectTrigger>
+            <SelectValue placeholder="Venezuela" />
           </SelectTrigger>
-          <SelectContent className="max-h-72">
-            {COUNTRIES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
+          <SelectContent>
+            <SelectItem value="Venezuela">Venezuela</SelectItem>
           </SelectContent>
         </Select>
-      );
-    }
-
-    // Si el país NO es Venezuela, todos los campos geográficos son texto libre
-    // y se guardan en la MISMA clave (estado_nacimiento, municipio_nacimiento, ...).
-    if (!isVE) {
-      const rawVal = formData[field.field_name];
-      // Si quedó un UUID viejo de Venezuela, no lo mostramos como texto
-      const looksLikeUuid =
-        typeof rawVal === "string" &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawVal);
-      const value = looksLikeUuid ? "" : rawVal || "";
-      return (
-        <Input
-          type="text"
-          placeholder={field.placeholder || field.field_label}
-          value={value}
-          onChange={(e) => onFieldChange(field.field_name, e.target.value)}
-        />
       );
     }
 
@@ -299,6 +263,7 @@ export function GroupedFormFields({
     }
 
     if (base === "ciudad") {
+      // If there's no estado field in this form AND no initialStateId, render as text input
       const hasEstadoField = !!geoKeyMap["estado"];
       const hasStateContext = hasEstadoField || !!effectiveStateId;
       
