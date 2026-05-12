@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Search, AlertTriangle, Mail, Eye } from "lucide-react";
+import { isOverdue } from "@/lib/delinquency";
 
 export default function DelinquentStudents() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -35,13 +36,15 @@ export default function DelinquentStudents() {
     queryKey: ["delinquent-balances", schoolId, activeYear?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("student_concept_balances")
-        .select("*, payment_plan_concepts(payment_concepts(name, concept_type), due_day)")
+        .select("*, payment_plan_concepts(payment_concepts(name, concept_type), due_day, due_month, is_recurring)")
         .eq("school_id", schoolId!)
         .eq("school_year_id", activeYear!.id)
         .gt("balance", 0)
         .order("student_id");
       if (error) throw error;
-      return data || [];
+      const today = new Date();
+      // Filtrar SOLO balances cuyo concepto ya esté vencido a la fecha de hoy
+      return (data || []).filter((b: any) => isOverdue(b.payment_plan_concepts, activeYear?.year_range, today));
     },
     enabled: !!schoolId && !!activeYear?.id,
   });

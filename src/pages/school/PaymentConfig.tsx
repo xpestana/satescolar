@@ -176,7 +176,7 @@ function PlansTab({ schoolId }: { schoolId: string }) {
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ["payment-plans", schoolId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payment_plans").select("*, payment_plan_concepts(id, amount, currency, display_order, is_mandatory, is_recurring, due_day, concept_id, payment_concepts(name, concept_type, currency))").eq("school_id", schoolId).order("name");
+      const { data, error } = await supabase.from("payment_plans").select("*, payment_plan_concepts(id, amount, currency, display_order, is_mandatory, is_recurring, due_day, due_month, concept_id, payment_concepts(name, concept_type, currency))").eq("school_id", schoolId).order("name");
       if (error) throw error;
       return data;
     },
@@ -308,7 +308,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
   });
 
   const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "" });
+  const [addForm, setAddForm] = useState({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "", due_month: "" });
 
   const addConcept = useMutation({
     mutationFn: async () => {
@@ -322,6 +322,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
         is_mandatory: addForm.is_mandatory,
         is_recurring: addForm.is_recurring,
         due_day: addForm.due_day ? parseInt(addForm.due_day) : null,
+        due_month: addForm.due_month ? parseInt(addForm.due_month) : null,
       });
       if (error) throw error;
     },
@@ -330,7 +331,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
       qc.invalidateQueries({ queryKey: ["payment-plans"] });
       toast({ title: "Concepto agregado al plan" });
       setAddOpen(false);
-      setAddForm({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "" });
+      setAddForm({ concept_id: "", amount: "", currency: "VES", display_order: "0", is_mandatory: true, is_recurring: false, due_day: "", due_month: "" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -384,6 +385,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                   <TableHead>Monto</TableHead>
                   <TableHead>Obligatorio</TableHead>
                   <TableHead>Recurrente</TableHead>
+                  <TableHead>Mes venc.</TableHead>
                   <TableHead>Día venc.</TableHead>
                   <TableHead className="w-16"></TableHead>
                 </TableRow>
@@ -391,6 +393,7 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
               <TableBody>
                 {planConcepts.map((pc: any) => {
                   const cur = pc.currency || pc.payment_concepts?.currency || "VES";
+                  const monthNames = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
                   return (
                     <TableRow key={pc.id}>
                       <TableCell className="font-medium">{pc.payment_concepts?.name}</TableCell>
@@ -399,12 +402,13 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                       <TableCell>{pc.amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur}</TableCell>
                       <TableCell>{pc.is_mandatory ? "Sí" : "No"}</TableCell>
                       <TableCell>{pc.is_recurring ? "Sí" : "No"}</TableCell>
+                      <TableCell>{pc.due_month ? monthNames[pc.due_month - 1] : "—"}</TableCell>
                       <TableCell>{pc.due_day || "—"}</TableCell>
                       <TableCell><Button size="icon" variant="ghost" onClick={() => removeConcept.mutate(pc.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button></TableCell>
                     </TableRow>
                   );
                 })}
-                {planConcepts.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-6">Sin conceptos asociados</TableCell></TableRow>}
+                {planConcepts.length === 0 && <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-6">Sin conceptos asociados</TableCell></TableRow>}
               </TableBody>
             </Table>
           )}
@@ -441,6 +445,19 @@ function PlanConceptsDialog({ open, onOpenChange, plan, allConcepts, schoolId }:
                 <div className="space-y-1"><Label>Día de vencimiento</Label><Input type="number" min="1" max="31" value={addForm.due_day} onChange={(e) => setAddForm({ ...addForm, due_day: e.target.value })} placeholder="ej: 15" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Mes de vencimiento</Label>
+                  <Select value={addForm.due_month || "none"} onValueChange={(v) => setAddForm({ ...addForm, due_month: v === "none" ? "" : v })}>
+                    <SelectTrigger><SelectValue placeholder="Sin mes específico" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin mes específico</SelectItem>
+                      {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => (
+                        <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Si recurrente, indica el primer mes de obligación.</p>
+                </div>
                 <div className="space-y-1"><Label>Orden</Label><Input type="number" value={addForm.display_order} onChange={(e) => setAddForm({ ...addForm, display_order: e.target.value })} /></div>
               </div>
               <div className="flex gap-6">

@@ -48,7 +48,7 @@ export default async function handler(req: Request): Promise<Response> {
       // Get active school year
       const { data: activeYear } = await supabaseAdmin
         .from("school_years")
-        .select("id")
+        .select("id, year_range")
         .eq("school_id", schoolId)
         .eq("is_active", true)
         .maybeSingle();
@@ -57,21 +57,42 @@ export default async function handler(req: Request): Promise<Response> {
       // Get delinquent students (balance > 0)
       const { data: balances } = await supabaseAdmin
         .from("student_concept_balances")
-        .select("student_id, balance, plan_concept_id, payment_plan_concepts(payment_concepts(name), due_day)")
+        .select("student_id, balance, plan_concept_id, payment_plan_concepts(payment_concepts(name), due_day, due_month, is_recurring)")
         .eq("school_id", schoolId)
         .eq("school_year_id", activeYear.id)
         .gt("balance", 0);
       if (!balances || balances.length === 0) continue;
 
-      // Group by student
+      // Compute due date per concept and skip those not yet overdue
+      const SCHOOL_YEAR_START_MONTH = 8;
+      const yrMatch = (activeYear.year_range || "").match(/(\d{4}).*?(\d{4})/);
+      const startYear = yrMatch ? parseInt(yrMatch[1], 10) : today.getFullYear();
+      const endYear = yrMatch ? parseInt(yrMatch[2], 10) : today.getFullYear();
+
       const studentDebts: Record<string, { total: number; concepts: any[] }> = {};
       for (const b of balances) {
-        const dueDay = (b.payment_plan_concepts as any)?.due_day || config.overdue_after_day || 15;
-        if (dayOfMonth < dueDay) continue; // Not yet overdue
+        const ppc = (b.payment_plan_concepts as any) || {};
+        const dueMonth: number | null = ppc.due_month ?? null;
+        const dueDay: number | null = ppc.due_day ?? null;
+        const isRecurring: boolean = !!ppc.is_recurring;
+
+        let dueDate: Date | null = null;
+        if (dueMonth) {
+          const yr = dueMonth >= SCHOOL_YEAR_START_MONTH ? startYear : endYear;
+          const d = dueDay ?? new Date(yr, dueMonth, 0).getDate();
+          dueDate = new Date(yr, dueMonth - 1, d, 23, 59, 59);
+        } else if (dueDay) {
+          // Sin mes específico: usa día del mes en curso (recurrente o legacy)
+          dueDate = new Date(today.getFullYear(), today.getMonth(), dueDay, 23, 59, 59);
+        }
+        // Sin vencimiento definido => no es moroso
+        if (!dueDate) continue;
+        if (today.getTime() <= dueDate.getTime()) continue;
+
         if (!studentDebts[b.student_id]) studentDebts[b.student_id] = { total: 0, concepts: [] };
         studentDebts[b.student_id].total += b.balance;
         studentDebts[b.student_id].concepts.push({
-          name: (b.payment_plan_concepts as any)?.payment_concepts?.name || "Concepto",
+          name: ppc.payment_concepts?.name || "Concepto",
           balance: b.balance,
         });
       }

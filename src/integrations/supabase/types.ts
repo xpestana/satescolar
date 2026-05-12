@@ -2244,6 +2244,7 @@ export type Database = {
           currency: string | null
           display_order: number
           due_day: number | null
+          due_month: number | null
           id: string
           is_mandatory: boolean
           is_recurring: boolean
@@ -2256,6 +2257,7 @@ export type Database = {
           currency?: string | null
           display_order?: number
           due_day?: number | null
+          due_month?: number | null
           id?: string
           is_mandatory?: boolean
           is_recurring?: boolean
@@ -2268,6 +2270,7 @@ export type Database = {
           currency?: string | null
           display_order?: number
           due_day?: number | null
+          due_month?: number | null
           id?: string
           is_mandatory?: boolean
           is_recurring?: boolean
