@@ -60,7 +60,7 @@ export default function DelinquentStudents() {
   });
 
   // Families for email
-  const studentIds = useMemo(() => [...new Set(pendingBalances.map((b: any) => b.student_id))], [pendingBalances]);
+  const studentIds = useMemo(() => delinquentRows.map((d) => d.student_id), [delinquentRows]);
 
   const { data: families = [] } = useQuery({
     queryKey: ["families-for-delinquent", studentIds],
@@ -87,16 +87,19 @@ export default function DelinquentStudents() {
     enabled: !!schoolId,
   });
 
-  // Aggregate delinquent students
+  // Aggregate delinquent students (already aggregated server-side)
   const delinquentStudents = useMemo(() => {
-    const map: Record<string, { studentId: string; totalOwed: number; concepts: any[]; oldestDue: string | null }> = {};
-    pendingBalances.forEach((b: any) => {
-      if (!map[b.student_id]) map[b.student_id] = { studentId: b.student_id, totalOwed: 0, concepts: [], oldestDue: null };
-      map[b.student_id].totalOwed += b.balance;
-      map[b.student_id].concepts.push(b);
-    });
-    return Object.values(map);
-  }, [pendingBalances]);
+    return delinquentRows.map((d) => ({
+      studentId: d.student_id,
+      totalOwed: Number(d.total_owed) || 0,
+      concepts: (d.concepts || []).map((c: any) => ({
+        ...c,
+        // Shape for legacy table rendering
+        payment_plan_concepts: { payment_concepts: { name: c.name } },
+      })),
+      oldestDue: null as string | null,
+    }));
+  }, [delinquentRows]);
 
   const enrollmentMap = useMemo(() => {
     const m: Record<string, any> = {};
