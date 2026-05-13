@@ -137,6 +137,7 @@ export default async function handler(req: Request): Promise<Response> {
           user_id: userData.user.id,
           role: role,
           school_id: school_id || null,
+          is_owner: role === "school",
         });
 
       if (roleError) {

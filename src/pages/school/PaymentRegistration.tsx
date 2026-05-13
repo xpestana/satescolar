@@ -159,59 +159,35 @@ export default function PaymentRegistration() {
     mutationFn: async () => {
       if (!assignStudentId || !assignPlanId || !activeYear?.id) throw new Error("Datos incompletos");
 
-      // 1) Insert assignment
-      const { error } = await supabase.from("student_payment_plans").insert({
-        student_id: assignStudentId,
-        plan_id: assignPlanId,
-        school_id: schoolId!,
-        school_year_id: activeYear.id,
-      });
-      if (error) throw error;
+      const currentPlan = planMap[assignStudentId];
+      if (currentPlan) {
+        if (currentPlan.plan_id === assignPlanId) return;
 
-      // 2) Load plan concepts (with currency) and current exchange rates
-      const { data: planConcepts, error: pcErr } = await supabase
-        .from("payment_plan_concepts")
-        .select("id, amount, currency, payment_concepts(currency)")
-        .eq("plan_id", assignPlanId);
-      if (pcErr) throw pcErr;
-
-      const { data: rates } = await supabase
-        .from("exchange_rates")
-        .select("currency, rate_to_ves")
-        .eq("school_id", schoolId!);
-      const rateMap: Record<string, number> = { VES: 1 };
-      (rates || []).forEach((r: any) => { rateMap[r.currency] = Number(r.rate_to_ves) || 0; });
-
-      // 3) Snapshot balances per concept (frozen in VES at assignment time)
-      const balances = (planConcepts || []).map((pc: any) => {
-        const currency = pc.currency || pc.payment_concepts?.currency || "VES";
-        const rate = rateMap[currency] ?? 1;
-        const original = Number(pc.amount) || 0;
-        const totalVes = original * rate;
-        return {
-          school_id: schoolId!,
-          student_id: assignStudentId,
-          school_year_id: activeYear.id,
-          plan_concept_id: pc.id,
-          currency,
-          original_amount: original,
-          exchange_rate_snapshot: rate,
-          total_amount: totalVes,
-          paid_amount: 0,
-          balance: totalVes,
-          status: "pending",
-        };
-      });
-
-      if (balances.length > 0) {
-        const { error: balErr } = await supabase.from("student_concept_balances").insert(balances);
-        if (balErr) throw balErr;
+        const { error } = await supabase
+          .from("student_payment_plans")
+          .update({
+            plan_id: assignPlanId,
+            assigned_at: new Date().toISOString(),
+          })
+          .eq("id", currentPlan.id);
+        if (error) throw error;
+        return;
       }
+
+      const { error } = await supabase
+        .from("student_payment_plans")
+        .insert({
+          student_id: assignStudentId,
+          plan_id: assignPlanId,
+          school_id: schoolId!,
+          school_year_id: activeYear.id,
+        });
+      if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["all-student-plans"] });
       qc.invalidateQueries({ queryKey: ["all-student-balances"] });
-      toast({ title: "Plan asignado exitosamente" });
+      toast({ title: planMap[assignStudentId || ""] ? "Plan actualizado exitosamente" : "Plan asignado exitosamente" });
       setAssignOpen(false);
       // Open payment modal after assigning
       if (assignEnrollment) {
@@ -220,6 +196,30 @@ export default function PaymentRegistration() {
         setSelectedStudentPlan(null);
         setPaymentOpen(true);
       }
+      setAssignPlanId("");
+      setAssignStudentId(null);
+      setAssignEnrollment(null);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const removePlanMut = useMutation({
+    mutationFn: async () => {
+      if (!assignStudentId) throw new Error("Seleccione un estudiante");
+      const currentPlan = planMap[assignStudentId];
+      if (!currentPlan) return;
+
+      const { error } = await supabase
+        .from("student_payment_plans")
+        .delete()
+        .eq("id", currentPlan.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-student-plans"] });
+      qc.invalidateQueries({ queryKey: ["all-student-balances"] });
+      toast({ title: "Plan retirado", description: "Los pagos registrados se conservaron en el historial." });
+      setAssignOpen(false);
       setAssignPlanId("");
       setAssignStudentId(null);
       setAssignEnrollment(null);
@@ -241,6 +241,14 @@ export default function PaymentRegistration() {
       setAssignPlanId("");
       setAssignOpen(true);
     }
+  };
+
+  const handlePlanClick = (enrollment: any) => {
+    const currentPlan = planMap[enrollment.students?.id];
+    setAssignStudentId(enrollment.students?.id);
+    setAssignEnrollment(enrollment);
+    setAssignPlanId(currentPlan?.plan_id || "");
+    setAssignOpen(true);
   };
 
   if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
@@ -290,7 +298,7 @@ export default function PaymentRegistration() {
                       <TableHead>Sección</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Saldo Pendiente</TableHead>
-                      <TableHead className="w-44">Acción</TableHead>
+                      <TableHead className="w-64">Acción</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -322,6 +330,11 @@ export default function PaymentRegistration() {
                               <Button size="sm" variant="outline" onClick={() => handlePayClick(e)}>
                                 <CreditCard className="h-3 w-3 mr-1" />{hasPlan ? "Pagar" : "Asignar"}
                               </Button>
+                              {hasPlan && (
+                                <Button size="sm" variant="secondary" onClick={() => handlePlanClick(e)}>
+                                  Plan
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -352,12 +365,18 @@ export default function PaymentRegistration() {
           <Dialog open={assignOpen} onOpenChange={(v) => { if (!v) { setAssignOpen(false); setAssignPlanId(""); setAssignStudentId(null); setAssignEnrollment(null); } else setAssignOpen(v); }}>
             <DialogContent className="max-w-md">
               <DialogHeader>
-                <DialogTitle>Asignar Plan de Pago</DialogTitle>
+                <DialogTitle>{planMap[assignStudentId || ""] ? "Cambiar Plan de Pago" : "Asignar Plan de Pago"}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <p className="text-sm text-muted-foreground">
-                  Seleccione el plan de pago para este estudiante. Una vez asignado, podrá registrar pagos.
+                  Seleccione el plan de pago para este estudiante. Si cambia o retira el plan, los pagos ya registrados se conservarán en el historial.
                 </p>
+                {planMap[assignStudentId || ""] && (
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                    <span className="text-muted-foreground">Plan actual: </span>
+                    <span className="font-medium">{planMap[assignStudentId || ""]?.payment_plans?.name || "—"}</span>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Plan de Pago *</Label>
                   <Select value={assignPlanId} onValueChange={setAssignPlanId}>
@@ -374,10 +393,20 @@ export default function PaymentRegistration() {
                 </div>
               </div>
               <DialogFooter>
+                {planMap[assignStudentId || ""] && (
+                  <Button
+                    variant="destructive"
+                    onClick={() => removePlanMut.mutate()}
+                    disabled={removePlanMut.isPending || assignPlanMut.isPending}
+                  >
+                    {removePlanMut.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
+                    Dejar sin plan
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => setAssignOpen(false)}>Cancelar</Button>
                 <Button onClick={() => assignPlanMut.mutate()} disabled={!assignPlanId || assignPlanMut.isPending}>
                   {assignPlanMut.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
-                  Asignar y Continuar
+                  {planMap[assignStudentId || ""] ? "Guardar cambio" : "Asignar y Continuar"}
                 </Button>
               </DialogFooter>
             </DialogContent>
