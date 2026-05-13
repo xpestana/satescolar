@@ -30,12 +30,12 @@ export default function DelinquentStudents() {
     enabled: !!schoolId,
   });
 
-  // Delinquent students from server-side RPC (works identically in Lovable y VPS).
-  const { data: delinquentRows = [], isLoading } = useQuery({
+  // Delinquent students from server-side RPC.
+  // get_delinquent_students internally calls rebuild_student_concept_balances_for_active_year
+  // before querying, so balances are always up-to-date.
+  const { data: delinquentRows = [], isLoading, error: delinquentError } = useQuery({
     queryKey: ["delinquent-rpc", schoolId, activeYear?.id],
     queryFn: async () => {
-      // Asegurar que existan los saldos para todos los planes asignados antes de calcular morosos.
-      await supabase.rpc("rebuild_student_concept_balances_for_active_year");
       const { data, error } = await supabase.rpc("get_delinquent_students", {
         _school_id: schoolId!,
         _school_year_id: activeYear!.id,
@@ -160,6 +160,12 @@ export default function DelinquentStudents() {
           </SelectContent>
         </Select>
       </div>
+
+      {delinquentError && (
+        <div className="mb-4 rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Error al cargar morosos: {(delinquentError as any)?.message || "Error desconocido"}
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">
