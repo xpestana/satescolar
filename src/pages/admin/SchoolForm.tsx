@@ -39,7 +39,7 @@ const institutionTypes = [
 
 const schoolSchema = z.object({
   name: z.string().min(1, "El nombre es requerido").max(200, "Máximo 200 caracteres"),
-  phone: z.string().min(1, "El teléfono es requerido").max(20, "Máximo 20 caracteres"),
+  phone: z.string().max(20, "Máximo 20 caracteres").optional().or(z.literal("")),
   address: z.string().min(1, "La dirección es requerida").max(500, "Máximo 500 caracteres"),
   dea_code: z.string().min(1, "El código DEA es requerido").max(50, "Máximo 50 caracteres"),
   email: z.string().email("Email inválido").max(100, "Máximo 100 caracteres"),
