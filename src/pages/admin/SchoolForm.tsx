@@ -369,7 +369,7 @@ export default function SchoolForm() {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Teléfono de la institución *</FormLabel>
+                    <FormLabel>Teléfono de la institución</FormLabel>
                     <FormControl>
                       <Input placeholder="Teléfono de la institución" {...field} />
                     </FormControl>
