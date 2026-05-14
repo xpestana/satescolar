@@ -112,7 +112,17 @@ export default async function handler(req: Request): Promise<Response> {
       }
 
       if (Array.isArray(profile_ids) && profile_ids.length > 0) {
-        await admin.from("school_user_profiles").insert(profile_ids.map((pid: string) => ({ user_id: userId, school_id: schoolId, profile_id: pid })));
+        // Validar que todos los perfiles pertenezcan a este colegio
+        const { data: validProfiles } = await admin
+          .from("permission_profiles")
+          .select("id")
+          .eq("school_id", schoolId)
+          .in("id", profile_ids);
+        const validIds = new Set((validProfiles ?? []).map((p: any) => p.id));
+        const filtered = profile_ids.filter((pid: string) => validIds.has(pid));
+        if (filtered.length > 0) {
+          await admin.from("school_user_profiles").insert(filtered.map((pid: string) => ({ user_id: userId, school_id: schoolId, profile_id: pid })));
+        }
       }
 
       sendEmail(email, schoolName, welcomeHtml(schoolName, logoUrl, email, password, full_name), `Bienvenido a ${schoolName} - SAT Escolar`).catch(console.error);
