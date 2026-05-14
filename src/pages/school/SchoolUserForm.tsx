@@ -8,7 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Copy, Eye, EyeOff } from "lucide-react";
+import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
+
+function generateRandomPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const arr = new Uint8Array(12);
+  crypto.getRandomValues(arr);
+  let p = "";
+  for (let i = 0; i < 12; i++) p += chars[arr[i] % chars.length];
+  return p;
+}
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
@@ -131,14 +140,26 @@ export default function SchoolUserForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Déjalo vacío para generar una automáticamente"
+                    className="pr-20"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      title="Generar contraseña"
+                      onClick={() => { setPassword(generateRandomPassword()); setShowPassword(true); }}
+                      className="text-muted-foreground hover:text-foreground p-1"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title={showPassword ? "Ocultar" : "Mostrar"}
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="text-muted-foreground hover:text-foreground p-1"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground mt-1">Mínimo 8 caracteres. Si la dejas vacía se generará una segura.</p>
