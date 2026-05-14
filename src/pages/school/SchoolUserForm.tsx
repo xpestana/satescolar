@@ -8,7 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Copy, Eye, EyeOff } from "lucide-react";
+import { Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
+
+function generateRandomPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const arr = new Uint8Array(12);
+  crypto.getRandomValues(arr);
+  let p = "";
+  for (let i = 0; i < 12; i++) p += chars[arr[i] % chars.length];
+  return p;
+}
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
