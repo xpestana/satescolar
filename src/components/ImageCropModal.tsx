@@ -178,9 +178,12 @@ export function ImageCropModal({
                   image={imageSrc}
                   crop={crop}
                   zoom={zoom}
+                  minZoom={0.3}
+                  maxZoom={3}
                   aspect={1}
                   cropShape="round"
                   showGrid={false}
+                  restrictPosition={false}
                   onCropChange={setCrop}
                   onCropComplete={onCropComplete}
                   onZoomChange={setZoom}
@@ -192,7 +195,7 @@ export function ImageCropModal({
                 <ZoomOut className="h-4 w-4 text-muted-foreground" />
                 <Slider
                   value={[zoom]}
-                  min={1}
+                  min={0.3}
                   max={3}
                   step={0.1}
                   onValueChange={([value]) => setZoom(value)}
