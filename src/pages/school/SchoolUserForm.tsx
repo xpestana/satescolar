@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Copy, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
@@ -20,9 +22,12 @@ export default function SchoolUserForm() {
 
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [profiles, setProfiles] = useState<{ id: string; name: string; description: string | null }[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -52,21 +57,47 @@ export default function SchoolUserForm() {
       toast({ title: "Completa los campos requeridos", variant: "destructive" });
       return;
     }
+    if (!isEdit && password && password.length < 8) {
+      toast({ title: "La contraseña debe tener al menos 8 caracteres", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const body = isEdit
       ? { action: "update", user_id: userId, full_name: fullName, profile_ids: Array.from(selected) }
-      : { action: "create", email, full_name: fullName, profile_ids: Array.from(selected) };
+      : { action: "create", email, full_name: fullName, profile_ids: Array.from(selected), password: password || undefined };
     const { data, error } = await supabase.functions.invoke("manage-school-subuser", { body });
     setSaving(false);
     if (error || data?.error) {
       toast({ title: "Error", description: data?.error || error?.message, variant: "destructive" });
       return;
     }
-    toast({
-      title: isEdit ? "Usuario actualizado" : "Usuario creado",
-      description: isEdit ? undefined : "Se enviaron las credenciales por correo.",
-    });
+    if (!isEdit && data?.password) {
+      setCreatedCreds({ email, password: data.password });
+      return;
+    }
+    toast({ title: isEdit ? "Usuario actualizado" : "Usuario creado" });
     navigate("/school/configuraciones/usuarios");
+  };
+
+  const copyCreds = async () => {
+    if (!createdCreds) return;
+    const text = `Usuario: ${createdCreds.email}\nContraseña: ${createdCreds.password}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: "Credenciales copiadas" });
+    } catch {
+      toast({ title: "No se pudo copiar", variant: "destructive" });
+    }
+  };
+
+  const copyPassword = async () => {
+    if (!createdCreds) return;
+    try {
+      await navigator.clipboard.writeText(createdCreds.password);
+      toast({ title: "Contraseña copiada" });
+    } catch {
+      toast({ title: "No se pudo copiar", variant: "destructive" });
+    }
   };
 
   return (
@@ -90,6 +121,29 @@ export default function SchoolUserForm() {
             <Label>Correo electrónico {isEdit && "(no editable)"}</Label>
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={isEdit} />
           </div>
+          {!isEdit && (
+            <div>
+              <Label>Contraseña (opcional)</Label>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Déjalo vacío para generar una automáticamente"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Mínimo 8 caracteres. Si la dejas vacía se generará una segura.</p>
+            </div>
+          )}
         </Card>
 
         <Card className="p-6">
@@ -123,6 +177,55 @@ export default function SchoolUserForm() {
           </Button>
         </div>
       </div>
+
+      <Dialog
+        open={!!createdCreds}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreatedCreds(null);
+            navigate("/school/configuraciones/usuarios");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Usuario creado</DialogTitle>
+            <DialogDescription>
+              Copia las credenciales ahora. También se enviaron por correo, pero no podrás volver a verlas aquí.
+            </DialogDescription>
+          </DialogHeader>
+          {createdCreds && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Usuario</Label>
+                <Input readOnly value={createdCreds.email} />
+              </div>
+              <div>
+                <Label className="text-xs">Contraseña</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={createdCreds.password} className="font-mono" />
+                  <Button type="button" variant="outline" size="icon" onClick={copyPassword}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={copyCreds}>
+              <Copy className="h-4 w-4 mr-2" /> Copiar usuario y contraseña
+            </Button>
+            <Button
+              onClick={() => {
+                setCreatedCreds(null);
+                navigate("/school/configuraciones/usuarios");
+              }}
+            >
+              Listo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

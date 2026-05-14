@@ -90,10 +90,10 @@ export default async function handler(req: Request): Promise<Response> {
 
     // === CREATE ===
     if (action === "create") {
-      const { email, full_name, profile_ids } = body;
+      const { email, full_name, profile_ids, password: customPassword } = body;
       if (!email || !full_name) return new Response(JSON.stringify({ error: "Email y nombre son requeridos" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-      const password = generatePassword();
+      const password = (typeof customPassword === "string" && customPassword.length >= 8) ? customPassword : generatePassword();
       const { data: existing } = await admin.auth.admin.listUsers();
       if (existing?.users?.find(u => u.email === email)) {
         return new Response(JSON.stringify({ error: "Ya existe un usuario con este correo" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
