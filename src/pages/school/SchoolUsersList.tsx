@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, KeyRound, Pencil, Trash2, ShieldCheck, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +21,7 @@ interface SubUser {
   user_id: string;
   email: string;
   full_name: string;
+  is_owner: boolean;
   profiles: { id: string; name: string }[];
 }
 
@@ -35,9 +35,8 @@ interface ProfileRow {
 
 export default function SchoolUsersList() {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { isOwner, loading: permLoading } = usePermissions();
-  const { schoolId } = useSchoolId();
+  const { schoolId, isLoading: schoolIdLoading } = useSchoolId();
   const { toast } = useToast();
 
   const [users, setUsers] = useState<SubUser[]>([]);
@@ -54,15 +53,15 @@ export default function SchoolUsersList() {
     if (!schoolId) return;
     setLoading(true);
 
-    // Sub-usuarios = role 'school' del mismo colegio, is_owner=false
+    // Todos los usuarios escolares del colegio: dueños (acceso total) y sub-usuarios con perfiles.
     const { data: roles } = await supabase
       .from("user_roles")
       .select("user_id, is_owner")
       .eq("school_id", schoolId)
-      .eq("role", "school")
-      .eq("is_owner", false);
+      .eq("role", "school");
 
     const userIds = (roles ?? []).map((r: any) => r.user_id);
+    const ownerById = new Map<string, boolean>((roles ?? []).map((r: any) => [r.user_id, !!r.is_owner]));
 
     // Get emails via edge function
     let emails: Record<string, { email: string; full_name: string }> = {};
@@ -95,6 +94,7 @@ export default function SchoolUsersList() {
         user_id: uid,
         email: emails[uid]?.email ?? "—",
         full_name: emails[uid]?.full_name ?? "—",
+        is_owner: ownerById.get(uid) ?? false,
         profiles: userProfiles.get(uid) ?? [],
       }))
     );
@@ -133,8 +133,15 @@ export default function SchoolUsersList() {
   };
 
   useEffect(() => {
-    if (schoolId) loadData();
-  }, [schoolId]);
+    if (schoolIdLoading) return;
+    if (!schoolId) {
+      setUsers([]);
+      setProfiles([]);
+      setLoading(false);
+      return;
+    }
+    loadData();
+  }, [schoolId, schoolIdLoading]);
 
   const handleResetPassword = async (u: SubUser) => {
     const { data, error } = await supabase.functions.invoke("manage-school-subuser", {
@@ -192,7 +199,7 @@ export default function SchoolUsersList() {
           <Card className="p-4">
             <div className="flex justify-between items-center mb-4">
               <p className="text-sm text-muted-foreground">
-                Gestiona los usuarios escolares de tu colegio y los perfiles de permiso que tienen asignados.
+                Lista de usuarios con rol escolar en tu colegio: administradores (acceso completo) y usuarios con perfiles de permiso.
               </p>
               <Button onClick={() => navigate("/school/configuraciones/usuarios/nuevo")}>
                 <Plus className="h-4 w-4 mr-2" />Nuevo Usuario
@@ -209,7 +216,7 @@ export default function SchoolUsersList() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Correo</TableHead>
-                    <TableHead>Perfiles asignados</TableHead>
+                    <TableHead>Permisos</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -219,24 +226,47 @@ export default function SchoolUsersList() {
                       <TableCell className="font-medium">{u.full_name}</TableCell>
                       <TableCell>{u.email}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {u.profiles.length === 0 && <span className="text-xs text-muted-foreground">Sin perfiles</span>}
-                          {u.profiles.map((p) => (
-                            <Badge key={p.id} variant="secondary">{p.name}</Badge>
-                          ))}
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {u.is_owner ? (
+                            <Badge variant="default">Administrador (acceso completo)</Badge>
+                          ) : (
+                            <>
+                              {u.profiles.length === 0 && (
+                                <span className="text-xs text-muted-foreground">Sin perfiles asignados</span>
+                              )}
+                              {u.profiles.map((p) => (
+                                <Badge key={p.id} variant="secondary">{p.name}</Badge>
+                              ))}
+                            </>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button size="icon" variant="ghost" title="Editar"
-                          onClick={() => navigate(`/school/configuraciones/usuarios/${u.user_id}/editar`)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={u.is_owner ? "Los administradores del colegio no se editan desde aquí" : "Editar"}
+                          disabled={u.is_owner}
+                          onClick={() => navigate(`/school/configuraciones/usuarios/${u.user_id}/editar`)}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" title="Resetear contraseña"
-                          onClick={() => handleResetPassword(u)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={u.is_owner ? "No disponible para administradores del colegio" : "Resetear contraseña"}
+                          disabled={u.is_owner}
+                          onClick={() => handleResetPassword(u)}
+                        >
                           <KeyRound className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" title="Eliminar"
-                          onClick={() => setConfirmDelete(u)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title={u.is_owner ? "No se puede eliminar un administrador del colegio desde aquí" : "Eliminar"}
+                          disabled={u.is_owner}
+                          onClick={() => setConfirmDelete(u)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </TableCell>
