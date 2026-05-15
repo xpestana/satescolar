@@ -32,7 +32,7 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { usePermissions } from "@/hooks/usePermissions";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Receipt } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
