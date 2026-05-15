@@ -153,6 +153,7 @@ const navSections: NavSection[] = [
       { label: "Representantes", href: "/representative/representantes", icon: Users, requiredRole: "representative" },
       { label: "Estudiantes", href: "/representative/estudiantes", icon: GraduationCap, requiredRole: "representative" },
       { label: "Datos", href: "/representative/datos-familia", icon: HomeIcon, requiredRole: "representative" },
+      { label: "Pagos", href: "/representative/pagos", icon: Receipt, requiredRole: "representative" },
     ],
   },
   // Teacher
