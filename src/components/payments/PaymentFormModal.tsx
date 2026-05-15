@@ -150,14 +150,30 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     }
   }, [primaryRep, open]);
 
-  // Reset on open
+  // Reset on open + prefill from report if any
   useEffect(() => {
     if (open) {
       setSelectedConcepts({});
       setMethods([createMethodLine()]);
       setObservations("");
+      setInvoiceNumber("");
+      if (fromReport) {
+        setObservations(`Confirmación del reporte ${fromReport.reference_code || ""} · ${fromReport.notes || ""}`.trim());
+        const m = createMethodLine();
+        m.method = fromReport.school_payment_method_id || m.method;
+        m.currency = fromReport.currency_reported || "VES";
+        m.amount_original = String(fromReport.amount_reported || "");
+        m.bank_name = fromReport.payer_bank_name || "";
+        m.reference_code = fromReport.reference_code || "";
+        m.payment_date = fromReport.payment_date || today();
+        const r = m.currency === "VES" ? 1 : (rates.find((x) => x.currency === m.currency)?.rate_to_ves || 1);
+        m.exchange_rate = String(r);
+        m.amount_ves = ((parseFloat(m.amount_original) || 0) * r).toFixed(2);
+        m.details = `Reportado por familia · ${fromReport.payer_document || ""} ${fromReport.payer_phone || ""}`.trim();
+        setMethods([m]);
+      }
     }
-  }, [open]);
+  }, [open, fromReport]);
 
   const getRate = (currency: string) => {
     if (currency === "VES") return 1;
