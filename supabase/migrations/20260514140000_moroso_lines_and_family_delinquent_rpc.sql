@@ -88,17 +88,17 @@ BEGIN
       AND scb.balance        > 0
   ),
   filtered AS (
-    SELECT *
-    FROM overdue
+    SELECT o.*
+    FROM overdue o
     WHERE
-      (due_day IS NULL AND due_month IS NULL)
+      (o.due_day IS NULL AND o.due_month IS NULL)
       OR (
-        due_date IS NOT NULL
-        AND v_today > (due_date + (v_grace_days || ' days')::interval)::date
+        o.due_date IS NOT NULL
+        AND v_today > (o.due_date + (v_grace_days || ' days')::interval)::date
       )
       OR (
-        is_recurring AND due_month IS NULL AND due_day IS NOT NULL
-        AND make_date(v_start_year, 8, due_day::int) < v_today
+        o.is_recurring AND o.due_month IS NULL AND o.due_day IS NOT NULL
+        AND make_date(v_start_year, 8, o.due_day::int) < v_today
       )
   )
   SELECT
