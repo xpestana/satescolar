@@ -59,6 +59,21 @@ export default function RepresentativeDashboard() {
     enabled: !!familyId && students.length > 0,
   });
 
+  const { data: pendingBalances = [] } = useQuery({
+    queryKey: ["rep-pending-balances", familyId],
+    queryFn: async () => {
+      const studentIds = students.map((s) => s.id);
+      if (!studentIds.length) return [];
+      const { data } = await supabase
+        .from("student_concept_balances")
+        .select("student_id, balance")
+        .in("student_id", studentIds)
+        .gt("balance", 0);
+      return data || [];
+    },
+    enabled: !!familyId && students.length > 0,
+  });
+
   const getAccessCode = (studentId: string) => accessCodes.find((c) => c.student_id === studentId);
 
   const copyCode = (code: string) => {
