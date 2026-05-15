@@ -46,9 +46,10 @@ interface Props {
   schoolId: string;
   schoolYearId: string;
   initialStudentPlan?: any;
+  fromReport?: any;
 }
 
-export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId, initialStudentPlan }: Props) {
+export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId, initialStudentPlan, fromReport }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
