@@ -58,6 +58,8 @@ interface SchoolUser {
   school_name: string | null;
   role: UserRole;
   is_suspended: boolean;
+  login_count: number;
+  last_login_at: string | null;
 }
 
 interface School {
