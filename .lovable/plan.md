@@ -1,28 +1,96 @@
-## Diagnóstico encontrado
+# Plan: Reporte de Pagos por Representantes + Confirmación Escolar
 
-- Hay una migración local (`20260514120000_auto_owner_on_school_user_insert.sql`) que fuerza `is_owner = true` para cualquier `user_roles.role = 'school'`. Eso explica por qué los subusuarios creados desde el colegio terminan como dueños.
-- El endpoint `manage-school-subuser` intenta crear subusuarios con `is_owner: false`, pero esa regla de base de datos lo contradice.
-- La pantalla `/school/configuraciones/usuarios` lista usuarios desde `user_roles` por `school_id`, pero si todos quedan como dueños, la UI los trata como administradores de acceso completo y bloquea edición/reset/eliminación.
-- La creación desde `/admin/usuarios` sí debe crear usuario escolar dueño del colegio; la creación desde `/school/configuraciones/usuarios/nuevo` debe crear subusuario no dueño y asignarle solo los perfiles seleccionados.
+## 1. Base de datos
 
-## Plan de corrección
+### Nueva tabla `payment_reports` (reportes de pago hechos por familias, pendientes de confirmar)
+Campos:
+- `school_id`, `student_id`, `school_year_id`, `family_id`, `reported_by` (user_id)
+- `plan_concept_id` (cuota seleccionada) + snapshot `concept_name`, `amount`, `currency`
+- `school_payment_method_id` (a qué método/cuenta del colegio envió el dinero)
+- `payer_method` (transferencia, pago_movil, zelle, efectivo, etc.)
+- `payer_bank_name`, `payer_phone`, `payer_document`, `payer_account_email` (zelle), `payer_account_holder` (zelle)
+- `reference_code`, `payment_date`, `amount_reported`, `currency_reported`
+- `receipt_url` (capture obligatorio en bucket `payment-receipts`)
+- `status`: `pending` | `confirmed` | `rejected`
+- `confirmed_payment_id` (FK a `payments`), `confirmed_by`, `confirmed_at`, `rejection_reason`
+- `created_at`, `updated_at`
 
-1. **Base de datos: separar dueño vs subusuario**
-   - Eliminar el trigger que convierte automáticamente todos los usuarios `school` en dueños.
-   - Reemplazarlo por una regla segura que solo impida dejar un colegio sin dueño, sin modificar a los subusuarios.
-   - Corregir datos existentes: marcar como `is_owner = false` los usuarios escolares que tengan perfiles asignados en `school_user_profiles`, preservando como dueños a los usuarios creados desde administración.
+RLS:
+- Familia: insertar/ver sólo sus reportes (vía `families.user_id`)
+- Colegio: ver/actualizar reportes de su `school_id` (`user_roles`)
+- Admin: full
 
-2. **Backend de creación de usuarios**
-   - Mantener `/admin/usuarios` usando `create-admin-user` para crear usuarios escolares con `is_owner = true` y `school_id` obligatorio.
-   - Ajustar `manage-school-subuser` para que al crear desde el colegio inserte explícitamente `is_owner = false` y valide que los perfiles seleccionados pertenezcan al mismo colegio antes de asignarlos.
-   - Si falla la asignación de perfiles, revertir el usuario creado para evitar usuarios incompletos.
+### Bucket Storage `payment-receipts` (privado)
+Políticas: familias suben en path `{school_id}/{family_id}/...`; colegio y admin leen los de su escuela.
 
-3. **Listado de usuarios del colegio**
-   - Ajustar `/school/configuraciones/usuarios` para mostrar todos los `user_roles.role = 'school'` del colegio: dueños y subusuarios.
-   - Mostrar dueños como “Administrador (acceso completo)” y subusuarios con sus perfiles seleccionados.
-   - Mantener bloqueadas las acciones peligrosas para dueños y permitir edición/reset/eliminación solo para subusuarios.
+### `payments` — agregar columna obligatoria `invoice_number TEXT NOT NULL DEFAULT ''`
+Trigger/check: requerir no vacío en INSERT nuevo (validación se hace en frontend + edge si hace falta).
 
-4. **Validación final**
-   - Revisar que la creación desde administración deje `is_owner = true`.
-   - Revisar que la creación desde el colegio deje `is_owner = false` y guarde perfiles.
-   - Revisar que el listado del colegio muestre todos los usuarios escolares asociados al `school_id` correcto.
+## 2. Frontend Representante
+
+Nueva sección **Pagos** en sidebar de representante:
+
+**`/representative/pagos`** — Dashboard de pagos
+- Lista de estudiantes de la familia
+- Por cada uno: cuotas pendientes y vencidas (de `student_concept_balances` filtrado por `balance > 0`)
+- Etiqueta "Cuota pendiente" (nunca "moroso") en rojo cuando la fecha límite ya pasó
+- Aviso visible en `RepresentativeDashboard` cuando existan cuotas vencidas: "Tienes cuotas pendientes por pagar"
+- Botón "Reportar pago" por cuota → abre modal
+
+**`PaymentReportModal`** (nuevo)
+- Estudiante (preseleccionado), Cuota (preseleccionada), Monto
+- Método de pago del colegio (select desde `payment_methods` del colegio, muestra banco/cuenta destino)
+- Método del pagador (transferencia / pago_movil / zelle / etc.)
+- Campos dinámicos según método:
+  - Transferencia/Pago móvil: banco origen, teléfono, cédula del titular, referencia, fecha
+  - Zelle: email cuenta, nombre del titular, referencia
+- **Capture obligatorio** (S3 upload, valida no submit sin archivo)
+- Submit → inserta en `payment_reports` con `status=pending`
+
+**`/representative/pagos/historial`** — historial de reportes con estado (pendiente/confirmado/rechazado)
+
+## 3. Frontend Colegio
+
+**`/school/pagos/reportes`** (nuevo) — Lista de reportes pendientes
+- Tarjetas/tabla con: estudiante, representante, cuota, monto, método, banco, referencia, fecha
+- Miniatura del capture → click abre modal grande con zoom
+- Acciones: **Confirmar** | **Rechazar** (con motivo)
+- Confirmar → abre `PaymentFormModal` precargado con: estudiante, cuota, método, banco, referencia, monto, fecha. Sólo falta confirmar y poner **N° de factura**. Al guardar enlaza `payment_reports.confirmed_payment_id` y cambia `status=confirmed`.
+
+Badge en sidebar con cantidad de reportes pendientes.
+
+## 4. N° de factura obligatorio en `PaymentFormModal`
+
+- Agregar input `invoice_number` requerido (validación zod)
+- Aplica a TODO ingreso de pago (registro manual o vía confirmación de reporte)
+- Mostrar el número en `PaymentHistoryModal` y recibos
+
+## 5. Detalles técnicos
+
+- Edge function nueva NO necesaria; se usa SDK de Supabase con RLS.
+- Subida de capture: reutilizar `s3-sign-upload` existente apuntando al nuevo bucket.
+- Realtime opcional en `payment_reports` para badge de pendientes.
+- Permisos: nueva clave `payments.reports.manage` para que el escolar vea/confirme reportes.
+
+## Archivos a crear/editar
+
+Crear:
+- `supabase/migrations/<ts>_payment_reports.sql`
+- `src/pages/representative/RepPayments.tsx`
+- `src/pages/representative/RepPaymentHistory.tsx`
+- `src/components/payments/PaymentReportModal.tsx`
+- `src/pages/school/PaymentReportsList.tsx`
+- `src/components/payments/ReceiptViewerModal.tsx`
+
+Editar:
+- `src/components/payments/PaymentFormModal.tsx` (agregar `invoice_number` + modo "desde reporte")
+- `src/pages/representative/RepresentativeDashboard.tsx` (alerta cuotas pendientes)
+- `src/components/layout/AppSidebar.tsx` (entradas nuevas + badge)
+- `src/App.tsx` (rutas)
+- `src/pages/school/PaymentRegistration.tsx` y `PaymentHistoryModal.tsx` (mostrar N° factura)
+
+## Preguntas antes de implementar
+
+1. ¿El capture del pago debe permitir también PDF o solo imagen?
+2. Cuando el escolar **rechaza** un reporte, ¿se notifica al representante por email automáticamente?
+3. El N° de factura, ¿debe ser único por colegio (validación de duplicados) o solo texto libre?
