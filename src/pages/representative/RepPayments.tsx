@@ -79,7 +79,7 @@ export default function RepPayments() {
     queryKey: ["family-delinquent-balances-rep", familyId, schoolId, schoolYear?.id],
     queryFn: async () => {
       if (!familyId || !schoolId || !schoolYear?.id) return [];
-      const { data, error } = await supabase.rpc("get_delinquent_balances_for_family", {
+      const { data, error } = await (supabase.rpc as any)("get_delinquent_balances_for_family", {
         _family_id: familyId,
         _school_id: schoolId,
         _school_year_id: schoolYear.id,
