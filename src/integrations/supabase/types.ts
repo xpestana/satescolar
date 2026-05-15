@@ -4077,17 +4077,6 @@ export type Database = {
         Args: { _plan_concept_id: string }
         Returns: undefined
       }
-      get_delinquent_balances_for_family: {
-        Args: { _family_id: string; _school_id: string; _school_year_id: string }
-        Returns: {
-          balance_json: Json
-          balance_ves_today: number
-          concept_currency: string
-          remaining_original_amount: number
-          rate_to_ves_today: number
-          rate_updated_at: string | null
-        }[]
-      }
       get_delinquent_students: {
         Args: { _school_id: string; _school_year_id: string }
         Returns: {
