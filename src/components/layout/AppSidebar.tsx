@@ -122,6 +122,7 @@ const navSections: NavSection[] = [
       { label: "Registro de Pagos", href: "/pagos/registro", icon: CreditCard, requiredRole: "school", permission: "payments.register" },
       { label: "Estado de Cuenta", href: "/pagos/estado-cuenta", icon: FileText, requiredRole: "school", permission: "payments.view" },
       { label: "Morosos", href: "/pagos/morosos", icon: Users, requiredRole: "school", permission: "payments.delinquency" },
+      { label: "Reportes de Pago", href: "/pagos/reportes", icon: Receipt, requiredRole: "school", permission: "payments.register" },
     ],
   },
   {
