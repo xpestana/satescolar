@@ -236,6 +236,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   // Save payment
   const saveMut = useMutation({
     mutationFn: async () => {
+      if (!invoiceNumber.trim()) throw new Error("El N° de factura es obligatorio");
       if (Object.keys(selectedConcepts).length === 0) throw new Error("Seleccione al menos un concepto");
       if (methods.length === 0) throw new Error("Agregue al menos una forma de pago");
       if (totalMethods <= 0) throw new Error("El monto total debe ser mayor a 0");
@@ -251,6 +252,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         total_amount_ves: totalMethods,
         status: "completed",
         observations: observations || null,
+        invoice_number: invoiceNumber.trim(),
         invoice_name: invoice.name || null,
         invoice_rif: invoice.rif || null,
         invoice_phone: invoice.phone || null,
