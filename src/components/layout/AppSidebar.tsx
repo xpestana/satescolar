@@ -32,7 +32,7 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { usePermissions } from "@/hooks/usePermissions";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Receipt } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -122,6 +122,7 @@ const navSections: NavSection[] = [
       { label: "Registro de Pagos", href: "/pagos/registro", icon: CreditCard, requiredRole: "school", permission: "payments.register" },
       { label: "Estado de Cuenta", href: "/pagos/estado-cuenta", icon: FileText, requiredRole: "school", permission: "payments.view" },
       { label: "Morosos", href: "/pagos/morosos", icon: Users, requiredRole: "school", permission: "payments.delinquency" },
+      { label: "Reportes de Pago", href: "/pagos/reportes", icon: Receipt, requiredRole: "school", permission: "payments.register" },
     ],
   },
   {
@@ -152,6 +153,7 @@ const navSections: NavSection[] = [
       { label: "Representantes", href: "/representative/representantes", icon: Users, requiredRole: "representative" },
       { label: "Estudiantes", href: "/representative/estudiantes", icon: GraduationCap, requiredRole: "representative" },
       { label: "Datos", href: "/representative/datos-familia", icon: HomeIcon, requiredRole: "representative" },
+      { label: "Pagos", href: "/representative/pagos", icon: Receipt, requiredRole: "representative" },
     ],
   },
   // Teacher

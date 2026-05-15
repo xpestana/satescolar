@@ -59,6 +59,21 @@ export default function RepresentativeDashboard() {
     enabled: !!familyId && students.length > 0,
   });
 
+  const { data: pendingBalances = [] } = useQuery({
+    queryKey: ["rep-pending-balances", familyId],
+    queryFn: async () => {
+      const studentIds = students.map((s) => s.id);
+      if (!studentIds.length) return [];
+      const { data } = await supabase
+        .from("student_concept_balances")
+        .select("student_id, balance")
+        .in("student_id", studentIds)
+        .gt("balance", 0);
+      return data || [];
+    },
+    enabled: !!familyId && students.length > 0,
+  });
+
   const getAccessCode = (studentId: string) => accessCodes.find((c) => c.student_id === studentId);
 
   const copyCode = (code: string) => {
@@ -142,6 +157,19 @@ export default function RepresentativeDashboard() {
           Es importante mantener los datos de su familia actualizados para una mejor comunicación con la institución.
         </AlertDescription>
       </Alert>
+
+      {/* Pending fees alert */}
+      {pendingBalances.length > 0 && (
+        <Alert className="border-amber-300 bg-amber-50 mb-6 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate("/representative/pagos")}>
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800 flex items-center justify-between w-full">
+            <span>
+              Tiene <strong>{pendingBalances.length}</strong> {pendingBalances.length === 1 ? "cuota pendiente" : "cuotas pendientes"} de pago. Haga clic aquí para gestionarlas.
+            </span>
+            <Button variant="link" size="sm" className="text-amber-800">Ir a Pagos →</Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Representatives Section */}
       <div className="mb-6">

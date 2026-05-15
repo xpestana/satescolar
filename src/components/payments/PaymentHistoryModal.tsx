@@ -147,6 +147,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                       </TableCell>
                       <TableCell>{new Date(p.payment_date).toLocaleDateString("es-VE")}</TableCell>
                       <TableCell className="text-xs">
+                        {p.invoice_number && <div className="font-medium">N° {p.invoice_number}</div>}
                         {p.invoice_name || "—"}
                         {p.invoice_rif && <div className="text-muted-foreground">{p.invoice_rif}</div>}
                       </TableCell>
