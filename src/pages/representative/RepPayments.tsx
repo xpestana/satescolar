@@ -88,7 +88,7 @@ export default function RepPayments() {
       const rows = (data || []) as Array<{
         balance_json: Record<string, unknown>;
         concept_currency: string;
-        balance_original_today: number;
+        remaining_original_amount: number;
         balance_ves_today: number;
         rate_to_ves_today: number;
         rate_updated_at: string | null;
@@ -97,7 +97,7 @@ export default function RepPayments() {
         .map((r) => ({
           ...(r.balance_json as any),
           concept_currency: r.concept_currency,
-          balance_original_today: Number(r.balance_original_today) || 0,
+          remaining_original_amount: Number(r.remaining_original_amount) || 0,
           balance_ves_today: Number(r.balance_ves_today) || 0,
           rate_to_ves_today: Number(r.rate_to_ves_today) || 0,
           rate_updated_at: r.rate_updated_at,
@@ -195,15 +195,15 @@ export default function RepPayments() {
                               </TableCell>
                               <TableCell>
                                 <div>
-                                  <p>{Number(b.balance_original_today).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {b.concept_currency}</p>
+                                  <p>{Number(b.remaining_original_amount).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {b.concept_currency}</p>
                                   <p className="text-[11px] text-muted-foreground">
-                                    Tasa hoy: {Number(b.rate_to_ves_today || 1).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                                    Tasa hoy: {Number(b.rate_to_ves_today || 1).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </p>
                                 </div>
                               </TableCell>
                               <TableCell>
                                 <div>
-                                  <p>{Number(b.balance_ves_today).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+                                  <p>{Number(b.balance_ves_today).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES</p>
                                   {b.rate_updated_at && (
                                     <p className="text-[11px] text-muted-foreground">
                                       Actualizada: {new Date(b.rate_updated_at).toLocaleDateString("es-VE")}

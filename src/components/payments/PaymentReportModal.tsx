@@ -58,7 +58,7 @@ export function PaymentReportModal({
       setAmount(
         Number(
           initialCurrency === conceptCurrency
-            ? (balance?.balance_original_today ?? balance?.balance ?? 0)
+            ? (balance?.remaining_original_amount ?? balance?.balance ?? 0)
             : 0
         ).toFixed(2)
       );
@@ -239,10 +239,10 @@ export function PaymentReportModal({
               <div>
                 <span className="text-muted-foreground">Saldo vencido:</span>
                 <p className="font-medium">
-                  {Number(balance?.balance_original_today ?? balance?.balance ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {conceptCurrency}
+                  {Number(balance?.remaining_original_amount ?? balance?.balance ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {conceptCurrency}
                 </p>
                 <p className="text-[11px] text-muted-foreground">
-                  Equiv. hoy: {Number(balance?.balance_ves_today ?? balance?.balance ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                  Equiv. hoy: {Number(balance?.balance_ves_today ?? balance?.balance ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
                 </p>
               </div>
               <div><span className="text-muted-foreground">Estado:</span><p><Badge variant="outline">Cuota pendiente</Badge></p></div>
@@ -255,9 +255,9 @@ export function PaymentReportModal({
               <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
                 <p className="font-medium text-foreground mb-1">Tasas de referencia</p>
                 <p>
-                  USD: {getRateToVes("USD").toLocaleString("es-VE", { minimumFractionDigits: 2 })} ·
-                  EUR: {getRateToVes("EUR").toLocaleString("es-VE", { minimumFractionDigits: 2 })} ·
-                  COP: {getRateToVes("COP").toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                  USD: {getRateToVes("USD").toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ·
+                  EUR: {getRateToVes("EUR").toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ·
+                  COP: {getRateToVes("COP").toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
                 {bcvInfo?.published_date && (
                   <p className="mt-1">
@@ -286,7 +286,7 @@ export function PaymentReportModal({
                   <Label className="text-xs">Monto pagado ({paymentCurrency}) *</Label>
                   <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
                   <p className="text-[11px] text-muted-foreground">
-                    Equivalente: {equivalentVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                    Equivalente: {equivalentVes.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES
                   </p>
                 </div>
                 <div className="space-y-1">
