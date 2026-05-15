@@ -2331,6 +2331,152 @@ export type Database = {
           },
         ]
       }
+      payment_reports: {
+        Row: {
+          amount_reported: number
+          concept_name: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          confirmed_payment_id: string | null
+          created_at: string
+          currency_reported: string
+          family_id: string
+          id: string
+          notes: string
+          payer_account_email: string
+          payer_account_holder: string
+          payer_bank_name: string
+          payer_document: string
+          payer_method: string
+          payer_phone: string
+          payment_date: string
+          plan_concept_id: string | null
+          receipt_url: string
+          reference_code: string
+          rejection_reason: string
+          reported_by: string
+          school_id: string
+          school_method_label: string
+          school_payment_method_id: string | null
+          school_year_id: string
+          status: string
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_reported?: number
+          concept_name?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_payment_id?: string | null
+          created_at?: string
+          currency_reported?: string
+          family_id: string
+          id?: string
+          notes?: string
+          payer_account_email?: string
+          payer_account_holder?: string
+          payer_bank_name?: string
+          payer_document?: string
+          payer_method?: string
+          payer_phone?: string
+          payment_date?: string
+          plan_concept_id?: string | null
+          receipt_url: string
+          reference_code?: string
+          rejection_reason?: string
+          reported_by: string
+          school_id: string
+          school_method_label?: string
+          school_payment_method_id?: string | null
+          school_year_id: string
+          status?: string
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_reported?: number
+          concept_name?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          confirmed_payment_id?: string | null
+          created_at?: string
+          currency_reported?: string
+          family_id?: string
+          id?: string
+          notes?: string
+          payer_account_email?: string
+          payer_account_holder?: string
+          payer_bank_name?: string
+          payer_document?: string
+          payer_method?: string
+          payer_phone?: string
+          payment_date?: string
+          plan_concept_id?: string | null
+          receipt_url?: string
+          reference_code?: string
+          rejection_reason?: string
+          reported_by?: string
+          school_id?: string
+          school_method_label?: string
+          school_payment_method_id?: string | null
+          school_year_id?: string
+          status?: string
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reports_confirmed_payment_id_fkey"
+            columns: ["confirmed_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reports_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reports_plan_concept_id_fkey"
+            columns: ["plan_concept_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plan_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reports_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reports_school_payment_method_id_fkey"
+            columns: ["school_payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "school_payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reports_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reports_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           created_at: string
@@ -2338,6 +2484,7 @@ export type Database = {
           id: string
           invoice_address: string | null
           invoice_name: string | null
+          invoice_number: string
           invoice_phone: string | null
           invoice_rif: string | null
           observations: string | null
@@ -2358,6 +2505,7 @@ export type Database = {
           id?: string
           invoice_address?: string | null
           invoice_name?: string | null
+          invoice_number?: string
           invoice_phone?: string | null
           invoice_rif?: string | null
           observations?: string | null
@@ -2378,6 +2526,7 @@ export type Database = {
           id?: string
           invoice_address?: string | null
           invoice_name?: string | null
+          invoice_number?: string
           invoice_phone?: string | null
           invoice_rif?: string | null
           observations?: string | null

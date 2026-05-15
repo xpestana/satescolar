@@ -46,15 +46,17 @@ interface Props {
   schoolId: string;
   schoolYearId: string;
   initialStudentPlan?: any;
+  fromReport?: any;
 }
 
-export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId, initialStudentPlan }: Props) {
+export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId, initialStudentPlan, fromReport }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
   // Invoice data
   const [invoice, setInvoice] = useState({ name: "", rif: "", phone: "", address: "" });
+  const [invoiceNumber, setInvoiceNumber] = useState("");
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
@@ -148,14 +150,30 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     }
   }, [primaryRep, open]);
 
-  // Reset on open
+  // Reset on open + prefill from report if any
   useEffect(() => {
     if (open) {
       setSelectedConcepts({});
       setMethods([createMethodLine()]);
       setObservations("");
+      setInvoiceNumber("");
+      if (fromReport) {
+        setObservations(`Confirmación del reporte ${fromReport.reference_code || ""} · ${fromReport.notes || ""}`.trim());
+        const m = createMethodLine();
+        m.method = fromReport.school_payment_method_id || m.method;
+        m.currency = fromReport.currency_reported || "VES";
+        m.amount_original = String(fromReport.amount_reported || "");
+        m.bank_name = fromReport.payer_bank_name || "";
+        m.reference_code = fromReport.reference_code || "";
+        m.payment_date = fromReport.payment_date || today();
+        const r = m.currency === "VES" ? 1 : (rates.find((x) => x.currency === m.currency)?.rate_to_ves || 1);
+        m.exchange_rate = String(r);
+        m.amount_ves = ((parseFloat(m.amount_original) || 0) * r).toFixed(2);
+        m.details = `Reportado por familia · ${fromReport.payer_document || ""} ${fromReport.payer_phone || ""}`.trim();
+        setMethods([m]);
+      }
     }
-  }, [open]);
+  }, [open, fromReport]);
 
   const getRate = (currency: string) => {
     if (currency === "VES") return 1;
@@ -218,6 +236,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   // Save payment
   const saveMut = useMutation({
     mutationFn: async () => {
+      if (!invoiceNumber.trim()) throw new Error("El N° de factura es obligatorio");
       if (Object.keys(selectedConcepts).length === 0) throw new Error("Seleccione al menos un concepto");
       if (methods.length === 0) throw new Error("Agregue al menos una forma de pago");
       if (totalMethods <= 0) throw new Error("El monto total debe ser mayor a 0");
@@ -233,6 +252,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         total_amount_ves: totalMethods,
         status: "completed",
         observations: observations || null,
+        invoice_number: invoiceNumber.trim(),
         invoice_name: invoice.name || null,
         invoice_rif: invoice.rif || null,
         invoice_phone: invoice.phone || null,
