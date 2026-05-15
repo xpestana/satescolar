@@ -118,6 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
     });
+    if (!error) {
+      // Fire-and-forget: incrementa el contador de inicios de sesión del usuario.
+      void supabase.rpc("record_login" as any).then(({ error: rpcErr }) => {
+        if (rpcErr) console.warn("record_login failed:", rpcErr.message);
+      });
+    }
     return { error };
   };
 
