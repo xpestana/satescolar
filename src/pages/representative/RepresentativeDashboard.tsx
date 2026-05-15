@@ -14,7 +14,20 @@ import { toast } from "sonner";
 
 export default function RepresentativeDashboard() {
   const navigate = useNavigate();
-  const { familyId, familyName, school } = useRepresentativeFamily();
+  const { familyId, familyName, schoolId } = useRepresentativeFamily();
+
+  const { data: schoolYear } = useQuery({
+    queryKey: ["active-school-year-rep-dash", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_years")
+        .select("id")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!schoolId,
+  });
 
   const { data: representatives = [] } = useQuery({
     queryKey: ["representatives", familyId],
@@ -59,19 +72,19 @@ export default function RepresentativeDashboard() {
     enabled: !!familyId && students.length > 0,
   });
 
-  const { data: pendingBalances = [] } = useQuery({
-    queryKey: ["rep-pending-balances", familyId],
+  const { data: delinquentBalances = [] } = useQuery({
+    queryKey: ["family-delinquent-balances-rep", familyId, schoolId, schoolYear?.id],
     queryFn: async () => {
-      const studentIds = students.map((s) => s.id);
-      if (!studentIds.length) return [];
-      const { data } = await supabase
-        .from("student_concept_balances")
-        .select("student_id, balance")
-        .in("student_id", studentIds)
-        .gt("balance", 0);
+      if (!familyId || !schoolId || !schoolYear?.id) return [];
+      const { data, error } = await supabase.rpc("get_delinquent_balances_for_family", {
+        _family_id: familyId,
+        _school_id: schoolId,
+        _school_year_id: schoolYear.id,
+      });
+      if (error) throw error;
       return data || [];
     },
-    enabled: !!familyId && students.length > 0,
+    enabled: !!familyId && !!schoolId && !!schoolYear?.id && students.length > 0,
   });
 
   const getAccessCode = (studentId: string) => accessCodes.find((c) => c.student_id === studentId);
@@ -159,12 +172,12 @@ export default function RepresentativeDashboard() {
       </Alert>
 
       {/* Pending fees alert */}
-      {pendingBalances.length > 0 && (
+      {delinquentBalances.length > 0 && (
         <Alert className="border-amber-300 bg-amber-50 mb-6 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate("/representative/pagos")}>
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800 flex items-center justify-between w-full">
             <span>
-              Tiene <strong>{pendingBalances.length}</strong> {pendingBalances.length === 1 ? "cuota pendiente" : "cuotas pendientes"} de pago. Haga clic aquí para gestionarlas.
+              Tiene <strong>{delinquentBalances.length}</strong> {delinquentBalances.length === 1 ? "cuota vencida" : "cuotas vencidas"} (morosidad). Haga clic aquí para verlas y reportar pagos.
             </span>
             <Button variant="link" size="sm" className="text-amber-800">Ir a Pagos →</Button>
           </AlertDescription>

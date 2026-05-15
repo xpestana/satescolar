@@ -4077,6 +4077,10 @@ export type Database = {
         Args: { _plan_concept_id: string }
         Returns: undefined
       }
+      get_delinquent_balances_for_family: {
+        Args: { _family_id: string; _school_id: string; _school_year_id: string }
+        Returns: { balance_json: Json }[]
+      }
       get_delinquent_students: {
         Args: { _school_id: string; _school_year_id: string }
         Returns: {

@@ -132,6 +132,7 @@ export function PaymentReportModal({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payment-reports-family"] });
+      qc.invalidateQueries({ queryKey: ["family-delinquent-balances-rep"] });
       toast({ title: "Pago reportado", description: "El colegio revisará tu reporte y lo confirmará pronto." });
       onOpenChange(false);
     },
