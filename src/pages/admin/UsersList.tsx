@@ -479,15 +479,16 @@ export default function UsersList() {
               <TableHead>Email</TableHead>
               <TableHead>Rol</TableHead>
               <TableHead>Institución</TableHead>
+              <TableHead className="text-center">Inicios de sesión</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableSkeleton rows={6} columns={5} />
+              <TableSkeleton rows={6} columns={6} />
             ) : paginatedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   {searchTerm
                     ? "No se encontraron usuarios con ese criterio de búsqueda"
                     : "No hay usuarios registrados. ¡Crea el primero!"}
