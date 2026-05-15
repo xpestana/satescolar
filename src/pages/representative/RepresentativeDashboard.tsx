@@ -158,6 +158,19 @@ export default function RepresentativeDashboard() {
         </AlertDescription>
       </Alert>
 
+      {/* Pending fees alert */}
+      {pendingBalances.length > 0 && (
+        <Alert className="border-amber-300 bg-amber-50 mb-6 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate("/representative/pagos")}>
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800 flex items-center justify-between w-full">
+            <span>
+              Tiene <strong>{pendingBalances.length}</strong> {pendingBalances.length === 1 ? "cuota pendiente" : "cuotas pendientes"} de pago. Haga clic aquí para gestionarlas.
+            </span>
+            <Button variant="link" size="sm" className="text-amber-800">Ir a Pagos →</Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Representatives Section */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
