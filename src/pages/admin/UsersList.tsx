@@ -112,7 +112,7 @@ export default function UsersList() {
       // Fetch profiles for user info
       const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
-        .select("user_id, full_name");
+        .select("user_id, full_name, login_count, last_login_at");
 
       if (profilesError) throw profilesError;
 
@@ -129,6 +129,8 @@ export default function UsersList() {
           school_name: role.schools?.name || null,
           role: role.role as UserRole,
           is_suspended: false,
+          login_count: (profile as any)?.login_count ?? 0,
+          last_login_at: (profile as any)?.last_login_at ?? null,
         });
       });
 
