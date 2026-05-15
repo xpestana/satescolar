@@ -4079,7 +4079,14 @@ export type Database = {
       }
       get_delinquent_balances_for_family: {
         Args: { _family_id: string; _school_id: string; _school_year_id: string }
-        Returns: { balance_json: Json }[]
+        Returns: {
+          balance_json: Json
+          balance_original_today: number
+          balance_ves_today: number
+          concept_currency: string
+          rate_to_ves_today: number
+          rate_updated_at: string | null
+        }[]
       }
       get_delinquent_students: {
         Args: { _school_id: string; _school_year_id: string }

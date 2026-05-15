@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Receipt, Upload, AlertTriangle } from "lucide-react";
 import { VENEZUELAN_BANKS, METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
+import { ensureFreshBcvRates } from "@/lib/ensureFreshBcvRates";
 
 interface Props {
   open: boolean;
@@ -33,9 +34,10 @@ export function PaymentReportModal({
   const qc = useQueryClient();
 
   const conceptName = balance?.payment_plan_concepts?.payment_concepts?.name || "Cuota";
-  const currency = balance?.currency || "VES";
+  const conceptCurrency = balance?.concept_currency || balance?.currency || "VES";
 
   const [amount, setAmount] = useState<string>("");
+  const [paymentCurrency, setPaymentCurrency] = useState<string>("VES");
   const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [schoolMethodId, setSchoolMethodId] = useState<string>("");
   const [payerMethod, setPayerMethod] = useState<string>("transferencia");
@@ -51,7 +53,15 @@ export function PaymentReportModal({
 
   useEffect(() => {
     if (open && balance) {
-      setAmount(Number(balance.balance || 0).toFixed(2));
+      const initialCurrency = conceptCurrency;
+      setPaymentCurrency(initialCurrency);
+      setAmount(
+        Number(
+          initialCurrency === conceptCurrency
+            ? (balance?.balance_original_today ?? balance?.balance ?? 0)
+            : 0
+        ).toFixed(2)
+      );
       setPaymentDate(new Date().toISOString().split("T")[0]);
       setSchoolMethodId("");
       setPayerMethod("transferencia");
@@ -59,7 +69,35 @@ export function PaymentReportModal({
       setPayerEmail(""); setPayerHolder(""); setReference("");
       setNotes(""); setFile(null);
     }
-  }, [open, balance]);
+  }, [open, balance, conceptCurrency]);
+
+  useEffect(() => {
+    if (!open || !schoolId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const result = await ensureFreshBcvRates();
+        if (!cancelled && result.updated) {
+          qc.invalidateQueries({ queryKey: ["exchange-rates", schoolId] });
+          qc.invalidateQueries({ queryKey: ["bcv-latest-public", schoolId] });
+          qc.invalidateQueries({ queryKey: ["family-delinquent-balances-rep"] });
+        }
+      } catch {
+        if (!cancelled) {
+          toast({
+            title: "Tasa BCV no actualizada",
+            description: "No se pudo actualizar BCV hoy. Se usará la última tasa disponible.",
+            variant: "destructive",
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, schoolId, qc, toast]);
 
   const { data: schoolMethods = [] } = useQuery({
     queryKey: ["school-payment-methods-public", schoolId],
@@ -78,6 +116,43 @@ export function PaymentReportModal({
     () => schoolMethods.find((m: any) => m.id === schoolMethodId),
     [schoolMethods, schoolMethodId]
   );
+
+  const { data: rates = [] } = useQuery({
+    queryKey: ["exchange-rates", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("exchange_rates")
+        .select("currency, rate_to_ves, updated_at")
+        .eq("school_id", schoolId);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: open && !!schoolId,
+  });
+
+  const { data: bcvInfo } = useQuery({
+    queryKey: ["bcv-latest-public", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("bcv_rates")
+        .select("published_date, fetched_at")
+        .eq("currency", "USD")
+        .order("published_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: open && !!schoolId,
+  });
+
+  const getRateToVes = (currency: string) => {
+    if (currency === "VES") return 1;
+    return Number(rates.find((r: any) => r.currency === currency)?.rate_to_ves || 1);
+  };
+
+  const amountNum = Number(amount || 0);
+  const selectedRate = getRateToVes(paymentCurrency);
+  const equivalentVes = amountNum * selectedRate;
 
   const isZelle = payerMethod === "zelle";
   const requiresBank = ["transferencia", "pago_movil"].includes(payerMethod);
@@ -113,7 +188,7 @@ export function PaymentReportModal({
         plan_concept_id: balance?.plan_concept_id || null,
         concept_name: conceptName,
         amount_reported: parseFloat(amount),
-        currency_reported: currency,
+        currency_reported: paymentCurrency,
         payment_date: paymentDate,
         school_payment_method_id: schoolMethodId,
         school_method_label: selectedSchoolMethod?.label || "",
@@ -161,7 +236,15 @@ export function PaymentReportModal({
             <CardContent className="pt-4 grid grid-cols-2 gap-3 text-sm">
               <div><span className="text-muted-foreground">Estudiante:</span><p className="font-medium">{studentName}</p></div>
               <div><span className="text-muted-foreground">Cuota:</span><p className="font-medium">{conceptName}</p></div>
-              <div><span className="text-muted-foreground">Pendiente:</span><p className="font-medium">{Number(balance?.balance || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {currency}</p></div>
+              <div>
+                <span className="text-muted-foreground">Saldo vencido:</span>
+                <p className="font-medium">
+                  {Number(balance?.balance_original_today ?? balance?.balance ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {conceptCurrency}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Equiv. hoy: {Number(balance?.balance_ves_today ?? balance?.balance ?? 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                </p>
+              </div>
               <div><span className="text-muted-foreground">Estado:</span><p><Badge variant="outline">Cuota pendiente</Badge></p></div>
             </CardContent>
           </Card>
@@ -169,10 +252,42 @@ export function PaymentReportModal({
           <Card>
             <CardHeader className="py-3"><CardTitle className="text-sm">Datos del pago</CardTitle></CardHeader>
             <CardContent className="space-y-3">
+              <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">Tasas de referencia</p>
+                <p>
+                  USD: {getRateToVes("USD").toLocaleString("es-VE", { minimumFractionDigits: 2 })} ·
+                  EUR: {getRateToVes("EUR").toLocaleString("es-VE", { minimumFractionDigits: 2 })} ·
+                  COP: {getRateToVes("COP").toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                </p>
+                {bcvInfo?.published_date && (
+                  <p className="mt-1">
+                    BCV publicado: {new Date(`${bcvInfo.published_date}T12:00:00`).toLocaleDateString("es-VE")}
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Monto pagado ({currency}) *</Label>
+                  <Label className="text-xs">Moneda del pago *</Label>
+                  <Select value={paymentCurrency} onValueChange={setPaymentCurrency}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="VES">VES</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="COP">COP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Monto pagado ({paymentCurrency}) *</Label>
                   <Input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                  <p className="text-[11px] text-muted-foreground">
+                    Equivalente: {equivalentVes.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Fecha del pago *</Label>

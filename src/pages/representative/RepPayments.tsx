@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -12,10 +12,14 @@ import { AlertCircle, Receipt, CheckCircle2, XCircle, Clock, CreditCard } from "
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { PaymentReportModal } from "@/components/payments/PaymentReportModal";
+import { ensureFreshBcvRates } from "@/lib/ensureFreshBcvRates";
+import { useToast } from "@/hooks/use-toast";
 
 export default function RepPayments() {
   const { familyId, schoolId } = useRepresentativeFamily();
   const [reportTarget, setReportTarget] = useState<{ student: any; balance: any } | null>(null);
+  const qc = useQueryClient();
+  const { toast } = useToast();
 
   const { data: schoolYear } = useQuery({
     queryKey: ["active-school-year-rep", schoolId],
@@ -44,6 +48,32 @@ export default function RepPayments() {
 
   const studentIds = students.map((s) => s.id);
 
+  useEffect(() => {
+    if (!schoolId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const result = await ensureFreshBcvRates();
+        if (!cancelled && result.updated) {
+          qc.invalidateQueries({ queryKey: ["family-delinquent-balances-rep"] });
+        }
+      } catch {
+        if (!cancelled) {
+          toast({
+            title: "Tasa BCV no actualizada",
+            description: "No se pudo actualizar BCV hoy. Se usará la última tasa disponible.",
+            variant: "destructive",
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [schoolId, qc, toast]);
+
   // Misma lógica de morosidad que el colegio (RPC alineado con get_delinquent_students).
   const { data: balances = [] } = useQuery({
     queryKey: ["family-delinquent-balances-rep", familyId, schoolId, schoolYear?.id],
@@ -55,8 +85,24 @@ export default function RepPayments() {
         _school_year_id: schoolYear.id,
       });
       if (error) throw error;
-      const rows = (data || []) as { balance_json: Record<string, unknown> }[];
-      return rows.map((r) => r.balance_json).filter(Boolean) as any[];
+      const rows = (data || []) as Array<{
+        balance_json: Record<string, unknown>;
+        concept_currency: string;
+        balance_original_today: number;
+        balance_ves_today: number;
+        rate_to_ves_today: number;
+        rate_updated_at: string | null;
+      }>;
+      return rows
+        .map((r) => ({
+          ...(r.balance_json as any),
+          concept_currency: r.concept_currency,
+          balance_original_today: Number(r.balance_original_today) || 0,
+          balance_ves_today: Number(r.balance_ves_today) || 0,
+          rate_to_ves_today: Number(r.rate_to_ves_today) || 0,
+          rate_updated_at: r.rate_updated_at,
+        }))
+        .filter(Boolean) as any[];
     },
     enabled: !!familyId && !!schoolId && !!schoolYear?.id && studentIds.length > 0,
   });
@@ -133,6 +179,7 @@ export default function RepPayments() {
                         <TableRow>
                           <TableHead>Concepto</TableHead>
                           <TableHead>Saldo vencido</TableHead>
+                          <TableHead>Equivalente VES (hoy)</TableHead>
                           <TableHead>Estado</TableHead>
                           <TableHead className="w-32">Acción</TableHead>
                         </TableRow>
@@ -142,11 +189,28 @@ export default function RepPayments() {
                             <TableRow key={b.id}>
                               <TableCell className="font-medium">
                                 {b.payment_plan_concepts?.payment_concepts?.name || "Concepto"}
-                                {b.currency !== "VES" && (
-                                  <span className="ml-2 text-xs text-muted-foreground">({b.currency})</span>
+                                {b.concept_currency !== "VES" && (
+                                  <span className="ml-2 text-xs text-muted-foreground">({b.concept_currency})</span>
                                 )}
                               </TableCell>
-                              <TableCell>{Number(b.balance).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {b.currency}</TableCell>
+                              <TableCell>
+                                <div>
+                                  <p>{Number(b.balance_original_today).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {b.concept_currency}</p>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    Tasa hoy: {Number(b.rate_to_ves_today || 1).toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p>{Number(b.balance_ves_today).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+                                  {b.rate_updated_at && (
+                                    <p className="text-[11px] text-muted-foreground">
+                                      Actualizada: {new Date(b.rate_updated_at).toLocaleDateString("es-VE")}
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
                               <TableCell>
                                 <Badge className="bg-orange-500 hover:bg-orange-600">Vencida</Badge>
                               </TableCell>
