@@ -525,6 +525,14 @@ export default function UsersList() {
                     <Badge className={roleBadgeClass}>{roleLabel}</Badge>
                   </TableCell>
                   <TableCell>{user.school_name || "—"}</TableCell>
+                  <TableCell className="text-center">
+                    <span
+                      className="font-medium tabular-nums"
+                      title={user.last_login_at ? `Último: ${new Date(user.last_login_at).toLocaleString("es-VE")}` : "Sin inicios registrados"}
+                    >
+                      {user.login_count ?? 0}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button
