@@ -3242,6 +3242,8 @@ export type Database = {
           created_at: string
           full_name: string | null
           id: string
+          last_login_at: string | null
+          login_count: number
           phone: string | null
           updated_at: string
           user_id: string
@@ -3251,6 +3253,8 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          last_login_at?: string | null
+          login_count?: number
           phone?: string | null
           updated_at?: string
           user_id: string
@@ -3260,6 +3264,8 @@ export type Database = {
           created_at?: string
           full_name?: string | null
           id?: string
+          last_login_at?: string | null
+          login_count?: number
           phone?: string | null
           updated_at?: string
           user_id?: string
@@ -4109,6 +4115,7 @@ export type Database = {
         Args: never
         Returns: number
       }
+      record_login: { Args: never; Returns: undefined }
       representative_child_in_assignment: {
         Args: { _assignment_id: string; _user_id: string }
         Returns: boolean

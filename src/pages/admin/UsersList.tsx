@@ -58,6 +58,8 @@ interface SchoolUser {
   school_name: string | null;
   role: UserRole;
   is_suspended: boolean;
+  login_count: number;
+  last_login_at: string | null;
 }
 
 interface School {
@@ -110,7 +112,7 @@ export default function UsersList() {
       // Fetch profiles for user info
       const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
-        .select("user_id, full_name");
+        .select("user_id, full_name, login_count, last_login_at");
 
       if (profilesError) throw profilesError;
 
@@ -127,6 +129,8 @@ export default function UsersList() {
           school_name: role.schools?.name || null,
           role: role.role as UserRole,
           is_suspended: false,
+          login_count: (profile as any)?.login_count ?? 0,
+          last_login_at: (profile as any)?.last_login_at ?? null,
         });
       });
 
@@ -475,15 +479,16 @@ export default function UsersList() {
               <TableHead>Email</TableHead>
               <TableHead>Rol</TableHead>
               <TableHead>Institución</TableHead>
+              <TableHead className="text-center">Inicios de sesión</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableSkeleton rows={6} columns={5} />
+              <TableSkeleton rows={6} columns={6} />
             ) : paginatedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   {searchTerm
                     ? "No se encontraron usuarios con ese criterio de búsqueda"
                     : "No hay usuarios registrados. ¡Crea el primero!"}
@@ -520,6 +525,14 @@ export default function UsersList() {
                     <Badge className={roleBadgeClass}>{roleLabel}</Badge>
                   </TableCell>
                   <TableCell>{user.school_name || "—"}</TableCell>
+                  <TableCell className="text-center">
+                    <span
+                      className="font-medium tabular-nums"
+                      title={user.last_login_at ? `Último: ${new Date(user.last_login_at).toLocaleString("es-VE")}` : "Sin inicios registrados"}
+                    >
+                      {user.login_count ?? 0}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button
