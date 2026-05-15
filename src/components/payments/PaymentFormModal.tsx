@@ -56,6 +56,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   // Invoice data
   const [invoice, setInvoice] = useState({ name: "", rif: "", phone: "", address: "" });
+  const [invoiceNumber, setInvoiceNumber] = useState("");
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
