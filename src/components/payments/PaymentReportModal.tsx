@@ -269,7 +269,22 @@ export function PaymentReportModal({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Moneda del pago *</Label>
-                  <Select value={paymentCurrency} onValueChange={setPaymentCurrency}>
+                  <Select
+                    value={paymentCurrency}
+                    onValueChange={(newCurrency) => {
+                      if (newCurrency !== paymentCurrency) {
+                        const oldRate = getRateToVes(paymentCurrency);
+                        const newRate = getRateToVes(newCurrency);
+                        const currentAmount = Number(amount || 0);
+                        if (currentAmount > 0 && oldRate > 0 && newRate > 0) {
+                          const ves = currentAmount * oldRate;
+                          const converted = ves / newRate;
+                          setAmount(converted.toFixed(2));
+                        }
+                      }
+                      setPaymentCurrency(newCurrency);
+                    }}
+                  >
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="VES">VES</SelectItem>
