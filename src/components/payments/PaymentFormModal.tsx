@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +38,8 @@ function createMethodLine(): PaymentMethodLine {
   return { id: crypto.randomUUID(), method: "transferencia", currency: "VES", amount_original: "", exchange_rate: "1", amount_ves: "", reference_code: "", bank_name: "", payment_date: today(), details: "" };
 }
 
+const EXCHANGE_RATE_TOLERANCE_VES = 1.0;
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -47,9 +49,10 @@ interface Props {
   schoolYearId: string;
   initialStudentPlan?: any;
   fromReport?: any;
+  onSaved?: (paymentId: string) => void;
 }
 
-export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId, initialStudentPlan, fromReport }: Props) {
+export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId, initialStudentPlan, fromReport, onSaved }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -59,6 +62,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
+  const autoSelectedRef = useRef(false);
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
 
   // Load school payment methods
@@ -153,6 +157,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   // Reset on open + prefill from report if any
   useEffect(() => {
     if (open) {
+      autoSelectedRef.current = false;
       setSelectedConcepts({});
       setMethods([createMethodLine()]);
       setObservations("");
@@ -174,6 +179,16 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
       }
     }
   }, [open, fromReport]);
+
+  // Auto-select concept matching the payment report
+  useEffect(() => {
+    if (!open || !fromReport || autoSelectedRef.current || balances.length === 0) return;
+    const match = balances.find((b: any) => b.plan_concept_id === fromReport.plan_concept_id && b.balance > 0);
+    if (match) {
+      setSelectedConcepts({ [match.id]: match.balance.toFixed(2) });
+      autoSelectedRef.current = true;
+    }
+  }, [balances, open, fromReport]);
 
   const getRate = (currency: string) => {
     if (currency === "VES") return 1;
@@ -268,7 +283,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
           payment_id: payment.id,
           plan_concept_id: bal!.plan_concept_id,
           amount_ves: amount,
-          is_partial: amount < (bal?.balance || 0),
+          is_partial: amount < (bal?.balance || 0) - 0.01,
         };
       });
       const { error: itemErr } = await supabase.from("payment_items").insert(items);
@@ -297,22 +312,26 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         const amount = parseFloat(amountStr) || 0;
         const bal = balances.find((b) => b.id === balanceId);
         if (!bal) continue;
-        const newPaid = (bal.paid_amount || 0) + amount;
-        const newBalance = (bal.total_amount || 0) - newPaid;
-        const newStatus = newBalance <= 0 ? "paid" : "partial";
+        const newPaid = parseFloat(((bal.paid_amount || 0) + amount).toFixed(2));
+        const newBalance = parseFloat(((bal.total_amount || 0) - newPaid).toFixed(2));
+        // Absorb residuals ≤ EXCHANGE_RATE_TOLERANCE_VES caused by exchange rate drift
+        const effectiveBalance = newBalance > 0 && newBalance <= EXCHANGE_RATE_TOLERANCE_VES ? 0 : Math.max(0, newBalance);
+        const newStatus = effectiveBalance <= 0 ? "paid" : "partial";
         await supabase.from("student_concept_balances").update({
-          paid_amount: newPaid,
-          balance: Math.max(0, newBalance),
+          paid_amount: effectiveBalance <= 0 ? bal.total_amount : newPaid,
+          balance: effectiveBalance,
           status: newStatus,
           last_payment_date: today(),
         }).eq("id", balanceId);
       }
+      return payment.id;
     },
-    onSuccess: () => {
+    onSuccess: (paymentId: string) => {
       qc.invalidateQueries({ queryKey: ["student-balances"] });
       qc.invalidateQueries({ queryKey: ["payments"] });
       qc.invalidateQueries({ queryKey: ["enrolled-students-payments"] });
       toast({ title: "Pago registrado exitosamente" });
+      onSaved?.(paymentId);
       onOpenChange(false);
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),

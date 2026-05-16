@@ -109,18 +109,11 @@ export default function PaymentReportsList() {
     setConfirmTarget({ report: r, enrollment: enr });
   };
 
-  const handleConfirmCompleted = async () => {
+  const handleConfirmCompleted = async (paymentId: string) => {
     if (!confirmTarget) return;
-    // The modal already created the payment. We just mark report as confirmed.
-    // We don't have payment_id back; we link by latest payment created today for this student.
-    const { data: latest } = await supabase.from("payments")
-      .select("id")
-      .eq("student_id", confirmTarget.report.student_id)
-      .eq("school_id", schoolId!)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
     await supabase.from("payment_reports").update({
       status: "confirmed",
-      confirmed_payment_id: latest?.id || null,
+      confirmed_payment_id: paymentId,
       confirmed_at: new Date().toISOString(),
     }).eq("id", confirmTarget.report.id);
     qc.invalidateQueries({ queryKey: ["payment-reports-school"] });
@@ -269,12 +262,13 @@ export default function PaymentReportsList() {
       {confirmTarget && (
         <PaymentFormModal
           open={!!confirmTarget}
-          onOpenChange={(v) => { if (!v) handleConfirmCompleted(); }}
+          onOpenChange={(v) => { if (!v) setConfirmTarget(null); }}
           student={confirmTarget.report.students}
           enrollment={confirmTarget.enrollment}
           schoolId={schoolId!}
           schoolYearId={confirmTarget.report.school_year_id}
           fromReport={confirmTarget.report}
+          onSaved={handleConfirmCompleted}
         />
       )}
     </DashboardLayout>
