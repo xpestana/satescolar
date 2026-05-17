@@ -50,7 +50,6 @@ import ClassroomList from "./pages/teacher/ClassroomList";
 import ClassroomDetail from "./pages/teacher/ClassroomDetail";
 import ChildClassroom from "./pages/representative/ChildClassroom";
 import RepPayments from "./pages/representative/RepPayments";
-import PaymentReportsList from "./pages/school/PaymentReportsList";
 
 import ClassroomSupervision from "./pages/school/ClassroomSupervision";
 import AttendanceScan from "./pages/AttendanceScan";
@@ -370,7 +369,7 @@ const App = () => (
               <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
               <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
               
-              <Route path="/pagos/reportes" element={<ProtectedRoute requiredRole="school"><PaymentReportsList /></ProtectedRoute>} />
+              <Route path="/pagos/reportes" element={<Navigate to="/pagos/registro?tab=reportes" replace />} />
               <Route path="/school/aula-virtual/supervision" element={<ProtectedRoute requiredRole="school"><ClassroomSupervision /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

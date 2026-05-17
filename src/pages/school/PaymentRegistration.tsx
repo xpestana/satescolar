@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
@@ -10,21 +11,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, CreditCard, AlertTriangle, History } from "lucide-react";
+import { Loader2, Search, CreditCard, AlertTriangle, History, Receipt } from "lucide-react";
 import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
 import { formatGradeLevel } from "@/lib/utils";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
 import { PaymentHistoryModal } from "@/components/payments/PaymentHistoryModal";
+import { PaymentReportsTab } from "@/components/payments/PaymentReportsTab";
 import { useToast } from "@/hooks/use-toast";
 
 export default function PaymentRegistration() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mainTab = searchParams.get("tab") === "reportes" ? "reportes" : "registro";
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
@@ -116,6 +121,20 @@ export default function PaymentRegistration() {
       return data || [];
     },
     enabled: !!schoolId,
+  });
+
+  // Pending payment reports count for badge
+  const { data: pendingReportsCount = 0 } = useQuery({
+    queryKey: ["payment-reports-pending-count", schoolId],
+    queryFn: async () => {
+      const { count } = await supabase.from("payment_reports")
+        .select("id", { count: "exact", head: true })
+        .eq("school_id", schoolId!)
+        .eq("status", "pending");
+      return count || 0;
+    },
+    enabled: !!schoolId,
+    refetchInterval: 60_000,
   });
 
   const planMap = useMemo(() => {
@@ -257,6 +276,29 @@ export default function PaymentRegistration() {
     <DashboardLayout>
       <PageHeader title="Registro de Pagos" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Registro de Pagos" }]} />
 
+      {/* Main section tabs */}
+      <Tabs value={mainTab} onValueChange={(v) => setSearchParams(v === "reportes" ? { tab: "reportes" } : {})} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="registro" className="gap-2">
+            <CreditCard className="h-4 w-4" />
+            Registro de Pagos
+          </TabsTrigger>
+          <TabsTrigger value="reportes" className="gap-2">
+            <Receipt className="h-4 w-4" />
+            Reportes de Representantes
+            {pendingReportsCount > 0 && (
+              <span className="ml-1 rounded-full bg-orange-500 text-white text-xs font-semibold px-1.5 py-0.5 leading-none">
+                {pendingReportsCount}
+              </span>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="reportes">
+          <PaymentReportsTab />
+        </TabsContent>
+
+        <TabsContent value="registro">
       {!activeYear ? (
         <Card><CardContent className="py-8 text-center text-muted-foreground">No hay un año escolar activo configurado.</CardContent></Card>
       ) : (
@@ -438,6 +480,8 @@ export default function PaymentRegistration() {
           )}
         </>
       )}
+        </TabsContent>
+      </Tabs>
     </DashboardLayout>
   );
 }
