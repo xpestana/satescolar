@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { RefreshCw, DollarSign, Euro, Loader2, Download } from "lucide-react";
+import { RefreshCw, DollarSign, Euro, Loader2, Download, ChevronUp, ChevronDown } from "lucide-react";
 
 interface ExchangeRateWidgetProps {
   schoolId: string;
@@ -15,6 +15,15 @@ export function ExchangeRateWidget({ schoolId, floating = true }: ExchangeRateWi
   const { toast } = useToast();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Record<string, string>>({});
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem("exchange-widget-collapsed") === "true"; } catch { return false; }
+  });
+
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try { localStorage.setItem("exchange-widget-collapsed", String(next)); } catch { /* ignore */ }
+  };
 
   const { data: rates = [], isLoading } = useQuery({
     queryKey: ["exchange-rates", schoolId],
@@ -97,71 +106,88 @@ export function ExchangeRateWidget({ schoolId, floating = true }: ExchangeRateWi
   const getRate = (currency: string) => rates.find((r) => r.currency === currency)?.rate_to_ves || 0;
 
   const wrapperClass = floating
-    ? "fixed bottom-4 left-4 z-50 w-72 bg-background border border-border rounded-xl shadow-lg p-4 space-y-3"
-    : "bg-background border border-border rounded-xl p-4 space-y-3";
+    ? "fixed bottom-4 left-4 z-50 w-64 bg-background border border-border rounded-xl shadow-lg overflow-hidden"
+    : "bg-background border border-border rounded-xl overflow-hidden";
 
   return (
     <div className={wrapperClass}>
-      <div className="flex items-center justify-between">
+      {/* Header — always visible */}
+      <div
+        className="flex items-center justify-between px-4 py-2.5 cursor-pointer select-none hover:bg-muted/40 transition-colors"
+        onClick={toggleCollapsed}
+        title={collapsed ? "Expandir tasas de cambio" : "Minimizar tasas de cambio"}
+      >
         <h4 className="text-sm font-bold text-foreground">Tasas de Cambio</h4>
         <div className="flex items-center gap-1">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={() => fetchBcv.mutate()}
-            disabled={fetchBcv.isPending}
-            title="Descargar tasa BCV"
-          >
-            {fetchBcv.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : <Download className="h-3 w-3" />}
-          </Button>
-          {isLoading && <Loader2 className="animate-spin h-3 w-3" />}
+          {isLoading && <Loader2 className="animate-spin h-3 w-3 text-muted-foreground" />}
+          {collapsed
+            ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+            : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          }
         </div>
       </div>
 
-      {bcvInfo && (
-        <p className="text-[10px] text-muted-foreground">
-          BCV: {new Date(bcvInfo.published_date + "T12:00:00").toLocaleDateString("es-VE", { day: "2-digit", month: "short", year: "numeric" })}
-        </p>
-      )}
+      {/* Collapsible body */}
+      {!collapsed && (
+        <div className="px-4 pb-4 space-y-3">
+          {bcvInfo && (
+            <p className="text-[10px] text-muted-foreground -mt-1">
+              BCV: {new Date(bcvInfo.published_date + "T12:00:00").toLocaleDateString("es-VE", { day: "2-digit", month: "short", year: "numeric" })}
+            </p>
+          )}
 
-      {currencies.map(({ code, label, icon: Icon, color }) => {
-        const rate = getRate(code);
-        const isEditing = code in editing;
-        return (
-          <div key={code} className="flex items-center gap-2">
-            <Icon className={`h-4 w-4 flex-shrink-0 ${color}`} />
-            <span className="text-xs font-medium w-10">{code}</span>
-            {isEditing ? (
-              <>
-                <Input
-                  type="number"
-                  step="0.01"
-                  className="h-7 text-xs flex-1"
-                  value={editing[code]}
-                  onChange={(e) => setEditing({ ...editing, [code]: e.target.value })}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") updateRate.mutate({ currency: code, rate: parseFloat(editing[code]) || 0 });
-                    if (e.key === "Escape") setEditing((prev) => { const n = { ...prev }; delete n[code]; return n; });
-                  }}
-                />
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateRate.mutate({ currency: code, rate: parseFloat(editing[code]) || 0 })} disabled={updateRate.isPending}>
-                  <RefreshCw className="h-3 w-3" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <span className="text-xs flex-1 font-mono cursor-pointer hover:text-primary" onClick={() => setEditing({ ...editing, [code]: rate.toString() })}>
-                  {rate > 0 ? rate.toLocaleString("es-VE", { minimumFractionDigits: 2 }) : "Sin tasa"}
-                </span>
-                <span className="text-[10px] text-muted-foreground">VES</span>
-              </>
-            )}
+          {currencies.map(({ code, label, icon: Icon, color }) => {
+            const rate = getRate(code);
+            const isEditing = code in editing;
+            return (
+              <div key={code} className="flex items-center gap-2">
+                <Icon className={`h-4 w-4 flex-shrink-0 ${color}`} />
+                <span className="text-xs font-medium w-10">{code}</span>
+                {isEditing ? (
+                  <>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      className="h-7 text-xs flex-1"
+                      value={editing[code]}
+                      onChange={(e) => setEditing({ ...editing, [code]: e.target.value })}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") updateRate.mutate({ currency: code, rate: parseFloat(editing[code]) || 0 });
+                        if (e.key === "Escape") setEditing((prev) => { const n = { ...prev }; delete n[code]; return n; });
+                      }}
+                    />
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateRate.mutate({ currency: code, rate: parseFloat(editing[code]) || 0 })} disabled={updateRate.isPending}>
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs flex-1 font-mono cursor-pointer hover:text-primary" onClick={(e) => { e.stopPropagation(); setEditing({ ...editing, [code]: rate.toString() }); }}>
+                      {rate > 0 ? rate.toLocaleString("es-VE", { minimumFractionDigits: 2 }) : "Sin tasa"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">VES</span>
+                  </>
+                )}
+              </div>
+            );
+          })}
+
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-[10px] text-muted-foreground">Click en la tasa para editar</p>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={(e) => { e.stopPropagation(); fetchBcv.mutate(); }}
+              disabled={fetchBcv.isPending}
+              title="Descargar tasa BCV"
+            >
+              {fetchBcv.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : <Download className="h-3 w-3" />}
+            </Button>
           </div>
-        );
-      })}
-      <p className="text-[10px] text-muted-foreground">Click en la tasa para editar · <Download className="inline h-2.5 w-2.5" /> para BCV</p>
+        </div>
+      )}
     </div>
   );
 }
