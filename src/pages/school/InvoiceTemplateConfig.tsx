@@ -13,31 +13,32 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Loader2, CheckCircle2, Eye } from "lucide-react";
 import { uploadToS3 } from "@/lib/s3-upload";
+import { InvoiceCanvasEditor } from "@/components/payments/InvoiceCanvasEditor";
 import { InvoiceOverlayPreview } from "@/components/payments/InvoiceOverlayPreview";
 
-// Fields available for positioning on the invoice overlay
+// ── Shared field definitions (used by canvas editor + print overlay) ──────────
 export const OVERLAY_FIELDS = [
-  { key: "invoice_number", label: "N° Factura", example: "016725" },
-  { key: "date_day", label: "Fecha – Día", example: "11" },
-  { key: "date_month", label: "Fecha – Mes", example: "5" },
-  { key: "date_year", label: "Fecha – Año", example: "2026" },
-  { key: "titular_nombre", label: "Nombre / Razón Social", example: "Juan Pérez" },
-  { key: "titular_ci", label: "C.I. / RIF", example: "V-12345678" },
-  { key: "student_name", label: "Para acreditar a (estudiante)", example: "Ana García" },
-  { key: "student_grade", label: "Grado", example: "3°" },
-  { key: "student_section", label: "Sección", example: "A" },
-  { key: "concept_1_name", label: "Concepto 1 – Descripción", example: "Mensualidad Septiembre" },
-  { key: "concept_1_amount", label: "Concepto 1 – Monto", example: "5.000,00" },
-  { key: "concept_2_name", label: "Concepto 2 – Descripción", example: "Seguro Escolar" },
-  { key: "concept_2_amount", label: "Concepto 2 – Monto", example: "1.200,00" },
-  { key: "concept_3_name", label: "Concepto 3 – Descripción", example: "Comunidad Educativa" },
-  { key: "concept_3_amount", label: "Concepto 3 – Monto", example: "800,00" },
-  { key: "concept_4_name", label: "Concepto 4 – Descripción", example: "" },
-  { key: "concept_4_amount", label: "Concepto 4 – Monto", example: "" },
-  { key: "concept_5_name", label: "Concepto 5 – Descripción", example: "" },
-  { key: "concept_5_amount", label: "Concepto 5 – Monto", example: "" },
-  { key: "total_amount", label: "Monto Total", example: "7.000,00" },
-  { key: "payment_method_text", label: "Forma de pago", example: "Zelle (USD)" },
+  { key: "invoice_number",      label: "N° Factura",                    example: "016725" },
+  { key: "date_day",            label: "Fecha – Día",                   example: "11" },
+  { key: "date_month",          label: "Fecha – Mes",                   example: "05" },
+  { key: "date_year",           label: "Fecha – Año",                   example: "2026" },
+  { key: "titular_nombre",      label: "Nombre / Razón Social",         example: "Juan Pérez" },
+  { key: "titular_ci",          label: "C.I. / RIF",                    example: "V-12345678" },
+  { key: "student_name",        label: "Para acreditar a (estudiante)", example: "Ana García" },
+  { key: "student_grade",       label: "Grado",                         example: "3°" },
+  { key: "student_section",     label: "Sección",                       example: "A" },
+  { key: "concept_1_name",      label: "Concepto 1 – Descripción",      example: "Mensualidad Sep." },
+  { key: "concept_1_amount",    label: "Concepto 1 – Monto",            example: "5.000,00" },
+  { key: "concept_2_name",      label: "Concepto 2 – Descripción",      example: "Comunidad Educ." },
+  { key: "concept_2_amount",    label: "Concepto 2 – Monto",            example: "1.200,00" },
+  { key: "concept_3_name",      label: "Concepto 3 – Descripción",      example: "Seguro Escolar" },
+  { key: "concept_3_amount",    label: "Concepto 3 – Monto",            example: "800,00" },
+  { key: "concept_4_name",      label: "Concepto 4 – Descripción",      example: "Deuda Anterior" },
+  { key: "concept_4_amount",    label: "Concepto 4 – Monto",            example: "500,00" },
+  { key: "concept_5_name",      label: "Concepto 5 – Descripción",      example: "" },
+  { key: "concept_5_amount",    label: "Concepto 5 – Monto",            example: "" },
+  { key: "total_amount",        label: "Monto Total",                   example: "7.000,00" },
+  { key: "payment_method_text", label: "Forma de pago",                 example: "Zelle (USD)" },
 ];
 
 export interface OverlayField {
@@ -62,13 +63,7 @@ export interface InvoiceTemplate {
   created_at: string;
 }
 
-const DEFAULT_FIELD: Omit<OverlayField, "key"> = {
-  x_mm: 20,
-  y_mm: 40,
-  font_size_pt: 9,
-  width_mm: 80,
-};
-
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function InvoiceTemplateConfig() {
   const { schoolId } = useSchoolId();
   const { toast } = useToast();
@@ -80,7 +75,6 @@ export default function InvoiceTemplateConfig() {
   const [previewTemplate, setPreviewTemplate] = useState<InvoiceTemplate | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  // Form state for new/edit template
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -90,6 +84,7 @@ export default function InvoiceTemplateConfig() {
   });
   const [fields, setFields] = useState<OverlayField[]>([]);
 
+  // ── Queries ──────────────────────────────────────────────────────────────
   const { data: templates = [], isLoading } = useQuery({
     queryKey: ["invoice-templates", schoolId],
     queryFn: async () => {
@@ -104,6 +99,7 @@ export default function InvoiceTemplateConfig() {
     enabled: !!schoolId,
   });
 
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const saveMut = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -113,24 +109,20 @@ export default function InvoiceTemplateConfig() {
         paper_width_mm: form.paper_width_mm,
         paper_height_mm: form.paper_height_mm,
         background_image_url: form.background_image_url || null,
-        fields: fields,
+        fields,
         updated_at: new Date().toISOString(),
       };
       if (editTemplate) {
-        const { error } = await supabase
-          .from("invoice_templates" as any)
-          .update(payload)
-          .eq("id", editTemplate.id);
+        const { error } = await supabase.from("invoice_templates" as any).update(payload).eq("id", editTemplate.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("invoice_templates" as any)
-          .insert({ ...payload, is_active: false });
+        const { error } = await supabase.from("invoice_templates" as any).insert({ ...payload, is_active: false });
         if (error) throw error;
       }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["invoice-templates"] });
+      qc.invalidateQueries({ queryKey: ["active-invoice-template"] });
       toast({ title: editTemplate ? "Plantilla actualizada" : "Plantilla creada" });
       setShowEditor(false);
     },
@@ -139,20 +131,14 @@ export default function InvoiceTemplateConfig() {
 
   const activateMut = useMutation({
     mutationFn: async (id: string) => {
-      // Deactivate all, then activate selected
-      const { error: err1 } = await supabase
-        .from("invoice_templates" as any)
-        .update({ is_active: false })
-        .eq("school_id", schoolId!);
-      if (err1) throw err1;
-      const { error: err2 } = await supabase
-        .from("invoice_templates" as any)
-        .update({ is_active: true })
-        .eq("id", id);
-      if (err2) throw err2;
+      const { error: e1 } = await supabase.from("invoice_templates" as any).update({ is_active: false }).eq("school_id", schoolId!);
+      if (e1) throw e1;
+      const { error: e2 } = await supabase.from("invoice_templates" as any).update({ is_active: true }).eq("id", id);
+      if (e2) throw e2;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["invoice-templates"] });
+      qc.invalidateQueries({ queryKey: ["active-invoice-template"] });
       toast({ title: "Plantilla activada" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -165,11 +151,13 @@ export default function InvoiceTemplateConfig() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["invoice-templates"] });
+      qc.invalidateQueries({ queryKey: ["active-invoice-template"] });
       toast({ title: "Plantilla eliminada" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const openNew = () => {
     setEditTemplate(null);
     setForm({ name: "", description: "", paper_width_mm: 215.9, paper_height_mm: 279.4, background_image_url: "" });
@@ -202,45 +190,21 @@ export default function InvoiceTemplateConfig() {
     }
   };
 
-  const updateField = (key: string, prop: keyof OverlayField, value: any) => {
-    setFields((prev) => {
-      const existing = prev.find((f) => f.key === key);
-      if (existing) {
-        return prev.map((f) => (f.key === key ? { ...f, [prop]: value } : f));
-      }
-      return [...prev, { key, ...DEFAULT_FIELD, [prop]: value }];
-    });
-  };
-
-  const toggleField = (key: string) => {
-    setFields((prev) => {
-      const exists = prev.find((f) => f.key === key);
-      if (exists) return prev.filter((f) => f.key !== key);
-      return [...prev, { key, ...DEFAULT_FIELD }];
-    });
-  };
-
-  const getField = (key: string): OverlayField | undefined => fields.find((f) => f.key === key);
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout>
       <PageHeader
         title="Formato de Factura"
-        breadcrumbs={[
-          { label: "Pagos", href: "/pagos/configuracion" },
-          { label: "Formato de Factura" },
-        ]}
+        breadcrumbs={[{ label: "Pagos", href: "/pagos/configuracion" }, { label: "Formato de Factura" }]}
         actions={
           <Button onClick={openNew}>
-            <Plus className="h-4 w-4 mr-1" />
-            Nueva plantilla
+            <Plus className="h-4 w-4 mr-1" />Nueva plantilla
           </Button>
         }
       />
 
       <p className="text-sm text-muted-foreground mb-4">
-        Configura la posición de cada dato sobre la factura física del colegio. Al imprimir, los datos se superponen
-        sobre el formulario en blanco que colocas en la impresora.
+        Diseña visualmente dónde imprimir cada dato sobre la factura física. Pon la factura en blanco en la impresora y los datos se imprimen encima.
       </p>
 
       {isLoading ? (
@@ -270,31 +234,17 @@ export default function InvoiceTemplateConfig() {
                   </div>
                   <div className="flex gap-2">
                     {!t.is_active && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => activateMut.mutate(t.id)}
-                        disabled={activateMut.isPending}
-                      >
+                      <Button size="sm" variant="outline" onClick={() => activateMut.mutate(t.id)} disabled={activateMut.isPending}>
                         <CheckCircle2 className="h-4 w-4 mr-1" />Activar
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => { setPreviewTemplate(t); setShowPreview(true); }}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => { setPreviewTemplate(t); setShowPreview(true); }}>
                       <Eye className="h-4 w-4 mr-1" />Preview
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => openEdit(t)}>
                       <Edit className="h-4 w-4 mr-1" />Editar
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => deleteMut.mutate(t.id)}
-                      disabled={deleteMut.isPending}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => deleteMut.mutate(t.id)} disabled={deleteMut.isPending}>
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -305,198 +255,90 @@ export default function InvoiceTemplateConfig() {
         </div>
       )}
 
-      {/* Editor Dialog */}
+      {/* ── Visual Editor Dialog ─────────────────────────────────────────── */}
       <Dialog open={showEditor} onOpenChange={(v) => !v && setShowEditor(false)}>
-        <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-[95vw] w-[1100px]" style={{ maxHeight: "95vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{editTemplate ? "Editar plantilla" : "Nueva plantilla"}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6">
-            {/* Basic info */}
-            <div className="grid grid-cols-2 gap-4">
+          {/* ── Top bar: name / description / paper size / background ── */}
+          <div className="flex-shrink-0 space-y-3 border-b pb-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Nombre de la plantilla *</Label>
+                <Label className="text-xs">Nombre *</Label>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   placeholder="Ej: Factura MLK 2026"
+                  className="h-8 text-sm"
                 />
               </div>
               <div className="space-y-1">
-                <Label>Descripción (opcional)</Label>
+                <Label className="text-xs">Descripción</Label>
                 <Input
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Ej: Formato carta, serie 016501–017000"
+                  placeholder="Ej: Serie 016501–017000"
+                  className="h-8 text-sm"
                 />
               </div>
             </div>
 
-            {/* Paper size */}
-            <div>
-              <p className="text-sm font-medium mb-2">Tamaño del papel (mm)</p>
-              <div className="grid grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Ancho (mm)</Label>
-                  <Input
-                    type="number"
-                    value={form.paper_width_mm}
-                    onChange={(e) => setForm((f) => ({ ...f, paper_width_mm: parseFloat(e.target.value) || 215.9 }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Alto (mm)</Label>
-                  <Input
-                    type="number"
-                    value={form.paper_height_mm}
-                    onChange={(e) => setForm((f) => ({ ...f, paper_height_mm: parseFloat(e.target.value) || 279.4 }))}
-                  />
-                </div>
-                <div className="col-span-2 flex gap-2 items-end pb-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setForm((f) => ({ ...f, paper_width_mm: 215.9, paper_height_mm: 279.4 }))}
-                  >
-                    Carta (Letter)
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setForm((f) => ({ ...f, paper_width_mm: 210, paper_height_mm: 297 }))}
-                  >
-                    A4
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setForm((f) => ({ ...f, paper_width_mm: 216, paper_height_mm: 356 }))}
-                  >
-                    Oficio
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Background image */}
-            <div className="space-y-2">
-              <Label>Imagen de fondo (escaneo de la factura en blanco)</Label>
-              <p className="text-xs text-muted-foreground">
-                Sube un escaneo de la factura en blanco. Se usará solo como referencia visual en el editor.
-              </p>
-              <div className="flex gap-3 items-center">
-                <label className="cursor-pointer">
-                  <Button size="sm" variant="outline" asChild>
-                    <span>{uploading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}Subir imagen</span>
-                  </Button>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && uploadBackground(e.target.files[0])}
-                  />
-                </label>
-                {form.background_image_url && (
-                  <span className="text-xs text-green-600">✓ Imagen subida</span>
-                )}
-              </div>
-              {form.background_image_url && (
-                <div className="border rounded overflow-hidden max-h-48">
-                  <img src={form.background_image_url} alt="Factura" className="w-full object-contain" />
-                </div>
-              )}
-            </div>
-
-            {/* Fields configuration */}
-            <div>
-              <p className="text-sm font-semibold mb-1">Posición de campos (en mm desde la esquina superior izquierda)</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Activa cada campo que quieras imprimir y configura su posición exacta. Usa el preview para verificar.
-              </p>
-
+            <div className="flex flex-wrap items-end gap-3">
+              {/* Paper presets */}
               <div className="space-y-1">
-                {/* Header row */}
-                <div className="grid grid-cols-[20px_160px_70px_70px_60px_60px_50px] gap-2 text-xs font-medium text-muted-foreground px-2 mb-1">
-                  <span></span>
-                  <span>Campo</span>
-                  <span>X (mm)</span>
-                  <span>Y (mm)</span>
-                  <span>Ancho</span>
-                  <span>Fuente pt</span>
-                  <span>Negrita</span>
+                <Label className="text-xs">Papel</Label>
+                <div className="flex gap-1.5">
+                  <Button size="sm" variant={Math.abs(form.paper_width_mm - 215.9) < 1 ? "default" : "outline"} className="h-7 text-xs" onClick={() => setForm((f) => ({ ...f, paper_width_mm: 215.9, paper_height_mm: 279.4 }))}>Carta</Button>
+                  <Button size="sm" variant={Math.abs(form.paper_width_mm - 210) < 1 ? "default" : "outline"} className="h-7 text-xs" onClick={() => setForm((f) => ({ ...f, paper_width_mm: 210, paper_height_mm: 297 }))}>A4</Button>
+                  <Button size="sm" variant={Math.abs(form.paper_width_mm - 216) < 1 && Math.abs(form.paper_height_mm - 356) < 1 ? "default" : "outline"} className="h-7 text-xs" onClick={() => setForm((f) => ({ ...f, paper_width_mm: 216, paper_height_mm: 356 }))}>Oficio</Button>
                 </div>
-
-                {OVERLAY_FIELDS.map((f) => {
-                  const cfg = getField(f.key);
-                  const active = !!cfg;
-                  return (
-                    <div
-                      key={f.key}
-                      className={`grid grid-cols-[20px_160px_70px_70px_60px_60px_50px] gap-2 items-center px-2 py-1 rounded ${active ? "bg-blue-50" : "hover:bg-muted/30"}`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={active}
-                        onChange={() => toggleField(f.key)}
-                        className="h-4 w-4"
-                      />
-                      <div>
-                        <p className="text-xs font-medium">{f.label}</p>
-                        {f.example && <p className="text-[10px] text-muted-foreground">Ej: {f.example}</p>}
-                      </div>
-                      <Input
-                        type="number"
-                        disabled={!active}
-                        value={cfg?.x_mm ?? ""}
-                        onChange={(e) => updateField(f.key, "x_mm", parseFloat(e.target.value) || 0)}
-                        className="h-7 text-xs"
-                        step={0.5}
-                      />
-                      <Input
-                        type="number"
-                        disabled={!active}
-                        value={cfg?.y_mm ?? ""}
-                        onChange={(e) => updateField(f.key, "y_mm", parseFloat(e.target.value) || 0)}
-                        className="h-7 text-xs"
-                        step={0.5}
-                      />
-                      <Input
-                        type="number"
-                        disabled={!active}
-                        value={cfg?.width_mm ?? ""}
-                        onChange={(e) => updateField(f.key, "width_mm", parseFloat(e.target.value) || 50)}
-                        className="h-7 text-xs"
-                        step={1}
-                      />
-                      <Input
-                        type="number"
-                        disabled={!active}
-                        value={cfg?.font_size_pt ?? ""}
-                        onChange={(e) => updateField(f.key, "font_size_pt", parseFloat(e.target.value) || 9)}
-                        className="h-7 text-xs"
-                        step={0.5}
-                      />
-                      <input
-                        type="checkbox"
-                        disabled={!active}
-                        checked={cfg?.bold ?? false}
-                        onChange={(e) => updateField(f.key, "bold", e.target.checked)}
-                        className="h-4 w-4"
-                      />
-                    </div>
-                  );
-                })}
+              </div>
+              {/* Custom dimensions */}
+              <div className="flex items-end gap-1.5">
+                <div className="space-y-1">
+                  <Label className="text-xs">Ancho mm</Label>
+                  <Input type="number" value={form.paper_width_mm} onChange={(e) => setForm((f) => ({ ...f, paper_width_mm: parseFloat(e.target.value) || 215.9 }))} className="h-7 w-20 text-xs" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Alto mm</Label>
+                  <Input type="number" value={form.paper_height_mm} onChange={(e) => setForm((f) => ({ ...f, paper_height_mm: parseFloat(e.target.value) || 279.4 }))} className="h-7 w-20 text-xs" />
+                </div>
+              </div>
+              {/* Background image upload */}
+              <div className="flex items-end gap-2">
+                <label className="cursor-pointer">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                    <span>
+                      {uploading && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+                      {form.background_image_url ? "Cambiar fondo" : "Subir factura en blanco"}
+                    </span>
+                  </Button>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadBackground(e.target.files[0])} />
+                </label>
+                {form.background_image_url && <span className="text-xs text-green-600">✓ fondo cargado</span>}
+                {form.background_image_url && (
+                  <button className="text-xs text-muted-foreground underline" onClick={() => setForm((f) => ({ ...f, background_image_url: "" }))}>quitar</button>
+                )}
               </div>
             </div>
           </div>
 
-          <DialogFooter className="mt-4">
+          {/* ── Canvas editor (fills remaining height) ── */}
+          <div className="flex-1 min-h-0 pt-2">
+            <InvoiceCanvasEditor
+              fields={fields}
+              onChange={setFields}
+              paperWidthMm={form.paper_width_mm}
+              paperHeightMm={form.paper_height_mm}
+              backgroundUrl={form.background_image_url || undefined}
+            />
+          </div>
+
+          <DialogFooter className="flex-shrink-0 pt-3 border-t mt-2">
             <Button variant="outline" onClick={() => setShowEditor(false)}>Cancelar</Button>
-            <Button
-              onClick={() => saveMut.mutate()}
-              disabled={!form.name.trim() || saveMut.isPending}
-            >
+            <Button onClick={() => saveMut.mutate()} disabled={!form.name.trim() || saveMut.isPending}>
               {saveMut.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               {editTemplate ? "Guardar cambios" : "Crear plantilla"}
             </Button>
@@ -504,7 +346,7 @@ export default function InvoiceTemplateConfig() {
         </DialogContent>
       </Dialog>
 
-      {/* Preview Dialog */}
+      {/* ── Preview Dialog ──────────────────────────────────────────────── */}
       {previewTemplate && (
         <Dialog open={showPreview} onOpenChange={(v) => !v && setShowPreview(false)}>
           <DialogContent className="max-w-3xl max-h-[95vh] overflow-y-auto">
