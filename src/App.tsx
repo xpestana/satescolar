@@ -61,7 +61,7 @@ import PaymentRegistration from "./pages/school/PaymentRegistration";
 import StudentLedger from "./pages/school/StudentLedger";
 import DelinquentStudents from "./pages/school/DelinquentStudents";
 import DelinquencyConfig from "./pages/school/DelinquencyConfig";
-import InvoiceTemplateConfig from "./pages/school/InvoiceTemplateConfig";
+import FormatsConfig from "./pages/school/FormatsConfig";
 import NotFound from "./pages/NotFound";
 import SchoolUsersList from "./pages/school/SchoolUsersList";
 import SchoolUserForm from "./pages/school/SchoolUserForm";
@@ -369,7 +369,7 @@ const App = () => (
               <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><StudentLedger /></ProtectedRoute>} />
               <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
               <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
-              <Route path="/pagos/formato-factura" element={<ProtectedRoute requiredRole="school"><InvoiceTemplateConfig /></ProtectedRoute>} />
+              <Route path="/pagos/formato-factura" element={<ProtectedRoute requiredRole="school"><FormatsConfig /></ProtectedRoute>} />
 
               <Route path="/pagos/reportes" element={<Navigate to="/pagos/registro?tab=reportes" replace />} />
               <Route path="/school/aula-virtual/supervision" element={<ProtectedRoute requiredRole="school"><ClassroomSupervision /></ProtectedRoute>} />

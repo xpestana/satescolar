@@ -16,6 +16,7 @@ import { Search, Loader2, Eye, Check, ChevronsUpDown, Download } from "lucide-re
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
+import { downloadBachilleratoBoleta } from "@/lib/bachilleratoBoleta";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -34,6 +35,11 @@ const NUMERIC_GRADES = new Set([
   "media_tecnica", "6_ano",
 ]);
 
+const SECONDARY_GRADES = new Set([
+  "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
+  "media_tecnica", "6_ano",
+]);
+
 export default function GradesConsultation() {
   const { schoolId } = useSchoolId();
   const [activeTab, setActiveTab] = useState("consulta");
@@ -48,6 +54,7 @@ export default function GradesConsultation() {
   const [openSubject, setOpenSubject] = useState(false);
   const [openSection, setOpenSection] = useState(false);
   const [openGcrpTeacher, setOpenGcrpTeacher] = useState(false);
+  const [downloadingStudentId, setDownloadingStudentId] = useState<string | null>(null);
   // School years
   const { data: schoolYears = [] } = useQuery({
     queryKey: ["school-years", schoolId],
@@ -543,62 +550,102 @@ export default function GradesConsultation() {
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{sectionLabel}</span>
-                  <Badge variant="outline">{filteredStudents.length} estudiantes</Badge>
-                </div>
-                <div className="relative w-64">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar estudiante..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-9"
-                  />
-                </div>
-              </div>
+              {(() => {
+                const sectionData = sections.find((s) => s.id === selectedSection);
+                const isSecondary = sectionData ? SECONDARY_GRADES.has(sectionData.grade_level) : false;
+                const yearRange = schoolYears.find((y) => y.id === effectiveYear)?.year_range ?? "";
+                return (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">{sectionLabel}</span>
+                        <Badge variant="outline">{filteredStudents.length} estudiantes</Badge>
+                        {!isSecondary && (
+                          <Badge variant="secondary" className="text-xs">Boleta de Primaria/Preescolar próximamente</Badge>
+                        )}
+                      </div>
+                      <div className="relative w-64">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar estudiante..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-9 h-9"
+                        />
+                      </div>
+                    </div>
 
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[50px] text-center">#</TableHead>
-                      <TableHead className="min-w-[220px]">Nombre del Alumno</TableHead>
-                      <TableHead className="min-w-[100px]">Cédula</TableHead>
-                      <TableHead className="min-w-[150px] text-center">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredStudents.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                          No se encontraron estudiantes.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredStudents.map((s: any, idx: number) => (
-                        <TableRow key={s.student_id}>
-                          <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
-                          <TableCell className="font-medium">{s.student_name}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
-                          <TableCell className="text-center">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 gap-1.5 text-xs"
-                              onClick={() => { /* TODO: descargar boleta */ }}
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              Descargar Boleta
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                    <div className="rounded-md border overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="min-w-[50px] text-center">#</TableHead>
+                            <TableHead className="min-w-[220px]">Nombre del Alumno</TableHead>
+                            <TableHead className="min-w-[100px]">Cédula</TableHead>
+                            <TableHead className="min-w-[150px] text-center">Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredStudents.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                                No se encontraron estudiantes.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredStudents.map((s: any, idx: number) => (
+                              <TableRow key={s.student_id}>
+                                <TableCell className="text-center text-muted-foreground">{idx + 1}</TableCell>
+                                <TableCell className="font-medium">{s.student_name}</TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
+                                <TableCell className="text-center">
+                                  {isSecondary ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 gap-1.5 text-xs"
+                                      disabled={downloadingStudentId === s.student_id}
+                                      onClick={async () => {
+                                        if (!schoolId) return;
+                                        setDownloadingStudentId(s.student_id);
+                                        try {
+                                          await downloadBachilleratoBoleta({
+                                            schoolId,
+                                            studentId: s.student_id,
+                                            studentName: s.student_name,
+                                            documentId: s.document_id ?? null,
+                                            sectionId: selectedSection,
+                                            sectionName: sectionData?.name ?? "",
+                                            gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                            yearId: effectiveYear,
+                                            yearRange,
+                                            momento: selectedMomento,
+                                          });
+                                        } finally {
+                                          setDownloadingStudentId(null);
+                                        }
+                                      }}
+                                    >
+                                      {downloadingStudentId === s.student_id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Download className="h-3.5 w-3.5" />
+                                      )}
+                                      Descargar Boleta
+                                    </Button>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">Próximamente</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                );
+              })()}
             </>
           )}
         </TabsContent>
