@@ -18,9 +18,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, FileText, Download, Ban, Eye } from "lucide-react";
+import { Loader2, Search, FileText, Download, Ban, Eye, Printer } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
+import { buildInvoiceData } from "@/lib/buildInvoiceData";
+import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 
 export default function StudentLedger() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -89,6 +92,20 @@ export default function StudentLedger() {
     },
     enabled: !!schoolId,
   });
+
+  const { data: activeTemplate } = useQuery({
+    queryKey: ["active-invoice-template", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("invoice_templates" as any)
+        .select("*")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .maybeSingle();
+      return data as InvoiceTemplate | null;
+    },
+    enabled: !!schoolId,
+  });
   const methodLabel = (raw: string) => {
     const found = schoolMethods.find((sm: any) => sm.id === raw);
     if (found) return found.label;
@@ -114,6 +131,17 @@ export default function StudentLedger() {
   const selectedEnrollment = enrollments.find((e: any) => e.student_id === selectedStudentId);
   const studentFd = selectedEnrollment?.students?.form_data as any;
   const studentName = studentFd ? [studentFd.primer_nombre, studentFd.segundo_nombre, studentFd.primer_apellido, studentFd.segundo_apellido].filter(Boolean).join(" ") : "";
+  const gradeLevel = selectedEnrollment?.sections?.grade_level || "";
+  const sectionName = selectedEnrollment?.sections?.name || "";
+
+  const handlePrintOverlay = (payment: any) => {
+    if (!activeTemplate) {
+      toast({ title: "Sin plantilla activa", description: "Configura y activa una plantilla de factura en Configuración > Formato de Factura.", variant: "destructive" });
+      return;
+    }
+    const data = buildInvoiceData(payment, studentName, gradeLevel, sectionName, methodLabel);
+    printInvoiceOverlay(activeTemplate, data);
+  };
 
   // Void payment
   const voidMut = useMutation({
@@ -264,7 +292,7 @@ export default function StudentLedger() {
             <CardHeader><CardTitle className="text-sm">Historial de Pagos</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Total (VES)</TableHead><TableHead>Conceptos</TableHead><TableHead>Métodos</TableHead><TableHead>Estado</TableHead><TableHead className="w-24">Acciones</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>Total (VES)</TableHead><TableHead>Conceptos</TableHead><TableHead>Métodos</TableHead><TableHead>Estado</TableHead><TableHead className="w-32">Acciones</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {payments.map((p: any) => (
                     <TableRow key={p.id} className={p.status === "voided" ? "opacity-50" : ""}>
@@ -291,7 +319,15 @@ export default function StudentLedger() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => generateReceipt(p)} title="Descargar recibo"><Download className="h-4 w-4" /></Button>
+                          <Button size="icon" variant="ghost" onClick={() => generateReceipt(p)} title="Descargar recibo PDF"><Download className="h-4 w-4" /></Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handlePrintOverlay(p)}
+                            title={activeTemplate ? `Imprimir en factura física (${activeTemplate.name})` : "Imprimir (configura una plantilla primero)"}
+                          >
+                            <Printer className={`h-4 w-4 ${activeTemplate ? "text-blue-600" : "text-muted-foreground"}`} />
+                          </Button>
                           {p.status === "completed" && (
                             <Button size="icon" variant="ghost" onClick={() => { setVoidPaymentId(p.id); setVoidOpen(true); }} title="Anular pago"><Ban className="h-4 w-4 text-destructive" /></Button>
                           )}

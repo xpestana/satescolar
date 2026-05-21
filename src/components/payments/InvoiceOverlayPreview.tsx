@@ -1,0 +1,104 @@
+import { OVERLAY_FIELDS, InvoiceTemplate, OverlayField } from "@/pages/school/InvoiceTemplateConfig";
+
+// Demo data for preview
+const SAMPLE_DATA: Record<string, string> = {
+  invoice_number: "016725",
+  date_day: "11",
+  date_month: "05",
+  date_year: "2026",
+  titular_nombre: "María González",
+  titular_ci: "V-15.234.567",
+  student_name: "Ana María González",
+  student_grade: "3°",
+  student_section: "A",
+  concept_1_name: "Mensualidad Septiembre",
+  concept_1_amount: "5.000,00",
+  concept_2_name: "Comunidad Educativa",
+  concept_2_amount: "1.200,00",
+  concept_3_name: "Seguro Escolar",
+  concept_3_amount: "800,00",
+  concept_4_name: "",
+  concept_4_amount: "",
+  concept_5_name: "",
+  concept_5_amount: "",
+  total_amount: "7.000,00",
+  payment_method_text: "Transferencia Bancaria",
+};
+
+interface Props {
+  template: InvoiceTemplate;
+  paymentData?: Record<string, string>;
+  scale?: number; // default 2 (50% scale for preview)
+}
+
+export function InvoiceOverlayPreview({ template, paymentData, scale = 2 }: Props) {
+  const data = paymentData || SAMPLE_DATA;
+  const pxPerMm = 3.7795275591; // 96dpi
+  const widthPx = template.paper_width_mm * pxPerMm;
+  const heightPx = template.paper_height_mm * pxPerMm;
+
+  return (
+    <div className="overflow-auto">
+      <p className="text-xs text-muted-foreground mb-2">
+        Vista previa a escala {Math.round(100 / scale)}% — los campos en azul muestran dónde se imprimirá cada dato.
+      </p>
+      <div
+        style={{
+          position: "relative",
+          width: widthPx / scale,
+          height: heightPx / scale,
+          border: "1px solid #e2e8f0",
+          backgroundColor: "white",
+          overflow: "hidden",
+          flexShrink: 0,
+        }}
+      >
+        {/* Background scan */}
+        {template.background_image_url && (
+          <img
+            src={template.background_image_url}
+            alt="Factura"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "fill",
+              opacity: 0.6,
+            }}
+          />
+        )}
+
+        {/* Overlay fields */}
+        {(template.fields || []).map((field: OverlayField) => {
+          const meta = OVERLAY_FIELDS.find((f) => f.key === field.key);
+          const value = data[field.key] || (meta?.example ?? "");
+          if (!value) return null;
+          return (
+            <div
+              key={field.key}
+              style={{
+                position: "absolute",
+                left: (field.x_mm * pxPerMm) / scale,
+                top: (field.y_mm * pxPerMm) / scale,
+                width: (field.width_mm * pxPerMm) / scale,
+                fontSize: field.font_size_pt / scale * (4 / 3), // pt to px / scale
+                fontWeight: field.bold ? "bold" : "normal",
+                fontFamily: "Arial, sans-serif",
+                color: "#1d4ed8",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                lineHeight: 1.2,
+              }}
+              title={`${meta?.label}: ${value}`}
+            >
+              {value}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
