@@ -25,7 +25,13 @@ export const GRADE_LABELS: Record<string, string> = {
 
 /**
  * Converts a payment record into the flat key→value map used by the invoice overlay.
- * Supports up to 10 individual concept rows plus a single "concepts_all" summary field.
+ *
+ * Concept fields use the key format "concept:{payment_concept_id}".
+ * If that concept was paid in this payment → value is "✓".
+ * If not paid → key is absent from the map (nothing prints).
+ *
+ * The template only prints the concepts whose keys are in this map,
+ * so unpaid concepts are automatically skipped.
  */
 export function buildInvoiceData(
   payment: any,
@@ -35,27 +41,30 @@ export function buildInvoiceData(
   methodLabel: (raw: string) => string,
 ): Record<string, string> {
   const date = new Date(payment.payment_date);
-  const fmt = (n: number) =>
+  const fmt  = (n: number) =>
     n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const items: any[] = payment.payment_items || [];
+  const items:   any[] = payment.payment_items          || [];
   const methods: any[] = payment.payment_method_entries || [];
 
-  // Individual concept rows (up to 10)
-  const conceptEntries: Record<string, string> = {};
+  // ── Concept marks: one entry per paid concept ─────────────────────────
+  // payment_items → payment_plan_concepts.concept_id  (payment_concepts.id)
+  const conceptMarks: Record<string, string> = {};
   const conceptNames: string[] = [];
 
-  items.slice(0, 10).forEach((item: any, i: number) => {
-    const name   = item.payment_plan_concepts?.payment_concepts?.name || "";
-    const amount = item.amount_ves ? fmt(Number(item.amount_ves)) : "";
-    conceptEntries[`concept_${i + 1}_name`]   = name;
-    conceptEntries[`concept_${i + 1}_amount`] = amount;
-    if (name) conceptNames.push(name);
+  items.forEach((item: any) => {
+    const conceptId   = item.payment_plan_concepts?.concept_id;
+    const conceptName = item.payment_plan_concepts?.payment_concepts?.name || "";
+    if (conceptId) {
+      conceptMarks[`concept:${conceptId}`] = "✓";
+    }
+    if (conceptName) conceptNames.push(conceptName);
   });
 
-  // General summary field: all concept names on one line
+  // ── General summary field (all paid concept names on one line) ────────
   const conceptsAll = conceptNames.join(" / ");
 
+  // ── Payment method text ───────────────────────────────────────────────
   const methodText = methods
     .map((m: any) => {
       const label = methodLabel(m.method);
@@ -72,11 +81,10 @@ export function buildInvoiceData(
     titular_nombre:      payment.invoice_name || "",
     titular_ci:          payment.invoice_rif  || "",
     student_name:        studentName,
-    // Format the raw DB enum value ("3_ano") into human text ("3er Año")
     student_grade:       GRADE_LABELS[gradeLevel] || gradeLevel,
     student_section:     sectionName,
     concepts_all:        conceptsAll,
-    ...conceptEntries,
+    ...conceptMarks,
     total_amount:        fmt(Number(payment.total_amount_ves || 0)),
     payment_method_text: methodText,
   };
