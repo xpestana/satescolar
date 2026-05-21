@@ -18,27 +18,44 @@ import { InvoiceOverlayPreview } from "@/components/payments/InvoiceOverlayPrevi
 
 // ── Shared field definitions (used by canvas editor + print overlay) ──────────
 export const OVERLAY_FIELDS = [
-  { key: "invoice_number",      label: "N° Factura",                    example: "016725" },
-  { key: "date_day",            label: "Fecha – Día",                   example: "11" },
-  { key: "date_month",          label: "Fecha – Mes",                   example: "05" },
-  { key: "date_year",           label: "Fecha – Año",                   example: "2026" },
-  { key: "titular_nombre",      label: "Nombre / Razón Social",         example: "Juan Pérez" },
-  { key: "titular_ci",          label: "C.I. / RIF",                    example: "V-12345678" },
-  { key: "student_name",        label: "Para acreditar a (estudiante)", example: "Ana García" },
-  { key: "student_grade",       label: "Grado",                         example: "3°" },
-  { key: "student_section",     label: "Sección",                       example: "A" },
-  { key: "concept_1_name",      label: "Concepto 1 – Descripción",      example: "Mensualidad Sep." },
-  { key: "concept_1_amount",    label: "Concepto 1 – Monto",            example: "5.000,00" },
-  { key: "concept_2_name",      label: "Concepto 2 – Descripción",      example: "Comunidad Educ." },
-  { key: "concept_2_amount",    label: "Concepto 2 – Monto",            example: "1.200,00" },
-  { key: "concept_3_name",      label: "Concepto 3 – Descripción",      example: "Seguro Escolar" },
-  { key: "concept_3_amount",    label: "Concepto 3 – Monto",            example: "800,00" },
-  { key: "concept_4_name",      label: "Concepto 4 – Descripción",      example: "Deuda Anterior" },
-  { key: "concept_4_amount",    label: "Concepto 4 – Monto",            example: "500,00" },
-  { key: "concept_5_name",      label: "Concepto 5 – Descripción",      example: "" },
-  { key: "concept_5_amount",    label: "Concepto 5 – Monto",            example: "" },
-  { key: "total_amount",        label: "Monto Total",                   example: "7.000,00" },
-  { key: "payment_method_text", label: "Forma de pago",                 example: "Zelle (USD)" },
+  // Header / identification
+  { key: "invoice_number",      label: "N° Factura",                    example: "016725",                  group: "header" },
+  { key: "date_day",            label: "Fecha – Día",                   example: "11",                      group: "header" },
+  { key: "date_month",          label: "Fecha – Mes",                   example: "05",                      group: "header" },
+  { key: "date_year",           label: "Fecha – Año",                   example: "2026",                    group: "header" },
+  // Titular
+  { key: "titular_nombre",      label: "Nombre / Razón Social",         example: "Juan Pérez",              group: "titular" },
+  { key: "titular_ci",          label: "C.I. / RIF",                    example: "V-12345678",              group: "titular" },
+  // Student
+  { key: "student_name",        label: "Para acreditar a (estudiante)", example: "Ana García",              group: "student" },
+  { key: "student_grade",       label: "Grado",                         example: "3er Año",                 group: "student" },
+  { key: "student_section",     label: "Sección",                       example: "A",                       group: "student" },
+  // Concepto general (un solo campo con todos los conceptos juntos)
+  { key: "concepts_all",        label: "Todos los conceptos (general)", example: "Mensualidad / Seguro",    group: "concepts" },
+  // Conceptos individuales por fila (hasta 10)
+  { key: "concept_1_name",      label: "Concepto 1 – Descripción",      example: "Mensualidad Sep.",        group: "concepts" },
+  { key: "concept_1_amount",    label: "Concepto 1 – Monto",            example: "5.000,00",                group: "concepts" },
+  { key: "concept_2_name",      label: "Concepto 2 – Descripción",      example: "Comunidad Educ.",         group: "concepts" },
+  { key: "concept_2_amount",    label: "Concepto 2 – Monto",            example: "1.200,00",                group: "concepts" },
+  { key: "concept_3_name",      label: "Concepto 3 – Descripción",      example: "Seguro Escolar",          group: "concepts" },
+  { key: "concept_3_amount",    label: "Concepto 3 – Monto",            example: "800,00",                  group: "concepts" },
+  { key: "concept_4_name",      label: "Concepto 4 – Descripción",      example: "Deuda Anterior",          group: "concepts" },
+  { key: "concept_4_amount",    label: "Concepto 4 – Monto",            example: "500,00",                  group: "concepts" },
+  { key: "concept_5_name",      label: "Concepto 5 – Descripción",      example: "Pre Inscripción",         group: "concepts" },
+  { key: "concept_5_amount",    label: "Concepto 5 – Monto",            example: "300,00",                  group: "concepts" },
+  { key: "concept_6_name",      label: "Concepto 6 – Descripción",      example: "",                        group: "concepts" },
+  { key: "concept_6_amount",    label: "Concepto 6 – Monto",            example: "",                        group: "concepts" },
+  { key: "concept_7_name",      label: "Concepto 7 – Descripción",      example: "",                        group: "concepts" },
+  { key: "concept_7_amount",    label: "Concepto 7 – Monto",            example: "",                        group: "concepts" },
+  { key: "concept_8_name",      label: "Concepto 8 – Descripción",      example: "",                        group: "concepts" },
+  { key: "concept_8_amount",    label: "Concepto 8 – Monto",            example: "",                        group: "concepts" },
+  { key: "concept_9_name",      label: "Concepto 9 – Descripción",      example: "",                        group: "concepts" },
+  { key: "concept_9_amount",    label: "Concepto 9 – Monto",            example: "",                        group: "concepts" },
+  { key: "concept_10_name",     label: "Concepto 10 – Descripción",     example: "",                        group: "concepts" },
+  { key: "concept_10_amount",   label: "Concepto 10 – Monto",           example: "",                        group: "concepts" },
+  // Totals
+  { key: "total_amount",        label: "Monto Total",                   example: "7.000,00",                group: "totals" },
+  { key: "payment_method_text", label: "Forma de pago",                 example: "Zelle (USD)",             group: "totals" },
 ];
 
 export interface OverlayField {
