@@ -202,7 +202,7 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
 
   if (cfg.style === "boletin_completo") {
     return (
-      <div className="space-y-2 overflow-y-auto" style={{ maxHeight: "calc(70vh - 120px)" }}>
+      <div className="space-y-2 pb-2">
 
         {/* Cabecera del colegio */}
         <Section label="Cabecera del colegio" enabled={cfg.sections.header} onToggle={() => sect("header")}>
@@ -625,9 +625,11 @@ export function BolletasFormatTab() {
           {/* Body: config panel + preview */}
           <div className="flex-1 min-h-0 flex gap-4 overflow-hidden pt-2">
             {/* Left: config */}
-            <div className="w-72 flex-shrink-0">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Secciones y estilos</p>
-              <ConfigPanel cfg={cfg} onChange={setCfg} schoolId={schoolId ?? ""} />
+            <div className="w-72 flex-shrink-0 flex flex-col overflow-hidden">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex-shrink-0">Secciones y estilos</p>
+              <div className="flex-1 overflow-y-auto pr-1">
+                <ConfigPanel cfg={cfg} onChange={setCfg} schoolId={schoolId ?? ""} />
+              </div>
             </div>
             {/* Right: preview */}
             <div className="flex-1 overflow-y-auto flex justify-center">
