@@ -369,7 +369,7 @@ const App = () => (
               <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><StudentLedger /></ProtectedRoute>} />
               <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
               <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
-              <Route path="/pagos/formato-factura" element={<ProtectedRoute requiredRole="school"><FormatsConfig /></ProtectedRoute>} />
+              <Route path="/formatos" element={<ProtectedRoute requiredRole="school"><FormatsConfig /></ProtectedRoute>} />
 
               <Route path="/pagos/reportes" element={<Navigate to="/pagos/registro?tab=reportes" replace />} />
               <Route path="/school/aula-virtual/supervision" element={<ProtectedRoute requiredRole="school"><ClassroomSupervision /></ProtectedRoute>} />
