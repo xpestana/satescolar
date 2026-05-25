@@ -219,7 +219,7 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
       subjects,
       avg_m1, avg_m2, avg_m3, avg_student, avg_section,
       position,
-      signature_lines: signatureLines,
+      signature_lines: [],
     };
 
     openWindow(generateBoletinCompletoHtml(cfg, boletinData, paperW, paperH));

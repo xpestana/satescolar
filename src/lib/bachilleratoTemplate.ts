@@ -43,10 +43,19 @@ export interface BachilleratoConfig {
     position_border:   string;
   };
   boletin?: {
-    mention:          string;
-    table_header_bg:  string;
+    mention:           string;
+    table_header_bg:   string;
     table_header_text: string;
+    signatures:        BoletinSignature[];
   };
+}
+
+export interface BoletinSignature {
+  nombre:    string;
+  cedula:    string;
+  cargo:     string;
+  firma_url: string;
+  sello_url: string;
 }
 
 // ─── Boletín Completo types ────────────────────────────────────────────────────
@@ -195,6 +204,7 @@ export const DEFAULT_BACHILLERATO_CONFIG: BachilleratoConfig = {
     mention:           "",
     table_header_bg:   "#000000",
     table_header_text: "#ffffff",
+    signatures:        [],
   },
 };
 
@@ -273,7 +283,7 @@ export const SAMPLE_BOLETIN_COMPLETO_DATA: BoletinCompletoRenderData = {
   avg_student: "19.44",
   avg_section: "16.88",
   position:    3,
-  signature_lines: ["Prof. María Teresa Pérez\nV-7.276.231  Directora", "Docente Orientador"],
+  signature_lines: [],
 };
 
 // ─── HTML generator ────────────────────────────────────────────────────────────
@@ -564,12 +574,12 @@ export function generateBoletinCompletoHtml(
   const hasM3 = data.avg_m3 && data.avg_m3 !== "0" && data.avg_m3 !== "—";
 
   const promediosHtml = `
-  <div style="font-size:9pt;padding-left:8px;min-width:110px">
+  <div style="font-size:9pt;padding-left:10px;width:135px;flex-shrink:0">
     <div style="font-weight:700;margin-bottom:4px;font-size:9pt">Promedios</div>
-    <table style="width:100%;font-size:8.5pt;border-collapse:collapse">
-      <tr><td>I Momento:</td><td style="text-align:right;font-weight:600">${hasM1 ? esc(data.avg_m1) : "—"}</td></tr>
-      <tr><td>II Momento:</td><td style="text-align:right;font-weight:600">${hasM2 ? esc(data.avg_m2) : "—"}</td></tr>
-      <tr><td>III Momento:</td><td style="text-align:right;font-weight:600">${hasM3 ? esc(data.avg_m3) : "—"}</td></tr>
+    <table style="width:100%;font-size:8.5pt;border-collapse:collapse;white-space:nowrap">
+      <tr><td style="padding-right:4px">I Momento:</td><td style="text-align:right;font-weight:600">${hasM1 ? esc(data.avg_m1) : "—"}</td></tr>
+      <tr><td style="padding-right:4px">II Momento:</td><td style="text-align:right;font-weight:600">${hasM2 ? esc(data.avg_m2) : "—"}</td></tr>
+      <tr><td style="padding-right:4px">III Momento:</td><td style="text-align:right;font-weight:600">${hasM3 ? esc(data.avg_m3) : "—"}</td></tr>
     </table>
     ${boxStyle("Prom. del Estudiante", data.avg_student || "—")}
     ${boxStyle("Prom. de la Sección", data.avg_section || "—")}
@@ -577,22 +587,32 @@ export function generateBoletinCompletoHtml(
 
   const mainHtml = `
   <div style="display:flex;align-items:flex-start;margin-bottom:12px">
-    <div style="flex:1">${tableHtml}</div>
+    <div style="flex:1;min-width:0">${tableHtml}</div>
     ${promediosHtml}
   </div>`;
 
-  // ── Signatures ─────────────────────────────────────────────────────────────
-  const sigHtml = cfg.sections.signatures && data.signature_lines.length > 0 ? `
-  <div style="display:flex;gap:32px;margin-top:40px;padding-top:8px">
-    ${data.signature_lines.map((sig) => {
-      const lines = sig.split("\n");
+  // ── Signatures (from template config) ────────────────────────────────────
+  const cfgSigs = cfg.boletin?.signatures ?? [];
+  const sigHtml = cfg.sections.signatures && cfgSigs.length > 0 ? (() => {
+    const cols = cfgSigs.map((sig) => {
+      const firmaImg = sig.firma_url
+        ? `<img src="${esc(sig.firma_url)}" alt="Firma" style="height:52px;object-fit:contain;display:block;margin:0 auto 2px">`
+        : `<div style="height:52px"></div>`;
+      const selloImg = sig.sello_url
+        ? `<img src="${esc(sig.sello_url)}" alt="Sello" style="height:36px;object-fit:contain;display:inline-block;vertical-align:middle;margin-left:6px">`
+        : "";
       return `<div style="text-align:center;flex:1">
-        <div style="border-top:1px solid #374151;width:75%;margin:0 auto;padding-top:8px">
-          ${lines.map((l) => `<div style="font-size:9pt;color:#374151">${esc(l)}</div>`).join("")}
+        ${firmaImg}
+        <div style="border-top:1px solid #000;width:80%;margin:0 auto;padding-top:6px">
+          ${selloImg}
+          <div style="font-size:9pt;font-weight:600">${esc(sig.nombre)}</div>
+          ${sig.cedula ? `<div style="font-size:8.5pt">${esc(sig.cedula)}</div>` : ""}
+          ${sig.cargo  ? `<div style="font-size:8.5pt">${esc(sig.cargo)}</div>`  : ""}
         </div>
       </div>`;
-    }).join("")}
-  </div>` : "";
+    });
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:55px">${cols.join("")}</div>`;
+  })() : "";
 
   // ── Full HTML ──────────────────────────────────────────────────────────────
   return /* html */`<!DOCTYPE html>
@@ -602,14 +622,14 @@ export function generateBoletinCompletoHtml(
   <title>Boletín — ${esc(data.student_name)}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    html,body{width:${paperWidthMm}mm;min-height:${paperHeightMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
+    html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:10mm 12mm}
-    @media print{#controls{display:none!important}}
+    @media print{#controls{display:none!important}.boletin{padding:0}}
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
     #btn-close{background:#e2e8f0;color:#374151}
-    .boletin{padding:10mm 12mm}
+    .boletin{padding:10mm 12mm;width:100%}
   </style>
 </head>
 <body>

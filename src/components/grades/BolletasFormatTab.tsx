@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -11,13 +11,14 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Plus, Edit, Trash2, Loader2, CheckCircle2, ChevronDown, ChevronRight,
+  Plus, Edit, Trash2, Loader2, CheckCircle2, ChevronDown, ChevronRight, UserCircle2, Upload,
 } from "lucide-react";
 import {
-  BachilleratoConfig, BachilleratoTemplate,
+  BachilleratoConfig, BachilleratoTemplate, BoletinSignature,
   DEFAULT_BACHILLERATO_CONFIG, SAMPLE_RENDER_DATA, generateBoletaHtml,
   SAMPLE_BOLETIN_COMPLETO_DATA, generateBoletinCompletoHtml,
 } from "@/lib/bachilleratoTemplate";
+import { uploadToS3 } from "@/lib/s3-upload";
 
 // ─── tiny accordion ───────────────────────────────────────────────────────────
 function Section({
@@ -72,10 +73,126 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
   );
 }
 
+// ─── Signature editor ─────────────────────────────────────────────────────────
+function SignatureEditor({ sigs, onChange, schoolId }: {
+  sigs: BoletinSignature[];
+  onChange: (sigs: BoletinSignature[]) => void;
+  schoolId: string;
+}) {
+  const { toast } = useToast();
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+
+  const empty = (): BoletinSignature => ({ nombre: "", cedula: "", cargo: "", firma_url: "", sello_url: "" });
+
+  const upd = (i: number, patch: Partial<BoletinSignature>) => {
+    const next = [...sigs];
+    next[i] = { ...next[i], ...patch };
+    onChange(next);
+  };
+
+  const handleImg = async (i: number, field: "firma_url" | "sello_url", file: File) => {
+    const key = `${i}-${field}`;
+    setUploading((u) => ({ ...u, [key]: true }));
+    try {
+      const result = await uploadToS3({ file, folder: "assets", schoolId, fileName: `boleta-sig-${Date.now()}-${file.name}` });
+      upd(i, { [field]: result.publicUrl });
+    } catch (e: any) {
+      toast({ title: "Error subiendo imagen", description: e.message, variant: "destructive" });
+    } finally {
+      setUploading((u) => ({ ...u, [key]: false }));
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {sigs.map((sig, i) => (
+        <div key={i} className="border rounded-md p-3 space-y-2 bg-muted/20">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold">Firma {i + 1}</span>
+            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => onChange(sigs.filter((_, j) => j !== i))}>
+              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {/* Firma image */}
+            <ImageUploadCell label="Imagen de firma" url={sig.firma_url} loading={!!uploading[`${i}-firma_url`]}
+              onFile={(f) => handleImg(i, "firma_url", f)} onClear={() => upd(i, { firma_url: "" })} />
+            {/* Sello image */}
+            <ImageUploadCell label="Sello (opcional)" url={sig.sello_url} loading={!!uploading[`${i}-sello_url`]}
+              onFile={(f) => handleImg(i, "sello_url", f)} onClear={() => upd(i, { sello_url: "" })} />
+          </div>
+
+          <div className="space-y-1.5">
+            <InputRow label="Nombre" value={sig.nombre} placeholder="Prof. Juan Pérez" onChange={(v) => upd(i, { nombre: v })} />
+            <InputRow label="Cédula" value={sig.cedula} placeholder="V-12.345.678" onChange={(v) => upd(i, { cedula: v })} />
+            <InputRow label="Cargo" value={sig.cargo} placeholder="Director(a)" onChange={(v) => upd(i, { cargo: v })} />
+          </div>
+        </div>
+      ))}
+
+      {sigs.length < 3 && (
+        <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={() => onChange([...sigs, empty()])}>
+          <Plus className="h-3.5 w-3.5 mr-1" />Agregar firma {sigs.length > 0 ? `(${sigs.length}/3)` : ""}
+        </Button>
+      )}
+      {sigs.length === 0 && (
+        <p className="text-xs text-muted-foreground text-center">Agrega hasta 3 firmantes</p>
+      )}
+    </div>
+  );
+}
+
+function ImageUploadCell({ label, url, loading, onFile, onClear }: {
+  label: string; url: string; loading: boolean;
+  onFile: (f: File) => void; onClear: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{label}</Label>
+      <div className="border rounded flex items-center justify-center h-16 bg-background relative overflow-hidden cursor-pointer"
+        onClick={() => ref.current?.click()}>
+        {loading ? (
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        ) : url ? (
+          <>
+            <img src={url} alt="" className="max-h-full max-w-full object-contain p-1" />
+            <button onClick={(e) => { e.stopPropagation(); onClear(); }}
+              className="absolute top-0.5 right-0.5 bg-white rounded-full p-0.5 shadow text-destructive hover:bg-destructive hover:text-white">
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </>
+        ) : (
+          <div className="text-center text-muted-foreground">
+            <Upload className="h-4 w-4 mx-auto mb-0.5" />
+            <span className="text-[10px]">Subir imagen</span>
+          </div>
+        )}
+        <input ref={ref} type="file" accept="image/*" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
+      </div>
+    </div>
+  );
+}
+
+function InputRow({ label, value, placeholder, onChange }: {
+  label: string; value: string; placeholder?: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Label className="text-xs w-12 shrink-0">{label}</Label>
+      <Input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)}
+        className="h-6 text-xs flex-1" />
+    </div>
+  );
+}
+
 // ─── Config panel ─────────────────────────────────────────────────────────────
-function ConfigPanel({ cfg, onChange }: {
+function ConfigPanel({ cfg, onChange, schoolId }: {
   cfg: BachilleratoConfig;
   onChange: (updated: BachilleratoConfig) => void;
+  schoolId: string;
 }) {
   const upd = (patch: Partial<BachilleratoConfig>) => onChange({ ...cfg, ...patch });
   const sect = (k: keyof BachilleratoConfig["sections"]) =>
@@ -125,9 +242,13 @@ function ConfigPanel({ cfg, onChange }: {
 
         {/* Firmas */}
         <Section label="Firmas" enabled={cfg.sections.signatures} onToggle={() => sect("signatures")}>
-          <p className="text-xs text-muted-foreground">
-            Las líneas de firma se configuran en <strong>Planillas → Configuración General</strong>.
-          </p>
+          {cfg.sections.signatures && (
+            <SignatureEditor
+              sigs={cfg.boletin?.signatures ?? []}
+              onChange={(s) => updBoletin({ signatures: s })}
+              schoolId={schoolId}
+            />
+          )}
         </Section>
       </div>
     );
@@ -506,7 +627,7 @@ export function BolletasFormatTab() {
             {/* Left: config */}
             <div className="w-72 flex-shrink-0">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Secciones y estilos</p>
-              <ConfigPanel cfg={cfg} onChange={setCfg} />
+              <ConfigPanel cfg={cfg} onChange={setCfg} schoolId={schoolId ?? ""} />
             </div>
             {/* Right: preview */}
             <div className="flex-1 overflow-y-auto flex justify-center">
