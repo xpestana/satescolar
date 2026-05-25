@@ -462,12 +462,13 @@ function fmtGrade(v: string | null | undefined): string {
 }
 
 function momentoCell(mg: BoletinMomentoGrade | null): string {
-  if (!mg) return `<td></td><td></td><td></td><td></td>`;
+  const td = `text-align:center;padding:2px 2px;border:1px solid #ccc;font-size:8pt;overflow:hidden`;
+  if (!mg) return `<td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td>`;
   return [
-    `<td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${esc(fmtGrade(mg.nota))}</td>`,
-    `<td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${esc(mg.ajuste && mg.ajuste !== "0" ? mg.ajuste : "")}</td>`,
-    `<td style="text-align:center;padding:3px 4px;border:1px solid #ccc;font-weight:600">${esc(fmtGrade(mg.definitiva))}</td>`,
-    `<td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${mg.inasistencias > 0 ? mg.inasistencias : ""}</td>`,
+    `<td style="${td}">${esc(fmtGrade(mg.nota))}</td>`,
+    `<td style="${td}">${esc(mg.ajuste && mg.ajuste !== "0" ? mg.ajuste : "")}</td>`,
+    `<td style="${td};font-weight:600">${esc(fmtGrade(mg.definitiva))}</td>`,
+    `<td style="${td}">${mg.inasistencias > 0 ? mg.inasistencias : ""}</td>`,
   ].join("");
 }
 
@@ -530,34 +531,42 @@ export function generateBoletinCompletoHtml(
   </div>`;
 
   // ── Grades table + promedios sidebar ──────────────────────────────────────
-  const thStyle = `background:${hdrBg};color:${hdrTxt};padding:4px 5px;border:1px solid #999;font-size:8.5pt;text-align:center;font-weight:600`;
+  const thStyle = `background:${hdrBg};color:${hdrTxt};padding:3px 3px;border:1px solid #999;font-size:7.5pt;text-align:center;font-weight:600;overflow:hidden`;
   const subjectRows = data.subjects.map((s, i) => {
     const bg = cfg.table.alt_row && i % 2 !== 0 ? (cfg.table.alt_row_color || "#f9fafb") : "#ffffff";
     return `<tr style="background:${bg}">
-      <td style="padding:3px 4px;border:1px solid #ccc;text-align:center;font-size:9pt">${s.number}</td>
-      <td style="padding:3px 6px;border:1px solid #ccc;font-size:9pt;text-transform:uppercase">${esc(s.name)}</td>
+      <td style="padding:2px 3px;border:1px solid #ccc;text-align:center;font-size:8pt">${s.number}</td>
+      <td style="padding:2px 4px;border:1px solid #ccc;font-size:8pt;text-transform:uppercase;word-break:break-word">${esc(s.name)}</td>
       ${momentoCell(s.m1)}
       ${momentoCell(s.m2)}
       ${momentoCell(s.m3)}
-      <td style="text-align:center;padding:3px 4px;border:1px solid #ccc;font-weight:700;font-size:9pt">${esc(fmtGrade(s.definitiva_final))}</td>
+      <td style="text-align:center;padding:2px 3px;border:1px solid #ccc;font-weight:700;font-size:8pt">${esc(fmtGrade(s.definitiva_final))}</td>
     </tr>`;
   }).join("\n");
 
   const tableHtml = `
-  <table style="border-collapse:collapse;font-size:9pt;width:100%">
+  <table style="border-collapse:collapse;font-size:8pt;width:100%;table-layout:fixed">
+    <colgroup>
+      <col style="width:20px">
+      <col><!-- Asignatura: fills remaining space -->
+      <col style="width:22px"><col style="width:20px"><col style="width:26px"><col style="width:20px">
+      <col style="width:22px"><col style="width:20px"><col style="width:26px"><col style="width:20px">
+      <col style="width:22px"><col style="width:20px"><col style="width:26px"><col style="width:20px">
+      <col style="width:26px">
+    </colgroup>
     <thead>
       <tr>
-        <th rowspan="2" style="${thStyle};width:26px">No.</th>
-        <th rowspan="2" style="${thStyle};text-align:left">Asignatura</th>
+        <th rowspan="2" style="${thStyle}">No.</th>
+        <th rowspan="2" style="${thStyle};text-align:left;padding-left:4px">Asignatura</th>
         <th colspan="4" style="${thStyle}">I Momento</th>
         <th colspan="4" style="${thStyle}">II Momento</th>
         <th colspan="4" style="${thStyle}">III Momento</th>
-        <th rowspan="2" style="${thStyle};width:36px">Def.</th>
+        <th rowspan="2" style="${thStyle}">Def.</th>
       </tr>
       <tr>
-        <th style="${thStyle};width:30px">Nota</th><th style="${thStyle};width:30px">Ajuste</th><th style="${thStyle};width:36px">Def.1M</th><th style="${thStyle};width:30px">Inas.</th>
-        <th style="${thStyle};width:30px">Nota</th><th style="${thStyle};width:30px">Ajuste</th><th style="${thStyle};width:36px">Def.2M</th><th style="${thStyle};width:30px">Inas.</th>
-        <th style="${thStyle};width:30px">Nota</th><th style="${thStyle};width:30px">Ajuste</th><th style="${thStyle};width:36px">Def.3M</th><th style="${thStyle};width:30px">Inas.</th>
+        <th style="${thStyle}">Nota</th><th style="${thStyle}">Ajuste</th><th style="${thStyle}">Def.1M</th><th style="${thStyle}">Inas.</th>
+        <th style="${thStyle}">Nota</th><th style="${thStyle}">Ajuste</th><th style="${thStyle}">Def.2M</th><th style="${thStyle}">Inas.</th>
+        <th style="${thStyle}">Nota</th><th style="${thStyle}">Ajuste</th><th style="${thStyle}">Def.3M</th><th style="${thStyle}">Inas.</th>
       </tr>
     </thead>
     <tbody>${subjectRows}</tbody>
@@ -587,7 +596,7 @@ export function generateBoletinCompletoHtml(
 
   const mainHtml = `
   <div style="display:flex;align-items:flex-start;margin-bottom:12px">
-    <div style="flex:1;min-width:0">${tableHtml}</div>
+    <div style="flex:1;min-width:0;overflow:hidden">${tableHtml}</div>
     ${promediosHtml}
   </div>`;
 
