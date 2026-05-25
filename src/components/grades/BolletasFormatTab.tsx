@@ -80,7 +80,60 @@ function ConfigPanel({ cfg, onChange }: {
   const upd = (patch: Partial<BachilleratoConfig>) => onChange({ ...cfg, ...patch });
   const sect = (k: keyof BachilleratoConfig["sections"]) =>
     upd({ sections: { ...cfg.sections, [k]: !cfg.sections[k] } });
+  const updBoletin = (patch: Partial<NonNullable<BachilleratoConfig["boletin"]>>) =>
+    onChange({ ...cfg, boletin: { ...cfg.boletin!, ...patch } });
 
+  if (cfg.style === "boletin_completo") {
+    return (
+      <div className="space-y-2 overflow-y-auto" style={{ maxHeight: "calc(70vh - 120px)" }}>
+
+        {/* Cabecera del colegio */}
+        <Section label="Cabecera del colegio" enabled={cfg.sections.header} onToggle={() => sect("header")}>
+          <ColorRow label="Color de línea divisora" value={cfg.header.accent_color}
+            onChange={(v) => upd({ header: { ...cfg.header, accent_color: v } })} />
+          <NumRow label="Tamaño nombre colegio" value={cfg.header.name_font_size}
+            onChange={(v) => upd({ header: { ...cfg.header, name_font_size: v } })} />
+          <NumRow label="Tamaño subtextos" value={cfg.header.sub_font_size}
+            onChange={(v) => upd({ header: { ...cfg.header, sub_font_size: v } })} min={6} max={16} />
+        </Section>
+
+        {/* Tabla de calificaciones */}
+        <Section label="Tabla de Calificaciones" enabled={cfg.sections.grades_table} onToggle={() => sect("grades_table")}>
+          <ColorRow label="Fondo de cabecera" value={cfg.boletin?.table_header_bg ?? "#000000"}
+            onChange={(v) => updBoletin({ table_header_bg: v })} />
+          <ColorRow label="Color de letras cabecera" value={cfg.boletin?.table_header_text ?? "#ffffff"}
+            onChange={(v) => updBoletin({ table_header_text: v })} />
+          <ToggleRow label="Filas alternas" value={cfg.table.alt_row}
+            onChange={(v) => upd({ table: { ...cfg.table, alt_row: v } })} />
+          {cfg.table.alt_row && (
+            <ColorRow label="Color fila alterna" value={cfg.table.alt_row_color}
+              onChange={(v) => upd({ table: { ...cfg.table, alt_row_color: v } })} />
+          )}
+        </Section>
+
+        {/* Mención */}
+        <div className="border rounded-md p-3 space-y-2">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mención</Label>
+          <input
+            type="text"
+            value={cfg.boletin?.mention ?? ""}
+            onChange={(e) => updBoletin({ mention: e.target.value })}
+            placeholder="Ej: CIENCIAS Y TECNOLOGÍA (dejar vacío si no aplica)"
+            className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+
+        {/* Firmas */}
+        <Section label="Firmas" enabled={cfg.sections.signatures} onToggle={() => sect("signatures")}>
+          <p className="text-xs text-muted-foreground">
+            Las líneas de firma se configuran en <strong>Planillas → Configuración General</strong>.
+          </p>
+        </Section>
+      </div>
+    );
+  }
+
+  // ── Simple style ────────────────────────────────────────────────────────────
   return (
     <div className="space-y-2 overflow-y-auto" style={{ maxHeight: "calc(70vh - 120px)" }}>
 
@@ -164,33 +217,6 @@ function ConfigPanel({ cfg, onChange }: {
           Aquí solo activas o desactivas la sección.
         </p>
       </Section>
-
-      {/* Boletín Completo options */}
-      {cfg.style === "boletin_completo" && (
-        <div className="border rounded-md overflow-hidden">
-          <div className="px-3 py-2 bg-muted/40">
-            <span className="text-sm font-medium">Opciones Boletín Completo</span>
-          </div>
-          <div className="p-3 space-y-3 border-t bg-background">
-            <div className="space-y-1">
-              <Label className="text-xs">Mención (ej: CIENCIAS Y TECNOLOGÍA)</Label>
-              <input
-                type="text"
-                value={cfg.boletin?.mention ?? ""}
-                onChange={(e) => onChange({ ...cfg, boletin: { ...cfg.boletin!, mention: e.target.value } })}
-                placeholder="Dejar vacío si no aplica"
-                className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <ColorRow label="Fondo cabecera tabla"
-              value={cfg.boletin?.table_header_bg ?? "#000000"}
-              onChange={(v) => onChange({ ...cfg, boletin: { ...cfg.boletin!, table_header_bg: v } })} />
-            <ColorRow label="Texto cabecera tabla"
-              value={cfg.boletin?.table_header_text ?? "#ffffff"}
-              onChange={(v) => onChange({ ...cfg, boletin: { ...cfg.boletin!, table_header_text: v } })} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -209,7 +235,7 @@ function BoletaPreview({ cfg, paperW, paperH }: {
   const MM_TO_PX = 96 / 25.4;
   const naturalW = paperW * MM_TO_PX;
   const naturalH = paperH * MM_TO_PX;
-  const previewW = 440;
+  const previewW = 580;
   const scale = previewW / naturalW;
   const previewH = naturalH * scale;
 

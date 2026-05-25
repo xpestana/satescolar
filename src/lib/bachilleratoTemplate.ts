@@ -583,11 +583,11 @@ export function generateBoletinCompletoHtml(
 
   // ── Signatures ─────────────────────────────────────────────────────────────
   const sigHtml = cfg.sections.signatures && data.signature_lines.length > 0 ? `
-  <div style="display:flex;gap:16px;margin-top:16px">
+  <div style="display:flex;gap:32px;margin-top:40px;padding-top:8px">
     ${data.signature_lines.map((sig) => {
       const lines = sig.split("\n");
       return `<div style="text-align:center;flex:1">
-        <div style="border-top:1px solid #374151;width:80%;margin:0 auto;padding-top:6px">
+        <div style="border-top:1px solid #374151;width:75%;margin:0 auto;padding-top:8px">
           ${lines.map((l) => `<div style="font-size:9pt;color:#374151">${esc(l)}</div>`).join("")}
         </div>
       </div>`;
