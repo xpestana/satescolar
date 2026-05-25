@@ -16,6 +16,7 @@ import {
 import {
   BachilleratoConfig, BachilleratoTemplate,
   DEFAULT_BACHILLERATO_CONFIG, SAMPLE_RENDER_DATA, generateBoletaHtml,
+  SAMPLE_BOLETIN_COMPLETO_DATA, generateBoletinCompletoHtml,
 } from "@/lib/bachilleratoTemplate";
 
 // ─── tiny accordion ───────────────────────────────────────────────────────────
@@ -163,6 +164,33 @@ function ConfigPanel({ cfg, onChange }: {
           Aquí solo activas o desactivas la sección.
         </p>
       </Section>
+
+      {/* Boletín Completo options */}
+      {cfg.style === "boletin_completo" && (
+        <div className="border rounded-md overflow-hidden">
+          <div className="px-3 py-2 bg-muted/40">
+            <span className="text-sm font-medium">Opciones Boletín Completo</span>
+          </div>
+          <div className="p-3 space-y-3 border-t bg-background">
+            <div className="space-y-1">
+              <Label className="text-xs">Mención (ej: CIENCIAS Y TECNOLOGÍA)</Label>
+              <input
+                type="text"
+                value={cfg.boletin?.mention ?? ""}
+                onChange={(e) => onChange({ ...cfg, boletin: { ...cfg.boletin!, mention: e.target.value } })}
+                placeholder="Dejar vacío si no aplica"
+                className="w-full h-7 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+            </div>
+            <ColorRow label="Fondo cabecera tabla"
+              value={cfg.boletin?.table_header_bg ?? "#000000"}
+              onChange={(v) => onChange({ ...cfg, boletin: { ...cfg.boletin!, table_header_bg: v } })} />
+            <ColorRow label="Texto cabecera tabla"
+              value={cfg.boletin?.table_header_text ?? "#ffffff"}
+              onChange={(v) => onChange({ ...cfg, boletin: { ...cfg.boletin!, table_header_text: v } })} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -172,7 +200,9 @@ function BoletaPreview({ cfg, paperW, paperH }: {
   cfg: BachilleratoConfig; paperW: number; paperH: number;
 }) {
   const html = useMemo(
-    () => generateBoletaHtml(cfg, SAMPLE_RENDER_DATA, paperW, paperH),
+    () => cfg.style === "boletin_completo"
+      ? generateBoletinCompletoHtml(cfg, SAMPLE_BOLETIN_COMPLETO_DATA, paperW, paperH)
+      : generateBoletaHtml(cfg, SAMPLE_RENDER_DATA, paperW, paperH),
     [cfg, paperW, paperH],
   );
 
@@ -299,7 +329,11 @@ export function BolletasFormatTab() {
   const openEdit = (t: BachilleratoTemplate) => {
     setEditItem(t);
     setForm({ name: t.name, description: t.description || "", paper_width_mm: t.paper_width_mm, paper_height_mm: t.paper_height_mm });
-    setCfg({ ...DEFAULT_BACHILLERATO_CONFIG, ...t.config, sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(t.config?.sections ?? {}) } });
+    setCfg({
+      ...DEFAULT_BACHILLERATO_CONFIG, ...t.config,
+      sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(t.config?.sections ?? {}) },
+      boletin:  { ...DEFAULT_BACHILLERATO_CONFIG.boletin,  ...(t.config?.boletin  ?? {}) },
+    });
     setShowEditor(true);
   };
 
@@ -335,6 +369,9 @@ export function BolletasFormatTab() {
                       <p className="font-semibold">{t.name}</p>
                       {t.is_active && <Badge className="bg-green-500 hover:bg-green-600">Activa</Badge>}
                       <Badge variant="secondary" className="text-xs">Bachillerato</Badge>
+                      {t.config?.style === "boletin_completo" && (
+                        <Badge variant="outline" className="text-xs">Boletín Completo</Badge>
+                      )}
                     </div>
                     {t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}
                     <p className="text-xs text-muted-foreground mt-1">
@@ -383,6 +420,24 @@ export function BolletasFormatTab() {
                 <Label className="text-xs">Descripción</Label>
                 <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Opcional" className="h-8 text-sm" />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Estilo de boleta</Label>
+                <div className="flex gap-1.5">
+                  {([
+                    { value: "simple",           label: "Simple" },
+                    { value: "boletin_completo",  label: "Boletín Completo" },
+                  ] as const).map(({ value, label }) => (
+                    <Button key={value} size="sm"
+                      variant={(cfg.style ?? "simple") === value ? "default" : "outline"}
+                      className="h-7 text-xs"
+                      onClick={() => setCfg((c) => ({ ...c, style: value }))}>
+                      {label}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="flex flex-wrap items-end gap-3">

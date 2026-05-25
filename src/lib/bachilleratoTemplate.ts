@@ -1,6 +1,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface BachilleratoConfig {
+  style?: "simple" | "boletin_completo";
   sections: {
     header:      boolean;
     title:       boolean;
@@ -10,9 +11,9 @@ export interface BachilleratoConfig {
     signatures:  boolean;
   };
   header: {
-    accent_color:     string;   // border + school name color
-    name_font_size:   number;   // pt, school name
-    sub_font_size:    number;   // pt, codes / address
+    accent_color:     string;
+    name_font_size:   number;
+    sub_font_size:    number;
   };
   title: {
     text:       string;
@@ -31,7 +32,7 @@ export interface BachilleratoConfig {
     header_text:    string;
     alt_row:        boolean;
     alt_row_color:  string;
-    pass_color:     boolean;   // green/red for ≥10 / <10
+    pass_color:     boolean;
   };
   summary: {
     show_definitiva:   boolean;
@@ -41,6 +42,63 @@ export interface BachilleratoConfig {
     position_bg:       string;
     position_border:   string;
   };
+  boletin?: {
+    mention:          string;
+    table_header_bg:  string;
+    table_header_text: string;
+  };
+}
+
+// ─── Boletín Completo types ────────────────────────────────────────────────────
+
+export interface BoletinMomentoGrade {
+  nota:          string;
+  ajuste:        string;
+  definitiva:    string;
+  inasistencias: number;
+}
+
+export interface BoletinSubjectRow {
+  number:          number;
+  name:            string;
+  m1:              BoletinMomentoGrade | null;
+  m2:              BoletinMomentoGrade | null;
+  m3:              BoletinMomentoGrade | null;
+  definitiva_final: string;
+}
+
+export interface BoletinCompletoRenderData {
+  school_name:      string;
+  school_logo:      string;
+  dea_code:         string;
+  statistical_code: string;
+  address:          string;
+  phone:            string;
+  rif:              string;
+  header_cfg: {
+    show_logo:             boolean;
+    show_name:             boolean;
+    show_dea_code:         boolean;
+    show_statistical_code: boolean;
+    show_address:          boolean;
+    show_phone:            boolean;
+    show_rif:              boolean;
+  };
+  student_name: string;
+  document_id:  string;
+  grade_label:  string;
+  section_name: string;
+  year_range:   string;
+  lapso:        number;
+  mention:      string;
+  subjects:     BoletinSubjectRow[];
+  avg_m1:       string;
+  avg_m2:       string;
+  avg_m3:       string;
+  avg_student:  string;
+  avg_section:  string;
+  position:     number;
+  signature_lines: string[];
 }
 
 export interface BachilleratoTemplate {
@@ -92,6 +150,7 @@ export interface BoletaRenderData {
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
 export const DEFAULT_BACHILLERATO_CONFIG: BachilleratoConfig = {
+  style: "simple",
   sections: {
     header:       true,
     title:        true,
@@ -132,6 +191,11 @@ export const DEFAULT_BACHILLERATO_CONFIG: BachilleratoConfig = {
     position_bg:       "#eff6ff",
     position_border:   "#bfdbfe",
   },
+  boletin: {
+    mention:           "",
+    table_header_bg:   "#000000",
+    table_header_text: "#ffffff",
+  },
 };
 
 // Sample data used while editing (preview)
@@ -166,6 +230,50 @@ export const SAMPLE_RENDER_DATA: BoletaRenderData = {
   definitiva:      "15.86",
   position:        3,
   signature_lines: ["Firma del Representante", "Firma del Director(a)"],
+};
+
+const sampleM1 = (n: string, a: string, i: number): BoletinMomentoGrade => {
+  const nota = parseFloat(n); const ajuste = parseFloat(a);
+  const def = nota + ajuste;
+  return { nota: n, ajuste: a || "0", definitiva: Number.isInteger(def) ? String(def) : def.toFixed(2), inasistencias: i };
+};
+
+export const SAMPLE_BOLETIN_COMPLETO_DATA: BoletinCompletoRenderData = {
+  school_name:      "UE COLEGIO EJEMPLO",
+  school_logo:      "",
+  dea_code:         "CO-12345",
+  statistical_code: "ES-67890",
+  address:          "Av. Las Americas, Sector Santa Barbara Este",
+  phone:            "274-2667989",
+  rif:              "J-12345678-9",
+  header_cfg: {
+    show_logo: true, show_name: true, show_dea_code: true,
+    show_statistical_code: true, show_address: true,
+    show_phone: true, show_rif: false,
+  },
+  student_name: "SALAZAR CHAVEZ, Ariana Victoria",
+  document_id:  "V-34856362",
+  grade_label:  "1er Año",
+  section_name: "A",
+  year_range:   "2025-2026",
+  lapso:        2,
+  mention:      "CIENCIAS Y TECNOLOGÍA",
+  subjects: [
+    { number: 1, name: "LENGUA Y LITERATURA",   m1: sampleM1("19","0",0), m2: sampleM1("19","0",4), m3: null, definitiva_final: "19" },
+    { number: 2, name: "IDIOMAS",               m1: sampleM1("20","0",0), m2: sampleM1("19","0",0), m3: null, definitiva_final: "19.50" },
+    { number: 3, name: "MATEMÁTICAS",           m1: sampleM1("18","1",0), m2: sampleM1("19","0",0), m3: null, definitiva_final: "19" },
+    { number: 4, name: "EDUCACIÓN FÍSICA",      m1: sampleM1("20","0",0), m2: sampleM1("20","0",0), m3: null, definitiva_final: "20" },
+    { number: 5, name: "BIOLOGÍA AMB. Y TEC.",  m1: sampleM1("20","0",0), m2: sampleM1("20","0",0), m3: null, definitiva_final: "20" },
+    { number: 6, name: "FÍSICA",               m1: sampleM1("20","0",0), m2: sampleM1("17","0",0), m3: null, definitiva_final: "18.50" },
+    { number: 7, name: "QUÍMICA",              m1: sampleM1("18","1",0), m2: sampleM1("18","0",0), m3: null, definitiva_final: "18.50" },
+  ],
+  avg_m1:      "19.56",
+  avg_m2:      "18.89",
+  avg_m3:      "0",
+  avg_student: "19.44",
+  avg_section: "16.88",
+  position:    3,
+  signature_lines: ["Prof. María Teresa Pérez\nV-7.276.231  Directora", "Docente Orientador"],
 };
 
 // ─── HTML generator ────────────────────────────────────────────────────────────
@@ -303,7 +411,7 @@ export function generateBoletaHtml(
   </div>` : "";
 
   // ── Full HTML ─────────────────────────────────────────────────────────────
-  return `<!DOCTYPE html>
+  return /* html */`<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -331,6 +439,190 @@ export function generateBoletaHtml(
   ${studentHtml}
   ${tableHtml}
   ${summaryHtml}
+  ${sigHtml}
+</div>
+</body>
+</html>`;
+}
+
+// ─── Boletín Completo HTML generator ──────────────────────────────────────────
+
+function fmtGrade(v: string | null | undefined): string {
+  return v && v !== "0" && v !== "" ? v : "—";
+}
+
+function momentoCell(mg: BoletinMomentoGrade | null): string {
+  if (!mg) return `<td></td><td></td><td></td><td></td>`;
+  return [
+    `<td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${esc(fmtGrade(mg.nota))}</td>`,
+    `<td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${esc(mg.ajuste && mg.ajuste !== "0" ? mg.ajuste : "")}</td>`,
+    `<td style="text-align:center;padding:3px 4px;border:1px solid #ccc;font-weight:600">${esc(fmtGrade(mg.definitiva))}</td>`,
+    `<td style="text-align:center;padding:3px 4px;border:1px solid #ccc">${mg.inasistencias > 0 ? mg.inasistencias : ""}</td>`,
+  ].join("");
+}
+
+export function generateBoletinCompletoHtml(
+  cfg: BachilleratoConfig,
+  data: BoletinCompletoRenderData,
+  paperWidthMm: number,
+  paperHeightMm: number,
+): string {
+  const hc = data.header_cfg;
+  const hdrBg  = cfg.boletin?.table_header_bg  ?? "#000000";
+  const hdrTxt = cfg.boletin?.table_header_text ?? "#ffffff";
+  const accentColor = cfg.header.accent_color;
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  const logoHtml = hc.show_logo && data.school_logo
+    ? `<img src="${esc(data.school_logo)}" alt="Logo" style="height:70px;width:auto;object-fit:contain;margin-right:10px">`
+    : "";
+
+  const leftLines = [
+    hc.show_name       ? `<div style="font-size:${cfg.header.name_font_size}pt;font-weight:700;text-transform:uppercase">${esc(data.school_name)}</div>` : "",
+    hc.show_address    ? `<div style="font-size:${cfg.header.sub_font_size}pt">${esc(data.address)}</div>` : "",
+    hc.show_dea_code   ? `<div style="font-size:${cfg.header.sub_font_size}pt">Cód. DEA: ${esc(data.dea_code)}</div>` : "",
+    hc.show_phone      ? `<div style="font-size:${cfg.header.sub_font_size}pt">Tlf: ${esc(data.phone)}</div>` : "",
+    hc.show_rif        ? `<div style="font-size:${cfg.header.sub_font_size}pt">RIF: ${esc(data.rif)}</div>` : "",
+  ].filter(Boolean).join("");
+
+  const rightBlock = `
+    <div style="text-align:right;font-size:${cfg.header.sub_font_size}pt;line-height:1.6">
+      <div>Año Escolar ${esc(data.year_range)}</div>
+      ${data.position > 0 ? `<div>Posición en la sección: ${data.position}</div>` : ""}
+    </div>`;
+
+  const headerHtml = `
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">
+    <div style="display:flex;align-items:center">${logoHtml}<div>${leftLines}</div></div>
+    ${rightBlock}
+  </div>`;
+
+  // ── Title ──────────────────────────────────────────────────────────────────
+  const titleHtml = `
+  <div style="text-align:center;margin-bottom:6px">
+    <div style="font-size:14pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">BOLETIN DE CALIFICACIONES</div>
+  </div>`;
+
+  // ── Student info ───────────────────────────────────────────────────────────
+  const mentionPart = data.mention ? ` &nbsp;&nbsp; MENCIÓN <u>${esc(data.mention)}</u>` : "";
+  const studentHtml = `
+  <div style="font-size:10pt;margin-bottom:4px;line-height:1.8">
+    <div>
+      <span>Año o Grado: <u><strong>${esc(data.grade_label)}</strong></u></span>
+      <span style="margin-left:16px">Sección <u>${esc(data.section_name)}</u></span>
+      ${mentionPart}
+      <span style="float:right">Lapso: ${data.lapso}</span>
+    </div>
+    <div>
+      <span>Estudiante: <u><strong>${esc(data.student_name)}</strong></u></span>
+      ${data.document_id ? `<span style="margin-left:24px">Documento: <u>${esc(data.document_id)}</u></span>` : ""}
+    </div>
+  </div>`;
+
+  // ── Grades table + promedios sidebar ──────────────────────────────────────
+  const thStyle = `background:${hdrBg};color:${hdrTxt};padding:4px 5px;border:1px solid #999;font-size:8.5pt;text-align:center;font-weight:600`;
+  const subjectRows = data.subjects.map((s, i) => {
+    const bg = cfg.table.alt_row && i % 2 !== 0 ? (cfg.table.alt_row_color || "#f9fafb") : "#ffffff";
+    return `<tr style="background:${bg}">
+      <td style="padding:3px 4px;border:1px solid #ccc;text-align:center;font-size:9pt">${s.number}</td>
+      <td style="padding:3px 6px;border:1px solid #ccc;font-size:9pt;text-transform:uppercase">${esc(s.name)}</td>
+      ${momentoCell(s.m1)}
+      ${momentoCell(s.m2)}
+      ${momentoCell(s.m3)}
+      <td style="text-align:center;padding:3px 4px;border:1px solid #ccc;font-weight:700;font-size:9pt">${esc(fmtGrade(s.definitiva_final))}</td>
+    </tr>`;
+  }).join("\n");
+
+  const tableHtml = `
+  <table style="border-collapse:collapse;font-size:9pt;width:100%">
+    <thead>
+      <tr>
+        <th rowspan="2" style="${thStyle};width:26px">No.</th>
+        <th rowspan="2" style="${thStyle};text-align:left">Asignatura</th>
+        <th colspan="4" style="${thStyle}">I Momento</th>
+        <th colspan="4" style="${thStyle}">II Momento</th>
+        <th colspan="4" style="${thStyle}">III Momento</th>
+        <th rowspan="2" style="${thStyle};width:36px">Def.</th>
+      </tr>
+      <tr>
+        <th style="${thStyle};width:30px">Nota</th><th style="${thStyle};width:30px">Ajuste</th><th style="${thStyle};width:36px">Def.1M</th><th style="${thStyle};width:30px">Inas.</th>
+        <th style="${thStyle};width:30px">Nota</th><th style="${thStyle};width:30px">Ajuste</th><th style="${thStyle};width:36px">Def.2M</th><th style="${thStyle};width:30px">Inas.</th>
+        <th style="${thStyle};width:30px">Nota</th><th style="${thStyle};width:30px">Ajuste</th><th style="${thStyle};width:36px">Def.3M</th><th style="${thStyle};width:30px">Inas.</th>
+      </tr>
+    </thead>
+    <tbody>${subjectRows}</tbody>
+  </table>`;
+
+  const boxStyle = (label: string, value: string) => `
+    <div style="border:1px solid #000;padding:3px 6px;margin-top:4px;text-align:center">
+      <div style="font-size:8pt">${label}</div>
+      <div style="font-size:11pt;font-weight:700">${esc(value)}</div>
+    </div>`;
+
+  const hasM1 = data.avg_m1 && data.avg_m1 !== "0" && data.avg_m1 !== "—";
+  const hasM2 = data.avg_m2 && data.avg_m2 !== "0" && data.avg_m2 !== "—";
+  const hasM3 = data.avg_m3 && data.avg_m3 !== "0" && data.avg_m3 !== "—";
+
+  const promediosHtml = `
+  <div style="font-size:9pt;padding-left:8px;min-width:110px">
+    <div style="font-weight:700;margin-bottom:4px;font-size:9pt">Promedios</div>
+    <table style="width:100%;font-size:8.5pt;border-collapse:collapse">
+      <tr><td>I Momento:</td><td style="text-align:right;font-weight:600">${hasM1 ? esc(data.avg_m1) : "—"}</td></tr>
+      <tr><td>II Momento:</td><td style="text-align:right;font-weight:600">${hasM2 ? esc(data.avg_m2) : "—"}</td></tr>
+      <tr><td>III Momento:</td><td style="text-align:right;font-weight:600">${hasM3 ? esc(data.avg_m3) : "—"}</td></tr>
+    </table>
+    ${boxStyle("Prom. del Estudiante", data.avg_student || "—")}
+    ${boxStyle("Prom. de la Sección", data.avg_section || "—")}
+  </div>`;
+
+  const mainHtml = `
+  <div style="display:flex;align-items:flex-start;margin-bottom:12px">
+    <div style="flex:1">${tableHtml}</div>
+    ${promediosHtml}
+  </div>`;
+
+  // ── Signatures ─────────────────────────────────────────────────────────────
+  const sigHtml = cfg.sections.signatures && data.signature_lines.length > 0 ? `
+  <div style="display:flex;gap:16px;margin-top:16px">
+    ${data.signature_lines.map((sig) => {
+      const lines = sig.split("\n");
+      return `<div style="text-align:center;flex:1">
+        <div style="border-top:1px solid #374151;width:80%;margin:0 auto;padding-top:6px">
+          ${lines.map((l) => `<div style="font-size:9pt;color:#374151">${esc(l)}</div>`).join("")}
+        </div>
+      </div>`;
+    }).join("")}
+  </div>` : "";
+
+  // ── Full HTML ──────────────────────────────────────────────────────────────
+  return /* html */`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Boletín — ${esc(data.student_name)}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:${paperWidthMm}mm;min-height:${paperHeightMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
+    @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:10mm 12mm}
+    @media print{#controls{display:none!important}}
+    #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
+    #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
+    #btn-print{background:#2563eb;color:white}
+    #btn-close{background:#e2e8f0;color:#374151}
+    .boletin{padding:10mm 12mm}
+  </style>
+</head>
+<body>
+<div id="controls">
+  <button id="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <button id="btn-close" onclick="window.close()">Cerrar</button>
+</div>
+<div class="boletin">
+  ${headerHtml}
+  <hr style="border:none;border-top:2px solid ${accentColor};margin-bottom:6px">
+  ${titleHtml}
+  ${studentHtml}
+  ${mainHtml}
   ${sigHtml}
 </div>
 </body>
