@@ -432,6 +432,7 @@ export function BolletasFormatTab() {
 
   const [showEditor, setShowEditor] = useState(false);
   const [editItem, setEditItem] = useState<BachilleratoTemplate | null>(null);
+  const [gradesOpen, setGradesOpen] = useState(false);
 
   const [form, setForm] = useState({ name: "", description: "", paper_width_mm: 215.9, paper_height_mm: 279.4, applicable_grades: [] as string[] });
   const [cfg, setCfg] = useState<BachilleratoConfig>(DEFAULT_BACHILLERATO_CONFIG);
@@ -620,147 +621,172 @@ export function BolletasFormatTab() {
       {/* ── Editor Dialog ────────────────────────────────────────────────── */}
       <Dialog open={showEditor} onOpenChange={(v) => !v && setShowEditor(false)}>
         <DialogContent
-          className="max-w-[96vw] w-[1150px]"
-          style={{ maxHeight: "95vh", display: "flex", flexDirection: "column", overflow: "hidden" }}
+          className="max-w-[96vw] w-[1150px] flex flex-col"
+          style={{ maxHeight: "95vh", overflow: "hidden" }}
         >
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>{editItem ? "Editar plantilla de boleta" : "Nueva plantilla de boleta"}</DialogTitle>
           </DialogHeader>
 
-          {/* Top bar */}
-          <div className="flex-shrink-0 space-y-3 border-b pb-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Nombre *</Label>
-                <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Ej: Boleta Bachillerato 2026" className="h-8 text-sm" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Descripción</Label>
-                <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Opcional" className="h-8 text-sm" />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Estilo de boleta</Label>
-                <div className="flex gap-1.5">
-                  {([
-                    { value: "simple",           label: "Simple" },
-                    { value: "boletin_completo",  label: "Bachillerato media hoja" },
-                  ] as const).map(({ value, label }) => (
-                    <Button key={value} size="sm"
-                      variant={(cfg.style ?? "simple") === value ? "default" : "outline"}
-                      className="h-7 text-xs"
-                      onClick={() => setCfg((c) => ({ ...c, style: value }))}>
-                      {label}
-                    </Button>
-                  ))}
+          {/* Scrollable content */}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+
+            {/* Top bar */}
+            <div className="space-y-3 border-b pb-3 mb-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Nombre *</Label>
+                  <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Ej: Boleta Bachillerato 2026" className="h-8 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Descripción</Label>
+                  <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                    placeholder="Opcional" className="h-8 text-sm" />
                 </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Grados aplicables</Label>
-              <div className="space-y-2">
-                {GRADE_GROUPS.map((group) => {
-                  const allChecked = group.grades.every((g) => form.applicable_grades.includes(g));
-                  const someChecked = group.grades.some((g) => form.applicable_grades.includes(g));
-                  return (
-                    <div key={group.label}>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <Checkbox
-                          id={`group-${group.label}`}
-                          checked={allChecked}
-                          data-state={someChecked && !allChecked ? "indeterminate" : undefined}
-                          onCheckedChange={(checked) =>
-                            setForm((f) => ({
-                              ...f,
-                              applicable_grades: checked
-                                ? [...f.applicable_grades.filter((x) => !group.grades.includes(x as any)), ...group.grades]
-                                : f.applicable_grades.filter((x) => !group.grades.includes(x as any)),
-                            }))
-                          }
-                        />
-                        <Label htmlFor={`group-${group.label}`} className="text-xs font-semibold cursor-pointer">
-                          {group.label}
-                        </Label>
-                      </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 pl-5">
-                        {group.grades.map((g) => (
-                          <div key={g} className="flex items-center gap-1">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Estilo de boleta</Label>
+                  <div className="flex gap-1.5">
+                    {([
+                      { value: "simple",           label: "Simple" },
+                      { value: "boletin_completo",  label: "Bachillerato media hoja" },
+                    ] as const).map(({ value, label }) => (
+                      <Button key={value} size="sm"
+                        variant={(cfg.style ?? "simple") === value ? "default" : "outline"}
+                        className="h-7 text-xs"
+                        onClick={() => setCfg((c) => ({ ...c, style: value }))}>
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grados aplicables — accordion */}
+              <div className="border rounded-md">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium hover:bg-muted/50 transition-colors"
+                  onClick={() => setGradesOpen((v) => !v)}
+                >
+                  <span>
+                    Grados aplicables
+                    {form.applicable_grades.length > 0 && (
+                      <span className="ml-2 text-muted-foreground font-normal">
+                        ({form.applicable_grades.map((g) => GRADE_LABELS[g] ?? g).join(", ")})
+                      </span>
+                    )}
+                    {form.applicable_grades.length === 0 && (
+                      <span className="ml-2 text-muted-foreground font-normal">Todos los grados</span>
+                    )}
+                  </span>
+                  {gradesOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
+                {gradesOpen && (
+                  <div className="px-3 pb-3 pt-1 border-t space-y-2">
+                    {GRADE_GROUPS.map((group) => {
+                      const allChecked = group.grades.every((g) => form.applicable_grades.includes(g));
+                      const someChecked = group.grades.some((g) => form.applicable_grades.includes(g));
+                      return (
+                        <div key={group.label}>
+                          <div className="flex items-center gap-1.5 mb-1">
                             <Checkbox
-                              id={`grade-${g}`}
-                              checked={form.applicable_grades.includes(g)}
+                              id={`group-${group.label}`}
+                              checked={allChecked}
+                              data-state={someChecked && !allChecked ? "indeterminate" : undefined}
                               onCheckedChange={(checked) =>
                                 setForm((f) => ({
                                   ...f,
                                   applicable_grades: checked
-                                    ? [...f.applicable_grades, g]
-                                    : f.applicable_grades.filter((x) => x !== g),
+                                    ? [...f.applicable_grades.filter((x) => !group.grades.includes(x as any)), ...group.grades]
+                                    : f.applicable_grades.filter((x) => !group.grades.includes(x as any)),
                                 }))
                               }
                             />
-                            <Label htmlFor={`grade-${g}`} className="text-xs font-normal cursor-pointer">
-                              {GRADE_LABELS[g]}
+                            <Label htmlFor={`group-${group.label}`} className="text-xs font-semibold cursor-pointer">
+                              {group.label}
                             </Label>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 pl-5">
+                            {group.grades.map((g) => (
+                              <div key={g} className="flex items-center gap-1">
+                                <Checkbox
+                                  id={`grade-${g}`}
+                                  checked={form.applicable_grades.includes(g)}
+                                  onCheckedChange={(checked) =>
+                                    setForm((f) => ({
+                                      ...f,
+                                      applicable_grades: checked
+                                        ? [...f.applicable_grades, g]
+                                        : f.applicable_grades.filter((x) => x !== g),
+                                    }))
+                                  }
+                                />
+                                <Label htmlFor={`grade-${g}`} className="text-xs font-normal cursor-pointer">
+                                  {GRADE_LABELS[g]}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <p className="text-xs text-muted-foreground">Sin selección = aplica a todos los grados</p>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground">Sin selección = aplica a todos los grados</p>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Papel</Label>
-                <div className="flex gap-1.5">
-                  {[
-                    { l: "Carta", w: 215.9, h: 279.4 },
-                    { l: "A4", w: 210, h: 297 },
-                    { l: "Oficio", w: 216, h: 356 },
-                  ].map(({ l, w, h }) => (
-                    <Button key={l} size="sm"
-                      variant={Math.abs(form.paper_width_mm - w) < 1 && Math.abs(form.paper_height_mm - h) < 1 ? "default" : "outline"}
-                      className="h-7 text-xs"
-                      onClick={() => setForm((f) => ({ ...f, paper_width_mm: w, paper_height_mm: h }))}>
-                      {l}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-end gap-1.5">
-                <div className="space-y-1">
-                  <Label className="text-xs">Ancho mm</Label>
-                  <Input type="number" value={form.paper_width_mm}
-                    onChange={(e) => setForm((f) => ({ ...f, paper_width_mm: parseFloat(e.target.value) || 215.9 }))}
-                    className="h-7 w-20 text-xs" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Alto mm</Label>
-                  <Input type="number" value={form.paper_height_mm}
-                    onChange={(e) => setForm((f) => ({ ...f, paper_height_mm: parseFloat(e.target.value) || 279.4 }))}
-                    className="h-7 w-20 text-xs" />
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Body: config panel + preview */}
-          <div className="flex-1 min-h-0 flex gap-4 overflow-hidden pt-2">
-            {/* Left: config */}
-            <div className="w-72 flex-shrink-0 flex flex-col overflow-hidden">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex-shrink-0">Secciones y estilos</p>
-              <div className="flex-1 overflow-y-auto pr-1">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Papel</Label>
+                  <div className="flex gap-1.5">
+                    {[
+                      { l: "Carta", w: 215.9, h: 279.4 },
+                      { l: "A4", w: 210, h: 297 },
+                      { l: "Oficio", w: 216, h: 356 },
+                    ].map(({ l, w, h }) => (
+                      <Button key={l} size="sm"
+                        variant={Math.abs(form.paper_width_mm - w) < 1 && Math.abs(form.paper_height_mm - h) < 1 ? "default" : "outline"}
+                        className="h-7 text-xs"
+                        onClick={() => setForm((f) => ({ ...f, paper_width_mm: w, paper_height_mm: h }))}>
+                        {l}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-end gap-1.5">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ancho mm</Label>
+                    <Input type="number" value={form.paper_width_mm}
+                      onChange={(e) => setForm((f) => ({ ...f, paper_width_mm: parseFloat(e.target.value) || 215.9 }))}
+                      className="h-7 w-20 text-xs" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Alto mm</Label>
+                    <Input type="number" value={form.paper_height_mm}
+                      onChange={(e) => setForm((f) => ({ ...f, paper_height_mm: parseFloat(e.target.value) || 279.4 }))}
+                      className="h-7 w-20 text-xs" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Body: config panel + preview */}
+            <div className="flex gap-4 pt-1" style={{ minHeight: "520px" }}>
+              {/* Left: config */}
+              <div className="w-72 flex-shrink-0">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Secciones y estilos</p>
                 <ConfigPanel cfg={cfg} onChange={setCfg} schoolId={schoolId ?? ""} />
               </div>
+              {/* Right: preview */}
+              <div className="flex-1 flex justify-center">
+                <BoletaPreview cfg={cfg} paperW={form.paper_width_mm} paperH={form.paper_height_mm} />
+              </div>
             </div>
-            {/* Right: preview */}
-            <div className="flex-1 overflow-y-auto flex justify-center">
-              <BoletaPreview cfg={cfg} paperW={form.paper_width_mm} paperH={form.paper_height_mm} />
-            </div>
-          </div>
+
+          </div>{/* end scrollable */}
 
           <DialogFooter className="flex-shrink-0 pt-3 border-t mt-2">
             <Button variant="outline" onClick={() => setShowEditor(false)}>Cancelar</Button>
