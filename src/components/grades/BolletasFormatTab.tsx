@@ -22,10 +22,28 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { uploadToS3 } from "@/lib/s3-upload";
 
 const GRADE_LABELS: Record<string, string> = {
+  pre_maternal: "Pre-Maternal", maternal: "Maternal",
+  i_nivel: "I Nivel", ii_nivel: "II Nivel", iii_nivel: "III Nivel",
+  "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
+  "4_grado": "4to Grado", "5_grado": "5to Grado", "6_grado": "6to Grado",
   "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
   "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
 };
-const BACHILLERATO_GRADES = ["1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano"] as const;
+
+const GRADE_GROUPS = [
+  {
+    label: "Preescolar",
+    grades: ["pre_maternal", "maternal", "i_nivel", "ii_nivel", "iii_nivel"],
+  },
+  {
+    label: "Primaria",
+    grades: ["1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado"],
+  },
+  {
+    label: "Secundaria",
+    grades: ["1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano"],
+  },
+] as const;
 
 // ─── tiny accordion ───────────────────────────────────────────────────────────
 function Section({
@@ -641,30 +659,58 @@ export function BolletasFormatTab() {
                 </div>
               </div>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label className="text-xs">Grados aplicables</Label>
-              <div className="flex flex-wrap gap-3">
-                {BACHILLERATO_GRADES.map((g) => (
-                  <div key={g} className="flex items-center gap-1.5">
-                    <Checkbox
-                      id={`grade-${g}`}
-                      checked={form.applicable_grades.includes(g)}
-                      onCheckedChange={(checked) =>
-                        setForm((f) => ({
-                          ...f,
-                          applicable_grades: checked
-                            ? [...f.applicable_grades, g]
-                            : f.applicable_grades.filter((x) => x !== g),
-                        }))
-                      }
-                    />
-                    <Label htmlFor={`grade-${g}`} className="text-xs font-normal cursor-pointer">
-                      {GRADE_LABELS[g]}
-                    </Label>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {GRADE_GROUPS.map((group) => {
+                  const allChecked = group.grades.every((g) => form.applicable_grades.includes(g));
+                  const someChecked = group.grades.some((g) => form.applicable_grades.includes(g));
+                  return (
+                    <div key={group.label}>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Checkbox
+                          id={`group-${group.label}`}
+                          checked={allChecked}
+                          data-state={someChecked && !allChecked ? "indeterminate" : undefined}
+                          onCheckedChange={(checked) =>
+                            setForm((f) => ({
+                              ...f,
+                              applicable_grades: checked
+                                ? [...f.applicable_grades.filter((x) => !group.grades.includes(x as any)), ...group.grades]
+                                : f.applicable_grades.filter((x) => !group.grades.includes(x as any)),
+                            }))
+                          }
+                        />
+                        <Label htmlFor={`group-${group.label}`} className="text-xs font-semibold cursor-pointer">
+                          {group.label}
+                        </Label>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 pl-5">
+                        {group.grades.map((g) => (
+                          <div key={g} className="flex items-center gap-1">
+                            <Checkbox
+                              id={`grade-${g}`}
+                              checked={form.applicable_grades.includes(g)}
+                              onCheckedChange={(checked) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  applicable_grades: checked
+                                    ? [...f.applicable_grades, g]
+                                    : f.applicable_grades.filter((x) => x !== g),
+                                }))
+                              }
+                            />
+                            <Label htmlFor={`grade-${g}`} className="text-xs font-normal cursor-pointer">
+                              {GRADE_LABELS[g]}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-xs text-muted-foreground">Sin selección = aplica a todos los años</p>
+              <p className="text-xs text-muted-foreground">Sin selección = aplica a todos los grados</p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
