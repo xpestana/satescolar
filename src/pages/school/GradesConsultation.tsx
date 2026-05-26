@@ -16,7 +16,7 @@ import { Search, Loader2, Eye, Check, ChevronsUpDown, Download } from "lucide-re
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
-import { downloadBachilleratoBoleta } from "@/lib/bachilleratoBoleta";
+import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas } from "@/lib/bachilleratoBoleta";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -55,6 +55,7 @@ export default function GradesConsultation() {
   const [openSection, setOpenSection] = useState(false);
   const [openGcrpTeacher, setOpenGcrpTeacher] = useState(false);
   const [downloadingStudentId, setDownloadingStudentId] = useState<string | null>(null);
+  const [downloadingAll, setDownloadingAll] = useState(false);
   // School years
   const { data: schoolYears = [] } = useQuery({
     queryKey: ["school-years", schoolId],
@@ -557,11 +558,47 @@ export default function GradesConsultation() {
                 return (
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm text-muted-foreground">{sectionLabel}</span>
                         <Badge variant="outline">{filteredStudents.length} estudiantes</Badge>
                         {!isSecondary && (
                           <Badge variant="secondary" className="text-xs">Boleta de Primaria/Preescolar próximamente</Badge>
+                        )}
+                        {isSecondary && students.length > 0 && (
+                          <Button
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                            disabled={downloadingAll}
+                            onClick={async () => {
+                              if (!schoolId || !selectedSection) return;
+                              setDownloadingAll(true);
+                              try {
+                                await downloadAllBachilleratoBoletas({
+                                  schoolId,
+                                  sectionId: selectedSection,
+                                  sectionName: sectionData?.name ?? "",
+                                  gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                  yearId: effectiveYear,
+                                  yearRange,
+                                  momento: selectedMomento,
+                                  students: students.map((s: any) => ({
+                                    studentId: s.student_id,
+                                    studentName: s.student_name,
+                                    documentId: s.document_id ?? null,
+                                  })),
+                                });
+                              } finally {
+                                setDownloadingAll(false);
+                              }
+                            }}
+                          >
+                            {downloadingAll ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                            Descargar todas las boletas
+                          </Button>
                         )}
                       </div>
                       <div className="relative w-64">
