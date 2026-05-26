@@ -626,7 +626,7 @@ export function generateBoletinCompletoHtml(
         </div>
       </div>`;
     });
-    return `<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:15px">${cols.join("")}</div>`;
+    return `<div class="sig-block" style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:15px">${cols.join("")}</div>`;
   })() : "";
 
   // ── Full HTML ──────────────────────────────────────────────────────────────
@@ -650,7 +650,11 @@ export function generateBoletinCompletoHtml(
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
-    @media print{#controls{display:none!important}.boletin{padding:4mm 12mm 6mm 12mm}}
+    @media print{
+      #controls{display:none!important}
+      .boletin{display:flex;flex-direction:column;min-height:${paperHeightMm}mm;padding:4mm 12mm 6mm 12mm}
+      .sig-block{margin-top:auto}
+    }
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
@@ -689,7 +693,13 @@ export function wrapAllBoletasHtml(
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:${pageMargin}}
-    @media print{#controls{display:none!important}.boletin{padding:4mm 12mm 6mm 12mm}.boleta-page{page-break-after:always}.boleta-page.last{page-break-after:avoid}}
+    @media print{
+      #controls{display:none!important}
+      .boletin{display:flex;flex-direction:column;min-height:${paperHeightMm}mm;padding:4mm 12mm 6mm 12mm}
+      .sig-block{margin-top:auto}
+      .boleta-page{page-break-after:always}
+      .boleta-page.last{page-break-after:avoid}
+    }
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
