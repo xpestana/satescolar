@@ -6,6 +6,24 @@ import {
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 
+/**
+ * Abre el HTML de una boleta en una nueva pestaña/ventana usando una Blob URL.
+ * Evita document.write() que en algunos navegadores sobreescribe la ventana
+ * actual cuando el bloqueador de popups redirige "_blank" al mismo tab.
+ */
+function openBoletaWindow(html: string, title = "Boleta"): void {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, "_blank");
+  if (!win) {
+    URL.revokeObjectURL(url);
+    alert("Por favor permite las ventanas emergentes para descargar la boleta.");
+    return;
+  }
+  // Libera el objeto URL una vez que el navegador ha cargado el contenido
+  win.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+}
+
 export interface BachillerataBoletaParams {
   schoolId:    string;
   studentId:   string;
@@ -92,14 +110,6 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
     show_phone:            show("show_phone"),
     show_rif:              show("show_rif"),
   };
-
-  // ── Open window helper ───────────────────────────────────────────────────
-  function openWindow(html: string) {
-    const win = window.open("", "_blank", "width=900,height=820");
-    if (!win) { alert("Por favor permite las ventanas emergentes para descargar la boleta."); return; }
-    win.document.write(html);
-    win.document.close();
-  }
 
   // ════════════════════════════════════════════════════════════════════════════
   // BOLETÍN COMPLETO (multi-momento)
@@ -223,7 +233,7 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
       signature_lines: [],
     };
 
-    openWindow(generateBoletinCompletoHtml(cfg, boletinData, paperW, paperH));
+    openBoletaWindow(generateBoletinCompletoHtml(cfg, boletinData, paperW, paperH));
     return;
   }
 
@@ -309,7 +319,7 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   };
 
   // ── 5. Open print window ─────────────────────────────────────────────────
-  openWindow(generateBoletaHtml(cfg, data, paperW, paperH));
+  openBoletaWindow(generateBoletaHtml(cfg, data, paperW, paperH));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -400,13 +410,6 @@ export async function downloadAllBachilleratoBoletas(params: {
     .filter((a: any) => a.subject?.name)
     .sort((a: any, b: any) => (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999));
   const assignmentIds = validAssignments.map((a: any) => a.id);
-
-  function openWindow(html: string) {
-    const win = window.open("", "_blank", "width=900,height=820");
-    if (!win) { alert("Por favor permite las ventanas emergentes para descargar las boletas."); return; }
-    win.document.write(html);
-    win.document.close();
-  }
 
   // ── BOLETÍN COMPLETO (multi-momento) ─────────────────────────────────────
   if (style === "boletin_completo") {
@@ -511,7 +514,7 @@ export async function downloadAllBachilleratoBoletas(params: {
       bodies.push(generateBoletinCompletoHtml(cfg, boletinData, paperW, paperH, { bodyOnly: true }));
     }
 
-    openWindow(wrapAllBoletasHtml(bodies, paperW, paperH, "boletin_completo"));
+    openBoletaWindow(wrapAllBoletasHtml(bodies, paperW, paperH, "boletin_completo"));
     return;
   }
 
@@ -572,5 +575,5 @@ export async function downloadAllBachilleratoBoletas(params: {
     bodies.push(generateBoletaHtml(cfg, data, paperW, paperH, { bodyOnly: true }));
   }
 
-  openWindow(wrapAllBoletasHtml(bodies, paperW, paperH, "simple"));
+  openBoletaWindow(wrapAllBoletasHtml(bodies, paperW, paperH, "simple"));
 }
