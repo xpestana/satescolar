@@ -649,13 +649,13 @@ export function generateBoletinCompletoHtml(
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
-    @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:2mm 12mm 4mm 12mm}
-    @media print{#controls{display:none!important}.boletin{padding:0}}
+    @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
+    @media print{#controls{display:none!important}.boletin{padding:4mm 12mm 6mm 12mm}}
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
     #btn-close{background:#e2e8f0;color:#374151}
-    .boletin{padding:10mm 12mm;width:100%}
+    .boletin{padding:3mm 12mm 8mm 12mm;width:100%}
   </style>
 </head>
 <body>
@@ -676,7 +676,7 @@ export function wrapAllBoletasHtml(
   paperHeightMm: number,
   boletaStyle: "simple" | "boletin_completo",
 ): string {
-  const pageMargin = boletaStyle === "boletin_completo" ? "4mm 12mm 10mm 12mm" : "12mm 15mm";
+  const pageMargin = boletaStyle === "boletin_completo" ? "0" : "12mm 15mm";
   const wrapped = bodies.map((b, i) =>
     `<div class="boleta-page${i === bodies.length - 1 ? " last" : ""}">${b}</div>`
   ).join("\n");
@@ -689,13 +689,13 @@ export function wrapAllBoletasHtml(
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:${pageMargin}}
-    @media print{#controls{display:none!important}.boletin{padding:0}.boleta-page{page-break-after:always}.boleta-page.last{page-break-after:avoid}}
+    @media print{#controls{display:none!important}.boletin{padding:4mm 12mm 6mm 12mm}.boleta-page{page-break-after:always}.boleta-page.last{page-break-after:avoid}}
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
     #btn-close{background:#e2e8f0;color:#374151}
     .boleta{padding:14mm 15mm}
-    .boletin{padding:10mm 12mm;width:100%}
+    .boletin{padding:3mm 12mm 8mm 12mm;width:100%}
     .boleta-page{page-break-after:always}
     .boleta-page.last{page-break-after:avoid}
   </style>
