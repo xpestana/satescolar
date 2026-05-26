@@ -649,7 +649,7 @@ export function generateBoletinCompletoHtml(
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
-    @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:4mm 12mm 4mm 12mm}
+    @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:2mm 12mm 4mm 12mm}
     @media print{#controls{display:none!important}.boletin{padding:0}}
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
