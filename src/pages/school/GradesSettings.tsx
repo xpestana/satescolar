@@ -12,11 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { FormSkeleton } from "@/components/ui/loading-skeletons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Baby, BookOpen, GraduationCap, Plus, Trash2, Settings2 } from "lucide-react";
+import { Baby, BookOpen, GraduationCap, Plus, Trash2, Settings2 } from "lucide-react";
 import { PrimaryIndicatorsModal } from "@/components/grades/PrimaryIndicatorsModal";
 import { PreschoolIndicatorsModal } from "@/components/grades/PreschoolIndicatorsModal";
-import { TemplatePreview } from "@/components/grades/TemplatePreview";
-import { preschoolTemplates, primaryTemplates, secondaryTemplates } from "@/lib/report-templates";
 
 interface Scale {
   id: string;
@@ -183,17 +181,6 @@ export default function GradesSettings() {
   const usePercentage = config?.use_percentage_plan ?? false;
   const reportType = (config as any)?.primary_report_type ?? "descriptive";
   const preschoolReportType = (config as any)?.preschool_report_type ?? "descriptive";
-  const preschoolTemplate = (config as any)?.preschool_template ?? "classic";
-  const primaryTemplate = (config as any)?.primary_template ?? "classic";
-  const secondaryTemplate = (config as any)?.secondary_template ?? "classic";
-
-  const filteredPreschoolTemplates = preschoolTemplates.filter(
-    (t) => t.compatibleTypes.includes(preschoolReportType) || t.compatibleTypes.includes("all")
-  );
-  const filteredPrimaryTemplates = primaryTemplates.filter(
-    (t) => t.compatibleTypes.includes(reportType) || t.compatibleTypes.includes("all")
-  );
-
 
   return (
     <DashboardLayout>
@@ -285,23 +272,6 @@ export default function GradesSettings() {
               </div>
             )}
 
-            {/* Template selector */}
-            <div className="space-y-2 pt-2 border-t">
-              <Label className="text-sm font-medium">Plantilla de boleta</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {filteredPreschoolTemplates.map((t) => (
-                  <TemplatePreview
-                    key={t.id}
-                    templateId={t.id}
-                    level="preschool"
-                    name={t.name}
-                    description={t.description}
-                    selected={preschoolTemplate === t.id}
-                    onClick={() => upsertConfig.mutate({ preschool_template: t.id })}
-                  />
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -388,24 +358,6 @@ export default function GradesSettings() {
               </div>
             </div>}
 
-            {/* Template selector */}
-            <div className="space-y-2 pt-2 border-t">
-              <Label className="text-sm font-medium">Plantilla de boleta</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {filteredPrimaryTemplates.map((t) => (
-                  <TemplatePreview
-                    key={t.id}
-                    templateId={t.id}
-                    level="primary"
-                    name={t.name}
-                    description={t.description}
-                    selected={primaryTemplate === t.id}
-                    onClick={() => upsertConfig.mutate({ primary_template: t.id })}
-                  />
-                ))}
-              </div>
-            </div>
-
           </CardContent>
         </Card>
 
@@ -438,23 +390,6 @@ export default function GradesSettings() {
               />
             </div>
 
-            {/* Template selector */}
-            <div className="space-y-2 pt-3">
-              <Label className="text-sm font-medium">Plantilla de boleta</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {secondaryTemplates.map((t) => (
-                  <TemplatePreview
-                    key={t.id}
-                    templateId={t.id}
-                    level="secondary"
-                    name={t.name}
-                    description={t.description}
-                    selected={secondaryTemplate === t.id}
-                    onClick={() => upsertConfig.mutate({ secondary_template: t.id })}
-                  />
-                ))}
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
