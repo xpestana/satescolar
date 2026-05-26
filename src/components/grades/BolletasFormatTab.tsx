@@ -570,7 +570,7 @@ export function BolletasFormatTab() {
                       {t.is_active && <Badge className="bg-green-500 hover:bg-green-600">Activa</Badge>}
                       <Badge variant="secondary" className="text-xs">Bachillerato</Badge>
                       {t.config?.style === "boletin_completo" && (
-                        <Badge variant="outline" className="text-xs">Boletín Completo</Badge>
+                        <Badge variant="outline" className="text-xs">Bachillerato media hoja</Badge>
                       )}
                     </div>
                     {t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}
@@ -647,7 +647,7 @@ export function BolletasFormatTab() {
                 <div className="flex gap-1.5">
                   {([
                     { value: "simple",           label: "Simple" },
-                    { value: "boletin_completo",  label: "Boletín Completo" },
+                    { value: "boletin_completo",  label: "Bachillerato media hoja" },
                   ] as const).map(({ value, label }) => (
                     <Button key={value} size="sm"
                       variant={(cfg.style ?? "simple") === value ? "default" : "outline"}
