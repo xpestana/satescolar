@@ -329,6 +329,17 @@ export default function SubjectAssignments() {
     onError: (err: any) => { toast({ variant: "destructive", title: "No se puede eliminar", description: err.message }); setDeleteConfirm(null); },
   });
 
+  const mainReportMutation = useMutation({
+    mutationFn: async ({ id, value }: { id: string; value: boolean }) => {
+      const { error } = await supabase.from("subject_teacher_assignments" as any).update({ is_main_report: value } as any).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subject-teacher-assignments", schoolId, selectedYearId] });
+    },
+    onError: () => toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar" }),
+  });
+
   const suspendMutation = useMutation({
     mutationFn: async ({ id, suspend }: { id: string; suspend: boolean }) => {
       const { error } = await supabase.from("subject_teacher_assignments" as any).update({ is_suspended: suspend } as any).eq("id", id);
@@ -504,6 +515,7 @@ export default function SubjectAssignments() {
                       <TableHead>Tipo</TableHead>
                       <TableHead>Docente</TableHead>
                       <TableHead>Sección / Estudiantes</TableHead>
+                      <TableHead className="text-center">Inf. Principal</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -531,6 +543,14 @@ export default function SubjectAssignments() {
                               )}
                               {a.is_suspended && <Badge variant="outline" className="text-xs border-destructive text-destructive">Suspendida</Badge>}
                             </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Checkbox
+                              checked={!!(a as any).is_main_report}
+                              onCheckedChange={(v) => mainReportMutation.mutate({ id: a.id, value: !!v })}
+                              disabled={mainReportMutation.isPending}
+                              title="Marcar como informe principal en la boleta descriptiva"
+                            />
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1">

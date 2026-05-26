@@ -1,0 +1,195 @@
+import { supabase } from "@/integrations/supabase/client";
+import {
+  BachilleratoConfig,
+  DEFAULT_BACHILLERATO_CONFIG,
+  PrimaryDescriptiveRenderData,
+  generatePrimaryDescriptiveHtml,
+  wrapAllBoletasHtml,
+} from "@/lib/bachilleratoTemplate";
+
+export interface PrimaryDescriptiveBoletaParams {
+  schoolId:    string;
+  studentId:   string;
+  studentName: string;
+  documentId:  string | null;
+  sectionId:   string;
+  sectionName: string;
+  gradeLabel:  string;
+  gradeKey:    string;
+  yearId:      string;
+  yearRange:   string;
+  momento:     number;
+}
+
+async function fetchTemplateAndCommon(schoolId: string, gradeKey: string) {
+  const [templateRes, schoolRes, planillaRes] = await Promise.all([
+    supabase
+      .from("boleta_templates" as any)
+      .select("config, paper_width_mm, paper_height_mm, applicable_grades")
+      .eq("school_id", schoolId)
+      .eq("is_active", true),
+    supabase
+      .from("schools")
+      .select("name, logo_url")
+      .eq("id", schoolId)
+      .single(),
+    supabase
+      .from("planilla_general_config")
+      .select("signature_lines")
+      .eq("school_id", schoolId)
+      .maybeSingle(),
+  ]);
+
+  const allTemplates = (templateRes.data ?? []) as any[];
+  // Find best-matching template with style = "primaria_descriptivo"
+  const primaryTemplates = allTemplates.filter(
+    (t) => t.config?.style === "primaria_descriptivo"
+  );
+  const tpl =
+    primaryTemplates.find(
+      (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeKey)
+    ) ??
+    primaryTemplates.find(
+      (t) => !t.applicable_grades || t.applicable_grades.length === 0
+    ) ??
+    null;
+
+  const cfg: BachilleratoConfig = tpl?.config
+    ? {
+        ...DEFAULT_BACHILLERATO_CONFIG,
+        ...tpl.config,
+        sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(tpl.config?.sections ?? {}) },
+        primaria: { show_footer_logo: false, footer_logo_url: "", ...(tpl.config?.primaria ?? {}) },
+      }
+    : DEFAULT_BACHILLERATO_CONFIG;
+
+  const paperW: number = tpl?.paper_width_mm ?? 215.9;
+  const paperH: number = tpl?.paper_height_mm ?? 279.4;
+
+  return { cfg, paperW, paperH, school: schoolRes.data, planilla: planillaRes.data };
+}
+
+async function fetchAssignmentsAndReports(
+  schoolId: string,
+  sectionId: string,
+  yearId: string,
+  studentId: string,
+  momento: number,
+) {
+  const { data: assignments } = await supabase
+    .from("subject_teacher_assignments" as any)
+    .select("id, is_main_report, subject:subject_id(name, display_order)")
+    .eq("school_id", schoolId)
+    .eq("section_id", sectionId)
+    .eq("school_year_id", yearId)
+    .eq("is_suspended", false)
+    .order("subject(display_order)" as any);
+
+  const validAssignments = ((assignments ?? []) as any[]).filter(
+    (a) => a.subject?.name
+  );
+  const assignmentIds = validAssignments.map((a) => a.id);
+
+  let reports: any[] = [];
+  if (assignmentIds.length > 0) {
+    const { data } = await supabase
+      .from("primary_final_reports" as any)
+      .select("assignment_id, descriptive_report")
+      .eq("student_id", studentId)
+      .eq("momento", momento)
+      .in("assignment_id", assignmentIds);
+    reports = (data ?? []) as any[];
+  }
+
+  const reportMap: Record<string, string> = {};
+  for (const r of reports) {
+    if (r.descriptive_report?.trim()) reportMap[r.assignment_id] = r.descriptive_report;
+  }
+
+  // Separate main report from especialistas
+  const mainAssignment = validAssignments.find((a) => a.is_main_report);
+  const especialistaAssignments = validAssignments.filter((a) => !a.is_main_report);
+
+  const main_report =
+    mainAssignment && reportMap[mainAssignment.id]
+      ? { subject_name: mainAssignment.subject.name, html: reportMap[mainAssignment.id] }
+      : null;
+
+  const especialistas = especialistaAssignments
+    .filter((a) => reportMap[a.id])
+    .map((a) => ({ subject_name: a.subject.name, html: reportMap[a.id] }));
+
+  return { main_report, especialistas };
+}
+
+export async function downloadPrimaryDescriptiveBoleta(
+  params: PrimaryDescriptiveBoletaParams,
+): Promise<string> {
+  const {
+    schoolId, studentId, studentName, documentId,
+    sectionId, gradeLabel, sectionName, gradeKey, yearId, yearRange, momento,
+  } = params;
+
+  const { cfg, paperW, paperH, school } = await fetchTemplateAndCommon(schoolId, gradeKey);
+  const { main_report, especialistas } = await fetchAssignmentsAndReports(
+    schoolId, sectionId, yearId, studentId, momento,
+  );
+
+  const data: PrimaryDescriptiveRenderData = {
+    school_name:  school?.name ?? "",
+    school_logo:  school?.logo_url ?? "",
+    year_range:   yearRange,
+    student_name: studentName,
+    document_id:  documentId ?? "",
+    grade_label:  gradeLabel,
+    section_name: sectionName,
+    momento,
+    main_report,
+    especialistas,
+  };
+
+  return generatePrimaryDescriptiveHtml(cfg, data, paperW, paperH);
+}
+
+export async function downloadAllPrimaryDescriptiveBoletas(params: {
+  schoolId:    string;
+  sectionId:   string;
+  sectionName: string;
+  gradeLabel:  string;
+  gradeKey:    string;
+  yearId:      string;
+  yearRange:   string;
+  momento:     number;
+  students: { studentId: string; studentName: string; documentId: string | null }[];
+}): Promise<string> {
+  const {
+    schoolId, sectionId, sectionName, gradeLabel, gradeKey,
+    yearId, yearRange, momento, students,
+  } = params;
+  if (students.length === 0) return "";
+
+  const { cfg, paperW, paperH, school } = await fetchTemplateAndCommon(schoolId, gradeKey);
+
+  const bodies = await Promise.all(
+    students.map(async (s) => {
+      const { main_report, especialistas } = await fetchAssignmentsAndReports(
+        schoolId, sectionId, yearId, s.studentId, momento,
+      );
+      const data: PrimaryDescriptiveRenderData = {
+        school_name:  school?.name ?? "",
+        school_logo:  school?.logo_url ?? "",
+        year_range:   yearRange,
+        student_name: s.studentName,
+        document_id:  s.documentId ?? "",
+        grade_label:  gradeLabel,
+        section_name: sectionName,
+        momento,
+        main_report,
+        especialistas,
+      };
+      return generatePrimaryDescriptiveHtml(cfg, data, paperW, paperH, { bodyOnly: true });
+    }),
+  );
+
+  return wrapAllBoletasHtml(bodies, paperW, paperH, "simple");
+}

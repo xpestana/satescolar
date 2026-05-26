@@ -1,7 +1,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface BachilleratoConfig {
-  style?: "simple" | "boletin_completo";
+  style?: "simple" | "boletin_completo" | "primaria_descriptivo";
   sections: {
     header:      boolean;
     title:       boolean;
@@ -52,6 +52,10 @@ export interface BachilleratoConfig {
     margin_bottom: number; // mm — bottom padding = distance from signatures to bottom edge
     margin_sides:  number; // mm — left/right padding
     title_size:    number; // pt — "BOLETIN DE CALIFICACIONES" font size
+  };
+  primaria?: {
+    show_footer_logo: boolean;
+    footer_logo_url:  string;
   };
 }
 
@@ -682,6 +686,139 @@ export function generateBoletinCompletoHtml(
   <button id="btn-close" onclick="window.close()">Cerrar</button>
 </div>
 ${boletinDiv}
+</body>
+</html>`;
+}
+
+// ─── Primary Descriptive Boleta ───────────────────────────────────────────────
+
+export interface PrimaryDescriptiveRenderData {
+  school_name:      string;
+  school_logo:      string;
+  year_range:       string;
+  student_name:     string;
+  document_id:      string;
+  grade_label:      string;
+  section_name:     string;
+  momento:          number;
+  main_report:      { subject_name: string; html: string } | null;
+  especialistas:    { subject_name: string; html: string }[];
+}
+
+export const SAMPLE_PRIMARY_DESCRIPTIVE_DATA: PrimaryDescriptiveRenderData = {
+  school_name:   "UE COLEGIO EJEMPLO",
+  school_logo:   "",
+  year_range:    "2025-2026",
+  student_name:  "MARTÍNEZ PÉREZ, Juan Carlos",
+  document_id:   "V-12.345.678",
+  grade_label:   "1er Grado",
+  section_name:  "A",
+  momento:       2,
+  main_report: {
+    subject_name: "Informe General",
+    html: `<p style="text-align:justify">Juan Carlos es un estudiante responsable y participativo. Se esmera por cumplir con sus asignaciones. Se encuentra alfabetizado y posee buena comprensión lectora. Identifica palabras según su cantidad de sílabas. Utiliza los números para contar y enumerar. <b>Recomendaciones:</b></p><ul><li>Leer todos los días para obtener mayor fluidez.</li><li>Practicar las operaciones básicas.</li></ul><p>¡Felicitaciones!</p>`,
+  },
+  especialistas: [
+    {
+      subject_name: "INGLÉS",
+      html: `<ul><li>Se inicia en el reconocimiento de algunos útiles escolares básicos en inglés.</li></ul>`,
+    },
+  ],
+};
+
+export function generatePrimaryDescriptiveHtml(
+  cfg: BachilleratoConfig,
+  data: PrimaryDescriptiveRenderData,
+  paperWidthMm: number,
+  paperHeightMm: number,
+  opts?: { bodyOnly?: boolean },
+): string {
+  const lapsoLabels: Record<number, string> = { 1: "1er", 2: "2do", 3: "3er" };
+  const lapsoLabel = lapsoLabels[data.momento] ?? `${data.momento}°`;
+
+  const logoHtml = data.school_logo
+    ? `<img src="${esc(data.school_logo)}" alt="Logo" style="height:70px;width:auto;object-fit:contain;flex-shrink:0">`
+    : `<div style="width:70px;height:70px;background:#e5e7eb;border-radius:50%;flex-shrink:0"></div>`;
+
+  const headerHtml = `
+  <div style="display:flex;align-items:center;gap:16px;padding-bottom:10px;border-bottom:2px solid #1e3a5f;margin-bottom:10px">
+    ${logoHtml}
+    <div style="flex:1;text-align:center">
+      <div style="font-size:14pt;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:0.5px">${esc(data.school_name)}</div>
+      <div style="font-size:10pt;color:#4b5563;margin-top:2px">AÑO ESCOLAR ${esc(data.year_range)}</div>
+    </div>
+  </div>`;
+
+  const titleHtml = `
+  <div style="text-align:center;margin-bottom:10px">
+    <div style="font-size:12pt;font-weight:700;text-decoration:underline;text-transform:uppercase">
+      INFORME DESCRIPTIVO DEL ${lapsoLabel} LAPSO
+    </div>
+  </div>`;
+
+  const studentHtml = `
+  <div style="font-size:10pt;margin-bottom:10px;line-height:1.6">
+    <div><b>Nombre y Apellidos:</b> <span style="text-decoration:underline">${esc(data.student_name)}</span>&nbsp;&nbsp;
+    <b>Grado:</b> <span style="text-decoration:underline">${esc(data.grade_label)}</span>&nbsp;&nbsp;
+    <b>Sección:</b> <span style="text-decoration:underline">${esc(data.section_name)}</span></div>
+    <div><b>C.E.:</b> <span style="text-decoration:underline">${esc(data.document_id || "—")}</span></div>
+  </div>`;
+
+  const mainHtml = data.main_report
+    ? `<div style="font-size:10pt;line-height:1.7;text-align:justify;margin-bottom:12px">${data.main_report.html}</div>`
+    : "";
+
+  const especialistasHtml = data.especialistas.length > 0 ? `
+  <div style="margin-top:10px">
+    <div style="font-size:11pt;font-weight:700;text-align:center;margin-bottom:6px">ESPECIALISTAS</div>
+    ${data.especialistas.map((e) => `
+      <div style="margin-bottom:8px">
+        <div style="font-size:10pt;font-weight:700;margin-bottom:2px">${esc(e.subject_name)}</div>
+        <div style="font-size:10pt;line-height:1.6;padding-left:8px">${e.html}</div>
+      </div>`).join("")}
+  </div>` : "";
+
+  const footerHtml = cfg.primaria?.show_footer_logo && cfg.primaria?.footer_logo_url ? `
+  <div style="margin-top:auto;padding-top:12px;text-align:center">
+    <img src="${esc(cfg.primaria.footer_logo_url)}" alt="Logo pie" style="height:60px;width:auto;object-fit:contain">
+  </div>` : "";
+
+  const body = `
+  <div class="primaria-page" style="font-family:Arial,Helvetica,sans-serif;padding:12mm 15mm;min-height:${paperHeightMm}mm;display:flex;flex-direction:column;box-sizing:border-box">
+    ${headerHtml}
+    ${titleHtml}
+    ${studentHtml}
+    ${mainHtml}
+    ${especialistasHtml}
+    ${footerHtml}
+  </div>`;
+
+  if (opts?.bodyOnly) return body;
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Informe Descriptivo — ${esc(data.student_name)}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
+    @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
+    @media print{#controls{display:none!important}}
+    #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
+    #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
+    #btn-print{background:#2563eb;color:white}
+    #btn-close{background:#e2e8f0;color:#374151}
+    ul,ol{padding-left:20px;margin:4px 0}
+    li{margin-bottom:2px}
+  </style>
+</head>
+<body>
+<div id="controls">
+  <button id="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
+  <button id="btn-close" onclick="window.close()">Cerrar</button>
+</div>
+${body}
 </body>
 </html>`;
 }

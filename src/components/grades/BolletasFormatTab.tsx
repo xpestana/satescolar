@@ -17,6 +17,7 @@ import {
   BachilleratoConfig, BachilleratoTemplate, BoletinSignature,
   DEFAULT_BACHILLERATO_CONFIG, SAMPLE_RENDER_DATA, generateBoletaHtml,
   SAMPLE_BOLETIN_COMPLETO_DATA, generateBoletinCompletoHtml,
+  SAMPLE_PRIMARY_DESCRIPTIVE_DATA, generatePrimaryDescriptiveHtml,
 } from "@/lib/bachilleratoTemplate";
 import { Checkbox } from "@/components/ui/checkbox";
 import { uploadToS3 } from "@/lib/s3-upload";
@@ -213,6 +214,48 @@ function InputRow({ label, value, placeholder, onChange }: {
   );
 }
 
+function FooterLogoUpload({ url, onChange, schoolId }: {
+  url: string; onChange: (url: string) => void; schoolId: string;
+}) {
+  const { toast } = useToast();
+  const ref = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">URL o imagen del logo</Label>
+      <div className="flex gap-1.5">
+        <Input
+          value={url}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="https://... (pega URL o sube imagen)"
+          className="h-7 text-xs flex-1"
+        />
+        <Button size="sm" variant="outline" className="h-7 text-xs px-2 shrink-0" disabled={uploading}
+          onClick={() => ref.current?.click()}>
+          {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+        </Button>
+        <input ref={ref} type="file" accept="image/*" className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setUploading(true);
+            try {
+              const result = await uploadToS3({ file, folder: "assets", schoolId, fileName: `footer-logo-${Date.now()}-${file.name}` });
+              onChange(result.publicUrl);
+            } catch (err: any) {
+              toast({ title: "Error subiendo imagen", description: err.message, variant: "destructive" });
+            } finally {
+              setUploading(false);
+              e.target.value = "";
+            }
+          }}
+        />
+      </div>
+      {url && <img src={url} alt="Logo pie" className="h-10 mt-1 object-contain" />}
+    </div>
+  );
+}
+
 // ─── Config panel ─────────────────────────────────────────────────────────────
 function ConfigPanel({ cfg, onChange, schoolId }: {
   cfg: BachilleratoConfig;
@@ -292,6 +335,32 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
             />
           )}
         </Section>
+      </div>
+    );
+  }
+
+  // ── Primaria Descriptivo style ──────────────────────────────────────────────
+  if (cfg.style === "primaria_descriptivo") {
+    const updPrimaria = (patch: Partial<NonNullable<BachilleratoConfig["primaria"]>>) =>
+      onChange({ ...cfg, primaria: { show_footer_logo: false, footer_logo_url: "", ...cfg.primaria, ...patch } });
+    return (
+      <div className="space-y-2 pb-2">
+        <Section label="Cabecera del colegio" enabled={cfg.sections.header} onToggle={() => sect("header")}>
+          <ColorRow label="Color de línea divisora" value={cfg.header.accent_color}
+            onChange={(v) => upd({ header: { ...cfg.header, accent_color: v } })} />
+        </Section>
+        <div className="border rounded-md p-3 space-y-2">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Logo al pie de página</Label>
+          <ToggleRow label="Mostrar logo al pie" value={cfg.primaria?.show_footer_logo ?? false}
+            onChange={(v) => updPrimaria({ show_footer_logo: v })} />
+          {cfg.primaria?.show_footer_logo && (
+            <FooterLogoUpload
+              url={cfg.primaria?.footer_logo_url ?? ""}
+              onChange={(url) => updPrimaria({ footer_logo_url: url })}
+              schoolId={schoolId}
+            />
+          )}
+        </div>
       </div>
     );
   }
@@ -388,12 +457,13 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
 function BoletaPreview({ cfg, paperW, paperH }: {
   cfg: BachilleratoConfig; paperW: number; paperH: number;
 }) {
-  const html = useMemo(
-    () => cfg.style === "boletin_completo"
-      ? generateBoletinCompletoHtml(cfg, SAMPLE_BOLETIN_COMPLETO_DATA, paperW, paperH)
-      : generateBoletaHtml(cfg, SAMPLE_RENDER_DATA, paperW, paperH),
-    [cfg, paperW, paperH],
-  );
+  const html = useMemo(() => {
+    if (cfg.style === "boletin_completo")
+      return generateBoletinCompletoHtml(cfg, SAMPLE_BOLETIN_COMPLETO_DATA, paperW, paperH);
+    if (cfg.style === "primaria_descriptivo")
+      return generatePrimaryDescriptiveHtml(cfg, SAMPLE_PRIMARY_DESCRIPTIVE_DATA, paperW, paperH);
+    return generateBoletaHtml(cfg, SAMPLE_RENDER_DATA, paperW, paperH);
+  }, [cfg, paperW, paperH]);
 
   const MM_TO_PX = 96 / 25.4;
   const naturalW = paperW * MM_TO_PX;
@@ -445,7 +515,6 @@ export function BolletasFormatTab() {
         .from("boleta_templates" as any)
         .select("*")
         .eq("school_id", schoolId!)
-        .eq("level", "bachillerato")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data || []) as BachilleratoTemplate[];
@@ -573,6 +642,9 @@ export function BolletasFormatTab() {
                       {t.config?.style === "boletin_completo" && (
                         <Badge variant="outline" className="text-xs">Bachillerato media hoja</Badge>
                       )}
+                      {t.config?.style === "primaria_descriptivo" && (
+                        <Badge variant="outline" className="text-xs">Primaria Descriptivo</Badge>
+                      )}
                     </div>
                     {t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -650,8 +722,9 @@ export function BolletasFormatTab() {
                   <Label className="text-xs">Estilo de boleta</Label>
                   <div className="flex gap-1.5">
                     {([
-                      { value: "simple",           label: "Simple" },
-                      { value: "boletin_completo",  label: "Bachillerato media hoja" },
+                      { value: "simple",              label: "Simple" },
+                      { value: "boletin_completo",    label: "Bachillerato media hoja" },
+                      { value: "primaria_descriptivo", label: "Primaria Descriptivo" },
                     ] as const).map(({ value, label }) => (
                       <Button key={value} size="sm"
                         variant={(cfg.style ?? "simple") === value ? "default" : "outline"}

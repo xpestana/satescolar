@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
 import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas } from "@/lib/bachilleratoBoleta";
+import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -38,6 +39,10 @@ const NUMERIC_GRADES = new Set([
 const SECONDARY_GRADES = new Set([
   "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
   "media_tecnica", "6_ano",
+]);
+
+const PRIMARY_GRADES = new Set([
+  "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado",
 ]);
 
 export default function GradesConsultation() {
@@ -563,8 +568,39 @@ export default function GradesConsultation() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm text-muted-foreground">{sectionLabel}</span>
                         <Badge variant="outline">{filteredStudents.length} estudiantes</Badge>
-                        {!isSecondary && (
-                          <Badge variant="secondary" className="text-xs">Boleta de Primaria/Preescolar próximamente</Badge>
+                        {PRIMARY_GRADES.has(sectionData?.grade_level ?? "") && students.length > 0 && (
+                          <Button
+                            size="sm"
+                            className="h-8 gap-1.5 text-xs"
+                            disabled={downloadingAll}
+                            onClick={async () => {
+                              if (!schoolId || !selectedSection) return;
+                              setDownloadingAll(true);
+                              try {
+                                const html = await downloadAllPrimaryDescriptiveBoletas({
+                                  schoolId,
+                                  sectionId: selectedSection,
+                                  sectionName: sectionData?.name ?? "",
+                                  gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                  gradeKey: sectionData?.grade_level ?? "",
+                                  yearId: effectiveYear,
+                                  yearRange,
+                                  momento: selectedMomento,
+                                  students: students.map((s: any) => ({
+                                    studentId: s.student_id,
+                                    studentName: s.student_name,
+                                    documentId: s.document_id ?? null,
+                                  })),
+                                });
+                                setBoletaModal({ html, title: `Sección ${sectionData?.name ?? ""} — todas las boletas` });
+                              } finally {
+                                setDownloadingAll(false);
+                              }
+                            }}
+                          >
+                            {downloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                            Descargar todas las boletas
+                          </Button>
                         )}
                         {isSecondary && students.length > 0 && (
                           <Button
@@ -651,6 +687,42 @@ export default function GradesConsultation() {
                                         setDownloadingStudentId(s.student_id);
                                         try {
                                           const html = await downloadBachilleratoBoleta({
+                                            schoolId,
+                                            studentId: s.student_id,
+                                            studentName: s.student_name,
+                                            documentId: s.document_id ?? null,
+                                            sectionId: selectedSection,
+                                            sectionName: sectionData?.name ?? "",
+                                            gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                            gradeKey: sectionData?.grade_level ?? "",
+                                            yearId: effectiveYear,
+                                            yearRange,
+                                            momento: selectedMomento,
+                                          });
+                                          setBoletaModal({ html, title: s.student_name });
+                                        } finally {
+                                          setDownloadingStudentId(null);
+                                        }
+                                      }}
+                                    >
+                                      {downloadingStudentId === s.student_id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Download className="h-3.5 w-3.5" />
+                                      )}
+                                      Descargar Boleta
+                                    </Button>
+                                  ) : PRIMARY_GRADES.has(sectionData?.grade_level ?? "") ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 gap-1.5 text-xs"
+                                      disabled={downloadingStudentId === s.student_id}
+                                      onClick={async () => {
+                                        if (!schoolId) return;
+                                        setDownloadingStudentId(s.student_id);
+                                        try {
+                                          const html = await downloadPrimaryDescriptiveBoleta({
                                             schoolId,
                                             studentId: s.student_id,
                                             studentName: s.student_name,
