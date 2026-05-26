@@ -495,7 +495,11 @@ export async function downloadAllBachilleratoBoletas(params: {
       bodies.push(generateBoletinCompletoHtml(cfg, boletinData, paperW, paperH, { bodyOnly: true }));
     }
 
-    return wrapAllBoletasHtml(bodies, paperW, paperH, "boletin_completo");
+    return wrapAllBoletasHtml(bodies, paperW, paperH, "boletin_completo", {
+      top:    cfg.boletin?.margin_top    ?? 4,
+      bottom: cfg.boletin?.margin_bottom ?? 6,
+      sides:  cfg.boletin?.margin_sides  ?? 12,
+    });
     return;
   }
 

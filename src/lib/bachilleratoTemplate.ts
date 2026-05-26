@@ -47,6 +47,11 @@ export interface BachilleratoConfig {
     table_header_bg:   string;
     table_header_text: string;
     signatures:        BoletinSignature[];
+    // Layout controls
+    margin_top:    number; // mm — top padding (print + screen)
+    margin_bottom: number; // mm — bottom padding = distance from signatures to bottom edge
+    margin_sides:  number; // mm — left/right padding
+    title_size:    number; // pt — "BOLETIN DE CALIFICACIONES" font size
   };
 }
 
@@ -205,6 +210,10 @@ export const DEFAULT_BACHILLERATO_CONFIG: BachilleratoConfig = {
     table_header_bg:   "#000000",
     table_header_text: "#ffffff",
     signatures:        [],
+    margin_top:    4,
+    margin_bottom: 6,
+    margin_sides:  12,
+    title_size:    14,
   },
 };
 
@@ -485,9 +494,13 @@ export function generateBoletinCompletoHtml(
   opts?: { bodyOnly?: boolean },
 ): string {
   const hc = data.header_cfg;
-  const hdrBg  = cfg.boletin?.table_header_bg  ?? "#000000";
-  const hdrTxt = cfg.boletin?.table_header_text ?? "#ffffff";
+  const hdrBg     = cfg.boletin?.table_header_bg  ?? "#000000";
+  const hdrTxt    = cfg.boletin?.table_header_text ?? "#ffffff";
   const accentColor = cfg.header.accent_color;
+  const mTop    = cfg.boletin?.margin_top    ?? 4;
+  const mBottom = cfg.boletin?.margin_bottom ?? 6;
+  const mSides  = cfg.boletin?.margin_sides  ?? 12;
+  const titlePt = cfg.boletin?.title_size    ?? 14;
 
   // ── Header ─────────────────────────────────────────────────────────────────
   const logoHtml = hc.show_logo && data.school_logo
@@ -517,7 +530,7 @@ export function generateBoletinCompletoHtml(
   // ── Title ──────────────────────────────────────────────────────────────────
   const titleHtml = `
   <div style="text-align:center;margin-bottom:6px">
-    <div style="font-size:14pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">BOLETIN DE CALIFICACIONES</div>
+    <div style="font-size:${titlePt}pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">BOLETIN DE CALIFICACIONES</div>
   </div>`;
 
   // ── Student info ───────────────────────────────────────────────────────────
@@ -652,14 +665,14 @@ export function generateBoletinCompletoHtml(
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
     @media print{
       #controls{display:none!important}
-      .boletin{display:flex;flex-direction:column;min-height:${paperHeightMm}mm;padding:4mm 12mm 6mm 12mm}
+      .boletin{display:flex;flex-direction:column;min-height:${paperHeightMm}mm;padding:${mTop}mm ${mSides}mm ${mBottom}mm ${mSides}mm}
       .sig-block{margin-top:auto}
     }
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
     #btn-close{background:#e2e8f0;color:#374151}
-    .boletin{padding:3mm 12mm 8mm 12mm;width:100%}
+    .boletin{padding:${mTop}mm ${mSides}mm ${mBottom}mm ${mSides}mm;width:100%}
   </style>
 </head>
 <body>
@@ -679,8 +692,12 @@ export function wrapAllBoletasHtml(
   paperWidthMm: number,
   paperHeightMm: number,
   boletaStyle: "simple" | "boletin_completo",
+  boletinMargins?: { top: number; bottom: number; sides: number },
 ): string {
   const pageMargin = boletaStyle === "boletin_completo" ? "0" : "12mm 15mm";
+  const mt = boletinMargins?.top    ?? 4;
+  const mb = boletinMargins?.bottom ?? 6;
+  const ms = boletinMargins?.sides  ?? 12;
   const wrapped = bodies.map((b, i) =>
     `<div class="boleta-page${i === bodies.length - 1 ? " last" : ""}">${b}</div>`
   ).join("\n");
@@ -695,7 +712,7 @@ export function wrapAllBoletasHtml(
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:${pageMargin}}
     @media print{
       #controls{display:none!important}
-      .boletin{display:flex;flex-direction:column;min-height:${paperHeightMm}mm;padding:4mm 12mm 6mm 12mm}
+      .boletin{display:flex;flex-direction:column;min-height:${paperHeightMm}mm;padding:${mt}mm ${ms}mm ${mb}mm ${ms}mm}
       .sig-block{margin-top:auto}
       .boleta-page{page-break-after:always}
       .boleta-page.last{page-break-after:avoid}
@@ -705,7 +722,7 @@ export function wrapAllBoletasHtml(
     #btn-print{background:#2563eb;color:white}
     #btn-close{background:#e2e8f0;color:#374151}
     .boleta{padding:14mm 15mm}
-    .boletin{padding:3mm 12mm 8mm 12mm;width:100%}
+    .boletin{padding:${mt}mm ${ms}mm ${mb}mm ${ms}mm;width:100%}
     .boleta-page{page-break-after:always}
     .boleta-page.last{page-break-after:avoid}
   </style>
