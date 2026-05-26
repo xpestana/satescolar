@@ -6,24 +6,6 @@ import {
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 
-/**
- * Abre el HTML de una boleta en una nueva pestaña/ventana usando una Blob URL.
- * Evita document.write() que en algunos navegadores sobreescribe la ventana
- * actual cuando el bloqueador de popups redirige "_blank" al mismo tab.
- */
-function openBoletaWindow(html: string, title = "Boleta"): void {
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url  = URL.createObjectURL(blob);
-  const win  = window.open(url, "_blank");
-  if (!win) {
-    URL.revokeObjectURL(url);
-    alert("Por favor permite las ventanas emergentes para descargar la boleta.");
-    return;
-  }
-  // Libera el objeto URL una vez que el navegador ha cargado el contenido
-  win.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
-}
-
 export interface BachillerataBoletaParams {
   schoolId:    string;
   studentId:   string;
@@ -37,7 +19,7 @@ export interface BachillerataBoletaParams {
   momento:     number;
 }
 
-export async function downloadBachilleratoBoleta(params: BachillerataBoletaParams): Promise<void> {
+export async function downloadBachilleratoBoleta(params: BachillerataBoletaParams): Promise<string> {
   const { schoolId, studentId, studentName, documentId,
           sectionId, sectionName, gradeLabel, yearId, yearRange, momento } = params;
 
@@ -233,8 +215,7 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
       signature_lines: [],
     };
 
-    openBoletaWindow(generateBoletinCompletoHtml(cfg, boletinData, paperW, paperH));
-    return;
+    return generateBoletinCompletoHtml(cfg, boletinData, paperW, paperH);
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -319,7 +300,7 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   };
 
   // ── 5. Open print window ─────────────────────────────────────────────────
-  openBoletaWindow(generateBoletaHtml(cfg, data, paperW, paperH));
+  return generateBoletaHtml(cfg, data, paperW, paperH);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -341,9 +322,9 @@ export async function downloadAllBachilleratoBoletas(params: {
   yearRange:   string;
   momento:     number;
   students:    BachillerataBoletaStudentParam[];
-}): Promise<void> {
+}): Promise<string> {
   const { schoolId, sectionId, sectionName, gradeLabel, yearId, yearRange, momento, students } = params;
-  if (students.length === 0) return;
+  if (students.length === 0) return "";
 
   // ── 1. Fetch template + school + planilla in parallel ─────────────────────
   const [templateRes, schoolRes, planillaRes] = await Promise.all([
@@ -514,7 +495,7 @@ export async function downloadAllBachilleratoBoletas(params: {
       bodies.push(generateBoletinCompletoHtml(cfg, boletinData, paperW, paperH, { bodyOnly: true }));
     }
 
-    openBoletaWindow(wrapAllBoletasHtml(bodies, paperW, paperH, "boletin_completo"));
+    return wrapAllBoletasHtml(bodies, paperW, paperH, "boletin_completo");
     return;
   }
 
@@ -575,5 +556,5 @@ export async function downloadAllBachilleratoBoletas(params: {
     bodies.push(generateBoletaHtml(cfg, data, paperW, paperH, { bodyOnly: true }));
   }
 
-  openBoletaWindow(wrapAllBoletasHtml(bodies, paperW, paperH, "simple"));
+  return wrapAllBoletasHtml(bodies, paperW, paperH, "simple");
 }
