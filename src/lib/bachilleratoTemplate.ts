@@ -305,6 +305,7 @@ export function generateBoletaHtml(
   data: BoletaRenderData,
   paperWidthMm: number,
   paperHeightMm: number,
+  opts?: { bodyOnly?: boolean },
 ): string {
   const momentoLabel = ["Primer", "Segundo", "Tercer"][data.momento - 1] ?? "Primer";
   const hc = data.header_cfg;
@@ -421,6 +422,17 @@ export function generateBoletaHtml(
   </div>` : "";
 
   // ── Full HTML ─────────────────────────────────────────────────────────────
+  const boletaDiv = `<div class="boleta">
+  ${headerHtml}
+  ${titleHtml}
+  ${studentHtml}
+  ${tableHtml}
+  ${summaryHtml}
+  ${sigHtml}
+</div>`;
+
+  if (opts?.bodyOnly) return boletaDiv;
+
   return /* html */`<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -443,14 +455,7 @@ export function generateBoletaHtml(
   <button id="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
   <button id="btn-close" onclick="window.close()">Cerrar</button>
 </div>
-<div class="boleta">
-  ${headerHtml}
-  ${titleHtml}
-  ${studentHtml}
-  ${tableHtml}
-  ${summaryHtml}
-  ${sigHtml}
-</div>
+${boletaDiv}
 </body>
 </html>`;
 }
@@ -477,6 +482,7 @@ export function generateBoletinCompletoHtml(
   data: BoletinCompletoRenderData,
   paperWidthMm: number,
   paperHeightMm: number,
+  opts?: { bodyOnly?: boolean },
 ): string {
   const hc = data.header_cfg;
   const hdrBg  = cfg.boletin?.table_header_bg  ?? "#000000";
@@ -624,6 +630,17 @@ export function generateBoletinCompletoHtml(
   })() : "";
 
   // ── Full HTML ──────────────────────────────────────────────────────────────
+  const boletinDiv = `<div class="boletin">
+  ${headerHtml}
+  <hr style="border:none;border-top:2px solid ${accentColor};margin-bottom:6px">
+  ${titleHtml}
+  ${studentHtml}
+  ${mainHtml}
+  ${sigHtml}
+</div>`;
+
+  if (opts?.bodyOnly) return boletinDiv;
+
   return /* html */`<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -646,14 +663,49 @@ export function generateBoletinCompletoHtml(
   <button id="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
   <button id="btn-close" onclick="window.close()">Cerrar</button>
 </div>
-<div class="boletin">
-  ${headerHtml}
-  <hr style="border:none;border-top:2px solid ${accentColor};margin-bottom:6px">
-  ${titleHtml}
-  ${studentHtml}
-  ${mainHtml}
-  ${sigHtml}
+${boletinDiv}
+</body>
+</html>`;
+}
+
+// ─── Combined boletas wrapper ───────────────────────────────────────────────────
+
+export function wrapAllBoletasHtml(
+  bodies: string[],
+  paperWidthMm: number,
+  paperHeightMm: number,
+  boletaStyle: "simple" | "boletin_completo",
+): string {
+  const pageMargin = boletaStyle === "boletin_completo" ? "10mm 12mm" : "12mm 15mm";
+  const wrapped = bodies.map((b, i) =>
+    `<div class="boleta-page${i === bodies.length - 1 ? " last" : ""}">${b}</div>`
+  ).join("\n");
+  return /* html */`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Boletas — Sección completa</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
+    @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:${pageMargin}}
+    @media print{#controls{display:none!important}.boletin{padding:0}.boleta-page{page-break-after:always}.boleta-page.last{page-break-after:avoid}}
+    #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
+    #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
+    #btn-print{background:#2563eb;color:white}
+    #btn-close{background:#e2e8f0;color:#374151}
+    .boleta{padding:14mm 15mm}
+    .boletin{padding:10mm 12mm;width:100%}
+    .boleta-page{page-break-after:always}
+    .boleta-page.last{page-break-after:avoid}
+  </style>
+</head>
+<body>
+<div id="controls">
+  <button id="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF (${bodies.length} boletas)</button>
+  <button id="btn-close" onclick="window.close()">Cerrar</button>
 </div>
+${wrapped}
 </body>
 </html>`;
 }
