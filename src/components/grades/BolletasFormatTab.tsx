@@ -51,15 +51,15 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
-function NumRow({ label, value, onChange, min = 6, max = 32 }:
-  { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number }) {
+function NumRow({ label, value, onChange, min = 6, max = 32, unit = "pt" }:
+  { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; unit?: string }) {
   return (
     <div className="flex items-center gap-2">
       <Label className="text-xs flex-1">{label}</Label>
       <Input type="number" value={value} min={min} max={max}
         onChange={(e) => onChange(Number(e.target.value) || min)}
         className="h-7 w-20 text-xs text-right" />
-      <span className="text-xs text-muted-foreground">pt</span>
+      <span className="text-xs text-muted-foreground w-5">{unit}</span>
     </div>
   );
 }
@@ -227,6 +227,23 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
               onChange={(v) => upd({ table: { ...cfg.table, alt_row_color: v } })} />
           )}
         </Section>
+
+        {/* Diseño y espaciado */}
+        <div className="border rounded-md p-3 space-y-2">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diseño y Espaciado</Label>
+          <NumRow label="Margen superior" unit="mm" min={0} max={30}
+            value={cfg.boletin?.margin_top ?? 4}
+            onChange={(v) => updBoletin({ margin_top: v })} />
+          <NumRow label="Margen inferior / firmas" unit="mm" min={0} max={60}
+            value={cfg.boletin?.margin_bottom ?? 6}
+            onChange={(v) => updBoletin({ margin_bottom: v })} />
+          <NumRow label="Márgenes laterales" unit="mm" min={0} max={30}
+            value={cfg.boletin?.margin_sides ?? 12}
+            onChange={(v) => updBoletin({ margin_sides: v })} />
+          <NumRow label="Tamaño título" unit="pt" min={8} max={20}
+            value={cfg.boletin?.title_size ?? 14}
+            onChange={(v) => updBoletin({ title_size: v })} />
+        </div>
 
         {/* Mención */}
         <div className="border rounded-md p-3 space-y-2">
