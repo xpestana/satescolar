@@ -18,7 +18,14 @@ import {
   DEFAULT_BACHILLERATO_CONFIG, SAMPLE_RENDER_DATA, generateBoletaHtml,
   SAMPLE_BOLETIN_COMPLETO_DATA, generateBoletinCompletoHtml,
 } from "@/lib/bachilleratoTemplate";
+import { Checkbox } from "@/components/ui/checkbox";
 import { uploadToS3 } from "@/lib/s3-upload";
+
+const GRADE_LABELS: Record<string, string> = {
+  "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
+  "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
+};
+const BACHILLERATO_GRADES = ["1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano"] as const;
 
 // ─── tiny accordion ───────────────────────────────────────────────────────────
 function Section({
@@ -408,7 +415,7 @@ export function BolletasFormatTab() {
   const [showEditor, setShowEditor] = useState(false);
   const [editItem, setEditItem] = useState<BachilleratoTemplate | null>(null);
 
-  const [form, setForm] = useState({ name: "", description: "", paper_width_mm: 215.9, paper_height_mm: 279.4 });
+  const [form, setForm] = useState({ name: "", description: "", paper_width_mm: 215.9, paper_height_mm: 279.4, applicable_grades: [] as string[] });
   const [cfg, setCfg] = useState<BachilleratoConfig>(DEFAULT_BACHILLERATO_CONFIG);
 
   // ── Queries ──────────────────────────────────────────────────────────────
@@ -438,6 +445,7 @@ export function BolletasFormatTab() {
         paper_width_mm: form.paper_width_mm,
         paper_height_mm: form.paper_height_mm,
         config: cfg,
+        applicable_grades: form.applicable_grades.length > 0 ? form.applicable_grades : null,
         updated_at: new Date().toISOString(),
       };
       if (editItem) {
@@ -458,14 +466,24 @@ export function BolletasFormatTab() {
 
   const activateMut = useMutation({
     mutationFn: async (id: string) => {
-      await supabase.from("boleta_templates" as any).update({ is_active: false })
-        .eq("school_id", schoolId!).eq("level", "bachillerato");
       const { error } = await supabase.from("boleta_templates" as any).update({ is_active: true }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["boleta-templates"] });
       toast({ title: "Plantilla activada" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deactivateMut = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("boleta_templates" as any).update({ is_active: false }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["boleta-templates"] });
+      toast({ title: "Plantilla desactivada" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -485,14 +503,14 @@ export function BolletasFormatTab() {
   // ── Helpers ───────────────────────────────────────────────────────────────
   const openNew = () => {
     setEditItem(null);
-    setForm({ name: "", description: "", paper_width_mm: 215.9, paper_height_mm: 279.4 });
+    setForm({ name: "", description: "", paper_width_mm: 215.9, paper_height_mm: 279.4, applicable_grades: [] });
     setCfg(DEFAULT_BACHILLERATO_CONFIG);
     setShowEditor(true);
   };
 
   const openEdit = (t: BachilleratoTemplate) => {
     setEditItem(t);
-    setForm({ name: t.name, description: t.description || "", paper_width_mm: t.paper_width_mm, paper_height_mm: t.paper_height_mm });
+    setForm({ name: t.name, description: t.description || "", paper_width_mm: t.paper_width_mm, paper_height_mm: t.paper_height_mm, applicable_grades: t.applicable_grades ?? [] });
     setCfg({
       ...DEFAULT_BACHILLERATO_CONFIG, ...t.config,
       sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(t.config?.sections ?? {}) },
@@ -529,7 +547,7 @@ export function BolletasFormatTab() {
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold">{t.name}</p>
                       {t.is_active && <Badge className="bg-green-500 hover:bg-green-600">Activa</Badge>}
                       <Badge variant="secondary" className="text-xs">Bachillerato</Badge>
@@ -538,12 +556,31 @@ export function BolletasFormatTab() {
                       )}
                     </div>
                     {t.description && <p className="text-sm text-muted-foreground">{t.description}</p>}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t.paper_width_mm}×{t.paper_height_mm} mm
-                    </p>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      <p className="text-xs text-muted-foreground">{t.paper_width_mm}×{t.paper_height_mm} mm</p>
+                      {t.applicable_grades && t.applicable_grades.length > 0 ? (
+                        <>
+                          <span className="text-xs text-muted-foreground">·</span>
+                          {t.applicable_grades.map((g) => (
+                            <Badge key={g} variant="outline" className="text-xs py-0 h-4">
+                              {GRADE_LABELS[g] ?? g}
+                            </Badge>
+                          ))}
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-xs text-muted-foreground">·</span>
+                          <Badge variant="outline" className="text-xs py-0 h-4">Todos los años</Badge>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2">
-                    {!t.is_active && (
+                    {t.is_active ? (
+                      <Button size="sm" variant="outline" onClick={() => deactivateMut.mutate(t.id)} disabled={deactivateMut.isPending}>
+                        Desactivar
+                      </Button>
+                    ) : (
                       <Button size="sm" variant="outline" onClick={() => activateMut.mutate(t.id)} disabled={activateMut.isPending}>
                         <CheckCircle2 className="h-4 w-4 mr-1" />Activar
                       </Button>
@@ -603,6 +640,31 @@ export function BolletasFormatTab() {
                   ))}
                 </div>
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Grados aplicables</Label>
+              <div className="flex flex-wrap gap-3">
+                {BACHILLERATO_GRADES.map((g) => (
+                  <div key={g} className="flex items-center gap-1.5">
+                    <Checkbox
+                      id={`grade-${g}`}
+                      checked={form.applicable_grades.includes(g)}
+                      onCheckedChange={(checked) =>
+                        setForm((f) => ({
+                          ...f,
+                          applicable_grades: checked
+                            ? [...f.applicable_grades, g]
+                            : f.applicable_grades.filter((x) => x !== g),
+                        }))
+                      }
+                    />
+                    <Label htmlFor={`grade-${g}`} className="text-xs font-normal cursor-pointer">
+                      {GRADE_LABELS[g]}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Sin selección = aplica a todos los años</p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">

@@ -14,6 +14,7 @@ export interface BachillerataBoletaParams {
   sectionId:   string;
   sectionName: string;
   gradeLabel:  string;
+  gradeKey:    string;
   yearId:      string;
   yearRange:   string;
   momento:     number;
@@ -21,17 +22,16 @@ export interface BachillerataBoletaParams {
 
 export async function downloadBachilleratoBoleta(params: BachillerataBoletaParams): Promise<string> {
   const { schoolId, studentId, studentName, documentId,
-          sectionId, sectionName, gradeLabel, yearId, yearRange, momento } = params;
+          sectionId, sectionName, gradeLabel, gradeKey, yearId, yearRange, momento } = params;
 
   // ── 1. Fetch template + school + planilla config in parallel ─────────────
   const [templateRes, schoolRes, planillaRes] = await Promise.all([
     supabase
       .from("boleta_templates" as any)
-      .select("config, paper_width_mm, paper_height_mm")
+      .select("config, paper_width_mm, paper_height_mm, applicable_grades")
       .eq("school_id", schoolId)
       .eq("level", "bachillerato")
-      .eq("is_active", true)
-      .maybeSingle(),
+      .eq("is_active", true),
     supabase
       .from("schools")
       .select("name, logo_url, dea_code, statistical_code, address, phone, rif")
@@ -44,11 +44,16 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
       .maybeSingle(),
   ]);
 
-  const tpl = templateRes.data as any;
+  const allTemplates = (templateRes.data ?? []) as any[];
+  const tpl = allTemplates.find(
+    (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeKey)
+  ) ?? allTemplates.find(
+    (t) => !t.applicable_grades || t.applicable_grades.length === 0
+  ) ?? null;
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 
-  // Build config: use active template or fall back to defaults
+  // Build config: use best-matching template or fall back to defaults
   const cfg: BachilleratoConfig = tpl?.config
     ? { ...DEFAULT_BACHILLERATO_CONFIG, ...tpl.config,
         sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(tpl.config?.sections ?? {}) },
@@ -318,23 +323,23 @@ export async function downloadAllBachilleratoBoletas(params: {
   sectionId:   string;
   sectionName: string;
   gradeLabel:  string;
+  gradeKey:    string;
   yearId:      string;
   yearRange:   string;
   momento:     number;
   students:    BachillerataBoletaStudentParam[];
 }): Promise<string> {
-  const { schoolId, sectionId, sectionName, gradeLabel, yearId, yearRange, momento, students } = params;
+  const { schoolId, sectionId, sectionName, gradeLabel, gradeKey, yearId, yearRange, momento, students } = params;
   if (students.length === 0) return "";
 
   // ── 1. Fetch template + school + planilla in parallel ─────────────────────
   const [templateRes, schoolRes, planillaRes] = await Promise.all([
     supabase
       .from("boleta_templates" as any)
-      .select("config, paper_width_mm, paper_height_mm")
+      .select("config, paper_width_mm, paper_height_mm, applicable_grades")
       .eq("school_id", schoolId)
       .eq("level", "bachillerato")
-      .eq("is_active", true)
-      .maybeSingle(),
+      .eq("is_active", true),
     supabase
       .from("schools")
       .select("name, logo_url, dea_code, statistical_code, address, phone, rif")
@@ -347,7 +352,12 @@ export async function downloadAllBachilleratoBoletas(params: {
       .maybeSingle(),
   ]);
 
-  const tpl = templateRes.data as any;
+  const allTemplatesAll = (templateRes.data ?? []) as any[];
+  const tpl = allTemplatesAll.find(
+    (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeKey)
+  ) ?? allTemplatesAll.find(
+    (t) => !t.applicable_grades || t.applicable_grades.length === 0
+  ) ?? null;
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 

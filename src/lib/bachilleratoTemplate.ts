@@ -124,8 +124,9 @@ export interface BachilleratoTemplate {
   paper_width_mm:  number;
   paper_height_mm: number;
   config:          BachilleratoConfig;
-  is_active:       boolean;
-  created_at:      string;
+  is_active:           boolean;
+  applicable_grades:   string[] | null;
+  created_at:          string;
 }
 
 export interface BoletaRenderData {
