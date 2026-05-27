@@ -77,17 +77,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!mounted) return;
 
-        if (event === 'INITIAL_SESSION') {
-          return;
-        }
+        // Skip the initial session event; handled by getSession() below.
+        if (event === 'INITIAL_SESSION') return;
 
+        // Token refresh / profile update — only update session tokens, never
+        // touch userRole so components don't re-render their guards.
         if (event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           setSession(session);
           setUser(session?.user ?? null);
           return;
         }
 
-        if (!session?.user) {
+        // Explicit sign-out: clear everything.
+        if (event === 'SIGNED_OUT') {
           roleRequestRef.current += 1;
           setSession(null);
           setUser(null);
@@ -96,7 +98,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        void applySession(session);
+        // SIGNED_IN or any other event with a valid user.
+        if (session?.user) {
+          void applySession(session, false);
+          return;
+        }
+
+        // Any other event without a user — treat as sign-out.
+        roleRequestRef.current += 1;
+        setSession(null);
+        setUser(null);
+        setUserRole(null);
+        setLoading(false);
       }
     );
 

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppSidebar } from "./AppSidebar";
 import { TopBar } from "./TopBar";
@@ -29,6 +29,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { collapsed } = useSidebarState();
   const isMobile = useIsMobile();
 
+  // Sticky user: keep the last known user so a transient null during a
+  // Supabase token-refresh cycle doesn't unmount children and destroy forms.
+  const lastUserRef = useRef(user);
+  if (user) lastUserRef.current = user;
+  const effectiveUser = user ?? lastUserRef.current;
+
   useEffect(() => {
     if (!loading && !user) {
       navigate("/login");
@@ -45,7 +51,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return <PageLoadingSkeleton />;
   }
 
-  if (!user) {
+  if (!effectiveUser) {
     return null;
   }
 
