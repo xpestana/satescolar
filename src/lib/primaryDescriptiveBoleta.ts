@@ -119,9 +119,12 @@ async function fetchAssignmentsAndReports(
     .filter((a) => reportMap[a.id])
     .map((a) => ({ subject_name: a.subject.name, html: reportMap[a.id] }));
 
-  const mainRecord = reports.find((r) => r.assignment_id === mainAssignment?.id);
-  const literal          = mainRecord?.literal?.trim() ?? "";
-  const literal_numerico = mainRecord?.literal_numerico != null ? String(mainRecord.literal_numerico) : "";
+  // FinalGradesTab saves literal/literal_numerico to assignmentIds[0] (not necessarily is_main_report),
+  // so search all fetched records for whichever has the values set.
+  const literalRecord = reports.find((r) => r.literal?.trim() || r.literal_numerico != null)
+    ?? reports[0];
+  const literal          = literalRecord?.literal?.trim() ?? "";
+  const literal_numerico = literalRecord?.literal_numerico != null ? String(literalRecord.literal_numerico) : "";
 
   return { main_report, especialistas, literal, literal_numerico };
 }

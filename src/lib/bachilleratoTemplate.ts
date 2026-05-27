@@ -905,11 +905,7 @@ ${footerHtml}`;
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
     @media print{#controls{display:none!important}${footerPrintCss}}
     @media screen{
-      body{background:#525659}
-      table{box-shadow:0 0 10px rgba(0,0,0,0.45)}
-      #controls{background:#3f3f3f;border-bottom:1px solid #555}
-      #controls button{background:#2563eb;color:white}
-      #btn-close{background:#6b7280!important}
+      body{background:white}
     }
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
@@ -945,16 +941,21 @@ ${footerHtml}
   if(window.matchMedia('print').matches)return;
   // Hide internal controls when inside the app iframe (app has its own print button)
   if(window.self!==window.top){var c=document.getElementById('controls');if(c)c.style.display='none';}
-  // Draw page-break lines at each paper-page interval
+  // Draw dashed page-break lines at each paper-page interval (screen only)
   var mmPx=96/25.4;
   var pgH=${paperHeightMm}*mmPx;
   function draw(){
     document.body.style.position='relative';
     var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);
-    for(var y=pgH;y<h+pgH;y+=pgH){
+    var page=1;
+    for(var y=pgH;y<h;y+=pgH){
+      page++;
       var el=document.createElement('div');
-      el.style.cssText='position:absolute;left:0;right:0;top:'+Math.round(y)+'px;height:20px;background:#525659;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:500;';
-      el.innerHTML='<span style="font-size:9px;color:rgba(255,255,255,0.65);font-family:Arial,sans-serif;letter-spacing:1px">━━━━━ cambio de hoja ━━━━━</span>';
+      el.style.cssText='position:absolute;left:0;right:0;top:'+Math.round(y)+'px;pointer-events:none;z-index:500;border-top:2px dashed #dc2626;';
+      var lbl=document.createElement('span');
+      lbl.style.cssText='position:absolute;right:8px;top:-10px;font-size:8px;color:#dc2626;background:white;padding:0 4px;font-family:Arial,sans-serif;';
+      lbl.textContent='hoja '+page;
+      el.appendChild(lbl);
       document.body.appendChild(el);
     }
   }
@@ -998,11 +999,9 @@ export function wrapAllBoletasHtml(
       .boleta-page.last{page-break-after:avoid}
     }
     @media screen{
-      body{background:#525659;padding:12px 0 32px}
-      .boleta-page{background:white;box-shadow:0 0 10px rgba(0,0,0,0.45);min-height:${paperHeightMm}mm;margin:0 auto 24px;width:${paperWidthMm}mm}
-      #controls{background:#3f3f3f;border-bottom:1px solid #555}
-      #controls button{background:#2563eb!important;color:white!important}
-      #btn-close{background:#6b7280!important}
+      body{background:white}
+      .boleta-page{border-bottom:2px dashed #dc2626;margin-bottom:2px;position:relative}
+      .boleta-page.last{border-bottom:none}
     }
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
