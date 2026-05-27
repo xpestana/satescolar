@@ -938,28 +938,29 @@ ${footerHtml}`;
 ${footerHtml}
 <script>
 (function(){
-  if(window.matchMedia('print').matches)return;
-  // Hide internal controls when inside the app iframe (app has its own print button)
-  if(window.self!==window.top){var c=document.getElementById('controls');if(c)c.style.display='none';}
-  // Draw dashed page-break lines at each paper-page interval (screen only)
-  var mmPx=96/25.4;
-  var pgH=${paperHeightMm}*mmPx;
-  function draw(){
-    document.body.style.position='relative';
-    var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);
-    var page=1;
-    for(var y=pgH;y<h;y+=pgH){
-      page++;
-      var el=document.createElement('div');
-      el.style.cssText='position:absolute;left:0;right:0;top:'+Math.round(y)+'px;pointer-events:none;z-index:500;border-top:2px dashed #dc2626;';
-      var lbl=document.createElement('span');
-      lbl.style.cssText='position:absolute;right:8px;top:-10px;font-size:8px;color:#dc2626;background:white;padding:0 4px;font-family:Arial,sans-serif;';
-      lbl.textContent='hoja '+page;
-      el.appendChild(lbl);
-      document.body.appendChild(el);
+  if(window.self!==window.top){
+    // Inside iframe (template editor preview) — draw page-break indicators
+    var mmPx=96/25.4, pgH=${paperHeightMm}*mmPx;
+    function draw(){
+      document.body.style.position='relative';
+      var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);
+      var page=1;
+      for(var y=pgH;y<h;y+=pgH){
+        page++;
+        var el=document.createElement('div');
+        el.style.cssText='position:absolute;left:0;right:0;top:'+Math.round(y)+'px;pointer-events:none;z-index:500;border-top:2px dashed #dc2626;';
+        var lbl=document.createElement('span');
+        lbl.style.cssText='position:absolute;right:8px;top:-10px;font-size:8px;color:#dc2626;background:white;padding:0 4px;font-family:Arial,sans-serif;';
+        lbl.textContent='hoja '+page;
+        el.appendChild(lbl);
+        document.body.appendChild(el);
+      }
     }
+    if(document.readyState==='complete')draw();else window.addEventListener('load',draw);
+  } else {
+    // Standalone window — auto-trigger print dialog
+    window.addEventListener('load',function(){ window.print(); });
   }
-  if(document.readyState==='complete')draw();else window.addEventListener('load',draw);
 })();
 </script>
 </body>
@@ -1021,7 +1022,9 @@ export function wrapAllBoletasHtml(
 ${wrapped}
 <script>
 (function(){
-  if(window.self!==window.top){var c=document.getElementById('controls');if(c)c.style.display='none';}
+  if(window.self===window.top){
+    window.addEventListener('load',function(){ window.print(); });
+  }
 })();
 </script>
 </body>

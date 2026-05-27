@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Search, Loader2, Eye, Check, ChevronsUpDown, Download, Printer, X } from "lucide-react";
+import { Search, Loader2, Eye, Check, ChevronsUpDown, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
@@ -61,8 +61,10 @@ export default function GradesConsultation() {
   const [openGcrpTeacher, setOpenGcrpTeacher] = useState(false);
   const [downloadingStudentId, setDownloadingStudentId] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
-  const [boletaModal, setBoletaModal] = useState<{ html: string; title: string } | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const openBoleta = (html: string) => {
+    const win = window.open("", "_blank");
+    if (win) { win.document.write(html); win.document.close(); }
+  };
   // School years
   const { data: schoolYears = [] } = useQuery({
     queryKey: ["school-years", schoolId],
@@ -592,7 +594,7 @@ export default function GradesConsultation() {
                                     documentId: s.document_id ?? null,
                                   })),
                                 });
-                                setBoletaModal({ html, title: `Sección ${sectionData?.name ?? ""} — todas las boletas` });
+                                openBoleta(html);
                               } finally {
                                 setDownloadingAll(false);
                               }
@@ -626,7 +628,7 @@ export default function GradesConsultation() {
                                     documentId: s.document_id ?? null,
                                   })),
                                 });
-                                setBoletaModal({ html, title: `Sección ${sectionData?.name ?? ""} — todas las boletas` });
+                                openBoleta(html);
                               } finally {
                                 setDownloadingAll(false);
                               }
@@ -699,7 +701,7 @@ export default function GradesConsultation() {
                                             yearRange,
                                             momento: selectedMomento,
                                           });
-                                          setBoletaModal({ html, title: s.student_name });
+                                          openBoleta(html);
                                         } finally {
                                           setDownloadingStudentId(null);
                                         }
@@ -735,7 +737,7 @@ export default function GradesConsultation() {
                                             yearRange,
                                             momento: selectedMomento,
                                           });
-                                          setBoletaModal({ html, title: s.student_name });
+                                          openBoleta(html);
                                         } finally {
                                           setDownloadingStudentId(null);
                                         }
@@ -793,44 +795,6 @@ export default function GradesConsultation() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Modal de boleta (iframe con srcDoc) ─────────────────────────── */}
-      <Dialog open={!!boletaModal} onOpenChange={() => setBoletaModal(null)}>
-        <DialogContent className="max-w-4xl w-[95vw] h-[92vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="flex flex-row items-center justify-between px-4 py-3 border-b shrink-0">
-            <DialogTitle className="text-sm font-semibold truncate pr-4">
-              {boletaModal?.title ?? "Boleta"}
-            </DialogTitle>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                size="sm"
-                className="gap-1.5"
-                onClick={() => iframeRef.current?.contentWindow?.print()}
-              >
-                <Printer className="h-4 w-4" />
-                Imprimir / Guardar PDF
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                onClick={() => setBoletaModal(null)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden">
-            {boletaModal && (
-              <iframe
-                ref={iframeRef}
-                srcDoc={boletaModal.html}
-                className="w-full h-full border-0"
-                title="Boleta de Calificaciones"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </DashboardLayout>
   );
 }
