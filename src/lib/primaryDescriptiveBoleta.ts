@@ -7,10 +7,20 @@ import {
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 
+function proxyImageUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.endsWith(".amazonaws.com")) {
+      return `/img-proxy/${parsed.hostname}${parsed.pathname}`;
+    }
+  } catch { /* not a valid URL, use as-is */ }
+  return url;
+}
+
 async function fetchAsBase64(url: string): Promise<string> {
   if (!url) return "";
   try {
-    const res = await fetch(url);
+    const res = await fetch(proxyImageUrl(url));
     const blob = await res.blob();
     return new Promise((resolve) => {
       const reader = new FileReader();
