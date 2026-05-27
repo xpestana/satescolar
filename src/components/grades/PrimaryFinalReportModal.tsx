@@ -10,11 +10,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Save, User } from "lucide-react";
+import { Eye, Loader2, Save, User } from "lucide-react";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/utilities/RichTextEditor";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  generatePrimaryDescriptiveHtml,
+  DEFAULT_BACHILLERATO_CONFIG,
+  type PrimaryDescriptiveRenderData,
+} from "@/lib/bachilleratoTemplate";
+
+const GRADE_LABELS: Record<string, string> = {
+  "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
+  "4_grado": "4to Grado", "5_grado": "5to Grado", "6_grado": "6to Grado",
+};
 
 interface PrimaryFinalReportModalProps {
   open: boolean;
@@ -41,6 +51,8 @@ export default function PrimaryFinalReportModal({
   const [projectName, setProjectName] = useState("");
   const [saving, setSaving] = useState(false);
   const [activeTeacherTab, setActiveTeacherTab] = useState("1");
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   // Load teacher info from assignment
   const { data: teacherInfo } = useQuery({
@@ -57,6 +69,34 @@ export default function PrimaryFinalReportModal({
       const fullName = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido]
         .filter(Boolean).join(" ");
       return { name: fullName || "Sin nombre", documentId: t.document_id || "—" };
+    },
+    enabled: open,
+  });
+
+  // School info for preview
+  const { data: schoolData } = useQuery({
+    queryKey: ["school-info-preview", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("schools")
+        .select("name, logo_url, address, dea_code, phone")
+        .eq("id", schoolId)
+        .single();
+      return data as any;
+    },
+    enabled: open,
+  });
+
+  // Section + year info for preview
+  const { data: assignmentDetail } = useQuery({
+    queryKey: ["assignment-section-year", assignmentId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("subject_teacher_assignments")
+        .select("section:section_id(id, name, grade_level), school_year:school_year_id(id, year_range)")
+        .eq("id", assignmentId)
+        .maybeSingle();
+      return data as any;
     },
     enabled: open,
   });
@@ -180,6 +220,42 @@ export default function PrimaryFinalReportModal({
     setIndicatorValues(map);
   }, [open, existingIndicatorGrades]);
 
+  // Live preview: regenerate boleta HTML 700ms after any content change
+  useEffect(() => {
+    if (!open || !schoolData || !assignmentDetail) return;
+    setPreviewLoading(true);
+    const timer = setTimeout(() => {
+      try {
+        const previewData: PrimaryDescriptiveRenderData = {
+          school_name: (schoolData as any)?.name ?? "",
+          school_logo: "",
+          year_range: (assignmentDetail as any)?.school_year?.year_range ?? "",
+          address: (schoolData as any)?.address ?? "",
+          dea_code: (schoolData as any)?.dea_code ?? "",
+          phone: (schoolData as any)?.phone ?? "",
+          literal,
+          literal_numerico: literalNumerico,
+          student_name: studentName,
+          document_id: "",
+          grade_label: GRADE_LABELS[gradeLevel] ?? gradeLevel,
+          section_name: (assignmentDetail as any)?.section?.name ?? "",
+          momento,
+          main_report: descriptiveReport.trim()
+            ? { subject_name: "Informe General", html: descriptiveReport }
+            : null,
+          especialistas: [],
+        };
+        setPreviewHtml(generatePrimaryDescriptiveHtml(DEFAULT_BACHILLERATO_CONFIG, previewData, 215.9, 279.4));
+      } finally {
+        setPreviewLoading(false);
+      }
+    }, 700);
+    return () => {
+      clearTimeout(timer);
+      setPreviewLoading(false);
+    };
+  }, [open, descriptiveReport, literal, literalNumerico, schoolData, assignmentDetail, studentName, momento, gradeLevel]);
+
   // Teacher grades grouped by momento
   const teacherGradesByMomento = useMemo(() => {
     const gradesMap: Record<string, string> = {};
@@ -258,8 +334,8 @@ export default function PrimaryFinalReportModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-7xl max-h-[95vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="w-[96vw] max-w-none h-[96vh] max-h-none flex flex-col p-4">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             Informe — {studentName}
             <Badge variant="outline">Momento {momento === 0 ? "Final" : momento}</Badge>
@@ -268,7 +344,7 @@ export default function PrimaryFinalReportModal({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_340px] gap-4 flex-1 min-h-0">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="border rounded-md p-3 space-y-3">
                 <Skeleton className="h-5 w-32" />
@@ -279,121 +355,124 @@ export default function PrimaryFinalReportModal({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
-              {/* Column 1: Teacher grades */}
-              <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
-                <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
-                  <h3 className="text-sm font-semibold">Notas del Docente</h3>
-                </div>
-                <Tabs value={activeTeacherTab} onValueChange={setActiveTeacherTab} className="flex-1 flex flex-col min-h-0">
-                  <TabsList className="mx-2 mt-2 shrink-0">
-                    {[1, 2, 3].map((m) => (
-                      <TabsTrigger key={m} value={String(m)} className="text-xs">
-                        Momento {m}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
+          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_340px] gap-4 flex-1 min-h-0">
+
+            {/* Column 1: Teacher grades — narrow reference panel */}
+            <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
+              <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
+                <h3 className="text-sm font-semibold">Notas del Docente</h3>
+              </div>
+              <Tabs value={activeTeacherTab} onValueChange={setActiveTeacherTab} className="flex-1 flex flex-col min-h-0">
+                <TabsList className="mx-2 mt-2 shrink-0">
                   {[1, 2, 3].map((m) => (
-                    <TabsContent key={m} value={String(m)} className="flex-1 px-3 pb-3 min-h-0">
-                      <ScrollArea className="h-full">
-                        {teacherGradesByMomento[m]?.length === 0 ? (
-                          <p className="text-sm text-muted-foreground py-4 text-center">
-                            Sin evaluaciones en este momento
-                          </p>
-                        ) : (
-                          <div className="space-y-2">
-                            {teacherGradesByMomento[m]?.map((item, idx) => (
-                              <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0">
-                                <span className="text-sm flex-1">{item.description}</span>
-                                <Badge variant="outline" className="shrink-0">{item.grade}</Badge>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </ScrollArea>
-                    </TabsContent>
+                    <TabsTrigger key={m} value={String(m)} className="text-xs">
+                      Momento {m}
+                    </TabsTrigger>
                   ))}
-                </Tabs>
-              </div>
-
-              {/* Column 2: Indicators or Descriptive */}
-              <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
-                <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
-                  <h3 className="text-sm font-semibold">
-                    {reportType === "descriptive" ? "Informe Descriptivo" : "Indicadores"}
-                  </h3>
-                </div>
-                <div className="flex-1 min-h-0 flex flex-col p-3">
-                  {reportType === "descriptive" ? (
-                    <RichTextEditor
-                      value={descriptiveReport}
-                      onChange={setDescriptiveReport}
-                      placeholder="Redacte el informe descriptivo del estudiante..."
-                      minHeight={100}
-                    />
-                  ) : (
+                </TabsList>
+                {[1, 2, 3].map((m) => (
+                  <TabsContent key={m} value={String(m)} className="flex-1 px-3 pb-3 min-h-0">
                     <ScrollArea className="h-full">
-                      <div className="space-y-4 pr-2">
-                        {areas.map((area: any) => (
-                          <div key={area.id}>
-                            <h4 className="text-sm font-semibold text-primary mb-2">{area.name}</h4>
-                            <div className="space-y-2">
-                              {(area.indicators || [])
-                                .sort((a: any, b: any) => a.display_order - b.display_order)
-                                .map((ind: any) => (
-                                  <div key={ind.id} className="flex items-start gap-2">
-                                    <span className="text-xs flex-1 pt-1.5">{ind.description}</span>
-                                    <Select
-                                      value={indicatorValues[ind.id] || ""}
-                                      onValueChange={(v) =>
-                                        setIndicatorValues((prev) => ({ ...prev, [ind.id]: v }))
-                                      }
-                                    >
-                                      <SelectTrigger className="h-8 w-24 text-xs shrink-0">
-                                        <SelectValue placeholder="—" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {scales.map((sc: any) => (
-                                          <SelectItem key={sc.id} value={sc.id} className="text-xs">
-                                            {sc.abbreviation}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                ))}
+                      {teacherGradesByMomento[m]?.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">
+                          Sin evaluaciones en este momento
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {teacherGradesByMomento[m]?.map((item, idx) => (
+                            <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0">
+                              <span className="text-sm flex-1">{item.description}</span>
+                              <Badge variant="outline" className="shrink-0">{item.grade}</Badge>
                             </div>
-                          </div>
-                        ))}
-                        {areas.length === 0 && (
-                          <p className="text-sm text-muted-foreground text-center py-8">
-                            No hay indicadores configurados para este grado.
-                          </p>
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </ScrollArea>
-                  )}
-                </div>
-              </div>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </div>
 
-              {/* Column 3: Observaciones del Momento */}
-              <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
-                <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
+            {/* Column 2: Informe Descriptivo — dominant editor workspace */}
+            <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
+              <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
+                <h3 className="text-sm font-semibold">
+                  {reportType === "descriptive" ? "Informe Descriptivo" : "Indicadores"}
+                </h3>
+              </div>
+              <div className="flex-1 min-h-0 flex flex-col p-3">
+                {reportType === "descriptive" ? (
+                  <RichTextEditor
+                    value={descriptiveReport}
+                    onChange={setDescriptiveReport}
+                    placeholder="Redacte el informe descriptivo del estudiante..."
+                  />
+                ) : (
+                  <ScrollArea className="h-full">
+                    <div className="space-y-4 pr-2">
+                      {areas.map((area: any) => (
+                        <div key={area.id}>
+                          <h4 className="text-sm font-semibold text-primary mb-2">{area.name}</h4>
+                          <div className="space-y-2">
+                            {(area.indicators || [])
+                              .sort((a: any, b: any) => a.display_order - b.display_order)
+                              .map((ind: any) => (
+                                <div key={ind.id} className="flex items-start gap-2">
+                                  <span className="text-xs flex-1 pt-1.5">{ind.description}</span>
+                                  <Select
+                                    value={indicatorValues[ind.id] || ""}
+                                    onValueChange={(v) =>
+                                      setIndicatorValues((prev) => ({ ...prev, [ind.id]: v }))
+                                    }
+                                  >
+                                    <SelectTrigger className="h-8 w-24 text-xs shrink-0">
+                                      <SelectValue placeholder="—" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {scales.map((sc: any) => (
+                                        <SelectItem key={sc.id} value={sc.id} className="text-xs">
+                                          {sc.abbreviation}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      ))}
+                      {areas.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-8">
+                          No hay indicadores configurados para este grado.
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+            </div>
+
+            {/* Column 3: Observaciones (top) + Vista Previa (bottom) */}
+            <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
+
+              {/* Observaciones del Momento — compact fixed section */}
+              <div className="shrink-0">
+                <div className="px-3 py-2 bg-muted/30 border-b">
                   <h3 className="text-sm font-semibold">Observaciones del Momento</h3>
                 </div>
-                <ScrollArea className="flex-1">
-                  <div className="p-3 space-y-3">
-                    <div className="space-y-1.5">
+                <div className="p-3 space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
                       <Label className="text-xs">Literal (A-E)</Label>
                       <Input
                         value={literal}
                         onChange={(e) => handleLiteralChange(e.target.value)}
                         placeholder="A"
                         maxLength={1}
-                        className="h-9 text-center font-semibold uppercase"
+                        className="h-8 text-center font-semibold uppercase"
                       />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <Label className="text-xs">Literal Numérico</Label>
                       <Input
                         type="number"
@@ -402,66 +481,93 @@ export default function PrimaryFinalReportModal({
                         step={0.01}
                         value={literalNumerico}
                         onChange={(e) => setLiteralNumerico(e.target.value)}
-                        placeholder="Ej: 19"
-                        className="h-9"
+                        placeholder="19"
+                        className="h-8"
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Inasistencias</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        value={absenceCount}
-                        onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="h-9"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Nombre del Proyecto</Label>
-                      <Input
-                        value={projectName}
-                        onChange={(e) => setProjectName(e.target.value)}
-                        placeholder="Nombre del proyecto..."
-                        className="h-9"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs flex items-center gap-1">
-                        <User className="h-3 w-3" /> Docente
-                      </Label>
-                      <Input
-                        value={teacherInfo?.name || "—"}
-                        readOnly
-                        className="h-9 bg-muted/50 cursor-default"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Cédula del Docente</Label>
-                      <Input
-                        value={teacherInfo?.documentId || "—"}
-                        readOnly
-                        className="h-9 bg-muted/50 cursor-default"
-                      />
-                    </div>
-                    {reportType === "indicators" && (
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Observación Descriptiva</Label>
-                        <RichTextEditor
-                          value={descriptiveReport}
-                          onChange={setDescriptiveReport}
-                          placeholder="Observación adicional..."
-                          minHeight={120}
-                          className="min-h-[160px]"
-                        />
-                      </div>
-                    )}
                   </div>
-                </ScrollArea>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Inasistencias</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={absenceCount}
+                      onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nombre del Proyecto</Label>
+                    <Input
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      placeholder="Nombre del proyecto..."
+                      className="h-8"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs flex items-center gap-1">
+                      <User className="h-3 w-3" /> Docente
+                    </Label>
+                    <Input
+                      value={teacherInfo?.name || "—"}
+                      readOnly
+                      className="h-8 bg-muted/50 cursor-default text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Cédula del Docente</Label>
+                    <Input
+                      value={teacherInfo?.documentId || "—"}
+                      readOnly
+                      className="h-8 bg-muted/50 cursor-default"
+                    />
+                  </div>
+                  {reportType === "indicators" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Observación Descriptiva</Label>
+                      <RichTextEditor
+                        value={descriptiveReport}
+                        onChange={setDescriptiveReport}
+                        placeholder="Observación adicional..."
+                        minHeight={120}
+                        className="min-h-[160px]"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {/* Vista Previa — live boleta preview, fills remaining height */}
+              <div className="flex-1 min-h-0 flex flex-col border-t">
+                <div className="px-3 py-2 bg-muted/30 border-b shrink-0 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                    <Eye className="h-3.5 w-3.5" />
+                    Vista Previa
+                  </h3>
+                  {previewLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                </div>
+                <div className="flex-1 relative min-h-0 overflow-hidden">
+                  {previewHtml ? (
+                    <iframe
+                      srcDoc={previewHtml}
+                      className="w-full h-full border-0"
+                      title="Vista previa de boleta"
+                      sandbox="allow-same-origin"
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground p-4 text-center">
+                      Complete los campos para ver la vista previa
+                    </p>
+                  )}
+                </div>
+              </div>
+
             </div>
+          </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>

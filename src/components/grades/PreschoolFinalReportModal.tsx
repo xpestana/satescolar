@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Save, User } from "lucide-react";
+import { Eye, Loader2, Save, User } from "lucide-react";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/utilities/RichTextEditor";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -46,20 +46,73 @@ function mapGradeLevelToPreschoolLevel(gradeLevel: string): string {
   }
 }
 
+function buildPreschoolPreviewHtml(opts: {
+  schoolName: string;
+  yearRange: string;
+  studentName: string;
+  levelLabel: string;
+  sectionName: string;
+  literal: string;
+  momento: number;
+  descriptiveReport: string;
+}): string {
+  const lapsoLabels: Record<number, string> = { 1: "1er", 2: "2do", 3: "3er" };
+  const lapso = lapsoLabels[opts.momento] ?? `${opts.momento}°`;
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 10pt; margin: 15mm 15mm 15mm 15mm; color: #111; }
+  .header { border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; margin-bottom: 10px; text-align: center; }
+  .school { font-size: 13pt; font-weight: 700; color: #1e3a5f; text-transform: uppercase; }
+  .year { font-size: 9pt; color: #4b5563; margin-top: 2px; }
+  .title { text-align: center; font-size: 11pt; font-weight: 700; text-decoration: underline; text-transform: uppercase; margin: 10px 0; }
+  .student-row { display: flex; gap: 20px; margin-bottom: 10px; font-size: 9.5pt; }
+  .student-row span { font-weight: 600; }
+  .report-body { font-size: 10pt; line-height: 1.7; text-align: justify; }
+  .footer-literal { margin-top: 16px; display: flex; gap: 24px; font-size: 9.5pt; }
+  .footer-literal span { font-weight: 600; }
+</style></head><body>
+<div class="header">
+  <div class="school">${esc(opts.schoolName)}</div>
+  <div class="year">AÑO ESCOLAR ${esc(opts.yearRange)}</div>
+</div>
+<div class="title">INFORME DESCRIPTIVO DEL ${lapso} LAPSO</div>
+<div class="student-row">
+  <div>Alumno(a): <span>${esc(opts.studentName)}</span></div>
+  <div>Nivel: <span>${esc(opts.levelLabel)}</span></div>
+  <div>Sección: <span>${esc(opts.sectionName)}</span></div>
+</div>
+<div class="report-body">${opts.descriptiveReport || "<em style='color:#9ca3af'>Sin contenido aún...</em>"}</div>
+${opts.literal ? `<div class="footer-literal">Literal: <span>${esc(opts.literal)}</span></div>` : ""}
+</body></html>`;
+}
+
 export default function PreschoolFinalReportModal({
   open, onClose, studentId, studentName, assignmentId, schoolId,
   momento, gradeLevel, reportType, onSaved,
 }: PreschoolFinalReportModalProps) {
   const [descriptiveReport, setDescriptiveReport] = useState("");
   const [indicatorValues, setIndicatorValues] = useState<Record<string, string>>({});
-  const [componentDescriptions, setComponentDescriptions] = useState<Record<string, string>>({});
   const [literal, setLiteral] = useState("");
   const [absenceCount, setAbsenceCount] = useState(0);
   const [projectName, setProjectName] = useState("");
   const [saving, setSaving] = useState(false);
   const [activeTeacherTab, setActiveTeacherTab] = useState("1");
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const preschoolLevel = mapGradeLevelToPreschoolLevel(gradeLevel);
+
+  const levelLabel = (() => {
+    switch (gradeLevel) {
+      case "pre_maternal": return "Prematernal";
+      case "maternal": return "Maternal";
+      case "i_nivel": return "1er Nivel";
+      case "ii_nivel": return "2do Nivel";
+      case "iii_nivel": return "3er Nivel";
+      default: return gradeLevel;
+    }
+  })();
 
   // Load teacher info from assignment
   const { data: teacherInfo } = useQuery({
@@ -76,6 +129,34 @@ export default function PreschoolFinalReportModal({
       const fullName = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido]
         .filter(Boolean).join(" ");
       return { name: fullName || "Sin nombre", documentId: t.document_id || "—" };
+    },
+    enabled: open,
+  });
+
+  // School info for preview
+  const { data: schoolData } = useQuery({
+    queryKey: ["school-info-preview", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("schools")
+        .select("name, logo_url, address, dea_code, phone")
+        .eq("id", schoolId)
+        .single();
+      return data as any;
+    },
+    enabled: open,
+  });
+
+  // Section + year info for preview
+  const { data: assignmentDetail } = useQuery({
+    queryKey: ["assignment-section-year", assignmentId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("subject_teacher_assignments")
+        .select("section:section_id(id, name, grade_level), school_year:school_year_id(id, year_range)")
+        .eq("id", assignmentId)
+        .maybeSingle();
+      return data as any;
     },
     enabled: open,
   });
@@ -196,6 +277,32 @@ export default function PreschoolFinalReportModal({
     setIndicatorValues(map);
   }, [open, existingIndicatorGrades]);
 
+  // Live preview: regenerate 700ms after any content change
+  useEffect(() => {
+    if (!open || !schoolData || !assignmentDetail) return;
+    setPreviewLoading(true);
+    const timer = setTimeout(() => {
+      try {
+        setPreviewHtml(buildPreschoolPreviewHtml({
+          schoolName: (schoolData as any)?.name ?? "",
+          yearRange: (assignmentDetail as any)?.school_year?.year_range ?? "",
+          studentName,
+          levelLabel: levelLabel,
+          sectionName: (assignmentDetail as any)?.section?.name ?? "",
+          literal,
+          momento,
+          descriptiveReport,
+        }));
+      } finally {
+        setPreviewLoading(false);
+      }
+    }, 700);
+    return () => {
+      clearTimeout(timer);
+      setPreviewLoading(false);
+    };
+  }, [open, descriptiveReport, literal, schoolData, assignmentDetail, studentName, momento, levelLabel]);
+
   // Teacher grades grouped by momento
   const teacherGradesByMomento = useMemo(() => {
     const gradesMap: Record<string, string> = {};
@@ -271,21 +378,10 @@ export default function PreschoolFinalReportModal({
 
   const isLoading = reportLoading || indicatorGradesLoading;
 
-  const levelLabel = (() => {
-    switch (gradeLevel) {
-      case "pre_maternal": return "Prematernal";
-      case "maternal": return "Maternal";
-      case "i_nivel": return "1er Nivel";
-      case "ii_nivel": return "2do Nivel";
-      case "iii_nivel": return "3er Nivel";
-      default: return gradeLevel;
-    }
-  })();
-
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-7xl max-h-[95vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="w-[96vw] max-w-none h-[96vh] max-h-none flex flex-col p-4">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             Informe — {studentName}
             <Badge variant="outline">Momento {momento === 0 ? "Final" : momento}</Badge>
@@ -295,7 +391,7 @@ export default function PreschoolFinalReportModal({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_340px] gap-4 flex-1 min-h-0">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="border rounded-md p-3 space-y-3">
                 <Skeleton className="h-5 w-32" />
@@ -306,8 +402,9 @@ export default function PreschoolFinalReportModal({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-0">
-            {/* Column 1: Teacher grades */}
+          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_340px] gap-4 flex-1 min-h-0">
+
+            {/* Column 1: Teacher grades — narrow reference panel */}
             <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
               <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
                 <h3 className="text-sm font-semibold">Notas del Docente</h3>
@@ -343,7 +440,7 @@ export default function PreschoolFinalReportModal({
               </Tabs>
             </div>
 
-            {/* Column 2: Components with descriptive or indicators */}
+            {/* Column 2: Components — dominant editor workspace */}
             <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
               <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
                 <h3 className="text-sm font-semibold">
@@ -363,7 +460,6 @@ export default function PreschoolFinalReportModal({
                           {components.map((comp: any) => (
                             <div key={comp.id} className="space-y-1.5">
                               <h4 className="text-sm font-semibold text-primary">{comp.name}</h4>
-                              {/* In descriptive mode, single WYSIWYG for all */}
                             </div>
                           ))}
                           <div className="mt-2">
@@ -371,7 +467,6 @@ export default function PreschoolFinalReportModal({
                               value={descriptiveReport}
                               onChange={setDescriptiveReport}
                               placeholder="Redacte el informe descriptivo del estudiante..."
-                              minHeight={280}
                             />
                           </div>
                         </>
@@ -423,62 +518,64 @@ export default function PreschoolFinalReportModal({
               </div>
             </div>
 
-            {/* Column 3: Observaciones del Momento */}
+            {/* Column 3: Observaciones (top) + Vista Previa (bottom) */}
             <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
-              <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
-                <h3 className="text-sm font-semibold">Observaciones del Momento</h3>
-              </div>
-              <ScrollArea className="flex-1">
-                <div className="p-3 space-y-3">
-                  <div className="space-y-1.5">
+
+              {/* Observaciones del Momento — compact fixed section */}
+              <div className="shrink-0">
+                <div className="px-3 py-2 bg-muted/30 border-b">
+                  <h3 className="text-sm font-semibold">Observaciones del Momento</h3>
+                </div>
+                <div className="p-3 space-y-2.5">
+                  <div className="space-y-1">
                     <Label className="text-xs">Literal (A-E)</Label>
                     <Input
                       value={literal}
                       onChange={(e) => handleLiteralChange(e.target.value)}
                       placeholder="A"
                       maxLength={1}
-                      className="h-9 text-center font-semibold uppercase"
+                      className="h-8 text-center font-semibold uppercase"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <Label className="text-xs">Inasistencias</Label>
                     <Input
                       type="number"
                       min={0}
                       value={absenceCount}
                       onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="h-9"
+                      className="h-8"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <Label className="text-xs">Nombre del Proyecto</Label>
                     <Input
                       value={projectName}
                       onChange={(e) => setProjectName(e.target.value)}
                       placeholder="Nombre del proyecto..."
-                      className="h-9"
+                      className="h-8"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <Label className="text-xs flex items-center gap-1">
                       <User className="h-3 w-3" /> Docente
                     </Label>
                     <Input
                       value={teacherInfo?.name || "—"}
                       readOnly
-                      className="h-9 bg-muted/50 cursor-default"
+                      className="h-8 bg-muted/50 cursor-default text-xs"
                     />
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <Label className="text-xs">Cédula del Docente</Label>
                     <Input
                       value={teacherInfo?.documentId || "—"}
                       readOnly
-                      className="h-9 bg-muted/50 cursor-default"
+                      className="h-8 bg-muted/50 cursor-default"
                     />
                   </div>
                   {reportType === "indicators" && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <Label className="text-xs">Observación Descriptiva</Label>
                       <RichTextEditor
                         value={descriptiveReport}
@@ -489,12 +586,38 @@ export default function PreschoolFinalReportModal({
                     </div>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
+
+              {/* Vista Previa — simple styled HTML preview */}
+              <div className="flex-1 min-h-0 flex flex-col border-t">
+                <div className="px-3 py-2 bg-muted/30 border-b shrink-0 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                    <Eye className="h-3.5 w-3.5" />
+                    Vista Previa
+                  </h3>
+                  {previewLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                </div>
+                <div className="flex-1 relative min-h-0 overflow-hidden">
+                  {previewHtml ? (
+                    <iframe
+                      srcDoc={previewHtml}
+                      className="w-full h-full border-0"
+                      title="Vista previa de boleta"
+                      sandbox="allow-same-origin"
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground p-4 text-center">
+                      Complete los campos para ver la vista previa
+                    </p>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancelar
           </Button>
