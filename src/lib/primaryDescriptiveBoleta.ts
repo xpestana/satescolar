@@ -7,6 +7,22 @@ import {
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 
+async function fetchAsBase64(url: string): Promise<string> {
+  if (!url) return "";
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string) ?? "");
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return "";
+  }
+}
+
 export interface PrimaryDescriptiveBoletaParams {
   schoolId:    string;
   studentId:   string;
@@ -142,9 +158,15 @@ export async function downloadPrimaryDescriptiveBoleta(
     schoolId, sectionId, yearId, studentId, momento,
   );
 
+  const [schoolLogoB64, footerLogoB64] = await Promise.all([
+    fetchAsBase64(school?.logo_url ?? ""),
+    fetchAsBase64(cfg.primaria?.footer_logo_url ?? ""),
+  ]);
+  if (cfg.primaria) cfg.primaria.footer_logo_url = footerLogoB64;
+
   const data: PrimaryDescriptiveRenderData = {
     school_name:      school?.name ?? "",
-    school_logo:      school?.logo_url ?? "",
+    school_logo:      schoolLogoB64,
     year_range:       yearRange,
     address:          (school as any)?.address ?? "",
     dea_code:         (school as any)?.dea_code ?? "",
@@ -182,6 +204,12 @@ export async function downloadAllPrimaryDescriptiveBoletas(params: {
 
   const { cfg, paperW, paperH, school } = await fetchTemplateAndCommon(schoolId, gradeKey);
 
+  const [schoolLogoB64, footerLogoB64] = await Promise.all([
+    fetchAsBase64(school?.logo_url ?? ""),
+    fetchAsBase64(cfg.primaria?.footer_logo_url ?? ""),
+  ]);
+  if (cfg.primaria) cfg.primaria.footer_logo_url = footerLogoB64;
+
   const bodies = await Promise.all(
     students.map(async (s) => {
       const { main_report, especialistas, literal, literal_numerico } = await fetchAssignmentsAndReports(
@@ -189,7 +217,7 @@ export async function downloadAllPrimaryDescriptiveBoletas(params: {
       );
       const data: PrimaryDescriptiveRenderData = {
         school_name:      school?.name ?? "",
-        school_logo:      school?.logo_url ?? "",
+        school_logo:      schoolLogoB64,
         year_range:       yearRange,
         address:          (school as any)?.address ?? "",
         dea_code:         (school as any)?.dea_code ?? "",
