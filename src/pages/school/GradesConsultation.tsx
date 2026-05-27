@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
 import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas } from "@/lib/bachilleratoBoleta";
 import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
+import { downloadHtmlAsPdf } from "@/lib/htmlToPdfDownload";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -61,9 +62,8 @@ export default function GradesConsultation() {
   const [openGcrpTeacher, setOpenGcrpTeacher] = useState(false);
   const [downloadingStudentId, setDownloadingStudentId] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
-  const openBoleta = (html: string) => {
-    const win = window.open("", "_blank");
-    if (win) { win.document.write(html); win.document.close(); }
+  const downloadBoletaPdf = async (html: string, filename: string) => {
+    await downloadHtmlAsPdf(html, filename);
   };
   // School years
   const { data: schoolYears = [] } = useQuery({
@@ -594,7 +594,7 @@ export default function GradesConsultation() {
                                     documentId: s.document_id ?? null,
                                   })),
                                 });
-                                openBoleta(html);
+                                await downloadBoletaPdf(html, `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`);
                               } finally {
                                 setDownloadingAll(false);
                               }
@@ -628,7 +628,7 @@ export default function GradesConsultation() {
                                     documentId: s.document_id ?? null,
                                   })),
                                 });
-                                openBoleta(html);
+                                await downloadBoletaPdf(html, `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`);
                               } finally {
                                 setDownloadingAll(false);
                               }
@@ -701,7 +701,7 @@ export default function GradesConsultation() {
                                             yearRange,
                                             momento: selectedMomento,
                                           });
-                                          openBoleta(html);
+                                          await downloadBoletaPdf(html, `Boleta_${s.student_name}_M${selectedMomento}.pdf`);
                                         } finally {
                                           setDownloadingStudentId(null);
                                         }
@@ -737,7 +737,7 @@ export default function GradesConsultation() {
                                             yearRange,
                                             momento: selectedMomento,
                                           });
-                                          openBoleta(html);
+                                          await downloadBoletaPdf(html, `Boleta_${s.student_name}_M${selectedMomento}.pdf`);
                                         } finally {
                                           setDownloadingStudentId(null);
                                         }
