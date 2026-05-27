@@ -826,15 +826,13 @@ export function generatePrimaryDescriptiveHtml(
       </div>`).join("")}
   </div>` : "";
 
-  // Literal / Numeral block
-  const hasLiteral = data.literal?.trim();
-  const hasNumeral = data.literal_numerico?.trim();
-  const literalNumeralHtml = (hasLiteral || hasNumeral) ? `
+  // Literal / Numeral block — always shown
+  const literalNumeralHtml = `
   <div style="text-align:center;margin-top:14px;font-size:${bodyFontSize}pt">
-    ${hasLiteral ? `Literal: <b>${esc(data.literal)}</b>` : ""}
-    ${hasLiteral && hasNumeral ? "&nbsp;&nbsp;&nbsp;&nbsp;" : ""}
-    ${hasNumeral ? `Numeral: <b>${esc(data.literal_numerico)}</b>` : ""}
-  </div>` : "";
+    Literal: <b>${esc(data.literal || "—")}</b>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    Numeral: <b>${esc(data.literal_numerico || "—")}</b>
+  </div>`;
 
   // Signatures block
   const cfgSigs = p.signatures ?? [];
@@ -906,6 +904,13 @@ ${footerHtml}`;
     html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
     @media print{#controls{display:none!important}${footerPrintCss}}
+    @media screen{
+      body{background:#525659}
+      table{box-shadow:0 0 10px rgba(0,0,0,0.45)}
+      #controls{background:#3f3f3f;border-bottom:1px solid #555}
+      #controls button{background:#2563eb;color:white}
+      #btn-close{background:#6b7280!important}
+    }
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
@@ -935,6 +940,27 @@ ${footerHtml}`;
   </tbody>
 </table>
 ${footerHtml}
+<script>
+(function(){
+  if(window.matchMedia('print').matches)return;
+  // Hide internal controls when inside the app iframe (app has its own print button)
+  if(window.self!==window.top){var c=document.getElementById('controls');if(c)c.style.display='none';}
+  // Draw page-break lines at each paper-page interval
+  var mmPx=96/25.4;
+  var pgH=${paperHeightMm}*mmPx;
+  function draw(){
+    document.body.style.position='relative';
+    var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);
+    for(var y=pgH;y<h+pgH;y+=pgH){
+      var el=document.createElement('div');
+      el.style.cssText='position:absolute;left:0;right:0;top:'+Math.round(y)+'px;height:20px;background:#525659;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:500;';
+      el.innerHTML='<span style="font-size:9px;color:rgba(255,255,255,0.65);font-family:Arial,sans-serif;letter-spacing:1px">━━━━━ cambio de hoja ━━━━━</span>';
+      document.body.appendChild(el);
+    }
+  }
+  if(document.readyState==='complete')draw();else window.addEventListener('load',draw);
+})();
+</script>
 </body>
 </html>`;
 }
@@ -971,6 +997,13 @@ export function wrapAllBoletasHtml(
       .boleta-page{page-break-after:always}
       .boleta-page.last{page-break-after:avoid}
     }
+    @media screen{
+      body{background:#525659;padding:12px 0 32px}
+      .boleta-page{background:white;box-shadow:0 0 10px rgba(0,0,0,0.45);min-height:${paperHeightMm}mm;margin:0 auto 24px;width:${paperWidthMm}mm}
+      #controls{background:#3f3f3f;border-bottom:1px solid #555}
+      #controls button{background:#2563eb!important;color:white!important}
+      #btn-close{background:#6b7280!important}
+    }
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
@@ -987,6 +1020,11 @@ export function wrapAllBoletasHtml(
   <button id="btn-close" onclick="window.close()">Cerrar</button>
 </div>
 ${wrapped}
+<script>
+(function(){
+  if(window.self!==window.top){var c=document.getElementById('controls');if(c)c.style.display='none';}
+})();
+</script>
 </body>
 </html>`;
 }
