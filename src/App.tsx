@@ -69,7 +69,7 @@ import PermissionProfileForm from "./pages/school/PermissionProfileForm";
 import { InstallAppPrompt } from "@/components/InstallAppPrompt";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1 } },
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
 
 const App = () => (

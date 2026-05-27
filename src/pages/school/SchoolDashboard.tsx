@@ -35,7 +35,6 @@ export default function SchoolDashboard() {
   const freshOpts = {
     staleTime: 30_000,
     refetchOnMount: "always" as const,
-    refetchOnWindowFocus: true,
   };
 
   const { data: enrolledStudents = 0, isLoading: l1 } = useQuery({
