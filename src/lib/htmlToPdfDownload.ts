@@ -90,14 +90,22 @@ export async function htmlToPdfBlob(
       // We extract those slices from the single canvas and recompose each page.
       const headerHpx = Math.round(headerEl.offsetHeight * scale);
       const footerHpx = footerEl ? Math.round(footerEl.offsetHeight * scale) : 0;
-      const availableHpx = pageHpx - headerHpx - footerHpx;
+      // Continuation pages have no natural top-padding (content slice starts mid-document),
+      // so we add an explicit gap below the header to avoid the first line sitting flush
+      // against it. Page 1 already has the tbody top-padding from the canvas layout.
+      const contTopPadHpx = Math.round(8 * pxPerMm);
+      const firstPageAvailHpx = pageHpx - headerHpx - footerHpx;
+      const laterPageAvailHpx = firstPageAvailHpx - contTopPadHpx;
       const contentTotalHpx = canvas.height - headerHpx - footerHpx;
 
       let yOffset = 0;
-      let firstPage = true;
+      let isFirstPage = true;
       while (yOffset < contentTotalHpx) {
-        if (!firstPage) pdf.addPage();
-        firstPage = false;
+        if (!isFirstPage) pdf.addPage();
+
+        const availableHpx = isFirstPage ? firstPageAvailHpx : laterPageAvailHpx;
+        const contentDestY  = isFirstPage ? headerHpx : headerHpx + contTopPadHpx;
+        isFirstPage = false;
 
         const pageCanvas = document.createElement("canvas");
         pageCanvas.width = canvas.width;
@@ -109,9 +117,9 @@ export async function htmlToPdfBlob(
         // Header — always from the top of the main canvas
         ctx.drawImage(canvas, 0, 0, canvas.width, headerHpx, 0, 0, canvas.width, headerHpx);
 
-        // Content slice
+        // Content slice — on continuation pages starts lower to create breathing room
         const sliceH = Math.min(availableHpx, contentTotalHpx - yOffset);
-        ctx.drawImage(canvas, 0, headerHpx + yOffset, canvas.width, sliceH, 0, headerHpx, canvas.width, sliceH);
+        ctx.drawImage(canvas, 0, headerHpx + yOffset, canvas.width, sliceH, 0, contentDestY, canvas.width, sliceH);
 
         // Footer — always from the bottom of the main canvas
         if (footerHpx > 0) {
