@@ -341,33 +341,96 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
 
   // ── Primaria Descriptivo style ──────────────────────────────────────────────
   if (cfg.style === "primaria_descriptivo") {
+    const PRIMARIA_DEFAULTS: NonNullable<BachilleratoConfig["primaria"]> = {
+      show_footer_logo: false, footer_logo_url: "", footer_logo_position: "center",
+      margin_top: 12, margin_bottom: 12, margin_sides: 15,
+      name_font_size: 14, sub_font_size: 10, body_font_size: 10,
+      accent_color: "#1e3a5f", title_color: "#000000",
+      show_address: false, show_dea_code: false, show_phone: false,
+      signatures: [],
+    };
     const updPrimaria = (patch: Partial<NonNullable<BachilleratoConfig["primaria"]>>) =>
-      onChange({ ...cfg, primaria: { show_footer_logo: false, footer_logo_url: "", ...cfg.primaria, ...patch } });
+      onChange({ ...cfg, primaria: { ...PRIMARIA_DEFAULTS, ...cfg.primaria, ...patch } });
+    const pr = { ...PRIMARIA_DEFAULTS, ...cfg.primaria };
     return (
       <div className="space-y-2 pb-2">
         <Section label="Cabecera del colegio" enabled={cfg.sections.header} onToggle={() => sect("header")}>
-          <ColorRow label="Color de línea divisora" value={cfg.header.accent_color}
-            onChange={(v) => upd({ header: { ...cfg.header, accent_color: v } })} />
+          <ColorRow label="Color de acento" value={pr.accent_color}
+            onChange={(v) => updPrimaria({ accent_color: v })} />
+          <NumRow label="Tamaño nombre colegio" value={pr.name_font_size} min={8} max={24}
+            onChange={(v) => updPrimaria({ name_font_size: v })} />
+          <NumRow label="Tamaño subtextos" value={pr.sub_font_size} min={6} max={16}
+            onChange={(v) => updPrimaria({ sub_font_size: v })} />
+          <ToggleRow label="Mostrar dirección" value={pr.show_address}
+            onChange={(v) => updPrimaria({ show_address: v })} />
+          <ToggleRow label="Mostrar Código DEA" value={pr.show_dea_code}
+            onChange={(v) => updPrimaria({ show_dea_code: v })} />
+          <ToggleRow label="Mostrar teléfono" value={pr.show_phone}
+            onChange={(v) => updPrimaria({ show_phone: v })} />
         </Section>
+
+        <div className="border rounded-md p-3 space-y-2">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Título</Label>
+          <ColorRow label="Color del título" value={pr.title_color}
+            onChange={(v) => updPrimaria({ title_color: v })} />
+        </div>
+
+        <div className="border rounded-md p-3 space-y-2">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diseño y Espaciado</Label>
+          <NumRow label="Margen superior" unit="mm" min={0} max={30}
+            value={pr.margin_top} onChange={(v) => updPrimaria({ margin_top: v })} />
+          <NumRow label="Margen inferior" unit="mm" min={0} max={30}
+            value={pr.margin_bottom} onChange={(v) => updPrimaria({ margin_bottom: v })} />
+          <NumRow label="Márgenes laterales" unit="mm" min={0} max={30}
+            value={pr.margin_sides} onChange={(v) => updPrimaria({ margin_sides: v })} />
+          <NumRow label="Tamaño texto cuerpo" unit="pt" min={7} max={16}
+            value={pr.body_font_size} onChange={(v) => updPrimaria({ body_font_size: v })} />
+        </div>
+
         <div className="border rounded-md p-3 space-y-2">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Logo al pie de página</Label>
-          <ToggleRow label="Mostrar logo al pie" value={cfg.primaria?.show_footer_logo ?? false}
+          <ToggleRow label="Mostrar logo al pie" value={pr.show_footer_logo}
             onChange={(v) => updPrimaria({ show_footer_logo: v })} />
-          {cfg.primaria?.show_footer_logo && (
-            <FooterLogoUpload
-              url={cfg.primaria?.footer_logo_url ?? ""}
-              onChange={(url) => updPrimaria({ footer_logo_url: url })}
+          {pr.show_footer_logo && (
+            <>
+              <FooterLogoUpload
+                url={pr.footer_logo_url}
+                onChange={(url) => updPrimaria({ footer_logo_url: url })}
+                schoolId={schoolId}
+              />
+              <div className="space-y-1">
+                <Label className="text-xs">Posición del logo</Label>
+                <div className="flex gap-1.5">
+                  {(["left", "center", "right"] as const).map((pos) => (
+                    <Button key={pos} size="sm"
+                      variant={pr.footer_logo_position === pos ? "default" : "outline"}
+                      className="h-7 text-xs flex-1"
+                      onClick={() => updPrimaria({ footer_logo_position: pos })}>
+                      {pos === "left" ? "Izquierda" : pos === "center" ? "Centro" : "Derecha"}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <Section label="Firmas" enabled={cfg.sections.signatures} onToggle={() => sect("signatures")}>
+          {cfg.sections.signatures && (
+            <SignatureEditor
+              sigs={pr.signatures ?? []}
+              onChange={(s) => updPrimaria({ signatures: s })}
               schoolId={schoolId}
             />
           )}
-        </div>
+        </Section>
       </div>
     );
   }
 
   // ── Simple style ────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-2 overflow-y-auto" style={{ maxHeight: "calc(70vh - 120px)" }}>
+    <div className="space-y-2 pb-2">
 
       {/* Encabezado */}
       <Section label="Encabezado" enabled={cfg.sections.header} onToggle={() => sect("header")}>
@@ -468,7 +531,7 @@ function BoletaPreview({ cfg, paperW, paperH }: {
   const MM_TO_PX = 96 / 25.4;
   const naturalW = paperW * MM_TO_PX;
   const naturalH = paperH * MM_TO_PX;
-  const previewW = 580;
+  const previewW = 700;
   const scale = previewW / naturalW;
   const previewH = naturalH * scale;
 
@@ -476,7 +539,7 @@ function BoletaPreview({ cfg, paperW, paperH }: {
     <div className="flex flex-col items-center gap-2">
       <span className="text-xs text-muted-foreground">Vista previa (datos de ejemplo)</span>
       <div className="border rounded shadow-sm overflow-hidden bg-white"
-        style={{ width: previewW, height: previewH, position: "relative" }}>
+        style={{ width: previewW, height: previewH, position: "relative", flexShrink: 0 }}>
         <iframe
           srcDoc={html}
           title="Boleta preview"
@@ -693,18 +756,18 @@ export function BolletasFormatTab() {
       {/* ── Editor Dialog ────────────────────────────────────────────────── */}
       <Dialog open={showEditor} onOpenChange={(v) => !v && setShowEditor(false)}>
         <DialogContent
-          className="max-w-[96vw] w-[1150px] flex flex-col"
+          className="max-w-[96vw] w-[1200px] flex flex-col"
           style={{ maxHeight: "95vh", overflow: "hidden" }}
         >
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>{editItem ? "Editar plantilla de boleta" : "Nueva plantilla de boleta"}</DialogTitle>
           </DialogHeader>
 
-          {/* Scrollable content */}
+          {/* Single scrollable area — everything scrolls together */}
           <div className="flex-1 min-h-0 overflow-y-auto pr-1">
 
             {/* Top bar */}
-            <div className="space-y-3 border-b pb-3 mb-2">
+            <div className="space-y-3 border-b pb-3 mb-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Nombre *</Label>
@@ -722,8 +785,8 @@ export function BolletasFormatTab() {
                   <Label className="text-xs">Estilo de boleta</Label>
                   <div className="flex gap-1.5">
                     {([
-                      { value: "simple",              label: "Simple" },
-                      { value: "boletin_completo",    label: "Bachillerato media hoja" },
+                      { value: "simple",               label: "Simple" },
+                      { value: "boletin_completo",     label: "Bachillerato media hoja" },
                       { value: "primaria_descriptivo", label: "Primaria Descriptivo" },
                     ] as const).map(({ value, label }) => (
                       <Button key={value} size="sm"
@@ -846,10 +909,10 @@ export function BolletasFormatTab() {
               </div>
             </div>
 
-            {/* Body: config panel + preview */}
-            <div className="flex gap-4 pt-1" style={{ minHeight: "520px" }}>
-              {/* Left: config */}
-              <div className="w-72 flex-shrink-0">
+            {/* Body: config panel + preview — scroll together with the modal */}
+            <div className="flex gap-4 pb-2">
+              {/* Left: config — no horizontal overflow */}
+              <div className="w-72 flex-shrink-0 overflow-x-hidden">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Secciones y estilos</p>
                 <ConfigPanel cfg={cfg} onChange={setCfg} schoolId={schoolId ?? ""} />
               </div>
@@ -859,7 +922,7 @@ export function BolletasFormatTab() {
               </div>
             </div>
 
-          </div>{/* end scrollable */}
+          </div>{/* end single scrollable */}
 
           <DialogFooter className="flex-shrink-0 pt-3 border-t mt-2">
             <Button variant="outline" onClick={() => setShowEditor(false)}>Cancelar</Button>

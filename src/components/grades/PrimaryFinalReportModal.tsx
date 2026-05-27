@@ -36,6 +36,7 @@ export default function PrimaryFinalReportModal({
   const [descriptiveReport, setDescriptiveReport] = useState("");
   const [indicatorValues, setIndicatorValues] = useState<Record<string, string>>({});
   const [literal, setLiteral] = useState("");
+  const [literalNumerico, setLiteralNumerico] = useState("");
   const [absenceCount, setAbsenceCount] = useState(0);
   const [projectName, setProjectName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -156,11 +157,13 @@ export default function PrimaryFinalReportModal({
     if (existingReport) {
       setDescriptiveReport((existingReport as any).descriptive_report || "");
       setLiteral((existingReport as any).literal || "");
+      setLiteralNumerico((existingReport as any).literal_numerico != null ? String((existingReport as any).literal_numerico) : "");
       setAbsenceCount((existingReport as any).absence_count || 0);
       setProjectName((existingReport as any).project_name || "");
     } else {
       setDescriptiveReport("");
       setLiteral("");
+      setLiteralNumerico("");
       setAbsenceCount(0);
       setProjectName("");
     }
@@ -210,6 +213,7 @@ export default function PrimaryFinalReportModal({
         momento,
         descriptive_report: descriptiveReport,
         literal,
+        literal_numerico: literalNumerico !== "" ? parseFloat(literalNumerico) : null,
         absence_count: absenceCount,
         project_name: projectName,
         updated_at: new Date().toISOString(),
@@ -319,13 +323,13 @@ export default function PrimaryFinalReportModal({
                     {reportType === "descriptive" ? "Informe Descriptivo" : "Indicadores"}
                   </h3>
                 </div>
-                <div className="flex-1 p-3 min-h-0">
+                <div className="flex-1 min-h-0 flex flex-col p-3">
                   {reportType === "descriptive" ? (
                     <RichTextEditor
                       value={descriptiveReport}
                       onChange={setDescriptiveReport}
                       placeholder="Redacte el informe descriptivo del estudiante..."
-                      minHeight={380}
+                      minHeight={100}
                     />
                   ) : (
                     <ScrollArea className="h-full">
@@ -390,6 +394,19 @@ export default function PrimaryFinalReportModal({
                       />
                     </div>
                     <div className="space-y-1.5">
+                      <Label className="text-xs">Literal Numérico</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={20}
+                        step={0.01}
+                        value={literalNumerico}
+                        onChange={(e) => setLiteralNumerico(e.target.value)}
+                        placeholder="Ej: 19"
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
                       <Label className="text-xs">Inasistencias</Label>
                       <Input
                         type="number"
@@ -434,6 +451,7 @@ export default function PrimaryFinalReportModal({
                           onChange={setDescriptiveReport}
                           placeholder="Observación adicional..."
                           minHeight={120}
+                          className="min-h-[160px]"
                         />
                       </div>
                     )}

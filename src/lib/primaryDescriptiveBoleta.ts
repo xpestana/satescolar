@@ -30,7 +30,7 @@ async function fetchTemplateAndCommon(schoolId: string, gradeKey: string) {
       .eq("is_active", true),
     supabase
       .from("schools")
-      .select("name, logo_url")
+      .select("name, logo_url, address, dea_code, statistical_code, phone, rif")
       .eq("id", schoolId)
       .single(),
     supabase
@@ -59,7 +59,7 @@ async function fetchTemplateAndCommon(schoolId: string, gradeKey: string) {
         ...DEFAULT_BACHILLERATO_CONFIG,
         ...tpl.config,
         sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(tpl.config?.sections ?? {}) },
-        primaria: { show_footer_logo: false, footer_logo_url: "", ...(tpl.config?.primaria ?? {}) },
+        primaria: { show_footer_logo: false, footer_logo_url: "", footer_logo_position: "center", signatures: [], ...(tpl.config?.primaria ?? {}) },
       }
     : DEFAULT_BACHILLERATO_CONFIG;
 
@@ -94,7 +94,7 @@ async function fetchAssignmentsAndReports(
   if (assignmentIds.length > 0) {
     const { data } = await supabase
       .from("primary_final_reports" as any)
-      .select("assignment_id, descriptive_report, literal")
+      .select("assignment_id, descriptive_report, literal, literal_numerico")
       .eq("student_id", studentId)
       .eq("momento", momento)
       .in("assignment_id", assignmentIds);
@@ -102,30 +102,13 @@ async function fetchAssignmentsAndReports(
   }
 
   const reportMap: Record<string, string> = {};
-  const literalMap: Record<string, string> = {};
   for (const r of reports) {
     if (r.descriptive_report?.trim()) reportMap[r.assignment_id] = r.descriptive_report;
-    if (r.literal?.trim()) literalMap[r.assignment_id] = r.literal;
   }
 
   // Separate main report from especialistas
   const mainAssignment = validAssignments.find((a) => a.is_main_report);
   const especialistaAssignments = validAssignments.filter((a) => !a.is_main_report);
-
-  // Fetch final grade (numeral) for the main assignment
-  let main_numeral: string | null = null;
-  if (mainAssignment) {
-    const { data: fg } = await supabase
-      .from("final_grades" as any)
-      .select("grade_value")
-      .eq("student_id", studentId)
-      .eq("assignment_id", mainAssignment.id)
-      .eq("momento", momento)
-      .maybeSingle();
-    main_numeral = (fg as any)?.grade_value ?? null;
-  }
-
-  const main_literal = mainAssignment ? (literalMap[mainAssignment.id] ?? null) : null;
 
   const main_report =
     mainAssignment && reportMap[mainAssignment.id]
@@ -136,7 +119,11 @@ async function fetchAssignmentsAndReports(
     .filter((a) => reportMap[a.id])
     .map((a) => ({ subject_name: a.subject.name, html: reportMap[a.id] }));
 
-  return { main_report, especialistas, main_literal, main_numeral };
+  const mainRecord = reports.find((r) => r.assignment_id === mainAssignment?.id);
+  const literal          = mainRecord?.literal?.trim() ?? "";
+  const literal_numerico = mainRecord?.literal_numerico != null ? String(mainRecord.literal_numerico) : "";
+
+  return { main_report, especialistas, literal, literal_numerico };
 }
 
 export async function downloadPrimaryDescriptiveBoleta(
@@ -148,23 +135,26 @@ export async function downloadPrimaryDescriptiveBoleta(
   } = params;
 
   const { cfg, paperW, paperH, school } = await fetchTemplateAndCommon(schoolId, gradeKey);
-  const { main_report, especialistas, main_literal, main_numeral } = await fetchAssignmentsAndReports(
+  const { main_report, especialistas, literal, literal_numerico } = await fetchAssignmentsAndReports(
     schoolId, sectionId, yearId, studentId, momento,
   );
 
   const data: PrimaryDescriptiveRenderData = {
-    school_name:  school?.name ?? "",
-    school_logo:  school?.logo_url ?? "",
-    year_range:   yearRange,
-    student_name: studentName,
-    document_id:  documentId ?? "",
-    grade_label:  gradeLabel,
-    section_name: sectionName,
+    school_name:      school?.name ?? "",
+    school_logo:      school?.logo_url ?? "",
+    year_range:       yearRange,
+    address:          (school as any)?.address ?? "",
+    dea_code:         (school as any)?.dea_code ?? "",
+    phone:            (school as any)?.phone ?? "",
+    literal,
+    literal_numerico,
+    student_name:     studentName,
+    document_id:      documentId ?? "",
+    grade_label:      gradeLabel,
+    section_name:     sectionName,
     momento,
     main_report,
     especialistas,
-    literal:      main_literal ?? undefined,
-    numeral:      main_numeral ?? undefined,
   };
 
   return generatePrimaryDescriptiveHtml(cfg, data, paperW, paperH);
@@ -191,22 +181,25 @@ export async function downloadAllPrimaryDescriptiveBoletas(params: {
 
   const bodies = await Promise.all(
     students.map(async (s) => {
-      const { main_report, especialistas, main_literal, main_numeral } = await fetchAssignmentsAndReports(
+      const { main_report, especialistas, literal, literal_numerico } = await fetchAssignmentsAndReports(
         schoolId, sectionId, yearId, s.studentId, momento,
       );
       const data: PrimaryDescriptiveRenderData = {
-        school_name:  school?.name ?? "",
-        school_logo:  school?.logo_url ?? "",
-        year_range:   yearRange,
-        student_name: s.studentName,
-        document_id:  s.documentId ?? "",
-        grade_label:  gradeLabel,
-        section_name: sectionName,
+        school_name:      school?.name ?? "",
+        school_logo:      school?.logo_url ?? "",
+        year_range:       yearRange,
+        address:          (school as any)?.address ?? "",
+        dea_code:         (school as any)?.dea_code ?? "",
+        phone:            (school as any)?.phone ?? "",
+        literal,
+        literal_numerico,
+        student_name:     s.studentName,
+        document_id:      s.documentId ?? "",
+        grade_label:      gradeLabel,
+        section_name:     sectionName,
         momento,
         main_report,
         especialistas,
-        literal:      main_literal ?? undefined,
-        numeral:      main_numeral ?? undefined,
       };
       return generatePrimaryDescriptiveHtml(cfg, data, paperW, paperH, { bodyOnly: true });
     }),

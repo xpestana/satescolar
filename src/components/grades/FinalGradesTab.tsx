@@ -88,6 +88,8 @@ export default function FinalGradesTab({
   // Primary literals state
   const [literals, setLiterals] = useState<Record<string, string>>({});
   const [dbLiterals, setDbLiterals] = useState<Record<string, string>>({});
+  const [literalNumericos, setLiteralNumericos] = useState<Record<string, string>>({});
+  const [dbLiteralNumericos, setDbLiteralNumericos] = useState<Record<string, string>>({});
   const [savingLiteralKeys, setSavingLiteralKeys] = useState<Set<string>>(new Set());
 
   const editedGradesRef = useRef(editedGrades);
@@ -301,6 +303,8 @@ export default function FinalGradesTab({
     setDbExtraFields({});
     setLiterals({});
     setDbLiterals({});
+    setLiteralNumericos({});
+    setDbLiteralNumericos({});
     setSavingKeys(new Set());
     setSavingAdjKeys(new Set());
     setSavingLiteralKeys(new Set());
@@ -314,6 +318,8 @@ export default function FinalGradesTab({
     if (primaryReportsLoading) return;
     const lits: Record<string, string> = {};
     const dbLits: Record<string, string> = {};
+    const litsNum: Record<string, string> = {};
+    const dbLitsNum: Record<string, string> = {};
     const extra: Record<string, ExtraFields> = {};
     const dbExtra: Record<string, ExtraFields> = {};
     const assignmentId = assignmentIds[0];
@@ -327,6 +333,9 @@ export default function FinalGradesTab({
         if (existing) {
           lits[key] = (existing as any).literal || "";
           dbLits[key] = (existing as any).literal || "";
+          const numVal = (existing as any).literal_numerico;
+          litsNum[key] = numVal != null ? String(numVal) : "";
+          dbLitsNum[key] = numVal != null ? String(numVal) : "";
           const ef: ExtraFields = {
             observation: "",
             attendance_count: (existing as any).attendance_count ?? 0,
@@ -338,10 +347,11 @@ export default function FinalGradesTab({
         } else {
           lits[key] = "";
           dbLits[key] = "";
+          litsNum[key] = "";
+          dbLitsNum[key] = "";
           if (m === 0) {
             let totalAtt = 0, totalAbs = 0;
             for (const mo of [1, 2, 3]) {
-              const moKey = `${s.student_id}-${mo}`;
               const moEx = primaryReports.find(
                 (pr: any) => pr.student_id === s.student_id && pr.momento === mo && pr.assignment_id === assignmentId
               );
@@ -360,6 +370,8 @@ export default function FinalGradesTab({
     }
     setLiterals(lits);
     setDbLiterals(dbLits);
+    setLiteralNumericos(litsNum);
+    setDbLiteralNumericos(dbLitsNum);
     if (isPrimary) {
       setExtraFields(extra);
       setDbExtraFields(dbExtra);
@@ -511,10 +523,13 @@ export default function FinalGradesTab({
     const key = `${studentId}-${momento}`;
     const literal = literals[key] || "";
     const dbLiteral = dbLiterals[key] || "";
+    const litNum = literalNumericos[key] ?? "";
+    const dbLitNum = dbLiteralNumericos[key] ?? "";
     const ef = extraFields[key] || DEFAULT_EXTRA;
     const dbEf = dbExtraFields[key] || DEFAULT_EXTRA;
 
     const changed = literal !== dbLiteral ||
+      litNum !== dbLitNum ||
       ef.attendance_count !== dbEf.attendance_count ||
       ef.absence_count !== dbEf.absence_count ||
       ef.final_status !== dbEf.final_status;
@@ -529,6 +544,7 @@ export default function FinalGradesTab({
         school_id: schoolId,
         momento,
         literal,
+        literal_numerico: litNum !== "" ? parseFloat(litNum) : null,
         attendance_count: ef.attendance_count,
         absence_count: ef.absence_count,
         final_status: ef.final_status || null,
@@ -539,6 +555,7 @@ export default function FinalGradesTab({
         .upsert(payload as any, { onConflict: "student_id,assignment_id,momento" });
 
       setDbLiterals(prev => ({ ...prev, [key]: literal }));
+      setDbLiteralNumericos(prev => ({ ...prev, [key]: litNum }));
       setDbExtraFields(prev => ({ ...prev, [key]: { ...ef } }));
 
       setSavedKeys(prev => {
@@ -551,7 +568,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingLiteralKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
-  }, [assignmentIds, literals, dbLiterals, extraFields, dbExtraFields, schoolId]);
+  }, [assignmentIds, literals, dbLiterals, literalNumericos, dbLiteralNumericos, extraFields, dbExtraFields, schoolId]);
 
   const savePreschoolReport = useCallback(async (studentId: string, momento: number) => {
     if (assignmentIds.length === 0) return;
@@ -929,6 +946,18 @@ export default function FinalGradesTab({
                 <Check className="absolute top-1.5 right-0.5 h-3 w-3 text-green-500" />
               )}
             </div>
+            <Input
+              type="number"
+              min={0}
+              max={20}
+              step={0.01}
+              value={literalNumericos[key] ?? ""}
+              onChange={(e) => setLiteralNumericos(prev => ({ ...prev, [key]: e.target.value }))}
+              onBlur={() => savePrimaryReport(s.student_id, m)}
+              className="h-8 w-14 text-xs text-center"
+              placeholder="Núm."
+              title="Literal Numérico"
+            />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0" />

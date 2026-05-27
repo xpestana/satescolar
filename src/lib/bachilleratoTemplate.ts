@@ -54,8 +54,26 @@ export interface BachilleratoConfig {
     title_size:    number; // pt — "BOLETIN DE CALIFICACIONES" font size
   };
   primaria?: {
-    show_footer_logo: boolean;
-    footer_logo_url:  string;
+    show_footer_logo:     boolean;
+    footer_logo_url:      string;
+    footer_logo_position: "left" | "center" | "right";
+    // Layout
+    margin_top:    number;
+    margin_bottom: number;
+    margin_sides:  number;
+    // Typography
+    name_font_size: number;
+    sub_font_size:  number;
+    body_font_size: number;
+    // Colors
+    accent_color: string;
+    title_color:  string;
+    // Header optional fields
+    show_address:  boolean;
+    show_dea_code: boolean;
+    show_phone:    boolean;
+    // Signatures
+    signatures: BoletinSignature[];
   };
 }
 
@@ -696,22 +714,30 @@ export interface PrimaryDescriptiveRenderData {
   school_name:      string;
   school_logo:      string;
   year_range:       string;
+  address:          string;
+  dea_code:         string;
+  phone:            string;
   student_name:     string;
   document_id:      string;
   grade_label:      string;
   section_name:     string;
   momento:          number;
+  literal:          string;
+  literal_numerico: string;
   main_report:      { subject_name: string; html: string } | null;
   especialistas:    { subject_name: string; html: string }[];
-  literal?:         string;
-  numeral?:         string;
 }
 
 export const SAMPLE_PRIMARY_DESCRIPTIVE_DATA: PrimaryDescriptiveRenderData = {
-  school_name:   "UE COLEGIO EJEMPLO",
-  school_logo:   "",
-  year_range:    "2025-2026",
-  student_name:  "MARTÍNEZ PÉREZ, Juan Carlos",
+  school_name:      "UE COLEGIO EJEMPLO",
+  school_logo:      "",
+  year_range:       "2025-2026",
+  address:          "Av. Las Americas, Sector Santa Barbara Este",
+  dea_code:         "CO-12345",
+  phone:            "274-2667989",
+  literal:          "A",
+  literal_numerico: "19",
+  student_name:     "MARTÍNEZ PÉREZ, Juan Carlos",
   document_id:   "V-12.345.678",
   grade_label:   "1er Grado",
   section_name:  "A",
@@ -726,8 +752,6 @@ export const SAMPLE_PRIMARY_DESCRIPTIVE_DATA: PrimaryDescriptiveRenderData = {
       html: `<ul><li>Se inicia en el reconocimiento de algunos útiles escolares básicos en inglés.</li></ul>`,
     },
   ],
-  literal: "A",
-  numeral: "19",
 };
 
 export function generatePrimaryDescriptiveHtml(
@@ -737,6 +761,20 @@ export function generatePrimaryDescriptiveHtml(
   paperHeightMm: number,
   opts?: { bodyOnly?: boolean },
 ): string {
+  const p = cfg.primaria ?? {};
+  const accentColor   = p.accent_color        ?? "#1e3a5f";
+  const titleColor    = p.title_color          ?? "#000000";
+  const mTop          = p.margin_top           ?? 12;
+  const mBottom       = p.margin_bottom        ?? 12;
+  const mSides        = p.margin_sides         ?? 15;
+  const nameFontSize  = p.name_font_size       ?? 14;
+  const subFontSize   = p.sub_font_size        ?? 10;
+  const bodyFontSize  = p.body_font_size       ?? 10;
+  const showAddress   = p.show_address         ?? false;
+  const showDeaCode   = p.show_dea_code        ?? false;
+  const showPhone     = p.show_phone           ?? false;
+  const footerPos     = p.footer_logo_position ?? "center";
+
   const lapsoLabels: Record<number, string> = { 1: "1er", 2: "2do", 3: "3er" };
   const lapsoLabel = lapsoLabels[data.momento] ?? `${data.momento}°`;
 
@@ -744,24 +782,31 @@ export function generatePrimaryDescriptiveHtml(
     ? `<img src="${esc(data.school_logo)}" alt="Logo" style="height:70px;width:auto;object-fit:contain;flex-shrink:0">`
     : `<div style="width:70px;height:70px;background:#e5e7eb;border-radius:50%;flex-shrink:0"></div>`;
 
+  const subLines = [
+    showAddress  && data.address  ? `<div style="font-size:${subFontSize}pt;color:#4b5563">${esc(data.address)}</div>`  : "",
+    showDeaCode  && data.dea_code ? `<div style="font-size:${subFontSize}pt;color:#4b5563">Cód. DEA: ${esc(data.dea_code)}</div>` : "",
+    showPhone    && data.phone    ? `<div style="font-size:${subFontSize}pt;color:#4b5563">Tel: ${esc(data.phone)}</div>` : "",
+    `<div style="font-size:${subFontSize}pt;color:#4b5563;margin-top:2px">AÑO ESCOLAR ${esc(data.year_range)}</div>`,
+  ].filter(Boolean).join("");
+
   const headerHtml = `
-  <div style="display:flex;align-items:center;gap:16px;padding-bottom:10px;border-bottom:2px solid #1e3a5f;margin-bottom:10px">
+  <div style="display:flex;align-items:center;gap:16px;padding-bottom:10px;border-bottom:2px solid ${accentColor};margin-bottom:10px">
     ${logoHtml}
     <div style="flex:1;text-align:center">
-      <div style="font-size:14pt;font-weight:700;color:#1e3a5f;text-transform:uppercase;letter-spacing:0.5px">${esc(data.school_name)}</div>
-      <div style="font-size:10pt;color:#4b5563;margin-top:2px">AÑO ESCOLAR ${esc(data.year_range)}</div>
+      <div style="font-size:${nameFontSize}pt;font-weight:700;color:${accentColor};text-transform:uppercase;letter-spacing:0.5px">${esc(data.school_name)}</div>
+      ${subLines}
     </div>
   </div>`;
 
   const titleHtml = `
   <div style="text-align:center;margin-bottom:10px">
-    <div style="font-size:12pt;font-weight:700;text-decoration:underline;text-transform:uppercase">
+    <div style="font-size:12pt;font-weight:700;text-decoration:underline;text-transform:uppercase;color:${titleColor}">
       INFORME DESCRIPTIVO DEL ${lapsoLabel} LAPSO
     </div>
   </div>`;
 
   const studentHtml = `
-  <div style="font-size:10pt;margin-bottom:10px;line-height:1.6">
+  <div style="font-size:${bodyFontSize}pt;margin-bottom:10px;line-height:1.6">
     <div><b>Nombre y Apellidos:</b> <span style="text-decoration:underline">${esc(data.student_name)}</span>&nbsp;&nbsp;
     <b>Grado:</b> <span style="text-decoration:underline">${esc(data.grade_label)}</span>&nbsp;&nbsp;
     <b>Sección:</b> <span style="text-decoration:underline">${esc(data.section_name)}</span></div>
@@ -769,43 +814,88 @@ export function generatePrimaryDescriptiveHtml(
   </div>`;
 
   const mainHtml = data.main_report
-    ? `<div style="font-size:10pt;line-height:1.7;text-align:justify;margin-bottom:12px">${data.main_report.html}</div>`
+    ? `<div style="font-size:${bodyFontSize}pt;line-height:1.7;text-align:justify;margin-bottom:12px">${data.main_report.html}</div>`
     : "";
 
   const especialistasHtml = data.especialistas.length > 0 ? `
   <div style="margin-top:10px">
-    <div style="font-size:11pt;font-weight:700;text-align:center;margin-bottom:6px">ESPECIALISTAS</div>
     ${data.especialistas.map((e) => `
       <div style="margin-bottom:8px">
-        <div style="font-size:10pt;font-weight:700;margin-bottom:2px">${esc(e.subject_name)}</div>
-        <div style="font-size:10pt;line-height:1.6;padding-left:8px">${e.html}</div>
+        <div style="font-size:${bodyFontSize}pt;font-weight:700;margin-bottom:2px">${esc(e.subject_name)}</div>
+        <div style="font-size:${bodyFontSize}pt;line-height:1.6;padding-left:8px">${e.html}</div>
       </div>`).join("")}
   </div>` : "";
 
-  const literalNumeralHtml = (data.literal || data.numeral) ? `
-  <div style="font-size:10pt;margin-top:14px;margin-bottom:6px;display:flex;gap:40px;justify-content:center">
-    ${data.literal ? `<span><b>Literal:</b>&nbsp;${esc(data.literal)}</span>` : ""}
-    ${data.numeral ? `<span><b>Numeral:</b>&nbsp;${esc(data.numeral)}</span>` : ""}
+  // Literal / Numeral block
+  const hasLiteral = data.literal?.trim();
+  const hasNumeral = data.literal_numerico?.trim();
+  const literalNumeralHtml = (hasLiteral || hasNumeral) ? `
+  <div style="text-align:center;margin-top:14px;font-size:${bodyFontSize}pt">
+    ${hasLiteral ? `Literal: <b>${esc(data.literal)}</b>` : ""}
+    ${hasLiteral && hasNumeral ? "&nbsp;&nbsp;&nbsp;&nbsp;" : ""}
+    ${hasNumeral ? `Numeral: <b>${esc(data.literal_numerico)}</b>` : ""}
   </div>` : "";
 
-  const footerHtml = cfg.primaria?.show_footer_logo && cfg.primaria?.footer_logo_url ? `
-  <div style="margin-top:auto;padding-top:12px;text-align:center">
-    <img src="${esc(cfg.primaria.footer_logo_url)}" alt="Logo pie" style="height:60px;width:auto;object-fit:contain">
-  </div>` : "";
+  // Signatures block
+  const cfgSigs = p.signatures ?? [];
+  const sigHtml = cfg.sections.signatures && cfgSigs.length > 0 ? (() => {
+    const cols = cfgSigs.map((sig) => {
+      const firmaImg = sig.firma_url
+        ? `<img src="${esc(sig.firma_url)}" alt="Firma" style="height:52px;object-fit:contain;display:block;margin:0 auto 2px">`
+        : `<div style="height:52px"></div>`;
+      const selloImg = sig.sello_url
+        ? `<img src="${esc(sig.sello_url)}" alt="Sello" style="height:36px;object-fit:contain;display:inline-block;vertical-align:middle;margin-left:6px">`
+        : "";
+      return `<div style="text-align:center;flex:1">
+        ${firmaImg}
+        <div style="border-top:1px solid #000;width:80%;margin:0 auto;padding-top:6px">
+          ${selloImg}
+          <div style="font-size:9pt;font-weight:600">${esc(sig.nombre)}</div>
+          ${sig.cedula ? `<div style="font-size:8.5pt">${esc(sig.cedula)}</div>` : ""}
+          ${sig.cargo  ? `<div style="font-size:8.5pt">${esc(sig.cargo)}</div>`  : ""}
+        </div>
+      </div>`;
+    });
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:20px;margin-top:10px">${cols.join("")}</div>`;
+  })() : "";
 
-  const body = `
-  <div class="primaria-page" style="font-family:Arial,Helvetica,sans-serif;padding:12mm 15mm;min-height:${paperHeightMm}mm;display:flex;flex-direction:column;box-sizing:border-box">
-    ${headerHtml}
-    ${titleHtml}
-    ${studentHtml}
-    ${mainHtml}
-    ${especialistasHtml}
-    ${literalNumeralHtml}
-    ${footerHtml}
-  </div>`;
+  // Footer logo — fixed at bottom of every print page
+  const footerAlignMap: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
+  const footerAlign = footerAlignMap[footerPos] ?? "center";
+  const hasFooter = !!(p.show_footer_logo && p.footer_logo_url);
+  // Reserve enough bottom space so content never hides behind the fixed footer
+  // footer = padding-top(14px≈5mm) + logo(60px≈21mm) + padding-bottom(mBottom mm) ≈ 26+mBottom mm
+  const footerReserveMm = hasFooter ? mBottom + 32 : mBottom;
 
-  if (opts?.bodyOnly) return body;
+  // Full HTML (single student): table layout so <thead> repeats on every printed page
+  const theadPad = `${mTop}mm ${mSides}mm 0 ${mSides}mm`;
+  const tbodyPad = `8px ${mSides}mm ${footerReserveMm}mm ${mSides}mm`;
 
+  const footerPrintCss = hasFooter ? `
+    .primaria-footer{position:fixed;bottom:0;left:0;right:0;background:white}` : "";
+
+  const footerHtml = hasFooter ? `
+<div class="primaria-footer" style="display:flex;justify-content:${footerAlign};padding:16px ${mSides}mm ${mBottom}mm">
+  <img src="${esc(p.footer_logo_url!)}" alt="Logo pie" style="height:60px;width:auto;object-fit:contain">
+</div>` : "";
+
+  // bodyOnly = used when wrapping all students; use simple div (wrapper @page handles margins)
+  if (opts?.bodyOnly) {
+    const bodyOnlyFooterCss = hasFooter ? `<style>@media print{.primaria-footer{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:${footerAlign};padding:16px ${mSides}mm ${mBottom}mm}}</style>` : "";
+    return `${bodyOnlyFooterCss}
+<div style="font-family:Arial,Helvetica,sans-serif;padding:0;box-sizing:border-box">
+  ${headerHtml}
+  ${titleHtml}
+  ${studentHtml}
+  ${mainHtml}
+  ${especialistasHtml}
+  ${literalNumeralHtml}
+  ${sigHtml}
+</div>
+${footerHtml}`;
+  }
+
+  // Single-student full HTML: table with repeating thead
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -815,7 +905,7 @@ export function generatePrimaryDescriptiveHtml(
     *{margin:0;padding:0;box-sizing:border-box}
     html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
-    @media print{#controls{display:none!important}}
+    @media print{#controls{display:none!important}${footerPrintCss}}
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
@@ -829,7 +919,22 @@ export function generatePrimaryDescriptiveHtml(
   <button id="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
   <button id="btn-close" onclick="window.close()">Cerrar</button>
 </div>
-${body}
+<table style="width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif" cellpadding="0" cellspacing="0">
+  <thead>
+    <tr><td style="padding:${theadPad}">${headerHtml}</td></tr>
+  </thead>
+  <tbody>
+    <tr><td style="padding:${tbodyPad};vertical-align:top">
+      ${titleHtml}
+      ${studentHtml}
+      ${mainHtml}
+      ${especialistasHtml}
+      ${literalNumeralHtml}
+      ${sigHtml}
+    </td></tr>
+  </tbody>
+</table>
+${footerHtml}
 </body>
 </html>`;
 }
