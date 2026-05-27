@@ -867,13 +867,14 @@ export function generatePrimaryDescriptiveHtml(
 
   // Full HTML (single student): table layout so <thead> repeats on every printed page
   const theadPad = `${mTop}mm ${mSides}mm 0 ${mSides}mm`;
-  const tbodyPad = `8px ${mSides}mm ${footerReserveMm}mm ${mSides}mm`;
+  const tbodyPad = `8px ${mSides}mm ${mBottom}mm ${mSides}mm`;
 
   const footerPrintCss = hasFooter ? `
-    .primaria-footer{position:fixed;bottom:0;left:0;right:0;background:white}` : "";
+    .primaria-tbody-cell{padding-bottom:${footerReserveMm}mm!important}
+    #pdf-footer{position:fixed;bottom:0;left:0;right:0;background:white}` : "";
 
   const footerHtml = hasFooter ? `
-<div class="primaria-footer" style="display:flex;justify-content:${footerAlign};padding:16px ${mSides}mm ${mBottom}mm">
+<div id="pdf-footer" style="display:flex;justify-content:${footerAlign};padding:16px ${mSides}mm ${mBottom}mm">
   <img src="${esc(p.footer_logo_url!)}" alt="Logo pie" style="height:60px;width:auto;object-fit:contain">
 </div>` : "";
 
@@ -921,11 +922,11 @@ ${footerHtml}`;
   <button id="btn-close" onclick="window.close()">Cerrar</button>
 </div>
 <table style="width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif" cellpadding="0" cellspacing="0">
-  <thead>
+  <thead id="pdf-header">
     <tr><td style="padding:${theadPad}">${headerHtml}</td></tr>
   </thead>
   <tbody>
-    <tr><td style="padding:${tbodyPad};vertical-align:top">
+    <tr><td class="primaria-tbody-cell" style="padding:${tbodyPad};vertical-align:top">
       ${titleHtml}
       ${studentHtml}
       ${mainHtml}

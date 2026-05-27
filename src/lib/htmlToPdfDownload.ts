@@ -60,8 +60,12 @@ export async function htmlToPdfBlob(
     if (controls) controls.style.display = "none";
 
     const body = doc.body;
+    const headerEl = doc.getElementById("pdf-header") as HTMLElement | null;
+    const footerEl = doc.getElementById("pdf-footer") as HTMLElement | null;
+
+    const scale = 2;
     const canvas = await html2canvas(body, {
-      scale: 2,
+      scale,
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
@@ -80,27 +84,71 @@ export async function htmlToPdfBlob(
     const pxPerMm = canvas.width / paperW;
     const pageHpx = Math.floor(paperH * pxPerMm);
 
-    let yPx = 0;
-    let firstPage = true;
-    while (yPx < canvas.height) {
-      if (!firstPage) pdf.addPage();
-      firstPage = false;
+    if (headerEl) {
+      // Header/footer-aware compositing: stamp header and footer on every PDF page.
+      // The rendered canvas layout is: [header][content][footer].
+      // We extract those slices from the single canvas and recompose each page.
+      const headerHpx = Math.round(headerEl.offsetHeight * scale);
+      const footerHpx = footerEl ? Math.round(footerEl.offsetHeight * scale) : 0;
+      const availableHpx = pageHpx - headerHpx - footerHpx;
+      const contentTotalHpx = canvas.height - headerHpx - footerHpx;
 
-      const sliceH = Math.min(pageHpx, canvas.height - yPx);
-      const slice = document.createElement("canvas");
-      slice.width = canvas.width;
-      slice.height = sliceH;
-      const ctx = slice.getContext("2d");
-      if (ctx) {
+      let yOffset = 0;
+      let firstPage = true;
+      while (yOffset < contentTotalHpx) {
+        if (!firstPage) pdf.addPage();
+        firstPage = false;
+
+        const pageCanvas = document.createElement("canvas");
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = pageHpx;
+        const ctx = pageCanvas.getContext("2d")!;
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, slice.width, slice.height);
-        ctx.drawImage(canvas, 0, -yPx);
+        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+        // Header — always from the top of the main canvas
+        ctx.drawImage(canvas, 0, 0, canvas.width, headerHpx, 0, 0, canvas.width, headerHpx);
+
+        // Content slice
+        const sliceH = Math.min(availableHpx, contentTotalHpx - yOffset);
+        ctx.drawImage(canvas, 0, headerHpx + yOffset, canvas.width, sliceH, 0, headerHpx, canvas.width, sliceH);
+
+        // Footer — always from the bottom of the main canvas
+        if (footerHpx > 0) {
+          ctx.drawImage(
+            canvas,
+            0, canvas.height - footerHpx, canvas.width, footerHpx,
+            0, pageHpx - footerHpx, canvas.width, footerHpx,
+          );
+        }
+
+        pdf.addImage(pageCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, paperW, paperH);
+        yOffset += availableHpx;
       }
+    } else {
+      // Fallback: simple canvas slicing (no header/footer repetition)
+      let yPx = 0;
+      let firstPage = true;
+      while (yPx < canvas.height) {
+        if (!firstPage) pdf.addPage();
+        firstPage = false;
 
-      const sliceHmm = sliceH / pxPerMm;
-      pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, paperW, sliceHmm);
+        const sliceH = Math.min(pageHpx, canvas.height - yPx);
+        const slice = document.createElement("canvas");
+        slice.width = canvas.width;
+        slice.height = sliceH;
+        const ctx = slice.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, slice.width, slice.height);
+          ctx.drawImage(canvas, 0, -yPx);
+        }
 
-      yPx += pageHpx;
+        const sliceHmm = sliceH / pxPerMm;
+        pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, paperW, sliceHmm);
+
+        yPx += pageHpx;
+      }
     }
 
     return pdf.output("blob");
