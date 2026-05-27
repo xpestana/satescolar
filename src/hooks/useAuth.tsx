@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    const applySession = async (nextSession: Session | null) => {
+    const applySession = async (nextSession: Session | null, isInitial = false) => {
       const requestId = ++roleRequestRef.current;
 
       if (!mounted) return;
@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      setLoading(true);
+      if (isInitial) setLoading(true);
       const role = await fetchUserRole(nextSession.user.id);
 
       if (!mounted || roleRequestRef.current !== requestId) return;
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
 
-      void applySession(session);
+      void applySession(session, true);
     });
 
     return () => {
