@@ -94,7 +94,7 @@ async function fetchAssignmentsAndReports(
   if (assignmentIds.length > 0) {
     const { data } = await supabase
       .from("primary_final_reports" as any)
-      .select("assignment_id, descriptive_report")
+      .select("assignment_id, descriptive_report, literal")
       .eq("student_id", studentId)
       .eq("momento", momento)
       .in("assignment_id", assignmentIds);
@@ -102,13 +102,30 @@ async function fetchAssignmentsAndReports(
   }
 
   const reportMap: Record<string, string> = {};
+  const literalMap: Record<string, string> = {};
   for (const r of reports) {
     if (r.descriptive_report?.trim()) reportMap[r.assignment_id] = r.descriptive_report;
+    if (r.literal?.trim()) literalMap[r.assignment_id] = r.literal;
   }
 
   // Separate main report from especialistas
   const mainAssignment = validAssignments.find((a) => a.is_main_report);
   const especialistaAssignments = validAssignments.filter((a) => !a.is_main_report);
+
+  // Fetch final grade (numeral) for the main assignment
+  let main_numeral: string | null = null;
+  if (mainAssignment) {
+    const { data: fg } = await supabase
+      .from("final_grades" as any)
+      .select("grade_value")
+      .eq("student_id", studentId)
+      .eq("assignment_id", mainAssignment.id)
+      .eq("momento", momento)
+      .maybeSingle();
+    main_numeral = (fg as any)?.grade_value ?? null;
+  }
+
+  const main_literal = mainAssignment ? (literalMap[mainAssignment.id] ?? null) : null;
 
   const main_report =
     mainAssignment && reportMap[mainAssignment.id]
@@ -119,7 +136,7 @@ async function fetchAssignmentsAndReports(
     .filter((a) => reportMap[a.id])
     .map((a) => ({ subject_name: a.subject.name, html: reportMap[a.id] }));
 
-  return { main_report, especialistas };
+  return { main_report, especialistas, main_literal, main_numeral };
 }
 
 export async function downloadPrimaryDescriptiveBoleta(
@@ -131,7 +148,7 @@ export async function downloadPrimaryDescriptiveBoleta(
   } = params;
 
   const { cfg, paperW, paperH, school } = await fetchTemplateAndCommon(schoolId, gradeKey);
-  const { main_report, especialistas } = await fetchAssignmentsAndReports(
+  const { main_report, especialistas, main_literal, main_numeral } = await fetchAssignmentsAndReports(
     schoolId, sectionId, yearId, studentId, momento,
   );
 
@@ -146,6 +163,8 @@ export async function downloadPrimaryDescriptiveBoleta(
     momento,
     main_report,
     especialistas,
+    literal:      main_literal ?? undefined,
+    numeral:      main_numeral ?? undefined,
   };
 
   return generatePrimaryDescriptiveHtml(cfg, data, paperW, paperH);
@@ -172,7 +191,7 @@ export async function downloadAllPrimaryDescriptiveBoletas(params: {
 
   const bodies = await Promise.all(
     students.map(async (s) => {
-      const { main_report, especialistas } = await fetchAssignmentsAndReports(
+      const { main_report, especialistas, main_literal, main_numeral } = await fetchAssignmentsAndReports(
         schoolId, sectionId, yearId, s.studentId, momento,
       );
       const data: PrimaryDescriptiveRenderData = {
@@ -186,6 +205,8 @@ export async function downloadAllPrimaryDescriptiveBoletas(params: {
         momento,
         main_report,
         especialistas,
+        literal:      main_literal ?? undefined,
+        numeral:      main_numeral ?? undefined,
       };
       return generatePrimaryDescriptiveHtml(cfg, data, paperW, paperH, { bodyOnly: true });
     }),

@@ -703,6 +703,8 @@ export interface PrimaryDescriptiveRenderData {
   momento:          number;
   main_report:      { subject_name: string; html: string } | null;
   especialistas:    { subject_name: string; html: string }[];
+  literal?:         string;
+  numeral?:         string;
 }
 
 export const SAMPLE_PRIMARY_DESCRIPTIVE_DATA: PrimaryDescriptiveRenderData = {
@@ -724,6 +726,8 @@ export const SAMPLE_PRIMARY_DESCRIPTIVE_DATA: PrimaryDescriptiveRenderData = {
       html: `<ul><li>Se inicia en el reconocimiento de algunos útiles escolares básicos en inglés.</li></ul>`,
     },
   ],
+  literal: "A",
+  numeral: "19",
 };
 
 export function generatePrimaryDescriptiveHtml(
@@ -778,6 +782,12 @@ export function generatePrimaryDescriptiveHtml(
       </div>`).join("")}
   </div>` : "";
 
+  const literalNumeralHtml = (data.literal || data.numeral) ? `
+  <div style="font-size:10pt;margin-top:14px;margin-bottom:6px;display:flex;gap:40px;justify-content:center">
+    ${data.literal ? `<span><b>Literal:</b>&nbsp;${esc(data.literal)}</span>` : ""}
+    ${data.numeral ? `<span><b>Numeral:</b>&nbsp;${esc(data.numeral)}</span>` : ""}
+  </div>` : "";
+
   const footerHtml = cfg.primaria?.show_footer_logo && cfg.primaria?.footer_logo_url ? `
   <div style="margin-top:auto;padding-top:12px;text-align:center">
     <img src="${esc(cfg.primaria.footer_logo_url)}" alt="Logo pie" style="height:60px;width:auto;object-fit:contain">
@@ -790,6 +800,7 @@ export function generatePrimaryDescriptiveHtml(
     ${studentHtml}
     ${mainHtml}
     ${especialistasHtml}
+    ${literalNumeralHtml}
     ${footerHtml}
   </div>`;
 
