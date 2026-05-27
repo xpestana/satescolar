@@ -2,18 +2,17 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 /**
- * Renders a full HTML document offscreen and downloads it as a paginated PDF.
- * No window/tab is opened; the browser fires a normal file download.
+ * Renders a full HTML document offscreen and returns it as a paginated PDF Blob.
+ * Caller is responsible for what to do with the blob (preview, download, upload…).
  *
  * Paper dimensions are extracted from the HTML's @page rule, falling back to
  * the explicit defaults (US Letter).
  */
-export async function downloadHtmlAsPdf(
+export async function htmlToPdfBlob(
   html: string,
-  filename: string,
   fallbackPaperWidthMm = 215.9,
   fallbackPaperHeightMm = 279.4,
-): Promise<void> {
+): Promise<Blob> {
   // Try to extract @page size from the HTML
   let paperW = fallbackPaperWidthMm;
   let paperH = fallbackPaperHeightMm;
@@ -104,8 +103,33 @@ export async function downloadHtmlAsPdf(
       yPx += pageHpx;
     }
 
-    pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`);
+    return pdf.output("blob");
   } finally {
     document.body.removeChild(iframe);
+  }
+}
+
+/**
+ * Convenience wrapper: renders the HTML to a PDF blob and triggers a file download.
+ * Kept for callers that just want a direct download without a preview step.
+ */
+export async function downloadHtmlAsPdf(
+  html: string,
+  filename: string,
+  fallbackPaperWidthMm = 215.9,
+  fallbackPaperHeightMm = 279.4,
+): Promise<void> {
+  const blob = await htmlToPdfBlob(html, fallbackPaperWidthMm, fallbackPaperHeightMm);
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } finally {
+    // Revoke after a tick so the browser has time to start the download
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }

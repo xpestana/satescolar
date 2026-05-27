@@ -12,13 +12,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Search, Loader2, Eye, Check, ChevronsUpDown, Download } from "lucide-react";
+import { Search, Loader2, Eye, Check, ChevronsUpDown, Download, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
 import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas } from "@/lib/bachilleratoBoleta";
 import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
-import { downloadHtmlAsPdf } from "@/lib/htmlToPdfDownload";
+import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -62,8 +62,30 @@ export default function GradesConsultation() {
   const [openGcrpTeacher, setOpenGcrpTeacher] = useState(false);
   const [downloadingStudentId, setDownloadingStudentId] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
-  const downloadBoletaPdf = async (html: string, filename: string) => {
-    await downloadHtmlAsPdf(html, filename);
+  const [boletaModal, setBoletaModal] = useState<
+    { blobUrl: string; filename: string; title: string } | null
+  >(null);
+
+  const openBoletaPreview = async (html: string, filename: string, title: string) => {
+    const safeName = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
+    const blob = await htmlToPdfBlob(html);
+    const blobUrl = URL.createObjectURL(blob);
+    setBoletaModal({ blobUrl, filename: safeName, title });
+  };
+
+  const closeBoletaModal = () => {
+    if (boletaModal) URL.revokeObjectURL(boletaModal.blobUrl);
+    setBoletaModal(null);
+  };
+
+  const downloadBoletaFromModal = () => {
+    if (!boletaModal) return;
+    const a = document.createElement("a");
+    a.href = boletaModal.blobUrl;
+    a.download = boletaModal.filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
   // School years
   const { data: schoolYears = [] } = useQuery({
@@ -594,7 +616,11 @@ export default function GradesConsultation() {
                                     documentId: s.document_id ?? null,
                                   })),
                                 });
-                                await downloadBoletaPdf(html, `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`);
+                                await openBoletaPreview(
+                                  html,
+                                  `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
+                                  `Sección ${sectionData?.name ?? ""} — todas las boletas`,
+                                );
                               } finally {
                                 setDownloadingAll(false);
                               }
@@ -628,7 +654,11 @@ export default function GradesConsultation() {
                                     documentId: s.document_id ?? null,
                                   })),
                                 });
-                                await downloadBoletaPdf(html, `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`);
+                                await openBoletaPreview(
+                                  html,
+                                  `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
+                                  `Sección ${sectionData?.name ?? ""} — todas las boletas`,
+                                );
                               } finally {
                                 setDownloadingAll(false);
                               }
@@ -701,7 +731,11 @@ export default function GradesConsultation() {
                                             yearRange,
                                             momento: selectedMomento,
                                           });
-                                          await downloadBoletaPdf(html, `Boleta_${s.student_name}_M${selectedMomento}.pdf`);
+                                          await openBoletaPreview(
+                                            html,
+                                            `Boleta_${s.student_name}_M${selectedMomento}.pdf`,
+                                            s.student_name,
+                                          );
                                         } finally {
                                           setDownloadingStudentId(null);
                                         }
@@ -737,7 +771,11 @@ export default function GradesConsultation() {
                                             yearRange,
                                             momento: selectedMomento,
                                           });
-                                          await downloadBoletaPdf(html, `Boleta_${s.student_name}_M${selectedMomento}.pdf`);
+                                          await openBoletaPreview(
+                                            html,
+                                            `Boleta_${s.student_name}_M${selectedMomento}.pdf`,
+                                            s.student_name,
+                                          );
                                         } finally {
                                           setDownloadingStudentId(null);
                                         }
@@ -792,6 +830,35 @@ export default function GradesConsultation() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Boleta PDF preview modal */}
+      <Dialog open={!!boletaModal} onOpenChange={(open) => { if (!open) closeBoletaModal(); }}>
+        <DialogContent className="max-w-5xl w-[95vw] h-[92vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="flex flex-row items-center justify-between px-4 py-3 border-b shrink-0 space-y-0">
+            <DialogTitle className="text-sm font-semibold truncate pr-4">
+              {boletaModal?.title ?? "Boleta"}
+            </DialogTitle>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button size="sm" className="gap-1.5" onClick={downloadBoletaFromModal}>
+                <Download className="h-4 w-4" />
+                Descargar PDF
+              </Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={closeBoletaModal}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden bg-neutral-100">
+            {boletaModal && (
+              <iframe
+                src={boletaModal.blobUrl}
+                className="w-full h-full border-0"
+                title="Boleta PDF"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
