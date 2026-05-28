@@ -10,11 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, Loader2, Save, User } from "lucide-react";
+import { Eye, Loader2, Save, User, ChevronDown, ClipboardList, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/utilities/RichTextEditor";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 import {
   generatePrimaryDescriptiveHtml,
   DEFAULT_BACHILLERATO_CONFIG,
@@ -53,6 +54,8 @@ export default function PrimaryFinalReportModal({
   const [activeTeacherTab, setActiveTeacherTab] = useState("1");
   const [previewHtml, setPreviewHtml] = useState("");
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [observacionesOpen, setObservacionesOpen] = useState(true);
+  const [notasOpen, setNotasOpen] = useState(true);
 
   // Load teacher info from assignment
   const { data: teacherInfo } = useQuery({
@@ -344,8 +347,8 @@ export default function PrimaryFinalReportModal({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_340px] gap-4 flex-1 min-h-0">
-            {Array.from({ length: 3 }).map((_, i) => (
+          <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
+            {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="border rounded-md p-3 space-y-3">
                 <Skeleton className="h-5 w-32" />
                 {Array.from({ length: 5 }).map((_, j) => (
@@ -355,191 +358,180 @@ export default function PrimaryFinalReportModal({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_340px] gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
 
-            {/* Column 1: Teacher grades — narrow reference panel */}
-            <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
-              <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
-                <h3 className="text-sm font-semibold">Notas del Docente</h3>
-              </div>
-              <Tabs value={activeTeacherTab} onValueChange={setActiveTeacherTab} className="flex-1 flex flex-col min-h-0">
-                <TabsList className="mx-2 mt-2 shrink-0">
-                  {[1, 2, 3].map((m) => (
-                    <TabsTrigger key={m} value={String(m)} className="text-xs">
-                      Momento {m}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                {[1, 2, 3].map((m) => (
-                  <TabsContent key={m} value={String(m)} className="flex-1 px-3 pb-3 min-h-0">
+            {/* Left column: Informe Descriptivo (top) + Observaciones del Momento (bottom) */}
+            <div className="flex flex-col gap-2 min-h-0">
+
+              {/* Top: Informe Descriptivo / Indicadores */}
+              <div className={cn(
+                "border rounded-md overflow-hidden flex flex-col min-h-0",
+                observacionesOpen ? "flex-[7]" : "flex-1"
+              )}>
+                <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
+                  <h3 className="text-sm font-semibold">
+                    {reportType === "descriptive" ? "Informe Descriptivo" : "Indicadores"}
+                  </h3>
+                </div>
+                <div className="flex-1 min-h-0 flex flex-col p-3">
+                  {reportType === "descriptive" ? (
+                    <RichTextEditor
+                      value={descriptiveReport}
+                      onChange={setDescriptiveReport}
+                      placeholder="Redacte el informe descriptivo del estudiante..."
+                    />
+                  ) : (
                     <ScrollArea className="h-full">
-                      {teacherGradesByMomento[m]?.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          Sin evaluaciones en este momento
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {teacherGradesByMomento[m]?.map((item, idx) => (
-                            <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0">
-                              <span className="text-sm flex-1">{item.description}</span>
-                              <Badge variant="outline" className="shrink-0">{item.grade}</Badge>
+                      <div className="space-y-4 pr-2">
+                        {areas.map((area: any) => (
+                          <div key={area.id}>
+                            <h4 className="text-sm font-semibold text-primary mb-2">{area.name}</h4>
+                            <div className="space-y-2">
+                              {(area.indicators || [])
+                                .sort((a: any, b: any) => a.display_order - b.display_order)
+                                .map((ind: any) => (
+                                  <div key={ind.id} className="flex items-start gap-2">
+                                    <span className="text-xs flex-1 pt-1.5">{ind.description}</span>
+                                    <Select
+                                      value={indicatorValues[ind.id] || ""}
+                                      onValueChange={(v) =>
+                                        setIndicatorValues((prev) => ({ ...prev, [ind.id]: v }))
+                                      }
+                                    >
+                                      <SelectTrigger className="h-8 w-24 text-xs shrink-0">
+                                        <SelectValue placeholder="—" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {scales.map((sc: any) => (
+                                          <SelectItem key={sc.id} value={sc.id} className="text-xs">
+                                            {sc.abbreviation}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                ))}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </TabsContent>
-                ))}
-              </Tabs>
-            </div>
-
-            {/* Column 2: Informe Descriptivo — dominant editor workspace */}
-            <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
-              <div className="px-3 py-2 bg-muted/30 border-b shrink-0">
-                <h3 className="text-sm font-semibold">
-                  {reportType === "descriptive" ? "Informe Descriptivo" : "Indicadores"}
-                </h3>
-              </div>
-              <div className="flex-1 min-h-0 flex flex-col p-3">
-                {reportType === "descriptive" ? (
-                  <RichTextEditor
-                    value={descriptiveReport}
-                    onChange={setDescriptiveReport}
-                    placeholder="Redacte el informe descriptivo del estudiante..."
-                  />
-                ) : (
-                  <ScrollArea className="h-full">
-                    <div className="space-y-4 pr-2">
-                      {areas.map((area: any) => (
-                        <div key={area.id}>
-                          <h4 className="text-sm font-semibold text-primary mb-2">{area.name}</h4>
-                          <div className="space-y-2">
-                            {(area.indicators || [])
-                              .sort((a: any, b: any) => a.display_order - b.display_order)
-                              .map((ind: any) => (
-                                <div key={ind.id} className="flex items-start gap-2">
-                                  <span className="text-xs flex-1 pt-1.5">{ind.description}</span>
-                                  <Select
-                                    value={indicatorValues[ind.id] || ""}
-                                    onValueChange={(v) =>
-                                      setIndicatorValues((prev) => ({ ...prev, [ind.id]: v }))
-                                    }
-                                  >
-                                    <SelectTrigger className="h-8 w-24 text-xs shrink-0">
-                                      <SelectValue placeholder="—" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {scales.map((sc: any) => (
-                                        <SelectItem key={sc.id} value={sc.id} className="text-xs">
-                                          {sc.abbreviation}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              ))}
                           </div>
+                        ))}
+                        {areas.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-8">
+                            No hay indicadores configurados para este grado.
+                          </p>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom: Observaciones del Momento (collapsible) */}
+              <div className={cn(
+                "border rounded-md overflow-hidden flex flex-col min-h-0",
+                observacionesOpen ? "flex-[3]" : "shrink-0 h-auto"
+              )}>
+                <button
+                  onClick={() => setObservacionesOpen(!observacionesOpen)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border-b border-blue-500/20 text-blue-700 dark:text-blue-300 transition-colors"
+                >
+                  <span className="text-sm font-semibold flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    Observaciones del Momento
+                  </span>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", observacionesOpen && "rotate-180")} />
+                </button>
+                {observacionesOpen && (
+                  <ScrollArea className="flex-1">
+                    <div className="p-3 space-y-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Literal (A-E)</Label>
+                          <Input
+                            value={literal}
+                            onChange={(e) => handleLiteralChange(e.target.value)}
+                            placeholder="A"
+                            maxLength={1}
+                            className="h-8 text-center font-semibold uppercase"
+                          />
                         </div>
-                      ))}
-                      {areas.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-8">
-                          No hay indicadores configurados para este grado.
-                        </p>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Literal Numérico</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={20}
+                            step={0.01}
+                            value={literalNumerico}
+                            onChange={(e) => setLiteralNumerico(e.target.value)}
+                            placeholder="19"
+                            className="h-8"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Inasistencias</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={absenceCount}
+                          onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="h-8"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nombre del Proyecto</Label>
+                        <Input
+                          value={projectName}
+                          onChange={(e) => setProjectName(e.target.value)}
+                          placeholder="Nombre del proyecto..."
+                          className="h-8"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs flex items-center gap-1">
+                          <User className="h-3 w-3" /> Docente
+                        </Label>
+                        <Input
+                          value={teacherInfo?.name || "—"}
+                          readOnly
+                          className="h-8 bg-muted/50 cursor-default text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Cédula del Docente</Label>
+                        <Input
+                          value={teacherInfo?.documentId || "—"}
+                          readOnly
+                          className="h-8 bg-muted/50 cursor-default"
+                        />
+                      </div>
+                      {reportType === "indicators" && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Observación Descriptiva</Label>
+                          <RichTextEditor
+                            value={descriptiveReport}
+                            onChange={setDescriptiveReport}
+                            placeholder="Observación adicional..."
+                            minHeight={120}
+                            className="min-h-[160px]"
+                          />
+                        </div>
                       )}
                     </div>
                   </ScrollArea>
                 )}
               </div>
+
             </div>
 
-            {/* Column 3: Observaciones (top) + Vista Previa (bottom) */}
-            <div className="border rounded-md overflow-hidden flex flex-col min-h-0">
+            {/* Right column: Vista Previa (top) + Notas del Docente (bottom) */}
+            <div className="flex flex-col gap-2 min-h-0">
 
-              {/* Observaciones del Momento — compact fixed section */}
-              <div className="shrink-0">
-                <div className="px-3 py-2 bg-muted/30 border-b">
-                  <h3 className="text-sm font-semibold">Observaciones del Momento</h3>
-                </div>
-                <div className="p-3 space-y-2.5">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Literal (A-E)</Label>
-                      <Input
-                        value={literal}
-                        onChange={(e) => handleLiteralChange(e.target.value)}
-                        placeholder="A"
-                        maxLength={1}
-                        className="h-8 text-center font-semibold uppercase"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Literal Numérico</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={20}
-                        step={0.01}
-                        value={literalNumerico}
-                        onChange={(e) => setLiteralNumerico(e.target.value)}
-                        placeholder="19"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Inasistencias</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={absenceCount}
-                      onChange={(e) => setAbsenceCount(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="h-8"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Nombre del Proyecto</Label>
-                    <Input
-                      value={projectName}
-                      onChange={(e) => setProjectName(e.target.value)}
-                      placeholder="Nombre del proyecto..."
-                      className="h-8"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs flex items-center gap-1">
-                      <User className="h-3 w-3" /> Docente
-                    </Label>
-                    <Input
-                      value={teacherInfo?.name || "—"}
-                      readOnly
-                      className="h-8 bg-muted/50 cursor-default text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Cédula del Docente</Label>
-                    <Input
-                      value={teacherInfo?.documentId || "—"}
-                      readOnly
-                      className="h-8 bg-muted/50 cursor-default"
-                    />
-                  </div>
-                  {reportType === "indicators" && (
-                    <div className="space-y-1">
-                      <Label className="text-xs">Observación Descriptiva</Label>
-                      <RichTextEditor
-                        value={descriptiveReport}
-                        onChange={setDescriptiveReport}
-                        placeholder="Observación adicional..."
-                        minHeight={120}
-                        className="min-h-[160px]"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Vista Previa — live boleta preview, fills remaining height */}
-              <div className="flex-1 min-h-0 flex flex-col border-t">
+              {/* Top: Vista Previa */}
+              <div className={cn(
+                "border rounded-md overflow-hidden flex flex-col min-h-0",
+                notasOpen ? "flex-[7]" : "flex-1"
+              )}>
                 <div className="px-3 py-2 bg-muted/30 border-b shrink-0 flex items-center justify-between">
                   <h3 className="text-sm font-semibold flex items-center gap-1.5">
                     <Eye className="h-3.5 w-3.5" />
@@ -561,6 +553,54 @@ export default function PrimaryFinalReportModal({
                     </p>
                   )}
                 </div>
+              </div>
+
+              {/* Bottom: Notas del Docente (collapsible) */}
+              <div className={cn(
+                "border rounded-md overflow-hidden flex flex-col min-h-0",
+                notasOpen ? "flex-[3]" : "shrink-0 h-auto"
+              )}>
+                <button
+                  onClick={() => setNotasOpen(!notasOpen)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 border-b border-amber-500/20 text-amber-700 dark:text-amber-400 transition-colors"
+                >
+                  <span className="text-sm font-semibold flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" />
+                    Notas del Docente
+                  </span>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", notasOpen && "rotate-180")} />
+                </button>
+                {notasOpen && (
+                  <Tabs value={activeTeacherTab} onValueChange={setActiveTeacherTab} className="flex-1 flex flex-col min-h-0">
+                    <TabsList className="mx-2 mt-2 shrink-0">
+                      {[1, 2, 3].map((m) => (
+                        <TabsTrigger key={m} value={String(m)} className="text-xs">
+                          Momento {m}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                    {[1, 2, 3].map((m) => (
+                      <TabsContent key={m} value={String(m)} className="flex-1 px-3 pb-3 min-h-0">
+                        <ScrollArea className="h-full">
+                          {teacherGradesByMomento[m]?.length === 0 ? (
+                            <p className="text-sm text-muted-foreground py-4 text-center">
+                              Sin evaluaciones en este momento
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {teacherGradesByMomento[m]?.map((item, idx) => (
+                                <div key={idx} className="flex items-start justify-between gap-2 py-1.5 border-b last:border-0">
+                                  <span className="text-sm flex-1">{item.description}</span>
+                                  <Badge variant="outline" className="shrink-0">{item.grade}</Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                )}
               </div>
 
             </div>
