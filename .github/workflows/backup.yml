@@ -1,0 +1,144 @@
+name: Daily Supabase Backup
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # 4:00 AM UTC = 12:00 AM Venezuela (UTC-4)
+  workflow_dispatch:      # permite correrlo manualmente desde GitHub
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Install PostgreSQL client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Set backup date
+        run: echo "DATE=$(date +%Y-%m-%d)" >> $GITHUB_ENV
+
+      - name: Backup public schema (estructura + datos)
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          pg_dump \
+            --host=db.hqiqvegpyxsshxkdyigs.supabase.co \
+            --port=5432 \
+            --username=postgres \
+            --dbname=postgres \
+            --schema=public \
+            --no-owner --no-privileges \
+            | gzip > public_${{ env.DATE }}.sql.gz
+          echo "Public schema: $(du -sh public_${{ env.DATE }}.sql.gz | cut -f1)"
+
+      - name: Backup auth users
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          pg_dump \
+            --host=db.hqiqvegpyxsshxkdyigs.supabase.co \
+            --port=5432 \
+            --username=postgres \
+            --dbname=postgres \
+            --table=auth.users \
+            --table=auth.identities \
+            --table=auth.sessions \
+            --table=auth.refresh_tokens \
+            --table=auth.mfa_factors \
+            --no-owner --no-privileges \
+            --data-only \
+            | gzip > auth_${{ env.DATE }}.sql.gz
+          echo "Auth data: $(du -sh auth_${{ env.DATE }}.sql.gz | cut -f1)"
+
+      - name: Backup storage metadata
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          pg_dump \
+            --host=db.hqiqvegpyxsshxkdyigs.supabase.co \
+            --port=5432 \
+            --username=postgres \
+            --dbname=postgres \
+            --table=storage.buckets \
+            --table=storage.objects \
+            --no-owner --no-privileges \
+            --data-only \
+            | gzip > storage_${{ env.DATE }}.sql.gz
+          echo "Storage metadata: $(du -sh storage_${{ env.DATE }}.sql.gz | cut -f1)"
+
+      - name: Create restore guide
+        run: |
+          cat > RESTORE_${{ env.DATE }}.md << 'EOF'
+          # Restauración — Backup ${{ env.DATE }}
+
+          ## Archivos en este backup
+          - `public_${{ env.DATE }}.sql.gz` — Schema público completo (estructura + datos)
+          - `auth_${{ env.DATE }}.sql.gz`   — Usuarios, identidades, sesiones
+          - `storage_${{ env.DATE }}.sql.gz` — Metadata de buckets y archivos
+
+          ## Pasos para restaurar
+
+          ### 1. Descargar los archivos desde S3
+          ```bash
+          aws s3 cp s3://satescolar/backups/${{ env.DATE }}/ . --recursive
+          gunzip *.sql.gz
+          ```
+
+          ### 2. Restaurar schema público
+          ```bash
+          psql "postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres?sslmode=require" \
+            -f public_${{ env.DATE }}.sql
+          ```
+
+          ### 3. Restaurar auth users
+          ```bash
+          psql "postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres?sslmode=require" \
+            -c "SET session_replication_role = replica;" \
+            -f auth_${{ env.DATE }}.sql \
+            -c "SET session_replication_role = DEFAULT;"
+          ```
+
+          ### 4. Restaurar storage metadata
+          ```bash
+          psql "postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postgres?sslmode=require" \
+            -c "SET session_replication_role = replica;" \
+            -f storage_${{ env.DATE }}.sql \
+            -c "SET session_replication_role = DEFAULT;"
+          ```
+
+          ## Nota
+          Los archivos físicos (fotos, logos, documentos) están en el bucket S3 `satescolar`
+          y no necesitan restauración — ya están ahí.
+          EOF
+
+      - name: Upload to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          PREFIX="s3://satescolar/backups/${{ env.DATE }}"
+          aws s3 cp public_${{ env.DATE }}.sql.gz   $PREFIX/public_schema.sql.gz
+          aws s3 cp auth_${{ env.DATE }}.sql.gz      $PREFIX/auth_data.sql.gz
+          aws s3 cp storage_${{ env.DATE }}.sql.gz   $PREFIX/storage_metadata.sql.gz
+          aws s3 cp RESTORE_${{ env.DATE }}.md       $PREFIX/RESTORE.md
+          echo "✅ Backup subido a $PREFIX"
+
+      - name: Delete backups older than 180 days
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          CUTOFF=$(date -d '180 days ago' +%Y-%m-%d)
+          echo "Eliminando backups anteriores a: $CUTOFF"
+
+          aws s3 ls s3://satescolar/backups/ | awk '{print $2}' | tr -d '/' | while read folder; do
+            if [[ "$folder" < "$CUTOFF" ]]; then
+              aws s3 rm s3://satescolar/backups/$folder/ --recursive
+              echo "🗑️  Eliminado: $folder"
+            fi
+          done
+
+          echo "Backups actuales en S3:"
+          aws s3 ls s3://satescolar/backups/ | awk '{print $2}'
