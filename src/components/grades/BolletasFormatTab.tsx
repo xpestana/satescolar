@@ -347,6 +347,7 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
       name_font_size: 14, sub_font_size: 10, body_font_size: 10,
       accent_color: "#1e3a5f", title_color: "#000000",
       show_address: false, show_dea_code: false, show_phone: false,
+      show_slogan: true, slogan: "",
       signatures: [],
     };
     const updPrimaria = (patch: Partial<NonNullable<BachilleratoConfig["primaria"]>>) =>
@@ -367,6 +368,19 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
             onChange={(v) => updPrimaria({ show_dea_code: v })} />
           <ToggleRow label="Mostrar teléfono" value={pr.show_phone}
             onChange={(v) => updPrimaria({ show_phone: v })} />
+          <ToggleRow label="Mostrar slogan" value={pr.show_slogan ?? true}
+            onChange={(v) => updPrimaria({ show_slogan: v })} />
+          {(pr.show_slogan ?? true) && (
+            <div className="space-y-1">
+              <Label className="text-xs">Texto del slogan</Label>
+              <Input
+                value={pr.slogan ?? ""}
+                onChange={(e) => updPrimaria({ slogan: e.target.value })}
+                placeholder="Ej: Construyendo Vidas con Propósitos"
+                className="h-7 text-xs"
+              />
+            </div>
+          )}
         </Section>
 
         <div className="border rounded-md p-3 space-y-2">
