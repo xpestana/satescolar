@@ -72,6 +72,8 @@ export interface BachilleratoConfig {
     show_address:  boolean;
     show_dea_code: boolean;
     show_phone:    boolean;
+    show_slogan:   boolean;
+    slogan:        string;
     // Signatures
     signatures: BoletinSignature[];
   };
@@ -773,6 +775,8 @@ export function generatePrimaryDescriptiveHtml(
   const showAddress   = p.show_address         ?? false;
   const showDeaCode   = p.show_dea_code        ?? false;
   const showPhone     = p.show_phone           ?? false;
+  const showSlogan    = p.show_slogan          ?? true;
+  const slogan        = p.slogan               ?? "";
   const footerPos     = p.footer_logo_position ?? "center";
 
   const lapsoLabels: Record<number, string> = { 1: "1er", 2: "2do", 3: "3er" };
@@ -789,11 +793,16 @@ export function generatePrimaryDescriptiveHtml(
     `<div style="font-size:${subFontSize}pt;color:#4b5563;margin-top:2px">AÑO ESCOLAR ${esc(data.year_range)}</div>`,
   ].filter(Boolean).join("");
 
+  const sloganHtml = showSlogan && slogan
+    ? `<div style="font-size:${subFontSize}pt;color:${accentColor};font-style:italic;margin-top:1px">${esc(slogan)}</div>`
+    : "";
+
   const headerHtml = `
   <div style="display:flex;align-items:center;gap:16px;padding-bottom:10px;border-bottom:2px solid ${accentColor};margin-bottom:10px">
     ${logoHtml}
     <div style="flex:1;text-align:center">
       <div style="font-size:${nameFontSize}pt;font-weight:700;color:${accentColor};text-transform:uppercase;letter-spacing:0.5px">${esc(data.school_name)}</div>
+      ${sloganHtml}
       ${subLines}
     </div>
   </div>`;
