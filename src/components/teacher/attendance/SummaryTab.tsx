@@ -282,19 +282,21 @@ export function SummaryTab({
           <CardContent>
             <div className="space-y-1">
               {topAbsent.map((s, idx) => (
-                <Button
+                <button
                   key={s.studentId}
-                  variant="ghost"
-                  className="w-full justify-between h-auto py-2 px-3"
+                  type="button"
+                  className="w-full text-left rounded-md px-3 py-2.5 hover:bg-muted/60 transition-colors"
                   onClick={() => setSelectedStudentId(s.studentId)}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground text-sm w-4 text-right">
+                  {/* Row 1: number + name (wraps freely) */}
+                  <div className="flex gap-2">
+                    <span className="text-muted-foreground text-sm shrink-0 w-5 text-right">
                       {idx + 1}.
                     </span>
-                    <span className="text-sm font-normal">{s.fullName}</span>
+                    <span className="text-sm font-medium leading-snug">{s.fullName}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  {/* Row 2: badge + chevron */}
+                  <div className="flex items-center justify-between mt-1 pl-7">
                     <Badge
                       variant="outline"
                       className="text-xs border-red-200 text-red-700 bg-red-50"
@@ -303,7 +305,7 @@ export function SummaryTab({
                     </Badge>
                     <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                   </div>
-                </Button>
+                </button>
               ))}
             </div>
           </CardContent>
