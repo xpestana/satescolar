@@ -310,6 +310,23 @@ export default function FormFieldsEditor() {
     },
   });
 
+  // Toggle required mutation
+  const toggleRequiredMutation = useMutation({
+    mutationFn: async ({ id, is_required }: { id: string; is_required: boolean }) => {
+      const { error } = await supabase
+        .from("form_fields")
+        .update({ is_required })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["form-fields"] });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Error", description: "No se pudo actualizar el campo." });
+    },
+  });
+
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingField(null);
@@ -508,11 +525,25 @@ export default function FormFieldsEditor() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        {field.is_required ? (
-                          <Badge variant="default" className="bg-primary">Sí</Badge>
-                        ) : (
-                          <Badge variant="outline">No</Badge>
-                        )}
+                        <button
+                          type="button"
+                          disabled={isProtected || toggleRequiredMutation.isPending}
+                          onClick={() =>
+                            !isProtected &&
+                            toggleRequiredMutation.mutate({
+                              id: field.id,
+                              is_required: !field.is_required,
+                            })
+                          }
+                          className="disabled:cursor-not-allowed disabled:opacity-60"
+                          title={isProtected ? "Este campo es siempre obligatorio" : field.is_required ? "Clic para quitar requerido" : "Clic para marcar como requerido"}
+                        >
+                          {field.is_required ? (
+                            <Badge variant="default" className="bg-primary hover:bg-primary/80 cursor-pointer transition-colors">Sí</Badge>
+                          ) : (
+                            <Badge variant="outline" className="hover:border-primary hover:text-primary cursor-pointer transition-colors">No</Badge>
+                          )}
+                        </button>
                       </TableCell>
                       <TableCell className="text-center">
                         <Switch
