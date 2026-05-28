@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, Loader2, Save, User, ChevronDown, ClipboardList, BookOpen } from "lucide-react";
+import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/utilities/RichTextEditor";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -99,7 +100,8 @@ export default function PreschoolFinalReportModal({
   const [projectName, setProjectName] = useState("");
   const [saving, setSaving] = useState(false);
   const [activeTeacherTab, setActiveTeacherTab] = useState("1");
-  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [observacionesOpen, setObservacionesOpen] = useState(true);
   const [notasOpen, setNotasOpen] = useState(true);
@@ -280,13 +282,21 @@ export default function PreschoolFinalReportModal({
     setIndicatorValues(map);
   }, [open, existingIndicatorGrades]);
 
-  // Live preview: regenerate 700ms after any content change
+  // Live preview: regenerate PDF 1200ms after any content change
   useEffect(() => {
-    if (!open || !schoolData || !assignmentDetail) return;
+    if (!open || !schoolData || !assignmentDetail) {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+        setPreviewPdfUrl(null);
+      }
+      return;
+    }
     setPreviewLoading(true);
-    const timer = setTimeout(() => {
+    const controller = { cancelled: false };
+    const timer = setTimeout(async () => {
       try {
-        setPreviewHtml(buildPreschoolPreviewHtml({
+        const html = buildPreschoolPreviewHtml({
           schoolName: (schoolData as any)?.name ?? "",
           yearRange: (assignmentDetail as any)?.school_year?.year_range ?? "",
           studentName,
@@ -295,16 +305,32 @@ export default function PreschoolFinalReportModal({
           literal,
           momento,
           descriptiveReport,
-        }));
+        });
+        const blob = await htmlToPdfBlob(html);
+        if (controller.cancelled) return;
+        const url = URL.createObjectURL(blob);
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = url;
+        setPreviewPdfUrl(url);
+      } catch {
+        // mantener preview anterior si falla
       } finally {
-        setPreviewLoading(false);
+        if (!controller.cancelled) setPreviewLoading(false);
       }
-    }, 700);
+    }, 1200);
     return () => {
+      controller.cancelled = true;
       clearTimeout(timer);
       setPreviewLoading(false);
     };
   }, [open, descriptiveReport, literal, schoolData, assignmentDetail, studentName, momento, levelLabel]);
+
+  // Revocar blob URL al desmontar
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
+  }, []);
 
   // Teacher grades grouped by momento
   const teacherGradesByMomento = useMemo(() => {
@@ -590,16 +616,15 @@ export default function PreschoolFinalReportModal({
                   {previewLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                 </div>
                 <div className="flex-1 relative min-h-0 overflow-hidden">
-                  {previewHtml ? (
+                  {previewPdfUrl ? (
                     <iframe
-                      srcDoc={previewHtml}
+                      src={previewPdfUrl}
                       className="w-full h-full border-0"
                       title="Vista previa de boleta"
-                      sandbox="allow-same-origin"
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground p-4 text-center">
-                      Complete los campos para ver la vista previa
+                      {previewLoading ? "Generando vista previa..." : "Complete los campos para ver la vista previa"}
                     </p>
                   )}
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -21,6 +21,7 @@ import {
   DEFAULT_BACHILLERATO_CONFIG,
   type PrimaryDescriptiveRenderData,
 } from "@/lib/bachilleratoTemplate";
+import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
 
 const GRADE_LABELS: Record<string, string> = {
   "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
@@ -52,7 +53,8 @@ export default function PrimaryFinalReportModal({
   const [projectName, setProjectName] = useState("");
   const [saving, setSaving] = useState(false);
   const [activeTeacherTab, setActiveTeacherTab] = useState("1");
-  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [observacionesOpen, setObservacionesOpen] = useState(true);
   const [notasOpen, setNotasOpen] = useState(true);
@@ -223,11 +225,19 @@ export default function PrimaryFinalReportModal({
     setIndicatorValues(map);
   }, [open, existingIndicatorGrades]);
 
-  // Live preview: regenerate boleta HTML 700ms after any content change
+  // Live preview: regenerate PDF 1200ms after any content change
   useEffect(() => {
-    if (!open || !schoolData || !assignmentDetail) return;
+    if (!open || !schoolData || !assignmentDetail) {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+        setPreviewPdfUrl(null);
+      }
+      return;
+    }
     setPreviewLoading(true);
-    const timer = setTimeout(() => {
+    const controller = { cancelled: false };
+    const timer = setTimeout(async () => {
       try {
         const previewData: PrimaryDescriptiveRenderData = {
           school_name: (schoolData as any)?.name ?? "",
@@ -248,16 +258,32 @@ export default function PrimaryFinalReportModal({
             : null,
           especialistas: [],
         };
-        setPreviewHtml(generatePrimaryDescriptiveHtml(DEFAULT_BACHILLERATO_CONFIG, previewData, 215.9, 279.4));
+        const html = generatePrimaryDescriptiveHtml(DEFAULT_BACHILLERATO_CONFIG, previewData, 215.9, 279.4);
+        const blob = await htmlToPdfBlob(html);
+        if (controller.cancelled) return;
+        const url = URL.createObjectURL(blob);
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = url;
+        setPreviewPdfUrl(url);
+      } catch {
+        // mantener preview anterior si falla
       } finally {
-        setPreviewLoading(false);
+        if (!controller.cancelled) setPreviewLoading(false);
       }
-    }, 700);
+    }, 1200);
     return () => {
+      controller.cancelled = true;
       clearTimeout(timer);
       setPreviewLoading(false);
     };
   }, [open, descriptiveReport, literal, literalNumerico, schoolData, assignmentDetail, studentName, momento, gradeLevel]);
+
+  // Revocar blob URL al desmontar
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
+  }, []);
 
   // Teacher grades grouped by momento
   const teacherGradesByMomento = useMemo(() => {
@@ -540,16 +566,15 @@ export default function PrimaryFinalReportModal({
                   {previewLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                 </div>
                 <div className="flex-1 relative min-h-0 overflow-hidden">
-                  {previewHtml ? (
+                  {previewPdfUrl ? (
                     <iframe
-                      srcDoc={previewHtml}
+                      src={previewPdfUrl}
                       className="w-full h-full border-0"
                       title="Vista previa de boleta"
-                      sandbox="allow-same-origin"
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground p-4 text-center">
-                      Complete los campos para ver la vista previa
+                      {previewLoading ? "Generando vista previa..." : "Complete los campos para ver la vista previa"}
                     </p>
                   )}
                 </div>
