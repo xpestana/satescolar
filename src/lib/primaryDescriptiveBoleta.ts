@@ -17,7 +17,7 @@ function proxyImageUrl(url: string): string {
   return url;
 }
 
-async function fetchAsBase64(url: string): Promise<string> {
+export async function fetchAsBase64(url: string): Promise<string> {
   if (!url) return "";
   try {
     const res = await fetch(proxyImageUrl(url));

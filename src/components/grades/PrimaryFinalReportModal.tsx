@@ -19,9 +19,11 @@ import { cn } from "@/lib/utils";
 import {
   generatePrimaryDescriptiveHtml,
   DEFAULT_BACHILLERATO_CONFIG,
+  type BachilleratoConfig,
   type PrimaryDescriptiveRenderData,
 } from "@/lib/bachilleratoTemplate";
 import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
+import { fetchAsBase64 } from "@/lib/primaryDescriptiveBoleta";
 
 const GRADE_LABELS: Record<string, string> = {
   "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
@@ -58,6 +60,8 @@ export default function PrimaryFinalReportModal({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [observacionesOpen, setObservacionesOpen] = useState(true);
   const [notasOpen, setNotasOpen] = useState(true);
+  const [schoolLogoB64, setSchoolLogoB64] = useState("");
+  const [footerLogoB64, setFooterLogoB64] = useState("");
 
   // Load teacher info from assignment
   const { data: teacherInfo } = useQuery({
@@ -100,6 +104,46 @@ export default function PrimaryFinalReportModal({
         .from("subject_teacher_assignments")
         .select("section:section_id(id, name, grade_level), school_year:school_year_id(id, year_range)")
         .eq("id", assignmentId)
+        .maybeSingle();
+      return data as any;
+    },
+    enabled: open,
+  });
+
+  // Boleta template config (colors, fonts, slogan, footer logo, signatures)
+  const { data: templateData } = useQuery({
+    queryKey: ["boleta-template-primary", schoolId, gradeLevel],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("boleta_templates" as any)
+        .select("config, paper_width_mm, paper_height_mm, applicable_grades")
+        .eq("school_id", schoolId)
+        .eq("is_active", true);
+      const allTemplates = (data ?? []) as any[];
+      const primaryTemplates = allTemplates.filter(
+        (t) => t.config?.style === "primaria_descriptivo"
+      );
+      const tpl =
+        primaryTemplates.find(
+          (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeLevel)
+        ) ??
+        primaryTemplates.find(
+          (t) => !t.applicable_grades || t.applicable_grades.length === 0
+        ) ??
+        null;
+      return tpl as any;
+    },
+    enabled: open,
+  });
+
+  // Student document_id
+  const { data: studentDocData } = useQuery({
+    queryKey: ["student-docid-preview", studentId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("students" as any)
+        .select("document_id")
+        .eq("id", studentId)
         .maybeSingle();
       return data as any;
     },
@@ -225,6 +269,20 @@ export default function PrimaryFinalReportModal({
     setIndicatorValues(map);
   }, [open, existingIndicatorGrades]);
 
+  // Fetch school logo as base64 when available
+  useEffect(() => {
+    const url = (schoolData as any)?.logo_url;
+    if (!url) { setSchoolLogoB64(""); return; }
+    fetchAsBase64(url).then(setSchoolLogoB64);
+  }, [(schoolData as any)?.logo_url]);
+
+  // Fetch footer logo as base64 when template config loads
+  useEffect(() => {
+    const url = (templateData as any)?.config?.primaria?.footer_logo_url;
+    if (!url) { setFooterLogoB64(""); return; }
+    fetchAsBase64(url).then(setFooterLogoB64);
+  }, [(templateData as any)?.config?.primaria?.footer_logo_url]);
+
   // Live preview: regenerate PDF 1200ms after any content change
   useEffect(() => {
     if (!open || !schoolData || !assignmentDetail) {
@@ -239,9 +297,28 @@ export default function PrimaryFinalReportModal({
     const controller = { cancelled: false };
     const timer = setTimeout(async () => {
       try {
+        // Build template config (same merge logic as primaryDescriptiveBoleta.ts)
+        const tpl = templateData as any;
+        const cfg: BachilleratoConfig = tpl?.config
+          ? {
+              ...DEFAULT_BACHILLERATO_CONFIG,
+              ...tpl.config,
+              sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(tpl.config?.sections ?? {}) },
+              primaria: {
+                show_footer_logo: false,
+                footer_logo_position: "center",
+                signatures: [],
+                ...(tpl.config?.primaria ?? {}),
+                footer_logo_url: footerLogoB64,
+              },
+            }
+          : DEFAULT_BACHILLERATO_CONFIG;
+        const paperW: number = tpl?.paper_width_mm ?? 215.9;
+        const paperH: number = tpl?.paper_height_mm ?? 279.4;
+
         const previewData: PrimaryDescriptiveRenderData = {
           school_name: (schoolData as any)?.name ?? "",
-          school_logo: "",
+          school_logo: schoolLogoB64,
           year_range: (assignmentDetail as any)?.school_year?.year_range ?? "",
           address: (schoolData as any)?.address ?? "",
           dea_code: (schoolData as any)?.dea_code ?? "",
@@ -249,7 +326,7 @@ export default function PrimaryFinalReportModal({
           literal,
           literal_numerico: literalNumerico,
           student_name: studentName,
-          document_id: "",
+          document_id: (studentDocData as any)?.document_id ?? "",
           grade_label: GRADE_LABELS[gradeLevel] ?? gradeLevel,
           section_name: (assignmentDetail as any)?.section?.name ?? "",
           momento,
@@ -258,7 +335,7 @@ export default function PrimaryFinalReportModal({
             : null,
           especialistas: [],
         };
-        const html = generatePrimaryDescriptiveHtml(DEFAULT_BACHILLERATO_CONFIG, previewData, 215.9, 279.4);
+        const html = generatePrimaryDescriptiveHtml(cfg, previewData, paperW, paperH);
         const blob = await htmlToPdfBlob(html);
         if (controller.cancelled) return;
         const url = URL.createObjectURL(blob);
@@ -276,7 +353,7 @@ export default function PrimaryFinalReportModal({
       clearTimeout(timer);
       setPreviewLoading(false);
     };
-  }, [open, descriptiveReport, literal, literalNumerico, schoolData, assignmentDetail, studentName, momento, gradeLevel]);
+  }, [open, descriptiveReport, literal, literalNumerico, schoolData, assignmentDetail, studentName, momento, gradeLevel, templateData, schoolLogoB64, footerLogoB64, studentDocData]);
 
   // Revocar blob URL al desmontar
   useEffect(() => {
