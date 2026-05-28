@@ -19,6 +19,7 @@ import { AbsenceConfirmDialog } from "./AbsenceConfirmDialog";
 import {
   TeacherAssignment,
   useEnrolledStudents,
+  useAttendanceByDate,
   useSaveAttendanceBatch,
   EnrolledStudent,
   AttendanceBatchItem,
@@ -31,6 +32,8 @@ interface RegisterTabProps {
 
 type StatusMap = Record<string, "present" | "absent">;
 
+const TODAY = new Date();
+
 export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
   const [assignmentId, setAssignmentId] = useState<string>("");
   const [momento, setMomento] = useState<string>("");
@@ -42,24 +45,49 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
     [assignments, assignmentId]
   );
 
-  // Reset marks when teacher switches assignment or momento
-  const prevKeyRef = useRef<string>("");
-  useEffect(() => {
-    const key = `${assignmentId}-${momento}`;
-    if (key !== prevKeyRef.current) {
-      setStatusMap({});
-      prevKeyRef.current = key;
-    }
-  }, [assignmentId, momento]);
-
   const schoolYearId = selectedAssignment?.school_year?.id;
   const sectionId = selectedAssignment?.section?.id;
+  const subjectId = selectedAssignment?.subject?.id;
 
   const { data: students = [], isLoading: loadingStudents } = useEnrolledStudents(
     sectionId,
     schoolYearId,
     schoolId
   );
+
+  // Fetch today's already-saved records for this section
+  const { data: todayRecords = [], isLoading: loadingToday } = useAttendanceByDate(
+    schoolId,
+    sectionId ? [sectionId] : [],
+    assignmentId && momento ? TODAY : undefined
+  );
+
+  // When assignment/momento changes OR today's records load, populate statusMap
+  const prevKeyRef = useRef<string>("");
+  useEffect(() => {
+    const key = `${assignmentId}-${momento}`;
+    const keyChanged = key !== prevKeyRef.current;
+
+    if (keyChanged) {
+      prevKeyRef.current = key;
+      setStatusMap({}); // reset before populating
+    }
+
+    if (!assignmentId || !momento || !subjectId) return;
+
+    const momentoNum = Number(momento);
+    const matching = todayRecords.filter(
+      (r) => r.subject_id === subjectId && r.momento === momentoNum
+    );
+
+    if (matching.length > 0) {
+      const map: StatusMap = {};
+      matching.forEach((r) => {
+        map[r.entity_id] = r.status as "present" | "absent";
+      });
+      setStatusMap(map);
+    }
+  }, [todayRecords, assignmentId, momento, subjectId]);
 
   const saveBatch = useSaveAttendanceBatch();
 
@@ -104,7 +132,6 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
     try {
       await saveBatch.mutateAsync([buildRecord(student, "present")]);
     } catch {
-      // Revert optimistic update
       setStatusMap((prev) => {
         const next = { ...prev };
         delete next[student.studentId];
@@ -151,14 +178,15 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const today = format(new Date(), "EEEE d 'de' MMMM yyyy", { locale: es });
+  const todayLabel = format(TODAY, "EEEE d 'de' MMMM yyyy", { locale: es });
+  const isLoading = loadingStudents || loadingToday;
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold">
-            Registrar asistencia — {today}
+            Registrar asistencia — {todayLabel}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -211,7 +239,7 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
         <div className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 text-sm">
-              {saveBatch.isPending ? (
+              {saveBatch.isPending || isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               ) : allMarked ? (
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -227,16 +255,16 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
               variant="outline"
               size="sm"
               onClick={handleAllPresent}
-              disabled={saveBatch.isPending || loadingStudents || allMarked}
+              disabled={saveBatch.isPending || isLoading || allMarked}
             >
               Todos presentes
             </Button>
           </div>
 
-          {loadingStudents ? (
-            <div className="flex flex-col gap-3">
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
+                <div key={i} className="h-52 rounded-2xl bg-muted animate-pulse" />
               ))}
             </div>
           ) : students.length === 0 ? (
