@@ -99,7 +99,7 @@ export function StudentAttendanceCard({
       {/* Card body */}
       <div
         ref={cardRef}
-        className="relative flex items-center gap-3 p-3 touch-pan-y cursor-grab active:cursor-grabbing"
+        className="relative flex items-center gap-3 p-4 touch-pan-y cursor-grab active:cursor-grabbing"
         style={{
           transform: `translateX(${dragOffset}px)`,
           transition: isDragging.current ? "none" : "transform 0.2s ease",
@@ -109,17 +109,17 @@ export function StudentAttendanceCard({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <Avatar className="h-10 w-10 shrink-0">
+        <Avatar className="h-14 w-14 shrink-0">
           {student.photoUrl && <AvatarImage src={student.photoUrl} alt={student.fullName} />}
-          <AvatarFallback className="text-xs font-semibold">
+          <AvatarFallback className="text-sm font-semibold">
             {getInitials(student.fullName)}
           </AvatarFallback>
         </Avatar>
 
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-sm truncate">{student.fullName}</p>
+          <p className="font-semibold text-base truncate">{student.fullName}</p>
           {student.documentId && (
-            <p className="text-xs text-muted-foreground">{student.documentId}</p>
+            <p className="text-sm text-muted-foreground">{student.documentId}</p>
           )}
         </div>
 
@@ -143,7 +143,7 @@ export function StudentAttendanceCard({
             type="button"
             size="icon"
             variant={status === "absent" ? "destructive" : "outline"}
-            className="h-7 w-7"
+            className="h-9 w-9"
             disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
@@ -151,13 +151,13 @@ export function StudentAttendanceCard({
             }}
             title="Marcar ausente"
           >
-            <X className="h-3.5 w-3.5" />
+            <X className="h-4 w-4" />
           </Button>
           <Button
             type="button"
             size="icon"
             variant={status === "present" ? "default" : "outline"}
-            className={cn("h-7 w-7", status === "present" && "bg-green-600 hover:bg-green-700")}
+            className={cn("h-9 w-9", status === "present" && "bg-green-600 hover:bg-green-700")}
             disabled={disabled}
             onClick={(e) => {
               e.stopPropagation();
@@ -165,7 +165,7 @@ export function StudentAttendanceCard({
             }}
             title="Marcar presente"
           >
-            <Check className="h-3.5 w-3.5" />
+            <Check className="h-4 w-4" />
           </Button>
         </div>
       </div>

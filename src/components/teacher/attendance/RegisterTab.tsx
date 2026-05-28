@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save, Users } from "lucide-react";
+import { Save, Users, CheckCircle2 } from "lucide-react";
 import { StudentAttendanceCard } from "./StudentAttendanceCard";
 import { AbsenceConfirmDialog } from "./AbsenceConfirmDialog";
 import {
@@ -35,11 +35,23 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
   const [momento, setMomento] = useState<string>("");
   const [statusMap, setStatusMap] = useState<StatusMap>({});
   const [pendingAbsent, setPendingAbsent] = useState<EnrolledStudent | null>(null);
+  const [savedRecently, setSavedRecently] = useState(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedAssignment = useMemo(
     () => assignments.find((a) => a.id === assignmentId) ?? null,
     [assignments, assignmentId]
   );
+
+  // Reset marks when the teacher switches to a different assignment
+  const prevAssignmentIdRef = useRef<string>("");
+  useEffect(() => {
+    if (assignmentId !== prevAssignmentIdRef.current) {
+      setStatusMap({});
+      setSavedRecently(false);
+      prevAssignmentIdRef.current = assignmentId;
+    }
+  }, [assignmentId]);
 
   const schoolYearId = selectedAssignment?.school_year?.id;
   const sectionId = selectedAssignment?.section?.id;
@@ -55,6 +67,13 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
   const markedCount = Object.keys(statusMap).length;
   const allMarked = students.length > 0 && markedCount === students.length;
   const canSave = !!assignmentId && !!momento && allMarked && !saveBatch.isPending;
+
+  // Sort: unmarked students first, marked students at the bottom
+  const sortedStudents = useMemo(() => {
+    const unmarked = students.filter((s) => !(s.studentId in statusMap));
+    const marked = students.filter((s) => s.studentId in statusMap);
+    return [...unmarked, ...marked];
+  }, [students, statusMap]);
 
   function handleMarkPresent(student: EnrolledStudent) {
     setStatusMap((prev) => ({ ...prev, [student.studentId]: "present" }));
@@ -95,9 +114,10 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
     try {
       await saveBatch.mutateAsync(records);
       toast.success("Asistencia guardada correctamente");
-      setStatusMap({});
-      setAssignmentId("");
-      setMomento("");
+      // Show "Guardado" state on button for 2 seconds — do NOT reset marks
+      setSavedRecently(true);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSavedRecently(false), 2500);
     } catch {
       toast.error("Error al guardar la asistencia");
     }
@@ -119,10 +139,7 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
               <Label htmlFor="assignment-select">Materia</Label>
               <Select
                 value={assignmentId}
-                onValueChange={(v) => {
-                  setAssignmentId(v);
-                  setStatusMap({});
-                }}
+                onValueChange={(v) => setAssignmentId(v)}
               >
                 <SelectTrigger id="assignment-select">
                   <SelectValue placeholder="Selecciona una materia" />
@@ -167,7 +184,7 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
 
       {assignmentId && momento && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Users className="h-4 w-4" />
               <span>
@@ -191,18 +208,27 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
                 size="sm"
                 onClick={handleSave}
                 disabled={!canSave}
-                className="gap-1.5"
+                className={savedRecently ? "bg-green-600 hover:bg-green-700 gap-1.5" : "gap-1.5"}
               >
-                <Save className="h-3.5 w-3.5" />
-                Guardar
+                {savedRecently ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Guardado
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3.5 w-3.5" />
+                    Guardar
+                  </>
+                )}
               </Button>
             </div>
           </div>
 
           {loadingStudents ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="flex flex-col gap-3">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />
+                <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />
               ))}
             </div>
           ) : students.length === 0 ? (
@@ -210,8 +236,8 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
               No hay estudiantes matriculados en esta sección.
             </p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {students.map((student) => (
+            <div className="flex flex-col gap-3">
+              {sortedStudents.map((student) => (
                 <StudentAttendanceCard
                   key={student.studentId}
                   student={student}

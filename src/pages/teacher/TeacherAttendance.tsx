@@ -62,7 +62,7 @@ function SectionStudentsProvider({
 
   const results = useQueries({
     queries: uniqueSections.map(({ sectionId, schoolYearId }) => ({
-      queryKey: ["enrolled-students-attendance", sectionId, schoolYearId],
+      queryKey: ["enrolled-students-section-map", sectionId, schoolYearId],
       queryFn: async () => {
         const { data } = await supabase
           .from("enrollments")
