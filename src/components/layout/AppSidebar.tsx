@@ -25,6 +25,7 @@ import {
   Bell,
   ShieldAlert,
   Upload,
+  BarChart2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -97,6 +98,7 @@ const navSections: NavSection[] = [
       { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school", permission: "planillas.config" },
       { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school", permission: "attendance.scan" },
       { label: "Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school", permission: "attendance.view" },
+      { label: "Dashboard Asistencia", href: "/utilidades/asistencias-dashboard", icon: BarChart2, requiredRole: "school", permission: "attendance.view" },
       { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school", permission: "classroom.supervise" },
     ],
   },
