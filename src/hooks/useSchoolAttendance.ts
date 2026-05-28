@@ -145,7 +145,7 @@ export function useAttendanceBySection(
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance_records")
-        .select("section_id, status")
+        .select("section_id, subject_id, status")
         .eq("school_id", schoolId!)
         .eq("entity_type", "student")
         .gte("attendance_date", dateFrom)
@@ -155,31 +155,54 @@ export function useAttendanceBySection(
 
       const records = data ?? [];
       const sectionIds = [...new Set(records.map((r) => r.section_id).filter(Boolean))] as string[];
+      const subjectIds = [...new Set(records.map((r) => r.subject_id).filter(Boolean))] as string[];
       if (sectionIds.length === 0) return [] as AttendanceBySectionPoint[];
 
-      const { data: sections } = await supabase
-        .from("sections")
-        .select("id, name, grade_level")
-        .in("id", sectionIds);
+      const [{ data: sections }, { data: subjects }] = await Promise.all([
+        supabase.from("sections").select("id, name, grade_level").in("id", sectionIds),
+        subjectIds.length > 0
+          ? supabase.from("school_subjects").select("id, name, abbreviation").in("id", subjectIds)
+          : Promise.resolve({ data: [] }),
+      ]);
 
-      const nameMap = new Map<string, string>(
-        (sections ?? []).map((s) => [s.id, `${s.name}`])
+      const GRADE_LABELS: Record<string, string> = {
+        pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
+        primaria: "Primaria", media_general: "Media General", media_tecnica: "Media Técnica",
+        i_nivel: "I Nivel", ii_nivel: "II Nivel", iii_nivel: "III Nivel",
+        "1_grado": "1° Grado", "2_grado": "2° Grado", "3_grado": "3° Grado",
+        "4_grado": "4° Grado", "5_grado": "5° Grado", "6_grado": "6° Grado",
+        "1_ano": "1° Año", "2_ano": "2° Año", "3_ano": "3° Año",
+        "4_ano": "4° Año", "5_ano": "5° Año", "6_ano": "6° Año",
+      };
+      const sectionMap = new Map<string, string>(
+        (sections ?? []).map((s) => {
+          const grade = GRADE_LABELS[s.grade_level] ?? s.grade_level;
+          return [s.id, `${grade} - ${s.name}`];
+        })
+      );
+      const subjectMap = new Map<string, string>(
+        (subjects ?? []).map((s) => [s.id, s.abbreviation || s.name])
       );
 
-      const bySection = new Map<string, { present: number; absent: number }>();
+      // Group by section+subject combination
+      const byKey = new Map<string, { label: string; present: number; absent: number }>();
       for (const r of records) {
         if (!r.section_id) continue;
-        const key = r.section_id;
-        const cur = bySection.get(key) ?? { present: 0, absent: 0 };
+        const sectionLabel = sectionMap.get(r.section_id) ?? r.section_id;
+        const subjectLabel = r.subject_id ? subjectMap.get(r.subject_id) : null;
+        const label = subjectLabel ? `${subjectLabel} · ${sectionLabel}` : sectionLabel;
+        const key = `${r.subject_id ?? ""}|${r.section_id}`;
+        const cur = byKey.get(key) ?? { label, present: 0, absent: 0 };
         if (r.status === "present") cur.present++;
         else cur.absent++;
-        bySection.set(key, cur);
+        byKey.set(key, cur);
       }
 
-      return Array.from(bySection.entries())
-        .map(([id, v]) => ({
-          section: nameMap.get(id) ?? id,
-          ...v,
+      return Array.from(byKey.values())
+        .map((v) => ({
+          section: v.label,
+          present: v.present,
+          absent: v.absent,
           rate: v.present + v.absent > 0
             ? Math.round((v.present / (v.present + v.absent)) * 100)
             : 0,

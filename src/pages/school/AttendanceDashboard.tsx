@@ -5,6 +5,7 @@ import { MetricCard } from "@/components/dashboard/MetricCard";
 import { AttendanceTrendChart } from "@/components/dashboard/attendance/AttendanceTrendChart";
 import { AttendanceBySectionChart } from "@/components/dashboard/attendance/AttendanceBySectionChart";
 import { AttendanceBySubjectChart } from "@/components/dashboard/attendance/AttendanceBySubjectChart";
+import { AbsenceRateBySubjectChart } from "@/components/dashboard/attendance/AbsenceRateBySubjectChart";
 import { TopAbsenteesTable } from "@/components/dashboard/attendance/TopAbsenteesTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,8 +160,13 @@ export default function AttendanceDashboard() {
       </div>
 
       {/* Charts row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <AttendanceBySubjectChart data={bySubject} isLoading={loadingSubject} />
+        <AbsenceRateBySubjectChart data={bySubject} isLoading={loadingSubject} />
+      </div>
+
+      {/* Charts row 3 */}
+      <div className="grid grid-cols-1 gap-4">
         <TopAbsenteesTable data={topAbsentees} isLoading={loadingAbsentees} />
       </div>
     </DashboardLayout>
