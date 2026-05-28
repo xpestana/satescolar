@@ -1,7 +1,5 @@
 import { useRef, useState, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EnrolledStudent } from "@/hooks/useTeacherAttendance";
@@ -36,12 +34,15 @@ export function StudentAttendanceCard({
   const isDragging = useRef(false);
   const THRESHOLD = 80;
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    if (disabled) return;
-    startX.current = e.clientX;
-    isDragging.current = true;
-    cardRef.current?.setPointerCapture(e.pointerId);
-  }, [disabled]);
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (disabled) return;
+      startX.current = e.clientX;
+      isDragging.current = true;
+      cardRef.current?.setPointerCapture(e.pointerId);
+    },
+    [disabled]
+  );
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging.current || startX.current === null) return;
@@ -52,13 +53,8 @@ export function StudentAttendanceCard({
   const handlePointerUp = useCallback(() => {
     if (!isDragging.current) return;
     isDragging.current = false;
-
-    if (dragOffset >= THRESHOLD) {
-      onMarkPresent();
-    } else if (dragOffset <= -THRESHOLD) {
-      onMarkAbsent();
-    }
-
+    if (dragOffset >= THRESHOLD) onMarkPresent();
+    else if (dragOffset <= -THRESHOLD) onMarkAbsent();
     setDragOffset(0);
     startX.current = null;
   }, [dragOffset, onMarkPresent, onMarkAbsent]);
@@ -70,36 +66,36 @@ export function StudentAttendanceCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-card shadow-sm select-none",
-        status === "present" && "border-green-500 bg-green-50",
+        "relative overflow-hidden rounded-2xl border shadow-sm select-none flex flex-col",
+        status === "present" && "border-green-400 bg-green-50",
         status === "absent" && "border-red-400 bg-red-50",
-        !status && "border-border"
+        !status && "border-border bg-card"
       )}
     >
-      {/* Swipe hint overlays */}
+      {/* Swipe overlays */}
       <div
-        className="absolute inset-0 flex items-center justify-start pl-4 pointer-events-none"
+        className="absolute inset-0 flex items-center justify-start pl-5 pointer-events-none z-10"
         style={{ opacity: isPullingRight ? Math.min(swipeProgress, 1) : 0 }}
       >
         <div className="flex items-center gap-2 text-green-600 font-semibold text-sm">
           <Check className="h-5 w-5" />
-          Presente
+          Asistente
         </div>
       </div>
       <div
-        className="absolute inset-0 flex items-center justify-end pr-4 pointer-events-none"
+        className="absolute inset-0 flex items-center justify-end pr-5 pointer-events-none z-10"
         style={{ opacity: isPullingLeft ? Math.min(swipeProgress, 1) : 0 }}
       >
         <div className="flex items-center gap-2 text-red-600 font-semibold text-sm">
-          Ausente
+          Inasistente
           <X className="h-5 w-5" />
         </div>
       </div>
 
-      {/* Card body */}
+      {/* Card body — draggable zone */}
       <div
         ref={cardRef}
-        className="relative flex items-center gap-3 p-4 touch-pan-y cursor-grab active:cursor-grabbing"
+        className="relative flex flex-col items-center pt-6 pb-4 px-3 gap-2 flex-1 touch-pan-y cursor-grab active:cursor-grabbing"
         style={{
           transform: `translateX(${dragOffset}px)`,
           transition: isDragging.current ? "none" : "transform 0.2s ease",
@@ -109,65 +105,57 @@ export function StudentAttendanceCard({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <Avatar className="h-14 w-14 shrink-0">
-          {student.photoUrl && <AvatarImage src={student.photoUrl} alt={student.fullName} />}
-          <AvatarFallback className="text-sm font-semibold">
+        <Avatar className="h-20 w-20 shrink-0 ring-2 ring-offset-2 ring-border">
+          {student.photoUrl && (
+            <AvatarImage src={student.photoUrl} alt={student.fullName} />
+          )}
+          <AvatarFallback className="text-lg font-bold">
             {getInitials(student.fullName)}
           </AvatarFallback>
         </Avatar>
 
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-base truncate">{student.fullName}</p>
+        <div className="text-center mt-1 w-full px-1">
+          <p className="font-semibold text-sm leading-tight line-clamp-2">
+            {student.fullName}
+          </p>
           {student.documentId && (
-            <p className="text-sm text-muted-foreground">{student.documentId}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {student.documentId}
+            </p>
           )}
         </div>
+      </div>
 
-        {status && (
-          <Badge
-            className={cn(
-              "shrink-0 text-xs",
-              status === "present"
-                ? "bg-green-100 text-green-800 border-green-200"
-                : "bg-red-100 text-red-800 border-red-200"
-            )}
-            variant="outline"
-          >
-            {status === "present" ? "Presente" : "Ausente"}
-          </Badge>
-        )}
-
-        {/* Desktop / fallback buttons */}
-        <div className="flex items-center gap-1 shrink-0">
-          <Button
-            type="button"
-            size="icon"
-            variant={status === "absent" ? "destructive" : "outline"}
-            className="h-9 w-9"
-            disabled={disabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMarkAbsent();
-            }}
-            title="Marcar ausente"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            size="icon"
-            variant={status === "present" ? "default" : "outline"}
-            className={cn("h-9 w-9", status === "present" && "bg-green-600 hover:bg-green-700")}
-            disabled={disabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMarkPresent();
-            }}
-            title="Marcar presente"
-          >
-            <Check className="h-4 w-4" />
-          </Button>
-        </div>
+      {/* Action buttons — pinned at bottom */}
+      <div className="grid grid-cols-2 border-t mt-auto">
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onMarkAbsent}
+          className={cn(
+            "flex items-center justify-center gap-1.5 py-3 text-sm font-semibold border-r transition-colors",
+            status === "absent"
+              ? "bg-red-500 text-white"
+              : "text-red-600 hover:bg-red-50 disabled:opacity-40"
+          )}
+        >
+          <X className="h-4 w-4" />
+          Inasistente
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onMarkPresent}
+          className={cn(
+            "flex items-center justify-center gap-1.5 py-3 text-sm font-semibold transition-colors",
+            status === "present"
+              ? "bg-green-500 text-white"
+              : "text-green-600 hover:bg-green-50 disabled:opacity-40"
+          )}
+        >
+          <Check className="h-4 w-4" />
+          Asistente
+        </button>
       </div>
     </div>
   );
