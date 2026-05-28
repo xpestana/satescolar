@@ -244,7 +244,7 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
               No hay estudiantes matriculados en esta sección.
             </p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {sortedStudents.map((student) => (
                 <StudentAttendanceCard
                   key={student.studentId}
