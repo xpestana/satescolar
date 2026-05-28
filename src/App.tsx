@@ -56,6 +56,7 @@ import ClassroomSupervision from "./pages/school/ClassroomSupervision";
 import AttendanceScan from "./pages/AttendanceScan";
 import AttendanceScanner from "./pages/school/AttendanceScanner";
 import AttendanceList from "./pages/school/AttendanceList";
+import AttendanceDashboard from "./pages/school/AttendanceDashboard";
 import PaymentDashboard from "./pages/school/PaymentDashboard";
 import PaymentConfig from "./pages/school/PaymentConfig";
 import PaymentRegistration from "./pages/school/PaymentRegistration";
@@ -364,6 +365,7 @@ const App = () => (
               <Route path="/attendance/scan/:token/*" element={<AttendanceScan />} />
               <Route path="/utilidades/escaner-qr" element={<ProtectedRoute requiredRole="school"><AttendanceScanner /></ProtectedRoute>} />
               <Route path="/utilidades/asistencias" element={<ProtectedRoute requiredRole="school"><AttendanceList /></ProtectedRoute>} />
+              <Route path="/utilidades/asistencias-dashboard" element={<ProtectedRoute requiredRole="school"><AttendanceDashboard /></ProtectedRoute>} />
               {/* Payment routes */}
               <Route path="/pagos" element={<ProtectedRoute requiredRole="school"><PaymentDashboard /></ProtectedRoute>} />
               <Route path="/pagos/configuracion" element={<ProtectedRoute requiredRole="school"><PaymentConfig /></ProtectedRoute>} />
