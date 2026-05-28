@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save, Users, CheckCircle2 } from "lucide-react";
+import { Users, CheckCircle2, Loader2 } from "lucide-react";
 import { StudentAttendanceCard } from "./StudentAttendanceCard";
 import { AbsenceConfirmDialog } from "./AbsenceConfirmDialog";
 import {
@@ -21,6 +21,7 @@ import {
   useEnrolledStudents,
   useSaveAttendanceBatch,
   EnrolledStudent,
+  AttendanceBatchItem,
 } from "@/hooks/useTeacherAttendance";
 
 interface RegisterTabProps {
@@ -35,23 +36,21 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
   const [momento, setMomento] = useState<string>("");
   const [statusMap, setStatusMap] = useState<StatusMap>({});
   const [pendingAbsent, setPendingAbsent] = useState<EnrolledStudent | null>(null);
-  const [savedRecently, setSavedRecently] = useState(false);
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedAssignment = useMemo(
     () => assignments.find((a) => a.id === assignmentId) ?? null,
     [assignments, assignmentId]
   );
 
-  // Reset marks when the teacher switches to a different assignment
-  const prevAssignmentIdRef = useRef<string>("");
+  // Reset marks when teacher switches assignment or momento
+  const prevKeyRef = useRef<string>("");
   useEffect(() => {
-    if (assignmentId !== prevAssignmentIdRef.current) {
+    const key = `${assignmentId}-${momento}`;
+    if (key !== prevKeyRef.current) {
       setStatusMap({});
-      setSavedRecently(false);
-      prevAssignmentIdRef.current = assignmentId;
+      prevKeyRef.current = key;
     }
-  }, [assignmentId]);
+  }, [assignmentId, momento]);
 
   const schoolYearId = selectedAssignment?.school_year?.id;
   const sectionId = selectedAssignment?.section?.id;
@@ -66,62 +65,91 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
 
   const markedCount = Object.keys(statusMap).length;
   const allMarked = students.length > 0 && markedCount === students.length;
-  const canSave = !!assignmentId && !!momento && allMarked && !saveBatch.isPending;
 
-  // Sort: unmarked students first, marked students at the bottom
+  // Unmarked students first, marked at the bottom
   const sortedStudents = useMemo(() => {
     const unmarked = students.filter((s) => !(s.studentId in statusMap));
     const marked = students.filter((s) => s.studentId in statusMap);
     return [...unmarked, ...marked];
   }, [students, statusMap]);
 
-  function handleMarkPresent(student: EnrolledStudent) {
-    setStatusMap((prev) => ({ ...prev, [student.studentId]: "present" }));
-  }
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
-  function handleMarkAbsent(student: EnrolledStudent) {
-    setPendingAbsent(student);
-  }
-
-  function confirmAbsent() {
-    if (!pendingAbsent) return;
-    setStatusMap((prev) => ({ ...prev, [pendingAbsent.studentId]: "absent" }));
-    setPendingAbsent(null);
-  }
-
-  async function handleSave() {
-    if (!selectedAssignment || !momento) return;
-    const today = new Date();
-    const dateStr = format(today, "yyyy-MM-dd");
-    const timeStr = format(today, "HH:mm:ss");
-    const ts = today.toISOString();
-
-    const records = students.map((s) => ({
-      entity_id: s.studentId,
-      entity_type: "student" as const,
+  function buildRecord(
+    student: EnrolledStudent,
+    status: "present" | "absent"
+  ): AttendanceBatchItem {
+    const now = new Date();
+    return {
+      entity_id: student.studentId,
+      entity_type: "student",
       school_id: schoolId,
-      section_id: selectedAssignment.section!.id,
-      subject_id: selectedAssignment.subject!.id,
+      section_id: selectedAssignment!.section!.id,
+      subject_id: selectedAssignment!.subject!.id,
       momento: Number(momento),
-      status: statusMap[s.studentId] ?? "present",
-      attendance_date: dateStr,
-      attendance_time: timeStr,
-      attendance_timestamp: ts,
-      record_type: "manual" as const,
+      status,
+      attendance_date: format(now, "yyyy-MM-dd"),
+      attendance_time: format(now, "HH:mm:ss"),
+      attendance_timestamp: now.toISOString(),
+      record_type: "manual",
       notification_sent: false,
-    }));
+    };
+  }
 
+  // ─── Handlers — auto-save on every mark ───────────────────────────────────
+
+  async function handleMarkPresent(student: EnrolledStudent) {
+    if (!selectedAssignment || !momento) return;
+    setStatusMap((prev) => ({ ...prev, [student.studentId]: "present" }));
     try {
-      await saveBatch.mutateAsync(records);
-      toast.success("Asistencia guardada correctamente");
-      // Show "Guardado" state on button for 2 seconds — do NOT reset marks
-      setSavedRecently(true);
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-      savedTimerRef.current = setTimeout(() => setSavedRecently(false), 2500);
+      await saveBatch.mutateAsync([buildRecord(student, "present")]);
     } catch {
+      // Revert optimistic update
+      setStatusMap((prev) => {
+        const next = { ...prev };
+        delete next[student.studentId];
+        return next;
+      });
       toast.error("Error al guardar la asistencia");
     }
   }
+
+  function handleMarkAbsent(student: EnrolledStudent) {
+    if (!selectedAssignment || !momento) return;
+    setPendingAbsent(student);
+  }
+
+  async function confirmAbsent() {
+    if (!pendingAbsent || !selectedAssignment || !momento) return;
+    const student = pendingAbsent;
+    setPendingAbsent(null);
+    setStatusMap((prev) => ({ ...prev, [student.studentId]: "absent" }));
+    try {
+      await saveBatch.mutateAsync([buildRecord(student, "absent")]);
+    } catch {
+      setStatusMap((prev) => {
+        const next = { ...prev };
+        delete next[student.studentId];
+        return next;
+      });
+      toast.error("Error al guardar la asistencia");
+    }
+  }
+
+  async function handleAllPresent() {
+    if (!selectedAssignment || !momento) return;
+    const all: StatusMap = {};
+    students.forEach((s) => (all[s.studentId] = "present"));
+    setStatusMap(all);
+    try {
+      await saveBatch.mutateAsync(students.map((s) => buildRecord(s, "present")));
+    } catch {
+      setStatusMap({});
+      toast.error("Error al guardar la asistencia");
+    }
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   const today = format(new Date(), "EEEE d 'de' MMMM yyyy", { locale: es });
 
@@ -137,10 +165,7 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="assignment-select">Materia</Label>
-              <Select
-                value={assignmentId}
-                onValueChange={(v) => setAssignmentId(v)}
-              >
+              <Select value={assignmentId} onValueChange={setAssignmentId}>
                 <SelectTrigger id="assignment-select">
                   <SelectValue placeholder="Selecciona una materia" />
                 </SelectTrigger>
@@ -185,44 +210,27 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
       {assignmentId && momento && (
         <div className="space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
-              <span>
+            <div className="flex items-center gap-2 text-sm">
+              {saveBatch.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : allMarked ? (
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              ) : (
+                <Users className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className={allMarked ? "text-green-600 font-medium" : "text-muted-foreground"}>
                 {markedCount} / {students.length} marcados
               </span>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const all: StatusMap = {};
-                  students.forEach((s) => (all[s.studentId] = "present"));
-                  setStatusMap(all);
-                }}
-                disabled={saveBatch.isPending}
-              >
-                Todos presentes
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={!canSave}
-                className={savedRecently ? "bg-green-600 hover:bg-green-700 gap-1.5" : "gap-1.5"}
-              >
-                {savedRecently ? (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                    Guardado
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-3.5 w-3.5" />
-                    Guardar
-                  </>
-                )}
-              </Button>
-            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAllPresent}
+              disabled={saveBatch.isPending || loadingStudents || allMarked}
+            >
+              Todos presentes
+            </Button>
           </div>
 
           {loadingStudents ? (
