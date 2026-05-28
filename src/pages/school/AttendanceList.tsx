@@ -73,6 +73,8 @@ const ATTENDANCE_FIXED_COLUMNS: ColumnDef[] = [
 const ENTITY_BASE_COLUMNS: Record<EntityType, ColumnDef[]> = {
   student: [
     { key: "document_id", label: "Cédula" },
+    { key: "momento", label: "Momento" },
+    { key: "subject_name", label: "Materia" },
   ],
   teacher: [
     { key: "document_id", label: "Cédula" },
@@ -239,6 +241,22 @@ function AttendanceTab({
 
   const entityIds = useMemo(() => [...new Set(records.map(r => r.entity_id))], [records]);
 
+  const subjectIds = useMemo(
+    () => entityType === "student" ? [...new Set(records.map(r => (r as any).subject_id).filter(Boolean))] : [],
+    [records, entityType]
+  );
+
+  const { data: subjectNames = {} } = useQuery({
+    queryKey: ["attendance-subjects", subjectIds],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_subjects").select("id, name").in("id", subjectIds);
+      const map: Record<string, string> = {};
+      (data || []).forEach(s => { map[s.id] = s.name; });
+      return map;
+    },
+    enabled: subjectIds.length > 0,
+  });
+
   const { data: entities = {} } = useQuery({
     queryKey: ["attendance-entities", entityType, entityIds],
     queryFn: async () => {
@@ -268,6 +286,7 @@ function AttendanceTab({
       const entity = entities[r.entity_id];
       const fd = (entity?.form_data as any) || {};
       const fullName = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido].filter(Boolean).join(" ");
+      const rAny = r as any;
       // Build flat record with form data prefixed
       const row: Record<string, any> = {
         ...r,
@@ -276,6 +295,8 @@ function AttendanceTab({
         email: entity?.email || "",
         phone: entity?.phone || fd.telefono || "",
         notification_info: r.notification_sent ? (r.notification_email || "Sí") : "—",
+        momento: rAny.momento ?? null,
+        subject_name: rAny.subject_id ? (subjectNames[rAny.subject_id] ?? "—") : "—",
       };
       // Add form_data fields with fd_ prefix
       if (fd) {
@@ -285,7 +306,7 @@ function AttendanceTab({
       }
       return row;
     });
-  }, [records, entities]);
+  }, [records, entities, subjectNames]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return enrichedRecords;
@@ -303,11 +324,12 @@ function AttendanceTab({
     switch (col.key) {
       case "attendance_time": return r.attendance_time?.substring(0, 5);
       case "record_type": return <Badge variant="outline">{r.record_type?.toUpperCase()}</Badge>;
-      case "status": return (
-        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-          {r.status === "present" ? "Presente" : r.status}
-        </Badge>
+      case "status": return r.status === "absent" ? (
+        <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Ausente</Badge>
+      ) : (
+        <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Presente</Badge>
       );
+      case "momento": return r.momento ? <Badge variant="outline">M{r.momento}</Badge> : <span className="text-muted-foreground">—</span>;
       case "notification_info": return <span className="text-xs text-muted-foreground">{r.notification_info}</span>;
       default: return r[col.key] ?? "—";
     }
@@ -317,7 +339,8 @@ function AttendanceTab({
     switch (col.key) {
       case "attendance_time": return r.attendance_time?.substring(0, 5) || "";
       case "record_type": return r.record_type?.toUpperCase() || "";
-      case "status": return r.status === "present" ? "Presente" : (r.status || "");
+      case "status": return r.status === "present" ? "Presente" : r.status === "absent" ? "Ausente" : (r.status || "");
+      case "momento": return r.momento ? `Momento ${r.momento}` : "—";
       case "notification_info": return r.notification_info || "";
       default: return r[col.key] != null ? String(r[col.key]) : "";
     }

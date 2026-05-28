@@ -170,6 +170,7 @@ const navSections: NavSection[] = [
       { label: "Áreas", href: "/teacher/materias", icon: BookOpen, requiredRole: "teacher" },
       { label: "Aula Virtual", href: "/teacher/aula-virtual", icon: GraduationCap, requiredRole: "teacher" },
       { label: "Carnet", href: "/teacher/carnet", icon: CreditCard, requiredRole: "teacher" },
+      { label: "Asistencias", href: "/teacher/asistencias", icon: ClipboardList, requiredRole: "teacher" },
     ],
   },
 ];

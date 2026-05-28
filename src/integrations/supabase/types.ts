@@ -23,11 +23,14 @@ export type Database = {
           entity_id: string
           entity_type: string
           id: string
+          momento: number | null
           notification_email: string | null
           notification_sent: boolean
           record_type: string
           school_id: string
+          section_id: string | null
           status: string
+          subject_id: string | null
           token_id: string | null
         }
         Insert: {
@@ -38,11 +41,14 @@ export type Database = {
           entity_id: string
           entity_type: string
           id?: string
+          momento?: number | null
           notification_email?: string | null
           notification_sent?: boolean
           record_type?: string
           school_id: string
+          section_id?: string | null
           status?: string
+          subject_id?: string | null
           token_id?: string | null
         }
         Update: {
@@ -53,11 +59,14 @@ export type Database = {
           entity_id?: string
           entity_type?: string
           id?: string
+          momento?: number | null
           notification_email?: string | null
           notification_sent?: boolean
           record_type?: string
           school_id?: string
+          section_id?: string | null
           status?: string
+          subject_id?: string | null
           token_id?: string | null
         }
         Relationships: [
@@ -66,6 +75,20 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "sections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "school_subjects"
             referencedColumns: ["id"]
           },
           {

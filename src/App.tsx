@@ -46,6 +46,7 @@ import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherSubjects from "./pages/teacher/TeacherSubjects";
 import TeacherCarnet from "./pages/teacher/TeacherCarnet";
 import TeacherGrades from "./pages/teacher/TeacherGrades";
+import TeacherAttendance from "./pages/teacher/TeacherAttendance";
 import ClassroomList from "./pages/teacher/ClassroomList";
 import ClassroomDetail from "./pages/teacher/ClassroomDetail";
 import ChildClassroom from "./pages/representative/ChildClassroom";
@@ -357,6 +358,7 @@ const App = () => (
               <Route path="/teacher/aula-virtual" element={<ProtectedRoute requiredRole="teacher"><ClassroomList /></ProtectedRoute>} />
               <Route path="/teacher/aula-virtual/:assignmentId" element={<ProtectedRoute requiredRole="teacher"><ClassroomDetail /></ProtectedRoute>} />
               <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />
+              <Route path="/teacher/asistencias" element={<ProtectedRoute requiredRole="teacher"><TeacherAttendance /></ProtectedRoute>} />
               {/* Attendance routes */}
               <Route path="/attendance/scan/:token" element={<AttendanceScan />} />
               <Route path="/attendance/scan/:token/*" element={<AttendanceScan />} />

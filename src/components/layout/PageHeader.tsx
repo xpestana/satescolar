@@ -70,6 +70,7 @@ const DESCRIPTIONS: Array<[string, string]> = [
 
   // Asistencia
   ["Escáner QR", "Registra la asistencia diaria al instante con la tecnología de escaneo QR."],
+  ["Asistencia de Clases", "Registra, consulta y analiza la asistencia de tus estudiantes por materia y momento."],
   ["Asistencias", "Lleva un control preciso de la asistencia y comparte reportes con representantes automáticamente."],
   ["Asistencia", "Lleva un control preciso de la asistencia y comparte reportes con representantes automáticamente."],
 
