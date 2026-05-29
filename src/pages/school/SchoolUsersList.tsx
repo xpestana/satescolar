@@ -260,15 +260,17 @@ export default function SchoolUsersList() {
                         >
                           <KeyRound className="h-4 w-4" />
                         </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          title={u.is_owner ? "No se puede eliminar un administrador del colegio desde aquí" : "Eliminar"}
-                          disabled={u.is_owner}
-                          onClick={() => setConfirmDelete(u)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+                        {isOwner && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            title={u.is_owner ? "No se puede eliminar un administrador del colegio desde aquí" : "Eliminar"}
+                            disabled={u.is_owner}
+                            onClick={() => setConfirmDelete(u)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

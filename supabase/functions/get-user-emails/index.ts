@@ -46,14 +46,13 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // Check if requesting user is admin or school
-    const { data: roleData } = await supabaseAdmin
+    const { data: roleRows } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", requestingUserId)
-      .in("role", ["admin", "school"])
-      .maybeSingle();
+      .in("role", ["admin", "school"]);
 
-    if (!roleData) {
+    if (!roleRows || roleRows.length === 0) {
       return new Response(JSON.stringify({ error: "Unauthorized: Access denied" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -89,6 +88,7 @@ export default async function handler(req: Request): Promise<Response> {
               id: userData.user.id,
               email: userData.user.email,
               banned_until: userData.user.banned_until,
+              user_metadata: userData.user.user_metadata ?? {},
             }
           : null;
       })

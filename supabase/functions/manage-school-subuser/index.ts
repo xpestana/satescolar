@@ -107,10 +107,10 @@ export default async function handler(req: Request): Promise<Response> {
     const schoolName = schoolData?.name ?? "Colegio";
     const logoUrl = schoolData?.logo_url ?? null;
 
-    // === CREATE === (owner only)
+    // === CREATE === (owner or settings.users)
     if (action === "create") {
-      if (!callerIsOwner) {
-        return new Response(JSON.stringify({ error: "Solo el dueño del colegio puede crear usuarios" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (!callerIsOwner && !callerHasSettingsUsers) {
+        return new Response(JSON.stringify({ error: "No tienes permisos para crear usuarios" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const { email, full_name, profile_ids, password: customPassword } = body;
       if (!email || !full_name) return new Response(JSON.stringify({ error: "Email y nombre son requeridos" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
