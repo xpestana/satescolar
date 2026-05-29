@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -14,14 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Save, Info, Plus, Trash2, ChevronDown, Eye, Star, FileDown, Loader2 } from "lucide-react";
+import { Info, Plus, Trash2, ChevronDown, Eye, Star, FileDown, Loader2 } from "lucide-react";
 import { downloadPlanillaInscripcion } from "@/lib/export-utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
 import GeneralConfigTab from "@/components/planilla/GeneralConfigTab";
-import { Separator } from "@/components/ui/separator";
 
 interface FieldConfig {
+  id?: string;
   field_name: string;
   field_label: string;
   is_visible: boolean;
@@ -47,6 +47,19 @@ export default function EnrollmentDisplayConfig() {
   const [customFieldInput, setCustomFieldInput] = useState<Record<number, string>>({});
   const [newSectionType, setNewSectionType] = useState<'fields' | 'text'>('fields');
   const [downloading, setDownloading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const modalDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (modalDebounceTimer.current) clearTimeout(modalDebounceTimer.current);
+    };
+  }, []);
+
+  const triggerSaved = () => {
+    setSaveStatus('saved');
+    setTimeout(() => setSaveStatus('idle'), 2000);
+  };
 
   // Fetch student form fields
   const { data: studentFields = [] } = useQuery({
@@ -190,6 +203,7 @@ export default function EnrollmentDisplayConfig() {
     const merged = formFields.map((ff, idx) => {
       const existing = configMap.get(ff.field_name);
       return {
+        id: existing?.id,
         field_name: ff.field_name,
         field_label: ff.field_label,
         is_visible: existing ? existing.is_visible : idx < 7,
@@ -216,18 +230,12 @@ export default function EnrollmentDisplayConfig() {
     }
   }, [existingPlanilla]);
 
-  const toggleField = (fieldName: string) => {
-    setFields(prev => prev.map(f =>
-      f.field_name === fieldName ? { ...f, is_visible: !f.is_visible } : f
-    ));
-  };
-
-  // Modal save
+  // Modal auto-save (debounced delete+insert)
   const saveModalMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (currentFields: FieldConfig[]) => {
       if (!schoolId) throw new Error("No school");
       await supabase.from("enrollment_display_config").delete().eq("school_id", schoolId);
-      const rows = fields.map((f, idx) => ({
+      const rows = currentFields.map((f, idx) => ({
         school_id: schoolId,
         field_name: f.field_name,
         field_label: f.field_label,
@@ -239,12 +247,30 @@ export default function EnrollmentDisplayConfig() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["enrollment-display-config"] });
-      toast({ title: "Configuración guardada", description: "Campos del modal actualizados." });
+      triggerSaved();
     },
     onError: () => {
-      toast({ variant: "destructive", title: "Error", description: "No se pudo guardar." });
+      toast({ variant: "destructive", title: "Error", description: "No se pudo guardar la configuración del modal." });
     },
   });
+
+  const debouncedSaveModal = (updatedFields: FieldConfig[]) => {
+    if (modalDebounceTimer.current) clearTimeout(modalDebounceTimer.current);
+    modalDebounceTimer.current = setTimeout(() => {
+      setSaveStatus('saving');
+      saveModalMutation.mutate(updatedFields);
+    }, 600);
+  };
+
+  const toggleField = (fieldName: string) => {
+    setFields(prev => {
+      const updated = prev.map(f =>
+        f.field_name === fieldName ? { ...f, is_visible: !f.is_visible } : f
+      );
+      debouncedSaveModal(updated);
+      return updated;
+    });
+  };
 
   // Planilla helpers
   const addSection = () => {
@@ -254,7 +280,69 @@ export default function EnrollmentDisplayConfig() {
     ]);
   };
 
-  const removeSection = (index: number) => {
+  const savePlanillaSection = async (section: PlanillaSection): Promise<string | null> => {
+    if (!schoolId || !section.title.trim()) return null;
+    setSaveStatus('saving');
+    try {
+      if (section.id) {
+        const { error } = await supabase
+          .from("enrollment_planilla_sections")
+          .update({
+            title: section.title.trim(),
+            field_names: section.field_names,
+            section_type: section.section_type,
+            section_text: section.section_text,
+            page_break_before: section.page_break_before,
+            display_order: section.display_order,
+          } as any)
+          .eq("id", section.id);
+        if (error) throw error;
+        triggerSaved();
+        return section.id;
+      } else {
+        const { data, error } = await supabase
+          .from("enrollment_planilla_sections")
+          .insert({
+            school_id: schoolId,
+            title: section.title.trim(),
+            field_names: section.field_names,
+            section_type: section.section_type,
+            section_text: section.section_text,
+            page_break_before: section.page_break_before,
+            display_order: section.display_order,
+          } as any)
+          .select("id")
+          .single();
+        if (error) throw error;
+        triggerSaved();
+        return data.id;
+      }
+    } catch {
+      setSaveStatus('error');
+      toast({ variant: "destructive", title: "Error", description: "No se pudo guardar la sección." });
+      return null;
+    }
+  };
+
+  const deletePlanillaSection = async (section: PlanillaSection) => {
+    if (!section.id || !schoolId) return;
+    setSaveStatus('saving');
+    try {
+      const { error } = await supabase
+        .from("enrollment_planilla_sections")
+        .delete()
+        .eq("id", section.id);
+      if (error) throw error;
+      triggerSaved();
+    } catch {
+      setSaveStatus('error');
+      toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar la sección." });
+    }
+  };
+
+  const removeSection = async (index: number) => {
+    const section = planillaSections[index];
+    await deletePlanillaSection(section);
     setPlanillaSections(prev => prev.filter((_, i) => i !== index));
   };
 
@@ -267,65 +355,36 @@ export default function EnrollmentDisplayConfig() {
   };
 
   const togglePageBreak = (index: number) => {
-    setPlanillaSections(prev => prev.map((s, i) => i === index ? { ...s, page_break_before: !s.page_break_before } : s));
+    setPlanillaSections(prev => {
+      const updated = prev.map((s, i) => i === index ? { ...s, page_break_before: !s.page_break_before } : s);
+      const updatedSection = updated[index];
+      if (updatedSection.id) savePlanillaSection(updatedSection);
+      return updated;
+    });
   };
 
   const toggleSectionField = (sectionIndex: number, fieldName: string) => {
-    setPlanillaSections(prev => prev.map((s, i) => {
-      if (i !== sectionIndex) return s;
-      const has = s.field_names.includes(fieldName);
-      
-      // Auto-add/remove "Edad" when toggling fecha_nacimiento
-      const isFechaNac = fieldName.endsWith(":fecha_nacimiento");
-      const ageKey = fieldName.replace(":fecha_nacimiento", ":_edad");
-      
-      if (has) {
-        let filtered = s.field_names.filter(f => f !== fieldName);
-        if (isFechaNac) filtered = filtered.filter(f => f !== ageKey);
-        return { ...s, field_names: filtered };
-      } else {
-        const newFields = [...s.field_names, fieldName];
-        if (isFechaNac && !newFields.includes(ageKey)) {
-          newFields.push(ageKey);
+    setPlanillaSections(prev => {
+      const updated = prev.map((s, i) => {
+        if (i !== sectionIndex) return s;
+        const has = s.field_names.includes(fieldName);
+        const isFechaNac = fieldName.endsWith(":fecha_nacimiento");
+        const ageKey = fieldName.replace(":fecha_nacimiento", ":_edad");
+        let newFieldNames: string[];
+        if (has) {
+          newFieldNames = s.field_names.filter(f => f !== fieldName);
+          if (isFechaNac) newFieldNames = newFieldNames.filter(f => f !== ageKey);
+        } else {
+          newFieldNames = [...s.field_names, fieldName];
+          if (isFechaNac && !newFieldNames.includes(ageKey)) newFieldNames.push(ageKey);
         }
-        return { ...s, field_names: newFields };
-      }
-    }));
+        return { ...s, field_names: newFieldNames };
+      });
+      const updatedSection = updated[sectionIndex];
+      if (updatedSection.id) savePlanillaSection(updatedSection);
+      return updated;
+    });
   };
-
-  // Planilla save
-  const savePlanillaMutation = useMutation({
-    mutationFn: async () => {
-      if (!schoolId) throw new Error("No school");
-
-      const emptyTitle = planillaSections.some(s => !s.title.trim());
-      if (emptyTitle) throw new Error("Todas las secciones deben tener un título.");
-
-      await supabase.from("enrollment_planilla_sections").delete().eq("school_id", schoolId);
-
-      if (planillaSections.length === 0) return;
-
-      const rows = planillaSections.map((s, idx) => ({
-        school_id: schoolId,
-        title: s.title.trim(),
-        field_names: s.field_names,
-        display_order: idx,
-        section_type: s.section_type,
-        section_text: s.section_text,
-        page_break_before: s.page_break_before,
-      }));
-
-      const { error } = await supabase.from("enrollment_planilla_sections").insert(rows as any);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["enrollment-planilla-sections"] });
-      toast({ title: "Configuración guardada", description: "Secciones de la planilla actualizadas." });
-    },
-    onError: (err: Error) => {
-      toast({ variant: "destructive", title: "Error", description: err.message || "No se pudo guardar." });
-    },
-  });
 
   const handleDownloadPreview = async () => {
     if (!schoolFull) return;
@@ -374,6 +433,19 @@ export default function EnrollmentDisplayConfig() {
     <DashboardLayout>
       <PageHeader title="Configuración de Planillas" breadcrumbs={breadcrumbs} />
 
+      {saveStatus !== 'idle' && (
+        <div className="flex justify-end mb-2">
+          <span className={`text-xs font-medium ${
+            saveStatus === 'saved' ? 'text-green-600' :
+            saveStatus === 'saving' ? 'text-muted-foreground' :
+            'text-destructive'
+          }`}>
+            {saveStatus === 'saved' ? '✓ Guardado' :
+             saveStatus === 'saving' ? 'Guardando...' : 'Error al guardar'}
+          </span>
+        </div>
+      )}
+
       <Tabs defaultValue="general" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="general">Modificaciones Generales</TabsTrigger>
@@ -389,12 +461,8 @@ export default function EnrollmentDisplayConfig() {
         {/* TAB 1: Modal Config */}
         <TabsContent value="modal">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader>
               <CardTitle className="text-lg">Campos visibles en el modal</CardTitle>
-              <Button onClick={() => saveModalMutation.mutate()} disabled={saveModalMutation.isPending} className="gap-2">
-                <Save className="h-4 w-4" />
-                {saveModalMutation.isPending ? "Guardando..." : "Guardar"}
-              </Button>
             </CardHeader>
             <CardContent>
               <div className="flex items-start gap-3 mb-6 p-4 bg-muted/50 rounded-lg">
@@ -439,10 +507,6 @@ export default function EnrollmentDisplayConfig() {
                   <Plus className="h-4 w-4" />
                   Agregar
                 </Button>
-                <Button onClick={() => savePlanillaMutation.mutate()} disabled={savePlanillaMutation.isPending} className="gap-2">
-                  <Save className="h-4 w-4" />
-                  {savePlanillaMutation.isPending ? "Guardando..." : "Guardar"}
-                </Button>
               </div>
             </CardHeader>
             <CardContent>
@@ -474,6 +538,16 @@ export default function EnrollmentDisplayConfig() {
                       <Input
                         value={section.title}
                         onChange={(e) => updateSectionTitle(sectionIdx, e.target.value)}
+                        onBlur={async () => {
+                          const sec = planillaSections[sectionIdx];
+                          if (!sec.title.trim()) return;
+                          const newId = await savePlanillaSection(sec);
+                          if (newId && !sec.id) {
+                            setPlanillaSections(prev =>
+                              prev.map((s, i) => i === sectionIdx ? { ...s, id: newId } : s)
+                            );
+                          }
+                        }}
                         placeholder="Título de la sección"
                         className="flex-1 font-medium"
                         onClick={(e) => e.stopPropagation()}
@@ -491,7 +565,7 @@ export default function EnrollmentDisplayConfig() {
                                   ? "bg-primary/10 border-primary/40 text-primary"
                                   : "bg-muted/50 border-border text-muted-foreground hover:bg-muted"
                               }`}
-                              onClick={(e) => { e.stopPropagation(); togglePageBreak(sectionIdx); }}
+                              onClick={(e) => e.stopPropagation()}
                             >
                               <Switch
                                 checked={section.page_break_before}
@@ -531,6 +605,10 @@ export default function EnrollmentDisplayConfig() {
                             <Textarea
                               value={section.section_text}
                               onChange={(e) => updateSectionText(sectionIdx, e.target.value)}
+                              onBlur={() => {
+                                const sec = planillaSections[sectionIdx];
+                                if (sec.id) savePlanillaSection(sec);
+                              }}
                               placeholder="Escribe el texto que aparecerá en esta sección de la planilla... (Dejar vacío para un área en blanco)"
                               className="min-h-[120px]"
                             />
