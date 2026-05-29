@@ -1029,10 +1029,20 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData, op
   // Render each section (no hardcoded mini-table — the first dynamic section handles student data)
   let sectionContentRendered = false;
   let atPageTop = true; // true right after drawHeader — don't pre-jump on a fresh page
+  let footerDrawnOnPage = -1; // tracks last page footer was drawn to avoid duplicates
+
+  const safeDrawFooter = () => {
+    const pg = (doc.internal as any).getCurrentPageInfo?.()?.pageNumber ?? doc.internal.pages.length - 1;
+    if (pg !== footerDrawnOnPage) {
+      footerDrawnOnPage = pg;
+      drawFooter(doc);
+    }
+  };
+
   for (const section of planillaData.sections) {
     // Force page break if configured — only after something has already been rendered
     if ((section as any).page_break_before && sectionContentRendered) {
-      drawFooter(doc);
+      safeDrawFooter();
       doc.addPage();
       y = drawHeader(doc);
       atPageTop = true;
@@ -1163,21 +1173,25 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData, op
       }
       y += 10;
     }
-    // Render inline signature block pinned to bottom of current page
+    // Render inline signature block pinned to bottom of the page
     if (section.signature_block_id && planillaData.signatureBlocks) {
       const block = planillaData.signatureBlocks.find(b => b.id === section.signature_block_id);
       if (block && block.signature_lines.length > 0) {
-        const rows = Math.ceil(block.signature_lines.length / 3);
-        const sigHeight = rows * 22 + 10;
-        // Target Y: bottom of page above footer
+        const sigHeight = Math.ceil(block.signature_lines.length / 3) * 22 + 10;
         const targetY = pageHeight - footerHeight - sigHeight;
-        if (y <= targetY) {
-          // Content fits above — pin signatures to bottom of this page
+        const pageContentBottom = pageHeight - footerHeight;
+
+        if (y + sigHeight <= pageContentBottom) {
+          // Signatures fit on this page — pin them to the bottom regardless of y
           drawSignatureLines(doc, block.signature_lines, targetY);
         } else {
-          // Content overflows target — draw right after content (may be on new page already)
-          y = ensureSpace(y, sigHeight);
-          drawSignatureLines(doc, block.signature_lines, y);
+          // Not enough room on this page — new dedicated page, signatures at bottom
+          safeDrawFooter();
+          doc.addPage();
+          drawHeader(doc);
+          drawSignatureLines(doc, block.signature_lines, targetY);
+          // Push y so next section always starts on a fresh page
+          y = pageContentBottom;
         }
       }
     }
@@ -1186,7 +1200,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData, op
   }
 
   // Draw footer on last page
-  drawFooter(doc);
+  safeDrawFooter();
 
   const safeName = studentName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_") || "planilla";
   if (options?.returnBlob) {
