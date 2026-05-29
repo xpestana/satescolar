@@ -885,8 +885,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
         pageDoc.line(x, y, x + lineWidth, y);
         pageDoc.text(label, x + lineWidth / 2, y + 5, { align: "center" });
         pageDoc.setFontSize(8);
-        pageDoc.text("C.I.:", x, y + 12);
-        pageDoc.line(x + 9, y + 12, x + lineWidth, y + 12);
+        pageDoc.text("C.I.", x + lineWidth / 2, y + 12, { align: "center" });
         pageDoc.setFontSize(9);
       });
       y += 18;
