@@ -6,9 +6,10 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Trash2, Eye, Info } from "lucide-react";
+import { Save, Plus, Trash2, Eye, Info, ChevronDown, Layers } from "lucide-react";
 
 interface HeaderConfig {
   show_logo: boolean;
@@ -28,6 +29,14 @@ interface FooterConfig {
   show_address: boolean;
   show_phone: boolean;
   show_rif: boolean;
+}
+
+interface SignatureBlock {
+  id?: string;
+  name: string;
+  signature_lines: string[];
+  display_order: number;
+  _newLine?: string;
 }
 
 interface SchoolFull {
@@ -65,8 +74,6 @@ const defaultFooter: FooterConfig = {
   show_rif: true,
 };
 
-const defaultSignatures = ["Firma del Representante", "Firma del Director(a)"];
-
 interface Props {
   schoolId: string | null;
 }
@@ -76,8 +83,10 @@ export default function GeneralConfigTab({ schoolId }: Props) {
   const queryClient = useQueryClient();
   const [headerConfig, setHeaderConfig] = useState<HeaderConfig>(defaultHeader);
   const [footerConfig, setFooterConfig] = useState<FooterConfig>(defaultFooter);
-  const [signatureLines, setSignatureLines] = useState<string[]>(defaultSignatures);
-  const [newSignature, setNewSignature] = useState("");
+  const [signatureBlocks, setSignatureBlocks] = useState<SignatureBlock[]>([]);
+
+  // isDirty is only set by explicit user actions — NOT by loading from DB
+  const isDirty = useRef(false);
 
   // Fetch full school data
   const { data: school } = useQuery({
@@ -101,7 +110,6 @@ export default function GeneralConfigTab({ schoolId }: Props) {
     queryFn: async () => {
       if (!school) return { state: "", municipality: "", city: "", parish: "" };
       const result: Record<string, string> = { state: "", municipality: "", city: "", parish: "" };
-
       if (school.state_id) {
         const { data } = await supabase.from("states").select("name").eq("id", school.state_id).single();
         if (data) result.state = data.name;
@@ -123,7 +131,7 @@ export default function GeneralConfigTab({ schoolId }: Props) {
     enabled: !!school,
   });
 
-  // Fetch existing config
+  // Fetch existing general config
   const { data: existingConfig } = useQuery({
     queryKey: ["planilla-general-config", schoolId],
     queryFn: async () => {
@@ -139,37 +147,60 @@ export default function GeneralConfigTab({ schoolId }: Props) {
     enabled: !!schoolId,
   });
 
-  // isDirty is only set by explicit user actions — NOT by loading from DB
-  const isDirty = useRef(false);
+  // Fetch signature blocks
+  const { data: existingBlocks = [] } = useQuery({
+    queryKey: ["planilla-signature-blocks", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase
+        .from("planilla_signature_blocks" as any)
+        .select("*")
+        .eq("school_id", schoolId)
+        .order("display_order");
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!schoolId,
+  });
 
   useEffect(() => {
     if (existingConfig) {
       setHeaderConfig({ ...defaultHeader, ...(existingConfig as any).header_config });
       setFooterConfig({ ...defaultFooter, ...(existingConfig as any).footer_config });
-      const sigs = (existingConfig as any).signature_lines;
-      if (Array.isArray(sigs)) setSignatureLines(sigs);
     }
   }, [existingConfig]);
 
-  // Auto-save: only fires when a user action has set isDirty
+  useEffect(() => {
+    if (existingBlocks.length > 0) {
+      setSignatureBlocks(
+        existingBlocks.map((b: any) => ({
+          id: b.id,
+          name: b.name,
+          signature_lines: Array.isArray(b.signature_lines) ? b.signature_lines : [],
+          display_order: b.display_order,
+          _newLine: "",
+        }))
+      );
+    }
+  }, [existingBlocks]);
+
+  // Auto-save header/footer: only fires when a user action has set isDirty
   useEffect(() => {
     if (!isDirty.current) return;
     isDirty.current = false;
-    const timer = setTimeout(() => { saveMutation.mutate(); }, 600);
+    const timer = setTimeout(() => { saveGeneralMutation.mutate(); }, 600);
     return () => clearTimeout(timer);
-  }, [headerConfig, footerConfig, signatureLines]);
+  }, [headerConfig, footerConfig]);
 
-  const saveMutation = useMutation({
+  // Auto-save header/footer mutation
+  const saveGeneralMutation = useMutation({
     mutationFn: async () => {
       if (!schoolId) throw new Error("No school");
-
       const payload = {
         school_id: schoolId,
         header_config: headerConfig,
         footer_config: footerConfig,
-        signature_lines: signatureLines,
       };
-
       if (existingConfig) {
         const { error } = await supabase
           .from("planilla_general_config" as any)
@@ -191,6 +222,43 @@ export default function GeneralConfigTab({ schoolId }: Props) {
     },
   });
 
+  // Save all signature blocks
+  const saveBlocksMutation = useMutation({
+    mutationFn: async () => {
+      if (!schoolId) throw new Error("No school");
+
+      const emptyName = signatureBlocks.some(b => !b.name.trim());
+      if (emptyName) throw new Error("Todos los bloques deben tener un nombre.");
+
+      await supabase
+        .from("planilla_signature_blocks" as any)
+        .delete()
+        .eq("school_id", schoolId);
+
+      if (signatureBlocks.length === 0) return;
+
+      const rows = signatureBlocks.map((b, idx) => ({
+        school_id: schoolId,
+        name: b.name.trim(),
+        signature_lines: b.signature_lines,
+        display_order: idx,
+        ...(b.id ? { id: b.id } : {}),
+      }));
+
+      const { error } = await supabase
+        .from("planilla_signature_blocks" as any)
+        .insert(rows as any);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["planilla-signature-blocks"] });
+      toast({ title: "Bloques guardados", description: "Bloques de firmas actualizados." });
+    },
+    onError: (err: Error) => {
+      toast({ variant: "destructive", title: "Error", description: err.message || "No se pudo guardar." });
+    },
+  });
+
   const toggleHeader = (key: keyof HeaderConfig) => {
     isDirty.current = true;
     setHeaderConfig(prev => ({ ...prev, [key]: !prev[key] }));
@@ -201,26 +269,47 @@ export default function GeneralConfigTab({ schoolId }: Props) {
     setFooterConfig(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const addSignature = () => {
-    const val = newSignature.trim();
-    if (!val) return;
-    isDirty.current = true;
-    setSignatureLines(prev => [...prev, val]);
-    setNewSignature("");
+  // Block management
+  const addBlock = () => {
+    setSignatureBlocks(prev => [
+      ...prev,
+      { name: "", signature_lines: [], display_order: prev.length, _newLine: "" },
+    ]);
   };
 
-  const removeSignature = (index: number) => {
-    isDirty.current = true;
-    setSignatureLines(prev => prev.filter((_, i) => i !== index));
+  const removeBlock = (idx: number) => {
+    setSignatureBlocks(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const updateSignature = (index: number, value: string) => {
-    setSignatureLines(prev => prev.map((s, i) => i === index ? value : s));
+  const updateBlockName = (idx: number, name: string) => {
+    setSignatureBlocks(prev => prev.map((b, i) => i === idx ? { ...b, name } : b));
   };
 
-  const handleSignatureBlur = () => {
-    isDirty.current = true;
-    setSignatureLines(prev => [...prev]); // trigger effect with dirty flag
+  const addLineToBlock = (blockIdx: number) => {
+    setSignatureBlocks(prev => prev.map((b, i) => {
+      if (i !== blockIdx) return b;
+      const val = (b._newLine || "").trim();
+      if (!val) return b;
+      return { ...b, signature_lines: [...b.signature_lines, val], _newLine: "" };
+    }));
+  };
+
+  const updateBlockNewLine = (blockIdx: number, value: string) => {
+    setSignatureBlocks(prev => prev.map((b, i) => i === blockIdx ? { ...b, _newLine: value } : b));
+  };
+
+  const updateLine = (blockIdx: number, lineIdx: number, value: string) => {
+    setSignatureBlocks(prev => prev.map((b, i) => {
+      if (i !== blockIdx) return b;
+      return { ...b, signature_lines: b.signature_lines.map((l, li) => li === lineIdx ? value : l) };
+    }));
+  };
+
+  const removeLine = (blockIdx: number, lineIdx: number) => {
+    setSignatureBlocks(prev => prev.map((b, i) => {
+      if (i !== blockIdx) return b;
+      return { ...b, signature_lines: b.signature_lines.filter((_, li) => li !== lineIdx) };
+    }));
   };
 
   // Build address string for preview
@@ -258,10 +347,11 @@ export default function GeneralConfigTab({ schoolId }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* HEADER / FOOTER — auto-save */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Modificaciones Generales de Planillas</CardTitle>
-          {saveMutation.isPending && (
+          {saveGeneralMutation.isPending && (
             <span className="text-xs text-muted-foreground animate-pulse">Guardando...</span>
           )}
         </CardHeader>
@@ -269,7 +359,7 @@ export default function GeneralConfigTab({ schoolId }: Props) {
           <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
             <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
             <p className="text-sm text-muted-foreground">
-              Configura los elementos que aparecerán en el encabezado, pie de página y firmas de las planillas de inscripción. Los datos se toman automáticamente de la información del colegio.
+              Configura los elementos que aparecerán en el encabezado y pie de página de las planillas. Los datos se toman automáticamente de la información del colegio.
             </p>
           </div>
 
@@ -280,7 +370,7 @@ export default function GeneralConfigTab({ schoolId }: Props) {
               {headerToggles.map(t => (
                 <label key={t.key} className="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
                   <span className="text-sm">{t.label}</span>
-                  <Switch checked={headerConfig[t.key]} onCheckedChange={() => toggleHeader(t.key)} />
+                  <Switch checked={headerConfig[t.key as keyof typeof headerConfig] as boolean} onCheckedChange={() => toggleHeader(t.key)} />
                 </label>
               ))}
             </div>
@@ -300,46 +390,128 @@ export default function GeneralConfigTab({ schoolId }: Props) {
               ))}
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <Separator />
+      {/* SIGNATURE BLOCKS — explicit save */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Layers className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-lg">Bloques de Firmas</CardTitle>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={addBlock} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo bloque
+            </Button>
+            <Button onClick={() => saveBlocksMutation.mutate()} disabled={saveBlocksMutation.isPending} className="gap-2">
+              <Save className="h-4 w-4" />
+              {saveBlocksMutation.isPending ? "Guardando..." : "Guardar"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+            <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-muted-foreground">
+              Crea bloques de firmas reutilizables. Luego, en la pestaña "Planilla de Inscripción", puedes asignar un bloque a cada sección donde quieras que aparezcan las firmas.
+            </p>
+          </div>
 
-          {/* SIGNATURES CONFIG */}
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Firmas para Planillas de Inscripción</h3>
-            <div className="space-y-2 mb-3">
-              {signatureLines.map((sig, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <Input
-                    value={sig}
-                    onChange={(e) => updateSignature(idx, e.target.value)}
-                    onBlur={handleSignatureBlur}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeSignature(idx)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={newSignature}
-                onChange={(e) => setNewSignature(e.target.value)}
-                placeholder="Nueva línea de firma (ej: Firma del Secretario)"
-                className="flex-1"
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSignature(); } }}
-              />
-              <Button variant="outline" size="sm" onClick={addSignature} className="gap-1">
-                <Plus className="h-3.5 w-3.5" />
-                Agregar
+          {signatureBlocks.length === 0 && (
+            <div className="text-center py-10 border-2 border-dashed rounded-lg">
+              <p className="text-muted-foreground mb-3">No hay bloques de firmas creados aún.</p>
+              <Button variant="outline" onClick={addBlock} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Crear primer bloque
               </Button>
             </div>
-          </div>
+          )}
+
+          {signatureBlocks.map((block, blockIdx) => (
+            <Collapsible key={blockIdx} defaultOpen={!block.id} className="border rounded-lg overflow-hidden">
+              <div className="flex items-center gap-3 p-4 bg-muted/30">
+                <Layers className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <Input
+                  value={block.name}
+                  onChange={(e) => updateBlockName(blockIdx, e.target.value)}
+                  placeholder="Nombre del bloque (ej: Firmas de Inscripción)"
+                  className="flex-1 font-medium"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-muted rounded">
+                  {block.signature_lines.length} {block.signature_lines.length === 1 ? "firma" : "firmas"}
+                </span>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="icon" className="flex-shrink-0">
+                    <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+                  </Button>
+                </CollapsibleTrigger>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeBlock(blockIdx)}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <CollapsibleContent>
+                <div className="p-4 border-t space-y-3">
+                  <div className="space-y-2">
+                    {block.signature_lines.map((line, lineIdx) => (
+                      <div key={lineIdx} className="flex items-center gap-2">
+                        <Input
+                          value={line}
+                          onChange={(e) => updateLine(blockIdx, lineIdx, e.target.value)}
+                          className="flex-1"
+                          placeholder="Ej: Firma del Representante"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeLine(blockIdx, lineIdx)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={block._newLine || ""}
+                      onChange={(e) => updateBlockNewLine(blockIdx, e.target.value)}
+                      placeholder="Nueva línea de firma (ej: Firma del Secretario)"
+                      className="flex-1"
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLineToBlock(blockIdx); } }}
+                    />
+                    <Button variant="outline" size="sm" onClick={() => addLineToBlock(blockIdx)} className="gap-1">
+                      <Plus className="h-3.5 w-3.5" />
+                      Agregar
+                    </Button>
+                  </div>
+
+                  {block.signature_lines.length > 0 && (
+                    <div className="mt-3 p-3 rounded-md bg-white border">
+                      <p className="text-[9px] text-muted-foreground uppercase tracking-wide mb-2">Vista previa</p>
+                      <div className={`grid gap-4 ${block.signature_lines.length <= 3 ? `grid-cols-${block.signature_lines.length}` : "grid-cols-3"}`}>
+                        {block.signature_lines.map((sig, idx) => (
+                          <div key={idx} className="text-center">
+                            <div className="border-b border-foreground/30 mb-1 h-6" />
+                            <p className="text-[9px] text-muted-foreground">{sig}</p>
+                            <p className="text-[8px] text-muted-foreground mt-0.5">C.I.</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
         </CardContent>
       </Card>
 
@@ -348,14 +520,12 @@ export default function GeneralConfigTab({ schoolId }: Props) {
         <Card>
           <CardHeader className="flex flex-row items-center gap-2">
             <Eye className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-lg">Previsualización</CardTitle>
+            <CardTitle className="text-lg">Previsualización de Encabezado/Pie</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="border rounded-lg overflow-hidden bg-white text-foreground">
-              {/* HEADER PREVIEW */}
               <div className="p-4">
                 <div className="flex items-start justify-between gap-4">
-                  {/* Logo */}
                   {headerConfig.show_logo && (
                     <div className="flex-shrink-0 w-16 h-16 border rounded-full overflow-hidden bg-muted flex items-center justify-center">
                       {school.logo_url ? (
@@ -365,8 +535,6 @@ export default function GeneralConfigTab({ schoolId }: Props) {
                       )}
                     </div>
                   )}
-
-                  {/* Center info */}
                   <div className="flex-1 text-center space-y-0.5">
                     {headerConfig.show_name && (
                       <p className="text-sm font-bold">{school.name}</p>
@@ -389,8 +557,6 @@ export default function GeneralConfigTab({ schoolId }: Props) {
                       </p>
                     )}
                   </div>
-
-                  {/* Photo spaces */}
                   <div className="flex gap-2 flex-shrink-0">
                     {headerConfig.show_representative_photo && (
                       <div className="w-14 h-16 border rounded bg-muted/50 flex items-center justify-center">
@@ -411,31 +577,12 @@ export default function GeneralConfigTab({ schoolId }: Props) {
 
               <Separator />
 
-              {/* Content placeholder */}
               <div className="p-4 py-8 text-center">
                 <p className="text-xs text-muted-foreground/50 italic">— Contenido de las secciones —</p>
               </div>
 
               <Separator />
 
-              {/* SIGNATURES PREVIEW */}
-              {signatureLines.length > 0 && (
-                <div className="p-4">
-                  <div className={`grid gap-6 ${signatureLines.length <= 3 ? `grid-cols-${signatureLines.length}` : 'grid-cols-3'}`}>
-                    {signatureLines.map((sig, idx) => (
-                      <div key={idx} className="text-center">
-                        <div className="border-b border-foreground/30 mb-1 h-8" />
-                        <p className="text-[9px] text-muted-foreground">{sig}</p>
-                        <p className="text-[8px] text-muted-foreground mt-1">C.I.</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <Separator />
-
-              {/* FOOTER PREVIEW */}
               <div className="p-3 text-center space-y-0.5">
                 {footerConfig.show_address && (
                   <p className="text-[9px] text-muted-foreground">{buildAddressLine()}</p>

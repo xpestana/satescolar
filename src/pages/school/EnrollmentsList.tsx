@@ -528,7 +528,7 @@ export default function EnrollmentsList() {
     try {
       toast.info("Generando planilla...");
 
-      const [familyRes, repRes, sectionsRes, configRes, enrollmentRes, geoRes, formFieldsRes] = await Promise.all([
+      const [familyRes, repRes, sectionsRes, configRes, enrollmentRes, geoRes, formFieldsRes, blocksRes] = await Promise.all([
         supabase.from("families").select("*").eq("id", student.family_id).single(),
         supabase.from("representatives").select("*").eq("family_id", student.family_id).eq("is_primary", true).limit(1).maybeSingle(),
         supabase.from("enrollment_planilla_sections").select("*").eq("school_id", schoolId).order("display_order"),
@@ -543,6 +543,7 @@ export default function EnrollmentsList() {
           school.parish_id ? supabase.from("parishes").select("name").eq("id", school.parish_id).single() : null,
         ]),
         supabase.from("form_fields").select("field_name, field_label, form_type").eq("school_id", schoolId).in("form_type", ["student", "representative"]),
+        supabase.from("planilla_signature_blocks" as any).select("*").eq("school_id", schoolId).order("display_order"),
       ]);
 
       let representative = repRes.data;
@@ -617,6 +618,7 @@ export default function EnrollmentsList() {
         enrollmentSection: enrollmentRes.data?.sections,
         formFields: formFieldsRes.data || [],
         geoCache,
+        signatureBlocks: (blocksRes as any).data || [],
       });
     } catch (err) {
       console.error("Error generating planilla:", err);

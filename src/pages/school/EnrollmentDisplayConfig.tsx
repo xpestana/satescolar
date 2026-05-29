@@ -36,6 +36,14 @@ interface PlanillaSection {
   section_type: 'fields' | 'text';
   section_text: string;
   page_break_before: boolean;
+  signature_block_id: string | null;
+}
+
+interface SignatureBlock {
+  id: string;
+  name: string;
+  signature_lines: string[];
+  display_order: number;
 }
 
 export default function EnrollmentDisplayConfig() {
@@ -44,6 +52,7 @@ export default function EnrollmentDisplayConfig() {
   const { schoolId } = useSchoolId();
   const [fields, setFields] = useState<FieldConfig[]>([]);
   const [planillaSections, setPlanillaSections] = useState<PlanillaSection[]>([]);
+  const [signatureBlocks, setSignatureBlocks] = useState<SignatureBlock[]>([]);
   const [customFieldInput, setCustomFieldInput] = useState<Record<number, string>>({});
   const [newSectionType, setNewSectionType] = useState<'fields' | 'text'>('fields');
   const [downloading, setDownloading] = useState(false);
@@ -162,6 +171,22 @@ export default function EnrollmentDisplayConfig() {
     enabled: !!schoolId,
   });
 
+  // Fetch signature blocks
+  const { data: existingBlocks = [] } = useQuery({
+    queryKey: ["planilla-signature-blocks", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return [];
+      const { data, error } = await supabase
+        .from("planilla_signature_blocks" as any)
+        .select("*")
+        .eq("school_id", schoolId)
+        .order("display_order");
+      if (error) throw error;
+      return data as any[];
+    },
+    enabled: !!schoolId,
+  });
+
   // Fetch planilla general config
   const { data: planillaConfig } = useQuery({
     queryKey: ["planilla-general-config", schoolId],
@@ -241,10 +266,23 @@ export default function EnrollmentDisplayConfig() {
           section_type: ((s as any).section_type || 'fields') as 'fields' | 'text',
           section_text: (s as any).section_text || '',
           page_break_before: (s as any).page_break_before ?? false,
+          signature_block_id: (s as any).signature_block_id ?? null,
         }))
       );
     }
   }, [existingPlanilla]);
+
+  // Build signature blocks list
+  useEffect(() => {
+    setSignatureBlocks(
+      existingBlocks.map((b: any) => ({
+        id: b.id,
+        name: b.name,
+        signature_lines: Array.isArray(b.signature_lines) ? b.signature_lines : [],
+        display_order: b.display_order,
+      }))
+    );
+  }, [existingBlocks]);
 
   // Modal auto-save (debounced delete+insert)
   const saveModalMutation = useMutation({
@@ -292,8 +330,17 @@ export default function EnrollmentDisplayConfig() {
   const addSection = () => {
     setPlanillaSections(prev => [
       ...prev,
-      { title: "", field_names: [], display_order: prev.length, section_type: newSectionType, section_text: "", page_break_before: false },
+      { title: "", field_names: [], display_order: prev.length, section_type: newSectionType, section_text: "", page_break_before: false, signature_block_id: null },
     ]);
+  };
+
+  const updateSectionSignatureBlock = (index: number, blockId: string | null) => {
+    setPlanillaSections(prev => {
+      const updated = prev.map((s, i) => i === index ? { ...s, signature_block_id: blockId } : s);
+      const updatedSection = updated[index];
+      if (updatedSection.id) savePlanillaSection(updatedSection);
+      return updated;
+    });
   };
 
   const savePlanillaSection = async (section: PlanillaSection): Promise<string | null> => {
@@ -310,6 +357,7 @@ export default function EnrollmentDisplayConfig() {
             section_text: section.section_text,
             page_break_before: section.page_break_before,
             display_order: section.display_order,
+            signature_block_id: section.signature_block_id || null,
           } as any)
           .eq("id", section.id);
         if (error) throw error;
@@ -326,6 +374,7 @@ export default function EnrollmentDisplayConfig() {
             section_text: section.section_text,
             page_break_before: section.page_break_before,
             display_order: section.display_order,
+            signature_block_id: section.signature_block_id || null,
           } as any)
           .select("id")
           .single();
@@ -449,6 +498,7 @@ export default function EnrollmentDisplayConfig() {
           section_type: s.section_type || "fields",
           section_text: s.section_text || "",
           page_break_before: s.page_break_before ?? false,
+          signature_block_id: s.signature_block_id ?? null,
         })),
         generalConfig: {
           ...(planillaConfig || {}),
@@ -457,6 +507,7 @@ export default function EnrollmentDisplayConfig() {
         },
         schoolYear: "Vista Previa",
         formFields: [...(studentFields as any[]), ...(repFields as any[])],
+        signatureBlocks: signatureBlocks,
       });
     } finally {
       setDownloading(false);
@@ -486,14 +537,16 @@ export default function EnrollmentDisplayConfig() {
               section_type: s.section_type,
               section_text: s.section_text,
               page_break_before: s.page_break_before,
+              signature_block_id: s.signature_block_id ?? null,
             })),
             generalConfig: {
               ...(planillaConfig || {}),
               header_config: { ...(planillaConfig?.header_config || {}), table_header_bg: tableHeaderBg, table_header_text: tableHeaderText },
-          planilla_title: planillaTitle,
+              planilla_title: planillaTitle,
             },
             schoolYear: "Vista Previa",
             formFields: [...(studentFields as any[]), ...(repFields as any[])],
+            signatureBlocks: signatureBlocks,
           },
           { returnBlob: true }
         );
@@ -688,6 +741,34 @@ export default function EnrollmentDisplayConfig() {
                       <span className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-muted rounded">
                         {section.section_type === 'text' ? 'Texto' : `${section.field_names.length} campos`}
                       </span>
+                      {/* Signature block selector */}
+                      {signatureBlocks.length > 0 && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Select
+                                  value={section.signature_block_id || "none"}
+                                  onValueChange={(v) => updateSectionSignatureBlock(sectionIdx, v === "none" ? null : v)}
+                                >
+                                  <SelectTrigger className={`h-8 text-xs w-auto min-w-[130px] ${section.signature_block_id ? "border-primary/40 text-primary bg-primary/5" : "text-muted-foreground"}`}>
+                                    <SelectValue placeholder="Sin firmas" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Sin firmas</SelectItem>
+                                    {signatureBlocks.map(block => (
+                                      <SelectItem key={block.id} value={block.id}>{block.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              <p>Bloque de firmas que aparece al final de esta sección</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                       {/* Page break toggle */}
                       <TooltipProvider>
                         <Tooltip>
