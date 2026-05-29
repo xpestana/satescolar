@@ -7,7 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, KeyRound, Pencil, Trash2, ShieldCheck, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Plus, KeyRound, Pencil, Trash2, ShieldCheck, Users, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -16,6 +19,15 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+function generateRandomPassword(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const arr = new Uint8Array(12);
+  crypto.getRandomValues(arr);
+  let p = "";
+  for (let i = 0; i < 12; i++) p += chars[arr[i] % chars.length];
+  return p;
+}
 
 interface SubUser {
   user_id: string;
@@ -44,6 +56,10 @@ export default function SchoolUsersList() {
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<SubUser | null>(null);
   const [confirmDeleteProfile, setConfirmDeleteProfile] = useState<ProfileRow | null>(null);
+  const [resetTarget, setResetTarget] = useState<SubUser | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     if (!permLoading && !isOwner && !has("settings.users")) navigate("/school/dashboard");
@@ -143,18 +159,30 @@ export default function SchoolUsersList() {
     loadData();
   }, [schoolId, schoolIdLoading]);
 
-  const handleResetPassword = async (u: SubUser) => {
+  const openResetDialog = (u: SubUser) => {
+    setResetTarget(u);
+    setResetPassword(generateRandomPassword());
+    setShowResetPassword(true);
+  };
+
+  const handleConfirmReset = async () => {
+    if (!resetTarget || !resetPassword) return;
+    if (resetPassword.length < 8) {
+      toast({ title: "La contraseña debe tener al menos 8 caracteres", variant: "destructive" });
+      return;
+    }
+    setResetting(true);
     const { data, error } = await supabase.functions.invoke("manage-school-subuser", {
-      body: { action: "reset_password", user_id: u.user_id },
+      body: { action: "reset_password", user_id: resetTarget.user_id, password: resetPassword },
     });
+    setResetting(false);
     if (error || data?.error) {
       toast({ title: "Error", description: data?.error || error?.message, variant: "destructive" });
       return;
     }
-    toast({
-      title: "Contraseña reenviada",
-      description: `Nueva contraseña enviada al correo del usuario.`,
-    });
+    toast({ title: "Contraseña actualizada", description: "Se envió la nueva contraseña al correo del usuario." });
+    setResetTarget(null);
+    setResetPassword("");
   };
 
   const handleDelete = async () => {
@@ -254,9 +282,9 @@ export default function SchoolUsersList() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          title={u.is_owner ? "No disponible para administradores del colegio" : "Resetear contraseña"}
+                          title={u.is_owner ? "No disponible para administradores del colegio" : "Cambiar contraseña"}
                           disabled={u.is_owner}
-                          onClick={() => handleResetPassword(u)}
+                          onClick={() => openResetDialog(u)}
                         >
                           <KeyRound className="h-4 w-4" />
                         </Button>
@@ -343,6 +371,59 @@ export default function SchoolUsersList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={!!resetTarget}
+        onOpenChange={(o) => { if (!o) { setResetTarget(null); setResetPassword(""); } }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar contraseña</DialogTitle>
+            <DialogDescription>
+              Establece una nueva contraseña para <strong>{resetTarget?.email || resetTarget?.full_name}</strong>. Se enviará por correo al guardar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label>Nueva contraseña</Label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  type={showResetPassword ? "text" : "password"}
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="Mínimo 8 caracteres"
+                  className="pr-20"
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  <button
+                    type="button"
+                    title="Generar contraseña aleatoria"
+                    onClick={() => { setResetPassword(generateRandomPassword()); setShowResetPassword(true); }}
+                    className="text-muted-foreground hover:text-foreground p-1"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    title={showResetPassword ? "Ocultar" : "Mostrar"}
+                    onClick={() => setShowResetPassword((v) => !v)}
+                    className="text-muted-foreground hover:text-foreground p-1"
+                  >
+                    {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Mínimo 8 caracteres. Usa el icono <RefreshCw className="inline h-3 w-3" /> para generar una contraseña segura.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetTarget(null); setResetPassword(""); }}>Cancelar</Button>
+            <Button onClick={handleConfirmReset} disabled={resetting || resetPassword.length < 8}>
+              {resetting ? "Guardando..." : "Guardar y enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!confirmDeleteProfile} onOpenChange={(o) => !o && setConfirmDeleteProfile(null)}>
         <AlertDialogContent>

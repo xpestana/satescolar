@@ -183,11 +183,11 @@ export default async function handler(req: Request): Promise<Response> {
       if (!callerIsOwner && !callerHasSettingsUsers) {
         return new Response(JSON.stringify({ error: "No tienes permisos para resetear contraseñas" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const { user_id } = body;
+      const { user_id, password: customPassword } = body;
       const { data: target } = await admin.from("user_roles").select("is_owner").eq("user_id", user_id).eq("school_id", schoolId).eq("role", "school").maybeSingle();
       if (!target || target.is_owner) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-      const password = generatePassword();
+      const password = (typeof customPassword === "string" && customPassword.length >= 8) ? customPassword : generatePassword();
       const { data: u } = await admin.auth.admin.getUserById(user_id);
       const email = u?.user?.email;
       const fullName = (u?.user?.user_metadata as any)?.full_name ?? "Usuario";
