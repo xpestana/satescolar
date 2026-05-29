@@ -162,7 +162,7 @@ export default function StudentsList() {
       // Data is complete, proceed with download
       toast.info("Generando planilla...");
 
-      const [configRes, enrollmentRes, geoRes] = await Promise.all([
+      const [configRes, enrollmentRes, geoRes, blocksRes] = await Promise.all([
         supabase.from("planilla_general_config").select("*").eq("school_id", school.id).maybeSingle(),
         supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", school.id).limit(1).maybeSingle(),
         Promise.all([
@@ -171,6 +171,7 @@ export default function StudentsList() {
           school.city_id ? supabase.from("cities").select("name").eq("id", school.city_id).single() : null,
           school.parish_id ? supabase.from("parishes").select("name").eq("id", school.parish_id).single() : null,
         ]),
+        supabase.from("planilla_signature_blocks" as any).select("*").eq("school_id", school.id).order("display_order"),
       ]);
 
       const familyGeoPromises = await Promise.all([
@@ -225,6 +226,7 @@ export default function StudentsList() {
         enrollmentSection: enrollmentRes.data?.sections,
         formFields: formFieldsRes.data || [],
         geoCache,
+        signatureBlocks: (blocksRes as any).data || [],
       });
     } catch (err) {
       console.error("Error generating planilla:", err);

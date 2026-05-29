@@ -593,7 +593,8 @@ export interface PlanillaData {
   enrollment?: any;
   enrollmentSection?: any;
   formFields?: any[];
-  geoCache?: Record<string, string>; // UUID -> name mapping for geographic fields
+  geoCache?: Record<string, string>;
+  signatureBlocks?: Array<{ id: string; name: string; signature_lines: string[] }>;
 }
 
 function resolveFieldValue(
@@ -740,7 +741,8 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
 
   const hc = planillaData.generalConfig?.header_config || {};
   const fc = planillaData.generalConfig?.footer_config || {};
-  const signatureLines: string[] = planillaData.generalConfig?.signature_lines || ["Firma del Representante", "Firma del Director(a)"];
+  const globalSignatureLines: string[] = planillaData.generalConfig?.signature_lines || [];
+  const hasInlineSignatures = (planillaData.sections || []).some(s => s.signature_block_id);
 
   // Preload images
   let logoB64: string | null = null;
@@ -761,8 +763,8 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
   const repFd = (planillaData.representative?.form_data || {}) as Record<string, any>;
   const studentName = `${studentFd.primer_nombre || ""} ${studentFd.segundo_nombre || ""} ${studentFd.primer_apellido || ""} ${studentFd.segundo_apellido || ""}`.replace(/\s+/g, " ").trim();
 
-  // Footer height reservation
-  const footerHeight = 38;
+  // Footer height: smaller when signatures are inline (no global sigs in footer)
+  const footerHeight = (!hasInlineSignatures && globalSignatureLines.length > 0) ? 38 : 20;
 
   function drawHeader(pageDoc: jsPDF): number {
     // Print date/time
@@ -864,15 +866,17 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     return y;
   }
 
-  function drawFooter(pageDoc: jsPDF) {
-    let y = pageHeight - footerHeight;
+  function drawSignatureLines(pageDoc: jsPDF, lines: string[], startY: number): number {
+    if (lines.length === 0) return startY;
+    const lineWidth = 55;
+    const gap = 15;
+    const maxPerRow = 3;
+    let y = startY + 6;
 
-    // Signature lines
-    if (signatureLines.length > 0) {
-      const lineWidth = 60;
-      const gap = 20;
-      const totalW = signatureLines.length * lineWidth + (signatureLines.length - 1) * gap;
-      let startX = (pageWidth - totalW) / 2;
+    for (let row = 0; row < Math.ceil(lines.length / maxPerRow); row++) {
+      const chunk = lines.slice(row * maxPerRow, row * maxPerRow + maxPerRow);
+      const totalW = chunk.length * lineWidth + (chunk.length - 1) * gap;
+      const startX = (pageWidth - totalW) / 2;
 
       pageDoc.setDrawColor(0);
       pageDoc.setLineWidth(0.3);
@@ -880,15 +884,25 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       pageDoc.setFont("helvetica", "normal");
       pageDoc.setTextColor(0);
 
-      signatureLines.forEach((label, i) => {
+      chunk.forEach((label, i) => {
         const x = startX + i * (lineWidth + gap);
         pageDoc.line(x, y, x + lineWidth, y);
         pageDoc.text(label, x + lineWidth / 2, y + 5, { align: "center" });
         pageDoc.setFontSize(8);
-        pageDoc.text("C.I.", x + lineWidth / 2, y + 12, { align: "center" });
+        pageDoc.text("C.I.", x + lineWidth / 2, y + 10, { align: "center" });
         pageDoc.setFontSize(9);
       });
       y += 18;
+    }
+    return y + 4;
+  }
+
+  function drawFooter(pageDoc: jsPDF) {
+    let y = pageHeight - footerHeight;
+
+    // Backward compat: render global signatures in footer only if no section has inline blocks
+    if (!hasInlineSignatures && globalSignatureLines.length > 0) {
+      y = drawSignatureLines(pageDoc, globalSignatureLines, y);
     }
 
     // Footer info
@@ -1064,6 +1078,16 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       }
       y += 10;
     }
+    // Render inline signature block if assigned to this section
+    if (section.signature_block_id && planillaData.signatureBlocks) {
+      const block = planillaData.signatureBlocks.find(b => b.id === section.signature_block_id);
+      if (block && block.signature_lines.length > 0) {
+        const sigHeight = Math.ceil(block.signature_lines.length / 3) * 22 + 10;
+        y = ensureSpace(y, sigHeight);
+        y = drawSignatureLines(doc, block.signature_lines, y);
+      }
+    }
+
     sectionContentRendered = true;
   }
 
