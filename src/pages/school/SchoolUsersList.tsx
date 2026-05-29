@@ -35,7 +35,7 @@ interface ProfileRow {
 
 export default function SchoolUsersList() {
   const navigate = useNavigate();
-  const { isOwner, loading: permLoading } = usePermissions();
+  const { isOwner, has, loading: permLoading } = usePermissions();
   const { schoolId, isLoading: schoolIdLoading } = useSchoolId();
   const { toast } = useToast();
 
@@ -46,8 +46,8 @@ export default function SchoolUsersList() {
   const [confirmDeleteProfile, setConfirmDeleteProfile] = useState<ProfileRow | null>(null);
 
   useEffect(() => {
-    if (!permLoading && !isOwner) navigate("/school/dashboard");
-  }, [permLoading, isOwner, navigate]);
+    if (!permLoading && !isOwner && !has("settings.users")) navigate("/school/dashboard");
+  }, [permLoading, isOwner, has, navigate]);
 
   const loadData = async () => {
     if (!schoolId) return;

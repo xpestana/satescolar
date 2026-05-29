@@ -138,7 +138,7 @@ const navSections: NavSection[] = [
       { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school", permission: "payments.config" },
       { label: "Formatos", href: "/formatos", icon: FileText, requiredRole: "school", permission: "payments.config" },
       { label: "Config. Morosidad", href: "/pagos/morosidad", icon: Bell, requiredRole: "school", permission: "payments.delinquency" },
-      { label: "Usuarios y Permisos", href: "/school/configuraciones/usuarios", icon: ShieldCheck, requiredRole: "school", ownerOnly: true },
+      { label: "Usuarios y Permisos", href: "/school/configuraciones/usuarios", icon: ShieldCheck, requiredRole: "school", permission: "settings.users" },
     ],
   },
   // Representative
