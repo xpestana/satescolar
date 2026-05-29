@@ -762,7 +762,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
   const studentName = `${studentFd.primer_nombre || ""} ${studentFd.segundo_nombre || ""} ${studentFd.primer_apellido || ""} ${studentFd.segundo_apellido || ""}`.replace(/\s+/g, " ").trim();
 
   // Footer height reservation
-  const footerHeight = 30;
+  const footerHeight = 38;
 
   function drawHeader(pageDoc: jsPDF): number {
     // Print date/time
@@ -884,8 +884,12 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
         const x = startX + i * (lineWidth + gap);
         pageDoc.line(x, y, x + lineWidth, y);
         pageDoc.text(label, x + lineWidth / 2, y + 5, { align: "center" });
+        pageDoc.setFontSize(8);
+        pageDoc.text("C.I.:", x, y + 12);
+        pageDoc.line(x + 9, y + 12, x + lineWidth, y + 12);
+        pageDoc.setFontSize(9);
       });
-      y += 12;
+      y += 18;
     }
 
     // Footer info

@@ -348,6 +348,10 @@ export function DocumentBuilder() {
       <div style="flex:1;text-align:center;">
         <div style="border-top:1px solid #000;width:80%;margin:0 auto;"></div>
         <div style="font-size:10px;margin-top:4px;">${label}</div>
+        <div style="display:flex;align-items:center;gap:4px;width:80%;margin:6px auto 0;">
+          <span style="font-size:9px;white-space:nowrap;">C.I.:</span>
+          <div style="flex:1;border-top:1px solid #000;"></div>
+        </div>
       </div>
     `).join("");
     return `<div style="display:flex;justify-content:center;gap:32px;margin-top:60px;margin-bottom:16px;">${cols}</div>`;
