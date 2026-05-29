@@ -35,6 +35,7 @@ interface PlanillaSection {
   display_order: number;
   section_type: 'fields' | 'text';
   section_text: string;
+  page_break_before: boolean;
 }
 
 export default function EnrollmentDisplayConfig() {
@@ -209,6 +210,7 @@ export default function EnrollmentDisplayConfig() {
           display_order: s.display_order,
           section_type: ((s as any).section_type || 'fields') as 'fields' | 'text',
           section_text: (s as any).section_text || '',
+          page_break_before: (s as any).page_break_before ?? false,
         }))
       );
     }
@@ -248,7 +250,7 @@ export default function EnrollmentDisplayConfig() {
   const addSection = () => {
     setPlanillaSections(prev => [
       ...prev,
-      { title: "", field_names: [], display_order: prev.length, section_type: newSectionType, section_text: "" },
+      { title: "", field_names: [], display_order: prev.length, section_type: newSectionType, section_text: "", page_break_before: false },
     ]);
   };
 
@@ -262,6 +264,10 @@ export default function EnrollmentDisplayConfig() {
 
   const updateSectionText = (index: number, section_text: string) => {
     setPlanillaSections(prev => prev.map((s, i) => i === index ? { ...s, section_text } : s));
+  };
+
+  const togglePageBreak = (index: number) => {
+    setPlanillaSections(prev => prev.map((s, i) => i === index ? { ...s, page_break_before: !s.page_break_before } : s));
   };
 
   const toggleSectionField = (sectionIndex: number, fieldName: string) => {
@@ -306,6 +312,7 @@ export default function EnrollmentDisplayConfig() {
         display_order: idx,
         section_type: s.section_type,
         section_text: s.section_text,
+        page_break_before: s.page_break_before,
       }));
 
       const { error } = await supabase.from("enrollment_planilla_sections").insert(rows as any);
@@ -335,6 +342,7 @@ export default function EnrollmentDisplayConfig() {
           field_names: Array.isArray(s.field_names) ? s.field_names : [],
           section_type: s.section_type || "fields",
           section_text: s.section_text || "",
+          page_break_before: s.page_break_before ?? false,
         })),
         generalConfig: planillaConfig,
         schoolYear: "Vista Previa",
@@ -473,6 +481,32 @@ export default function EnrollmentDisplayConfig() {
                       <span className="text-xs text-muted-foreground whitespace-nowrap px-2 py-1 bg-muted rounded">
                         {section.section_type === 'text' ? 'Texto' : `${section.field_names.length} campos`}
                       </span>
+                      {/* Page break toggle */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <label
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded border cursor-pointer transition-colors select-none whitespace-nowrap text-xs font-medium ${
+                                section.page_break_before
+                                  ? "bg-primary/10 border-primary/40 text-primary"
+                                  : "bg-muted/50 border-border text-muted-foreground hover:bg-muted"
+                              }`}
+                              onClick={(e) => { e.stopPropagation(); togglePageBreak(sectionIdx); }}
+                            >
+                              <Switch
+                                checked={section.page_break_before}
+                                onCheckedChange={() => togglePageBreak(sectionIdx)}
+                                className="scale-75"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              Nueva página
+                            </label>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>Esta sección iniciará en una nueva página del PDF</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <CollapsibleTrigger asChild>
                         <Button variant="ghost" size="icon" className="flex-shrink-0">
                           <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
@@ -741,7 +775,11 @@ export default function EnrollmentDisplayConfig() {
                     if (section.section_type === 'text') {
                       return (
                         <div key={idx}>
-                          <Separator />
+                          {section.page_break_before ? (
+                            <div className="flex items-center gap-2 px-4 py-1 bg-primary/5 border-y border-primary/20">
+                              <span className="text-[9px] font-medium text-primary uppercase tracking-wide">↳ Nueva página en PDF</span>
+                            </div>
+                          ) : <Separator />}
                           <div className="bg-muted/50 px-4 py-2 border-b">
                             <h4 className="text-sm font-bold text-center uppercase tracking-wide">
                               {section.title || "Sin título"}
@@ -767,7 +805,11 @@ export default function EnrollmentDisplayConfig() {
                     }
                     return (
                       <div key={idx}>
-                        <Separator />
+                        {section.page_break_before ? (
+                          <div className="flex items-center gap-2 px-4 py-1 bg-primary/5 border-y border-primary/20">
+                            <span className="text-[9px] font-medium text-primary uppercase tracking-wide">↳ Nueva página en PDF</span>
+                          </div>
+                        ) : <Separator />}
                         <div className="bg-muted/50 px-4 py-2 border-b">
                           <h4 className="text-sm font-bold text-center uppercase tracking-wide">
                             {section.title || "Sin título"}
