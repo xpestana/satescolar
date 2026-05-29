@@ -67,19 +67,38 @@ export default async function handler(req: Request): Promise<Response> {
 
     const callerId = authUser.user.id;
 
-    // Verify caller is school owner
-    const { data: ownerRole } = await admin
+    // Get caller's school role
+    const { data: callerRole } = await admin
       .from("user_roles")
       .select("school_id, is_owner")
       .eq("user_id", callerId)
       .eq("role", "school")
-      .eq("is_owner", true)
       .maybeSingle();
 
-    if (!ownerRole?.school_id) {
-      return new Response(JSON.stringify({ error: "Solo el dueño del colegio puede gestionar sub-usuarios" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!callerRole?.school_id) {
+      return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    const schoolId = ownerRole.school_id;
+    const schoolId = callerRole.school_id;
+    const callerIsOwner = !!callerRole.is_owner;
+
+    // Check if non-owner has settings.users permission
+    let callerHasSettingsUsers = false;
+    if (!callerIsOwner) {
+      const { data: assigns } = await admin
+        .from("school_user_profiles")
+        .select("profile_id")
+        .eq("user_id", callerId)
+        .eq("school_id", schoolId);
+      const profileIds = (assigns ?? []).map((a: any) => a.profile_id);
+      if (profileIds.length > 0) {
+        const { data: permItems } = await admin
+          .from("permission_profile_items")
+          .select("permission_key")
+          .in("profile_id", profileIds)
+          .eq("permission_key", "settings.users");
+        callerHasSettingsUsers = (permItems?.length ?? 0) > 0;
+      }
+    }
 
     const body = await req.json();
     const { action } = body;
@@ -88,8 +107,11 @@ export default async function handler(req: Request): Promise<Response> {
     const schoolName = schoolData?.name ?? "Colegio";
     const logoUrl = schoolData?.logo_url ?? null;
 
-    // === CREATE ===
+    // === CREATE === (owner only)
     if (action === "create") {
+      if (!callerIsOwner) {
+        return new Response(JSON.stringify({ error: "Solo el dueño del colegio puede crear usuarios" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const { email, full_name, profile_ids, password: customPassword } = body;
       if (!email || !full_name) return new Response(JSON.stringify({ error: "Email y nombre son requeridos" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -130,8 +152,11 @@ export default async function handler(req: Request): Promise<Response> {
       return new Response(JSON.stringify({ success: true, user_id: userId, password }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // === UPDATE (profiles + name) ===
+    // === UPDATE (profiles + name) === (owner or settings.users)
     if (action === "update") {
+      if (!callerIsOwner && !callerHasSettingsUsers) {
+        return new Response(JSON.stringify({ error: "No tienes permisos para editar usuarios" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const { user_id, full_name, profile_ids } = body;
       if (!user_id) return new Response(JSON.stringify({ error: "user_id requerido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
@@ -153,8 +178,11 @@ export default async function handler(req: Request): Promise<Response> {
       return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // === RESET PASSWORD ===
+    // === RESET PASSWORD === (owner or settings.users)
     if (action === "reset_password") {
+      if (!callerIsOwner && !callerHasSettingsUsers) {
+        return new Response(JSON.stringify({ error: "No tienes permisos para resetear contraseñas" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const { user_id } = body;
       const { data: target } = await admin.from("user_roles").select("is_owner").eq("user_id", user_id).eq("school_id", schoolId).eq("role", "school").maybeSingle();
       if (!target || target.is_owner) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -170,8 +198,11 @@ export default async function handler(req: Request): Promise<Response> {
       return new Response(JSON.stringify({ success: true, password }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // === DELETE ===
+    // === DELETE === (owner only)
     if (action === "delete") {
+      if (!callerIsOwner) {
+        return new Response(JSON.stringify({ error: "Solo el dueño del colegio puede eliminar usuarios" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       const { user_id } = body;
       const { data: target } = await admin.from("user_roles").select("is_owner").eq("user_id", user_id).eq("school_id", schoolId).eq("role", "school").maybeSingle();
       if (!target || target.is_owner) return new Response(JSON.stringify({ error: "No autorizado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
