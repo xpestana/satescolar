@@ -134,7 +134,7 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
   if (!supabaseUrl || !supabaseKey) return null;
 
   const proxyUrl = `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(url)}`;
-  return fetchToPng(proxyUrl, { apikey: supabaseKey });
+  return fetchToPng(proxyUrl, { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` });
 }
 
 export async function downloadPDF(
@@ -1149,7 +1149,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData, op
           });
           y = (doc as any).lastAutoTable.finalY + 3;
         }
-        y += 10;
+        if (!section.signature_block_id) y += 10;
       }
     } else if (section.section_type === "text") {
       // Text block
@@ -1171,7 +1171,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData, op
         doc.line(margin, y, pageWidth - margin, y);
         y += 5;
       }
-      y += 10;
+      if (!section.signature_block_id) y += 10;
     }
     // Render inline signature block pinned to bottom of the page
     if (section.signature_block_id && planillaData.signatureBlocks) {

@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.manage-school-subuser]
 verify_jwt = false
+
+[functions.image-proxy]
+verify_jwt = false
