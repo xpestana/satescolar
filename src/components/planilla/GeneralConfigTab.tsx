@@ -222,7 +222,7 @@ export default function GeneralConfigTab({ schoolId }: Props) {
     },
   });
 
-  // Save all signature blocks
+  // Save all signature blocks — upsert existing, insert new, delete removed
   const saveBlocksMutation = useMutation({
     mutationFn: async () => {
       if (!schoolId) throw new Error("No school");
@@ -230,25 +230,48 @@ export default function GeneralConfigTab({ schoolId }: Props) {
       const emptyName = signatureBlocks.some(b => !b.name.trim());
       if (emptyName) throw new Error("Todos los bloques deben tener un nombre.");
 
-      await supabase
+      // 1. Delete blocks that were removed (those with id not in current list)
+      const currentIds = signatureBlocks.map(b => b.id).filter(Boolean) as string[];
+      const { data: existingInDb } = await supabase
         .from("planilla_signature_blocks" as any)
-        .delete()
+        .select("id")
         .eq("school_id", schoolId);
+      const dbIds = ((existingInDb as any[]) || []).map((b: any) => b.id as string);
+      const toDelete = dbIds.filter(id => !currentIds.includes(id));
+      if (toDelete.length > 0) {
+        const { error } = await supabase
+          .from("planilla_signature_blocks" as any)
+          .delete()
+          .in("id", toDelete);
+        if (error) throw error;
+      }
 
-      if (signatureBlocks.length === 0) return;
+      // 2. Update existing blocks (those with id)
+      for (const [idx, b] of signatureBlocks.entries()) {
+        if (!b.id) continue;
+        const { error } = await supabase
+          .from("planilla_signature_blocks" as any)
+          .update({ name: b.name.trim(), signature_lines: b.signature_lines, display_order: idx } as any)
+          .eq("id", b.id);
+        if (error) throw error;
+      }
 
-      const rows = signatureBlocks.map((b, idx) => ({
-        school_id: schoolId,
-        name: b.name.trim(),
-        signature_lines: b.signature_lines,
-        display_order: idx,
-        ...(b.id ? { id: b.id } : {}),
-      }));
-
-      const { error } = await supabase
-        .from("planilla_signature_blocks" as any)
-        .insert(rows as any);
-      if (error) throw error;
+      // 3. Insert new blocks (those without id) — let DB generate UUID
+      const toInsert = signatureBlocks
+        .map((b, idx) => ({ b, idx }))
+        .filter(({ b }) => !b.id);
+      if (toInsert.length > 0) {
+        const rows = toInsert.map(({ b, idx }) => ({
+          school_id: schoolId,
+          name: b.name.trim(),
+          signature_lines: b.signature_lines,
+          display_order: idx,
+        }));
+        const { error } = await supabase
+          .from("planilla_signature_blocks" as any)
+          .insert(rows as any);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["planilla-signature-blocks"] });
