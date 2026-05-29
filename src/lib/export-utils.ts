@@ -1163,13 +1163,22 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData, op
       }
       y += 10;
     }
-    // Render inline signature block if assigned to this section
+    // Render inline signature block pinned to bottom of current page
     if (section.signature_block_id && planillaData.signatureBlocks) {
       const block = planillaData.signatureBlocks.find(b => b.id === section.signature_block_id);
       if (block && block.signature_lines.length > 0) {
-        const sigHeight = Math.ceil(block.signature_lines.length / 3) * 22 + 10;
-        y = ensureSpace(y, sigHeight);
-        y = drawSignatureLines(doc, block.signature_lines, y);
+        const rows = Math.ceil(block.signature_lines.length / 3);
+        const sigHeight = rows * 22 + 10;
+        // Target Y: bottom of page above footer
+        const targetY = pageHeight - footerHeight - sigHeight;
+        if (y <= targetY) {
+          // Content fits above — pin signatures to bottom of this page
+          drawSignatureLines(doc, block.signature_lines, targetY);
+        } else {
+          // Content overflows target — draw right after content (may be on new page already)
+          y = ensureSpace(y, sigHeight);
+          drawSignatureLines(doc, block.signature_lines, y);
+        }
       }
     }
 
