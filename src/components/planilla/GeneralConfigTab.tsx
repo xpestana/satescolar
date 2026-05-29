@@ -405,6 +405,10 @@ export default function GeneralConfigTab({ schoolId }: Props) {
                       <div key={idx} className="text-center">
                         <div className="border-b border-foreground/30 mb-1 h-8" />
                         <p className="text-[9px] text-muted-foreground">{sig}</p>
+                        <div className="flex items-center gap-1 mt-1 w-4/5 mx-auto">
+                          <span className="text-[8px] text-muted-foreground shrink-0">C.I.:</span>
+                          <div className="border-b border-foreground/30 flex-1" />
+                        </div>
                       </div>
                     ))}
                   </div>
