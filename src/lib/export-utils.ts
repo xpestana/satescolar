@@ -931,9 +931,10 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
   let y = drawHeader(doc);
 
   // Render each section (no hardcoded mini-table — the first dynamic section handles student data)
+  let sectionContentRendered = false;
   for (const section of planillaData.sections) {
-    // Force page break if configured
-    if ((section as any).page_break_before) {
+    // Force page break if configured — only after something has already been rendered
+    if ((section as any).page_break_before && sectionContentRendered) {
       drawFooter(doc);
       doc.addPage();
       y = drawHeader(doc);
@@ -1063,6 +1064,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       }
       y += 10;
     }
+    sectionContentRendered = true;
   }
 
   // Draw footer on last page
