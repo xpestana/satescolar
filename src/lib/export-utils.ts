@@ -89,15 +89,33 @@ export function downloadExcel(
 }
 
 // ── PDF ──────────────────────────────────────────────
+// Loads any image URL as a PNG data URL via fetch → blob URL → canvas.
+// Using a blob URL keeps the canvas same-origin so toDataURL() never throws.
 async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
     const response = await fetch(url);
+    if (!response.ok) return null;
     const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
     return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth || 200;
+          canvas.height = img.naturalHeight || 200;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) { URL.revokeObjectURL(blobUrl); resolve(null); return; }
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(blobUrl);
+          resolve(canvas.toDataURL("image/png"));
+        } catch {
+          URL.revokeObjectURL(blobUrl);
+          resolve(null);
+        }
+      };
+      img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null); };
+      img.src = blobUrl;
     });
   } catch {
     return null;
@@ -581,6 +599,14 @@ function triggerDownload(blob: Blob, filename: string) {
 }
 
 // ── Planilla de Inscripción ──────────────────────────
+function hexToRgbArr(hex: string): [number, number, number] {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return [isNaN(r) ? 41 : r, isNaN(g) ? 128 : g, isNaN(b) ? 185 : b];
+}
+
 export interface PlanillaData {
   student: any;
   representative: any;
@@ -731,16 +757,18 @@ function getFieldLabel(fieldKey: string, data: PlanillaData): string {
   return labels[fieldName] || fieldName.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
 }
 
-export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
+export async function downloadPlanillaInscripcion(planillaData: PlanillaData, options?: { returnBlob?: boolean }): Promise<Blob | void> {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 12;
+  const margin = 8;
   const contentWidth = pageWidth - margin * 2;
 
   const hc = planillaData.generalConfig?.header_config || {};
   const fc = planillaData.generalConfig?.footer_config || {};
   const signatureLines: string[] = planillaData.generalConfig?.signature_lines || ["Firma del Representante", "Firma del Director(a)"];
+  const tableHeaderBg = hexToRgbArr(hc.table_header_bg ?? "#2980b9");
+  const tableHeaderText = hexToRgbArr(hc.table_header_text ?? "#ffffff");
 
   // Preload images
   let logoB64: string | null = null;
@@ -773,27 +801,65 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     pageDoc.setTextColor(150, 150, 150);
     pageDoc.text(`Impreso: ${printDate} ${printTime}`, pageWidth - margin, 6, { align: "right" });
 
-    let y = 10;
+    let y = 8;
     const school = planillaData.school;
+    const photoSize = 20;
+    const logoSize = 20;
+    const photoGap = 2;
 
-    // Logo left
-    if (logoB64) {
-      try { pageDoc.addImage(logoB64, "PNG", margin, y, 18, 18); } catch {}
+    // ── Calculate left/right bounds for center text area ──
+    const leftBound = hc.show_logo !== false
+      ? margin + logoSize + 3
+      : margin;
+
+    const numPhotos = (hc.show_student_photo !== false ? 1 : 0) + (hc.show_representative_photo !== false ? 1 : 0);
+    const rightBound = numPhotos > 0
+      ? pageWidth - margin - numPhotos * photoSize - (numPhotos - 1) * photoGap - 3
+      : pageWidth - margin;
+
+    const centerX = (leftBound + rightBound) / 2;
+    const maxTextWidth = rightBound - leftBound - 4;
+
+    // Logo left — draw placeholder box, then actual image on top if available
+    if (hc.show_logo !== false) {
+      pageDoc.setDrawColor(180);
+      pageDoc.setLineWidth(0.3);
+      pageDoc.rect(margin, y, logoSize, logoSize);
+      if (logoB64) {
+        try { pageDoc.addImage(logoB64, "PNG", margin, y, logoSize, logoSize); } catch {}
+      }
     }
 
-    // Photos right
-    const photoSize = 18;
-    let photosX = pageWidth - margin - photoSize;
-    if (studentPhotoB64) {
-      try { pageDoc.addImage(studentPhotoB64, "JPEG", photosX, y, photoSize, photoSize); } catch {}
-      photosX -= photoSize + 2;
+    // Photos right — always draw placeholder boxes, actual photos on top if available
+    let photosRightX = pageWidth - margin;
+    if (hc.show_student_photo !== false) {
+      photosRightX -= photoSize;
+      pageDoc.setDrawColor(180);
+      pageDoc.setLineWidth(0.3);
+      pageDoc.rect(photosRightX, y, photoSize, photoSize);
+      pageDoc.setFontSize(6);
+      pageDoc.setTextColor(160);
+      pageDoc.text("Foto", photosRightX + photoSize / 2, y + photoSize / 2 - 1.5, { align: "center" });
+      pageDoc.text("Est.", photosRightX + photoSize / 2, y + photoSize / 2 + 2.5, { align: "center" });
+      if (studentPhotoB64) {
+        try { pageDoc.addImage(studentPhotoB64, "PNG", photosRightX, y, photoSize, photoSize); } catch {}
+      }
+      photosRightX -= photoGap;
     }
-    if (repPhotoB64) {
-      try { pageDoc.addImage(repPhotoB64, "JPEG", photosX, y, photoSize, photoSize); } catch {}
+    if (hc.show_representative_photo !== false) {
+      photosRightX -= photoSize;
+      pageDoc.setDrawColor(180);
+      pageDoc.setLineWidth(0.3);
+      pageDoc.rect(photosRightX, y, photoSize, photoSize);
+      pageDoc.setFontSize(6);
+      pageDoc.setTextColor(160);
+      pageDoc.text("Foto", photosRightX + photoSize / 2, y + photoSize / 2 - 1.5, { align: "center" });
+      pageDoc.text("Rep.", photosRightX + photoSize / 2, y + photoSize / 2 + 2.5, { align: "center" });
+      if (repPhotoB64) {
+        try { pageDoc.addImage(repPhotoB64, "PNG", photosRightX, y, photoSize, photoSize); } catch {}
+      }
     }
 
-    // Center text
-    const centerX = pageWidth / 2;
     let textY = y + 4;
     pageDoc.setFontSize(11);
     pageDoc.setFont("helvetica", "bold");
@@ -815,7 +881,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       if (planillaData.schoolGeo.city) addrParts.push(planillaData.schoolGeo.city);
       if (planillaData.schoolGeo.state) addrParts.push(planillaData.schoolGeo.state);
       const addrLine = addrParts.filter(Boolean).join(", ");
-      const addrLines = pageDoc.splitTextToSize(addrLine, contentWidth - 80);
+      const addrLines = pageDoc.splitTextToSize(addrLine, maxTextWidth);
       pageDoc.text(addrLines, centerX, textY, { align: "center" });
       textY += addrLines.length * 4;
     }
@@ -841,10 +907,11 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
     y = Math.max(y + 28, textY + 8);
 
     // PLANILLA title
+    const planillaTitle = planillaData.generalConfig?.planilla_title || "PLANILLA";
     pageDoc.setFontSize(16);
     pageDoc.setFont("helvetica", "bold");
     pageDoc.setTextColor(0);
-    pageDoc.text("PLANILLA", centerX, y, { align: "center" });
+    pageDoc.text(planillaTitle.toUpperCase(), centerX, y, { align: "center" });
     y += 7;
 
     pageDoc.setFontSize(13);
@@ -932,12 +999,14 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
 
   // Render each section (no hardcoded mini-table — the first dynamic section handles student data)
   let sectionContentRendered = false;
+  let atPageTop = true; // true right after drawHeader — don't pre-jump on a fresh page
   for (const section of planillaData.sections) {
     // Force page break if configured — only after something has already been rendered
     if ((section as any).page_break_before && sectionContentRendered) {
       drawFooter(doc);
       doc.addPage();
       y = drawHeader(doc);
+      atPageTop = true;
     }
 
     // Estimate full section height to avoid splitting across pages
@@ -958,8 +1027,11 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
       estimatedHeight += lines.length * 4.5 + 8;
     }
 
-    // If section won't fit, jump to next page
-    y = ensureSpace(y, estimatedHeight);
+    // If section won't fit, jump to next page — but skip when we just started a fresh page
+    if (!atPageTop) {
+      y = ensureSpace(y, estimatedHeight);
+    }
+    atPageTop = false;
 
     // Section title
     doc.setFontSize(9);
@@ -1025,8 +1097,6 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
         for (let i = 0; i < tableHead.length; i += chunkSize) {
           const headChunk = tableHead.slice(i, i + chunkSize);
           const bodyChunk = tableBody.slice(i, i + chunkSize);
-          // Pad to chunkSize
-          while (headChunk.length < chunkSize) { headChunk.push(""); bodyChunk.push(""); }
 
           y = ensureSpace(y, 18);
           autoTable(doc, {
@@ -1034,7 +1104,7 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
             head: [headChunk],
             body: [bodyChunk],
             styles: { fontSize: 9, cellPadding: 3, halign: "center", font: "helvetica" },
-            headStyles: { fillColor: [41, 128, 185], fontSize: 8 },
+            headStyles: { fillColor: tableHeaderBg, textColor: tableHeaderText, fontSize: 8 },
             margin: { left: margin, right: margin },
             theme: "grid",
           });
@@ -1071,5 +1141,8 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
   drawFooter(doc);
 
   const safeName = studentName.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "").trim().replace(/\s+/g, "_") || "planilla";
+  if (options?.returnBlob) {
+    return doc.output("blob");
+  }
   doc.save(`Planilla_${safeName}.pdf`);
 }

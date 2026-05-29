@@ -47,6 +47,11 @@ export default function EnrollmentDisplayConfig() {
   const [customFieldInput, setCustomFieldInput] = useState<Record<number, string>>({});
   const [newSectionType, setNewSectionType] = useState<'fields' | 'text'>('fields');
   const [downloading, setDownloading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [tableHeaderBg, setTableHeaderBg] = useState("#2980b9");
+  const [tableHeaderText, setTableHeaderText] = useState("#ffffff");
+  const [planillaTitle, setPlanillaTitle] = useState("PLANILLA");
 
   // Fetch student form fields
   const { data: studentFields = [] } = useQuery({
@@ -199,6 +204,15 @@ export default function EnrollmentDisplayConfig() {
     setFields(merged);
   }, [formFields, existingConfig]);
 
+  // Sync colors and title from DB config
+  useEffect(() => {
+    if (planillaConfig?.header_config) {
+      if (planillaConfig.header_config.table_header_bg) setTableHeaderBg(planillaConfig.header_config.table_header_bg);
+      if (planillaConfig.header_config.table_header_text) setTableHeaderText(planillaConfig.header_config.table_header_text);
+    }
+    if (planillaConfig?.planilla_title) setPlanillaTitle(planillaConfig.planilla_title);
+  }, [planillaConfig]);
+
   // Build planilla sections
   useEffect(() => {
     if (existingPlanilla.length > 0) {
@@ -301,6 +315,21 @@ export default function EnrollmentDisplayConfig() {
       const emptyTitle = planillaSections.some(s => !s.title.trim());
       if (emptyTitle) throw new Error("Todas las secciones deben tener un título.");
 
+      // Save colors into planilla_general_config
+      const currentHeaderConfig = planillaConfig?.header_config || {};
+      const colorPayload = {
+        school_id: schoolId,
+        header_config: { ...currentHeaderConfig, table_header_bg: tableHeaderBg, table_header_text: tableHeaderText },
+        footer_config: planillaConfig?.footer_config || {},
+        signature_lines: planillaConfig?.signature_lines || ["Firma del Representante", "Firma del Director(a)"],
+        planilla_title: planillaTitle,
+      };
+      if (planillaConfig) {
+        await supabase.from("planilla_general_config" as any).update(colorPayload as any).eq("school_id", schoolId);
+      } else {
+        await supabase.from("planilla_general_config" as any).insert(colorPayload as any);
+      }
+
       await supabase.from("enrollment_planilla_sections").delete().eq("school_id", schoolId);
 
       if (planillaSections.length === 0) return;
@@ -320,6 +349,7 @@ export default function EnrollmentDisplayConfig() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["enrollment-planilla-sections"] });
+      queryClient.invalidateQueries({ queryKey: ["planilla-general-config"] });
       toast({ title: "Configuración guardada", description: "Secciones de la planilla actualizadas." });
     },
     onError: (err: Error) => {
@@ -344,7 +374,11 @@ export default function EnrollmentDisplayConfig() {
           section_text: s.section_text || "",
           page_break_before: s.page_break_before ?? false,
         })),
-        generalConfig: planillaConfig,
+        generalConfig: {
+          ...(planillaConfig || {}),
+          header_config: { ...(planillaConfig?.header_config || {}), table_header_bg: tableHeaderBg, table_header_text: tableHeaderText },
+          planilla_title: planillaTitle,
+        },
         schoolYear: "Vista Previa",
         formFields: [...(studentFields as any[]), ...(repFields as any[])],
       });
@@ -352,6 +386,56 @@ export default function EnrollmentDisplayConfig() {
       setDownloading(false);
     }
   };
+
+  // Regenerate PDF preview whenever sections or config change
+  useEffect(() => {
+    const hasSections = planillaSections.some(s => s.field_names.length > 0 || s.section_type === 'text');
+    if (!schoolFull || !hasSections) {
+      setPreviewUrl(null);
+      return;
+    }
+    setPreviewLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const blob = await downloadPlanillaInscripcion(
+          {
+            student: { form_data: {} },
+            representative: { form_data: {} },
+            family: null,
+            school: schoolFull,
+            schoolGeo: (schoolFull as any).geo || {},
+            sections: planillaSections.map(s => ({
+              title: s.title,
+              field_names: s.field_names,
+              section_type: s.section_type,
+              section_text: s.section_text,
+              page_break_before: s.page_break_before,
+            })),
+            generalConfig: {
+              ...(planillaConfig || {}),
+              header_config: { ...(planillaConfig?.header_config || {}), table_header_bg: tableHeaderBg, table_header_text: tableHeaderText },
+          planilla_title: planillaTitle,
+            },
+            schoolYear: "Vista Previa",
+            formFields: [...(studentFields as any[]), ...(repFields as any[])],
+          },
+          { returnBlob: true }
+        );
+        if (blob) {
+          const url = URL.createObjectURL(blob as Blob);
+          setPreviewUrl(prev => {
+            if (prev) URL.revokeObjectURL(prev);
+            return url;
+          });
+        }
+      } catch {
+        // silent — preview is best-effort
+      } finally {
+        setPreviewLoading(false);
+      }
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [planillaSections, planillaConfig, schoolFull, studentFields, repFields, tableHeaderBg, tableHeaderText, planillaTitle]);
 
   const resolveLabel = (prefixed: string) => {
     const [type, ...rest] = prefixed.split(":");
@@ -446,6 +530,37 @@ export default function EnrollmentDisplayConfig() {
               </div>
             </CardHeader>
             <CardContent>
+              {/* Table header colors + title */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer">
+                  <span className="text-sm">Color de fondo del encabezado</span>
+                  <input
+                    type="color"
+                    value={tableHeaderBg}
+                    onChange={e => setTableHeaderBg(e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer border-0 p-0.5 bg-transparent"
+                  />
+                </label>
+                <label className="flex items-center justify-between p-3 rounded-lg border cursor-pointer">
+                  <span className="text-sm">Color del texto del encabezado</span>
+                  <input
+                    type="color"
+                    value={tableHeaderText}
+                    onChange={e => setTableHeaderText(e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer border-0 p-0.5 bg-transparent"
+                  />
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border mb-6">
+                <span className="text-sm shrink-0 mr-4">Título de la planilla</span>
+                <Input
+                  value={planillaTitle}
+                  onChange={e => setPlanillaTitle(e.target.value)}
+                  placeholder="PLANILLA"
+                  className="max-w-xs text-right"
+                />
+              </div>
+
               <div className="flex items-start gap-3 mb-6 p-4 bg-muted/50 rounded-lg">
                 <Info className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                 <p className="text-sm text-muted-foreground">
@@ -700,8 +815,8 @@ export default function EnrollmentDisplayConfig() {
             </CardContent>
           </Card>
 
-          {/* Preview */}
-          {planillaSections.some(s => s.field_names.length > 0 || s.section_type === 'text') && (
+          {/* Preview PDF */}
+          {(previewUrl || previewLoading) && (
             <Card className="mt-6">
               <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -719,165 +834,21 @@ export default function EnrollmentDisplayConfig() {
                   {downloading ? "Generando..." : "Descargar PDF"}
                 </Button>
               </CardHeader>
-              <CardContent>
-                <div className="border rounded-lg overflow-hidden bg-white text-foreground">
-
-                  {/* HEADER */}
-                  {schoolFull && (
-                    <div className="p-3 border-b border-gray-300">
-                      <div className="flex items-start justify-between gap-3">
-                        {planillaConfig?.header_config?.show_logo !== false && (schoolFull as any).logo_url && (
-                          <img src={(schoolFull as any).logo_url} alt="Logo" className="w-12 h-12 object-contain flex-shrink-0 rounded-full border" />
-                        )}
-                        <div className="flex-1 text-center space-y-0.5">
-                          {planillaConfig?.header_config?.show_name !== false && (
-                            <p className="text-[11px] font-bold text-black uppercase">{(schoolFull as any).name}</p>
-                          )}
-                          {planillaConfig?.header_config?.show_address !== false && (schoolFull as any).address && (
-                            <p className="text-[8px] text-gray-600">
-                              {[(schoolFull as any).address, (schoolFull as any).geo?.municipality, (schoolFull as any).geo?.city, (schoolFull as any).geo?.state].filter(Boolean).join(", ")}
-                            </p>
-                          )}
-                          {(planillaConfig?.header_config?.show_dea_code !== false || planillaConfig?.header_config?.show_statistical_code !== false) && (
-                            <p className="text-[8px] text-gray-600">
-                              {planillaConfig?.header_config?.show_dea_code !== false && `Código DEA: ${(schoolFull as any).dea_code}`}
-                              {planillaConfig?.header_config?.show_dea_code !== false && planillaConfig?.header_config?.show_statistical_code !== false && " - "}
-                              {planillaConfig?.header_config?.show_statistical_code !== false && `Código Estadístico: ${(schoolFull as any).statistical_code}`}
-                            </p>
-                          )}
-                          {(planillaConfig?.header_config?.show_phone !== false || planillaConfig?.header_config?.show_rif !== false) && (
-                            <p className="text-[8px] text-gray-600">
-                              {planillaConfig?.header_config?.show_phone !== false && `Tel: ${(schoolFull as any).phone}`}
-                              {planillaConfig?.header_config?.show_phone !== false && planillaConfig?.header_config?.show_rif !== false && "  -  "}
-                              {planillaConfig?.header_config?.show_rif !== false && `Rif: ${(schoolFull as any).rif}`}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex gap-1 flex-shrink-0">
-                          {planillaConfig?.header_config?.show_representative_photo !== false && (
-                            <div className="w-10 h-12 border border-gray-300 rounded bg-gray-50 flex items-center justify-center">
-                              <span className="text-[7px] text-gray-400 text-center leading-tight">Foto<br/>Rep.</span>
-                            </div>
-                          )}
-                          {planillaConfig?.header_config?.show_student_photo !== false && (
-                            <div className="w-10 h-12 border border-gray-300 rounded bg-gray-50 flex items-center justify-center">
-                              <span className="text-[7px] text-gray-400 text-center leading-tight">Foto<br/>Est.</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="border-t border-gray-200 mt-2 pt-2">
-                        <p className="text-sm font-bold text-center text-black uppercase tracking-wider">PLANILLA</p>
-                        <p className="text-[9px] font-semibold text-center text-black uppercase">AÑO ESCOLAR: ___________</p>
-                        <p className="text-[7px] italic text-center text-gray-400 mt-1">Lea detenidamente esta planilla, los datos suministrados deben ser exactos y ajustados a la realidad, de lo contrario será invalidada</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SECTIONS */}
-                  {planillaSections.filter(s => s.field_names.length > 0 || s.section_type === 'text').map((section, idx) => {
-                    const pageBreakBadge = section.page_break_before && (
-                      <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 border-y border-blue-200">
-                        <span className="text-[9px] font-semibold text-blue-600 uppercase tracking-wide">↳ Nueva página en PDF</span>
-                      </div>
-                    );
-
-                    if (section.section_type === 'text') {
-                      return (
-                        <div key={idx}>
-                          {pageBreakBadge}
-                          <div className="px-4 pt-3 pb-1">
-                            <p className="text-[11px] font-bold text-center text-black">{section.title || "Sin título"}</p>
-                          </div>
-                          <div className="px-4 pb-3">
-                            {section.section_text ? (
-                              <p className="text-[9px] leading-relaxed whitespace-pre-line text-black">{section.section_text}</p>
-                            ) : (
-                              <div className="border-b border-black/30 mt-6 mb-1" />
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    const labels = section.field_names.map(resolveLabel);
-                    const rows: string[][] = [];
-                    for (let i = 0; i < labels.length; i += 4) {
-                      rows.push(labels.slice(i, i + 4));
-                    }
-                    return (
-                      <div key={idx}>
-                        {pageBreakBadge}
-                        {/* Section title — plain centered, like the PDF */}
-                        <div className="px-4 pt-3 pb-1">
-                          <p className="text-[11px] font-bold text-center text-black">{section.title || "Sin título"}</p>
-                        </div>
-                        {/* Tables: each row of 4 = blue header + white data, matching autoTable */}
-                        <div className="px-2 pb-3 space-y-0.5">
-                          {rows.map((row, rIdx) => {
-                            const padded = [...row];
-                            while (padded.length < 4) padded.push("");
-                            return (
-                              <div key={rIdx} className="border border-gray-300 overflow-hidden">
-                                {/* Header row */}
-                                <div className="grid grid-cols-4 divide-x divide-white bg-[#2980b9]">
-                                  {padded.map((label, cIdx) => (
-                                    <div key={cIdx} className="px-2 py-1.5">
-                                      <p className="text-[8px] font-bold text-white uppercase leading-tight">{label}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                                {/* Data row */}
-                                <div className="grid grid-cols-4 divide-x divide-gray-200 bg-white">
-                                  {padded.map((label, cIdx) => (
-                                    <div key={cIdx} className="px-2 py-1.5">
-                                      <p className="text-[8px] text-gray-400">{label ? "No registrado" : ""}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* SIGNATURES */}
-                  {planillaConfig?.signature_lines?.length > 0 && (
-                    <div className="px-6 pt-6 pb-3">
-                      <div className={`grid gap-8 ${planillaConfig.signature_lines.length <= 3 ? `grid-cols-${planillaConfig.signature_lines.length}` : "grid-cols-3"}`}>
-                        {planillaConfig.signature_lines.map((sig: string, idx: number) => (
-                          <div key={idx} className="text-center">
-                            <div className="border-b border-black/40 mb-1 h-6" />
-                            <p className="text-[9px] text-black">{sig}</p>
-                            <p className="text-[8px] text-black mt-0.5">C.I.</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* FOOTER */}
-                  {planillaConfig?.footer_config && schoolFull && (
-                    <div className="border-t border-gray-300 px-4 py-2 text-center space-y-0.5">
-                      {planillaConfig.footer_config.show_address !== false && (schoolFull as any).address && (
-                        <p className="text-[8px] text-gray-500">
-                          {[(schoolFull as any).address, (schoolFull as any).geo?.municipality, (schoolFull as any).geo?.city, (schoolFull as any).geo?.state].filter(Boolean).join(", ")}
-                        </p>
-                      )}
-                      {(planillaConfig.footer_config.show_phone !== false || planillaConfig.footer_config.show_rif !== false) && (
-                        <p className="text-[8px] text-gray-500">
-                          {planillaConfig.footer_config.show_phone !== false && `Tel: ${(schoolFull as any).phone}`}
-                          {planillaConfig.footer_config.show_phone !== false && planillaConfig.footer_config.show_rif !== false && "  "}
-                          {planillaConfig.footer_config.show_rif !== false && `Rif: ${(schoolFull as any).rif}`}
-                        </p>
-                      )}
-                      <p className="text-[7px] text-gray-400">Documento generado de forma automática por SAT Escolar</p>
-                    </div>
-                  )}
-
-                </div>
+              <CardContent className="p-0">
+                {previewLoading && !previewUrl && (
+                  <div className="flex items-center justify-center h-48 gap-2 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-sm">Generando previsualización...</span>
+                  </div>
+                )}
+                {previewUrl && (
+                  <iframe
+                    src={previewUrl}
+                    title="Previsualización Planilla"
+                    className="w-full border-0 rounded-b-lg"
+                    style={{ height: "850px" }}
+                  />
+                )}
               </CardContent>
             </Card>
           )}

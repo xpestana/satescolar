@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Save, Plus, Trash2, Eye, Info } from "lucide-react";
+import { Plus, Trash2, Eye, Info } from "lucide-react";
 
 interface HeaderConfig {
   show_logo: boolean;
@@ -20,6 +20,8 @@ interface HeaderConfig {
   show_rif: boolean;
   show_student_photo: boolean;
   show_representative_photo: boolean;
+  table_header_bg?: string;
+  table_header_text?: string;
 }
 
 interface FooterConfig {
@@ -137,6 +139,9 @@ export default function GeneralConfigTab({ schoolId }: Props) {
     enabled: !!schoolId,
   });
 
+  // isDirty is only set by explicit user actions — NOT by loading from DB
+  const isDirty = useRef(false);
+
   useEffect(() => {
     if (existingConfig) {
       setHeaderConfig({ ...defaultHeader, ...(existingConfig as any).header_config });
@@ -145,6 +150,14 @@ export default function GeneralConfigTab({ schoolId }: Props) {
       if (Array.isArray(sigs)) setSignatureLines(sigs);
     }
   }, [existingConfig]);
+
+  // Auto-save: only fires when a user action has set isDirty
+  useEffect(() => {
+    if (!isDirty.current) return;
+    isDirty.current = false;
+    const timer = setTimeout(() => { saveMutation.mutate(); }, 600);
+    return () => clearTimeout(timer);
+  }, [headerConfig, footerConfig, signatureLines]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -172,7 +185,6 @@ export default function GeneralConfigTab({ schoolId }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["planilla-general-config"] });
-      toast({ title: "Configuración guardada", description: "Modificaciones generales actualizadas." });
     },
     onError: () => {
       toast({ variant: "destructive", title: "Error", description: "No se pudo guardar." });
@@ -180,26 +192,35 @@ export default function GeneralConfigTab({ schoolId }: Props) {
   });
 
   const toggleHeader = (key: keyof HeaderConfig) => {
+    isDirty.current = true;
     setHeaderConfig(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const toggleFooter = (key: keyof FooterConfig) => {
+    isDirty.current = true;
     setFooterConfig(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const addSignature = () => {
     const val = newSignature.trim();
     if (!val) return;
+    isDirty.current = true;
     setSignatureLines(prev => [...prev, val]);
     setNewSignature("");
   };
 
   const removeSignature = (index: number) => {
+    isDirty.current = true;
     setSignatureLines(prev => prev.filter((_, i) => i !== index));
   };
 
   const updateSignature = (index: number, value: string) => {
     setSignatureLines(prev => prev.map((s, i) => i === index ? value : s));
+  };
+
+  const handleSignatureBlur = () => {
+    isDirty.current = true;
+    setSignatureLines(prev => [...prev]); // trigger effect with dirty flag
   };
 
   // Build address string for preview
@@ -240,10 +261,9 @@ export default function GeneralConfigTab({ schoolId }: Props) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Modificaciones Generales de Planillas</CardTitle>
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
-            <Save className="h-4 w-4" />
-            {saveMutation.isPending ? "Guardando..." : "Guardar"}
-          </Button>
+          {saveMutation.isPending && (
+            <span className="text-xs text-muted-foreground animate-pulse">Guardando...</span>
+          )}
         </CardHeader>
         <CardContent className="space-y-8">
           <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
@@ -292,6 +312,7 @@ export default function GeneralConfigTab({ schoolId }: Props) {
                   <Input
                     value={sig}
                     onChange={(e) => updateSignature(idx, e.target.value)}
+                    onBlur={handleSignatureBlur}
                     className="flex-1"
                   />
                   <Button
