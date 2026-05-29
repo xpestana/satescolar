@@ -91,35 +91,50 @@ export function downloadExcel(
 // ── PDF ──────────────────────────────────────────────
 // Loads any image URL as a PNG data URL via fetch → blob URL → canvas.
 // Using a blob URL keeps the canvas same-origin so toDataURL() never throws.
+// Falls back to the image-proxy edge function when direct fetch fails (CORS).
 async function loadImageAsBase64(url: string): Promise<string | null> {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) return null;
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = img.naturalWidth || 200;
-          canvas.height = img.naturalHeight || 200;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) { URL.revokeObjectURL(blobUrl); resolve(null); return; }
-          ctx.drawImage(img, 0, 0);
-          URL.revokeObjectURL(blobUrl);
-          resolve(canvas.toDataURL("image/png"));
-        } catch {
-          URL.revokeObjectURL(blobUrl);
-          resolve(null);
-        }
-      };
-      img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null); };
-      img.src = blobUrl;
-    });
-  } catch {
-    return null;
-  }
+  const fetchToPng = async (fetchUrl: string, headers?: Record<string, string>): Promise<string | null> => {
+    try {
+      const response = await fetch(fetchUrl, headers ? { headers } : undefined);
+      if (!response.ok) return null;
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth || 200;
+            canvas.height = img.naturalHeight || 200;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) { URL.revokeObjectURL(blobUrl); resolve(null); return; }
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(blobUrl);
+            resolve(canvas.toDataURL("image/png"));
+          } catch {
+            URL.revokeObjectURL(blobUrl);
+            resolve(null);
+          }
+        };
+        img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null); };
+        img.src = blobUrl;
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  // Try direct fetch first (works when S3 bucket has CORS configured)
+  const direct = await fetchToPng(url);
+  if (direct) return direct;
+
+  // Fallback: proxy through Supabase edge function to bypass CORS restrictions
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+  if (!supabaseUrl || !supabaseKey) return null;
+
+  const proxyUrl = `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(url)}`;
+  return fetchToPng(proxyUrl, { apikey: supabaseKey });
 }
 
 export async function downloadPDF(
