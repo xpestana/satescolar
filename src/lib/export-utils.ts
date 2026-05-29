@@ -932,6 +932,13 @@ export async function downloadPlanillaInscripcion(planillaData: PlanillaData) {
 
   // Render each section (no hardcoded mini-table — the first dynamic section handles student data)
   for (const section of planillaData.sections) {
+    // Force page break if configured
+    if ((section as any).page_break_before) {
+      drawFooter(doc);
+      doc.addPage();
+      y = drawHeader(doc);
+    }
+
     // Estimate full section height to avoid splitting across pages
     let estimatedHeight = 10; // title + spacing
     if (section.section_type === "fields") {
