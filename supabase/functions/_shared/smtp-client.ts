@@ -66,6 +66,10 @@ async function safeClose(client: SMTPClient): Promise<void> {
 /**
  * Envía corrreo cerrando cliente; si Mailgun en 587/STARTTLS falla con errores conocidos en Deno,
  * reintenta una vez por smtp.mailgun.org:465 (TLS implícito), que suele funcionar mejor.
+ *
+ * Nota: denomailer v1.x usa `from` para el envelope SMTP (MAIL FROM) pero no garantiza
+ * que el header `From:` quede en los MIME headers del mensaje. Gmail lo rechaza con
+ * 550 5.7.1 si ese header falta. Se inyecta explícitamente aquí para todos los envíos.
  */
 export async function sendViaSmtp(mail: SendConfig): Promise<void> {
   const hostname = Deno.env.get("SMTP_HOST") ?? "";
@@ -74,9 +78,18 @@ export async function sendViaSmtp(mail: SendConfig): Promise<void> {
   const envPort = parsePort();
   const mode = resolveSmtpTlsMode(envPort);
 
+  // Forzar header From: en MIME para cumplir RFC 5322 (fix Gmail 550 5.7.1)
+  const enrichedMail: SendConfig = {
+    ...mail,
+    headers: {
+      "From": mail.from,
+      ...(mail.headers ?? {}),
+    },
+  };
+
   const client = new SMTPClient(buildSmtpClientOptions());
   try {
-    await client.send(mail);
+    await client.send(enrichedMail);
     await client.close();
     return;
   } catch (e) {
@@ -110,7 +123,7 @@ export async function sendViaSmtp(mail: SendConfig): Promise<void> {
       debug: { noStartTLS: false },
     });
     try {
-      await fb.send(mail);
+      await fb.send(enrichedMail);
     } finally {
       await fb.close().catch(() => {});
     }
