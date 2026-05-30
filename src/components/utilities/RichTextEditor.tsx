@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Bold,
@@ -20,6 +20,10 @@ import {
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
+export interface RichTextEditorHandle {
+  insertAtCursor: (text: string) => void;
+}
+
 interface RichTextEditorProps {
   value: string;
   onChange: (html: string) => void;
@@ -28,14 +32,25 @@ interface RichTextEditorProps {
   className?: string;
 }
 
-export function RichTextEditor({
+export const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
+function RichTextEditor({
   value,
   onChange,
   placeholder = "Escribe tu mensaje aquí...",
   minHeight = 250,
   className = "",
-}: RichTextEditorProps) {
+}, ref) {
   const editorRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    insertAtCursor(text: string) {
+      editorRef.current?.focus();
+      document.execCommand("insertText", false, text);
+      setTimeout(() => {
+        if (editorRef.current) onChange(editorRef.current.innerHTML);
+      }, 0);
+    },
+  }));
   const isInternalChangeRef = useRef(false);
 
   useEffect(() => {
@@ -154,4 +169,6 @@ export function RichTextEditor({
       `}</style>
     </div>
   );
-}
+});
+
+RichTextEditor.displayName = "RichTextEditor";

@@ -1,3 +1,5 @@
+import { buildDelinquencyEmailHtml, resolveSnippets, wrapWithEmailLayout } from "../_shared/email-templates.ts";
+import { sendViaSmtp } from "../_shared/smtp-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -118,6 +120,23 @@ export default async function handler(req: Request): Promise<Response> {
 
       const schoolInfo = config.schools as any;
 
+      // Check for custom template once per school
+      const { data: customTemplate } = await supabaseAdmin
+        .from("email_templates")
+        .select("subject, body_html, primary_color, text_color")
+        .eq("school_id", schoolId)
+        .eq("template_type", "delinquency")
+        .eq("is_active", true)
+        .maybeSingle();
+
+      // Fetch school logo for custom template wrapper
+      const { data: schoolRecord } = customTemplate
+        ? await supabaseAdmin.from("schools").select("logo_url").eq("id", schoolId).maybeSingle()
+        : { data: null };
+
+      const smtpFromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
+      const smtpFromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
+
       for (const student of (students || [])) {
         const debt = studentDebts[student.id];
         if (!debt) continue;
@@ -141,43 +160,66 @@ export default async function handler(req: Request): Promise<Response> {
         const gradeName = enrollment?.sections?.grade_level || "";
         const sectionName = enrollment?.sections?.name || "";
 
-        const conceptsList = debt.concepts.map((c: any) =>
-          `<li>${c.name}: <strong>${c.balance.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</strong></li>`
-        ).join("");
+        let htmlBody: string;
+        let emailSubject: string;
 
-        const htmlBody = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #333;">Recordatorio de Pago Pendiente</h2>
-            <p>Estimado(a) representante,</p>
-            <p>Le informamos cordialmente que el/la estudiante <strong>${studentName}</strong>${gradeName ? ` (${gradeName} - ${sectionName})` : ""} presenta un saldo pendiente en nuestra institución.</p>
-            <h3 style="color: #555;">Conceptos pendientes:</h3>
-            <ul>${conceptsList}</ul>
-            <p style="font-size: 18px; color: #c0392b;"><strong>Total pendiente: ${debt.total.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</strong></p>
-            <p>Le invitamos amablemente a regularizar su situación a la brevedad posible. Si ya realizó el pago, le agradecemos nos haga llegar el comprobante correspondiente.</p>
-            <p>Para cualquier consulta, puede comunicarse con nosotros:</p>
-            <ul>
-              ${schoolInfo?.phone ? `<li>Teléfono: ${schoolInfo.phone}</li>` : ""}
-              ${schoolInfo?.email ? `<li>Email: ${schoolInfo.email}</li>` : ""}
-            </ul>
-            <p>Atentamente,<br/><strong>${schoolInfo?.name || "La Institución"}</strong></p>
-            <hr style="border: none; border-top: 1px solid #eee; margin-top: 30px;"/>
-            <p style="font-size: 11px; color: #999;">Este es un mensaje automático generado por el sistema de gestión escolar.</p>
-          </div>
-        `;
+        if (customTemplate) {
+          const conceptsList = debt.concepts
+            .map((c: any) => `<li>${c.name}: <strong>${c.balance.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</strong></li>`)
+            .join("");
+          const snippetData: Record<string, string> = {
+            nombre_colegio: schoolInfo?.name || "La Institución",
+            nombre_estudiante: studentName,
+            grado_seccion: gradeName ? `${gradeName} - ${sectionName}` : "",
+            conceptos_pendientes: `<ul>${conceptsList}</ul>`,
+            total_adeudado: `${debt.total.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`,
+            telefono_colegio: schoolInfo?.phone || "",
+            email_colegio: schoolInfo?.email || "",
+          };
+          htmlBody = wrapWithEmailLayout(
+            resolveSnippets(customTemplate.body_html, snippetData),
+            customTemplate.primary_color,
+            customTemplate.text_color,
+            schoolInfo?.name || "La Institución",
+            schoolRecord?.logo_url ?? null
+          );
+          emailSubject = resolveSnippets(customTemplate.subject, snippetData);
+        } else {
+          htmlBody = buildDelinquencyEmailHtml(
+            schoolInfo?.name || "La Institución",
+            studentName,
+            gradeName,
+            sectionName,
+            debt.concepts,
+            debt.total,
+            schoolInfo?.phone,
+            schoolInfo?.email
+          );
+          emailSubject = `Recordatorio de Pago Pendiente - ${studentName}`;
+        }
 
         let status = "sent";
         let errorMessage = null;
 
         try {
-          const { error: sendErr } = await supabaseAdmin.functions.invoke("send-email", {
-            body: {
+          if (customTemplate && smtpFromEmail) {
+            await sendViaSmtp({
+              from: `${smtpFromName} <${smtpFromEmail}>`,
               to: [email],
-              subject: `Recordatorio de Pago Pendiente - ${studentName}`,
-              body: htmlBody,
-              isHtml: true,
-            },
-          });
-          if (sendErr) throw sendErr;
+              subject: emailSubject,
+              html: htmlBody,
+            });
+          } else {
+            const { error: sendErr } = await supabaseAdmin.functions.invoke("send-email", {
+              body: {
+                to: [email],
+                subject: emailSubject,
+                body: htmlBody,
+                isHtml: true,
+              },
+            });
+            if (sendErr) throw sendErr;
+          }
           totalSent++;
         } catch (err: any) {
           status = "failed";

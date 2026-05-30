@@ -68,6 +68,8 @@ import NotFound from "./pages/NotFound";
 import SchoolUsersList from "./pages/school/SchoolUsersList";
 import SchoolUserForm from "./pages/school/SchoolUserForm";
 import PermissionProfileForm from "./pages/school/PermissionProfileForm";
+import EmailTemplatesList from "./pages/school/EmailTemplatesList";
+import EmailTemplateEditor from "./pages/school/EmailTemplateEditor";
 import { InstallAppPrompt } from "@/components/InstallAppPrompt";
 
 const queryClient = new QueryClient({
@@ -144,6 +146,8 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+              <Route path="/school/configuraciones/correos" element={<ProtectedRoute requiredRole="school"><EmailTemplatesList /></ProtectedRoute>} />
+              <Route path="/school/configuraciones/correos/:type" element={<ProtectedRoute requiredRole="school"><EmailTemplateEditor /></ProtectedRoute>} />
               <Route path="/school/configuraciones/usuarios" element={<ProtectedRoute requiredRole="school"><SchoolUsersList /></ProtectedRoute>} />
               <Route path="/school/configuraciones/usuarios/nuevo" element={<ProtectedRoute requiredRole="school"><SchoolUserForm /></ProtectedRoute>} />
               <Route path="/school/configuraciones/usuarios/:userId/editar" element={<ProtectedRoute requiredRole="school"><SchoolUserForm /></ProtectedRoute>} />

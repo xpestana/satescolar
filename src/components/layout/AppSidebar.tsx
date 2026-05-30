@@ -135,6 +135,7 @@ const navSections: NavSection[] = [
       { label: "Planillas", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school", permission: "planillas.config" },
       { label: "Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school", permission: "settings.school" },
       { label: "Carnet", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school", permission: "settings.school" },
+      { label: "Templates de Correo", href: "/school/configuraciones/correos", icon: Mail, requiredRole: "school", permission: "settings.school" },
       { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school", permission: "payments.config" },
       { label: "Formatos", href: "/formatos", icon: FileText, requiredRole: "school", permission: "payments.config" },
       { label: "Config. Morosidad", href: "/pagos/morosidad", icon: Bell, requiredRole: "school", permission: "payments.delinquency" },
