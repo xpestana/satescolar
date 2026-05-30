@@ -64,10 +64,46 @@ async function safeClose(client: SMTPClient): Promise<void> {
 }
 
 /**
+ * RFC 2047 base64 encode para valores de header con caracteres no-ASCII.
+ * Denomailer v1.x codifica subjects largos con QP sin respetar el límite de 75 chars
+ * por encoded-word (RFC 2047 §2), produciendo subjects malformados que corrompen el
+ * bloque de headers y hacen que Gmail "pierda" el From: al parsear.
+ * Pre-codificamos aquí para entregar a denomailer un valor ya en ASCII puro.
+ */
+function rfc2047Encode(value: string): string {
+  if (/^[\x09\x20-\x7E]*$/.test(value)) return value; // ASCII puro, no se toca
+  const encoder = new TextEncoder();
+  // Máx 45 bytes por chunk → 60 chars base64 + 12 de cabecera = 72 ≤ 75 (RFC 2047 §2)
+  const MAX_BYTES = 45;
+  const parts: string[] = [];
+  let i = 0;
+  while (i < value.length) {
+    let j = i, n = 0;
+    while (j < value.length) {
+      const cb = encoder.encode(value[j]).length;
+      if (n + cb > MAX_BYTES) break;
+      n += cb;
+      j++;
+    }
+    if (j === i) j++; // garantiza avance mínimo
+    const bytes = encoder.encode(value.slice(i, j));
+    parts.push(`=?utf-8?b?${btoa(String.fromCharCode(...bytes))}?=`);
+    i = j;
+  }
+  return parts.join(" ");
+}
+
+/**
  * Envía corrreo cerrando cliente; si Mailgun en 587/STARTTLS falla con errores conocidos en Deno,
  * reintenta una vez por smtp.mailgun.org:465 (TLS implícito), que suele funcionar mejor.
  */
 export async function sendViaSmtp(mail: SendConfig): Promise<void> {
+  // Pre-codificar subject para evitar encoded-words malformados en subjects largos con
+  // caracteres no-ASCII (bug denominado en denomailer v1.x con QP + RFC 2047 §2 limit)
+  const encodedMail: SendConfig = {
+    ...mail,
+    subject: rfc2047Encode(mail.subject),
+  };
   const hostname = Deno.env.get("SMTP_HOST") ?? "";
   const username = Deno.env.get("SMTP_USER") ?? "";
   const password = Deno.env.get("SMTP_PASS") ?? "";
@@ -76,7 +112,7 @@ export async function sendViaSmtp(mail: SendConfig): Promise<void> {
 
   const client = new SMTPClient(buildSmtpClientOptions());
   try {
-    await client.send(mail);
+    await client.send(encodedMail);
     await client.close();
     return;
   } catch (e) {
@@ -110,7 +146,7 @@ export async function sendViaSmtp(mail: SendConfig): Promise<void> {
       debug: { noStartTLS: false },
     });
     try {
-      await fb.send(mail);
+      await fb.send(encodedMail);
     } finally {
       await fb.close().catch(() => {});
     }
