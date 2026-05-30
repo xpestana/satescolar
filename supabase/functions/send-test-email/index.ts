@@ -162,6 +162,29 @@ Este es un mensaje automático del sistema de gestión escolar SAT Escolar.`,
         trigger: "Envío manual desde el panel de admin o school con HTML desactivado",
       };
 
+    case "payment-reminder":
+      return {
+        subject: "[PRUEBA] Recordatorio de Cuota - Carlos Rodríguez",
+        html: buildDelinquencyEmailHtml(
+          "Colegio Demo SAT",
+          "Carlos Rodríguez",
+          "5to Grado",
+          "Sección A",
+          [{ name: "Mensualidad Marzo 2025", balance: 150 }],
+          150,
+          "0412-0000000",
+          "contacto@colegiodemo.edu.ve"
+        ),
+        previewData: {
+          student: "Carlos Rodríguez",
+          grade: "5to Grado - Sección A",
+          concepts: ["Mensualidad Marzo 2025: 150 VES"],
+          total: "150 VES",
+        },
+        source: "payment-reminder (trigger futuro)",
+        trigger: "Template configurable para recordatorio de cuotas próximas a vencer",
+      };
+
     default:
       throw new Error(`Tipo de correo desconocido: ${type}`);
   }
