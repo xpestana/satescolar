@@ -222,6 +222,7 @@ export default async function handler(req: Request): Promise<Response> {
             email_usuario: email,
             contrasena: teacherPassword,
             url_plataforma: loginUrl,
+            primary_color: customTemplate.primary_color,
           };
           html = wrapWithEmailLayout(
             resolveSnippets(customTemplate.body_html, snippetData),

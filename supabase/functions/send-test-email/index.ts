@@ -281,7 +281,7 @@ export default async function handler(req: Request): Promise<Response> {
           "payment-reminder": { nombre_colegio: "Colegio Demo SAT", nombre_estudiante: "Carlos Rodríguez", grado_seccion: "5to Grado - Sección A", conceptos_pendientes: "<ul><li>Mensualidad Marzo: <strong>150,00 VES</strong></li></ul>", total_adeudado: "150,00 VES", telefono_colegio: "0412-0000000", email_colegio: "contacto@demo.edu.ve" },
         };
 
-        const dummy = dummyMap[email_type] ?? {};
+        const dummy = { ...(dummyMap[email_type] ?? {}), primary_color: ct.primary_color };
         customHtml = wrapWithEmailLayout(
           resolveSnippets(ct.body_html, dummy),
           ct.primary_color,

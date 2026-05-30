@@ -48,7 +48,8 @@ export function buildEmailPreviewHtml(
   schoolLogoUrl: string | null
 ): string {
   const dummy = DUMMY_DATA[templateType] ?? {};
-  const resolvedBody = resolveSnippets(bodyHtml, dummy);
+  // primary_color is available as a snippet so buttons in body_html pick it up
+  const resolvedBody = resolveSnippets(bodyHtml, { ...dummy, primary_color: primaryColor });
 
   const logoBlock = schoolLogoUrl
     ? `<img src="${schoolLogoUrl}" alt="${schoolName}" style="max-height:80px;max-width:200px;margin-bottom:12px;" />`

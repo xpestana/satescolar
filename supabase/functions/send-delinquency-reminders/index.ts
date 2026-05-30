@@ -175,6 +175,7 @@ export default async function handler(req: Request): Promise<Response> {
             total_adeudado: `${debt.total.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`,
             telefono_colegio: schoolInfo?.phone || "",
             email_colegio: schoolInfo?.email || "",
+            primary_color: customTemplate.primary_color,
           };
           htmlBody = wrapWithEmailLayout(
             resolveSnippets(customTemplate.body_html, snippetData),

@@ -215,6 +215,7 @@ export default async function handler(req: Request): Promise<Response> {
         email_usuario: targetEmail,
         contrasena: newPassword,
         url_plataforma: loginUrl,
+        primary_color: customTemplate.primary_color,
       };
       const resolvedBody = resolveSnippets(customTemplate.body_html, snippetData);
       const resolvedSubject = resolveSnippets(customTemplate.subject, snippetData);

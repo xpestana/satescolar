@@ -29,7 +29,6 @@ import { RichTextEditor, RichTextEditorHandle } from "@/components/utilities/Ric
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
-import { getContrastTextColor } from "@/lib/color-utils";
 import { buildEmailPreviewHtml } from "@/lib/email-preview";
 import { toast } from "sonner";
 import {
@@ -96,14 +95,14 @@ const DEFAULT_BODIES: Record<TemplateType, string> = {
 <p>Ha sido registrado como <strong>representante</strong> en <strong>{{nombre_colegio}}</strong> a través de la plataforma <strong>SAT Escolar</strong>.</p>
 <p>Sus credenciales de acceso:</p>
 <p><strong>Usuario:</strong> {{email_usuario}}<br/><strong>Contraseña:</strong> {{contrasena}}</p>
-<p style="text-align:center;"><a href="{{url_plataforma}}" style="display:inline-block;padding:12px 28px;background-color:#1e78c8;color:#ffffff;font-weight:bold;text-decoration:none;border-radius:8px;">Ingresar a la Plataforma</a></p>
+<p style="text-align:center;"><a href="{{url_plataforma}}" style="display:inline-block;padding:12px 28px;background-color:{{primary_color}};color:#ffffff;font-weight:bold;text-decoration:none;border-radius:8px;">Ingresar a la Plataforma</a></p>
 <p style="font-size:13px;color:#9ca3af;text-align:center;">Le recomendamos cambiar su contraseña una vez ingrese al sistema.</p>`,
 
   "welcome-teacher": `<h2>¡Bienvenido/a!</h2>
 <p>Ha sido registrado como <strong>docente</strong> en <strong>{{nombre_colegio}}</strong> a través de la plataforma <strong>SAT Escolar</strong>.</p>
 <p>Sus credenciales de acceso:</p>
 <p><strong>Usuario:</strong> {{email_usuario}}<br/><strong>Contraseña:</strong> {{contrasena}}</p>
-<p style="text-align:center;"><a href="{{url_plataforma}}" style="display:inline-block;padding:12px 28px;background-color:#1e78c8;color:#ffffff;font-weight:bold;text-decoration:none;border-radius:8px;">Ingresar a la Plataforma</a></p>
+<p style="text-align:center;"><a href="{{url_plataforma}}" style="display:inline-block;padding:12px 28px;background-color:{{primary_color}};color:#ffffff;font-weight:bold;text-decoration:none;border-radius:8px;">Ingresar a la Plataforma</a></p>
 <p style="font-size:13px;color:#9ca3af;text-align:center;">Le recomendamos cambiar su contraseña una vez ingrese al sistema.</p>`,
 
   delinquency: `<h2>Recordatorio de Pago Pendiente</h2>
@@ -140,13 +139,12 @@ export default function EmailTemplateEditor() {
   const [subject, setSubject] = useState(DEFAULT_SUBJECTS[templateType] ?? "");
   const [bodyHtml, setBodyHtml] = useState(DEFAULT_BODIES[templateType] ?? "");
   const [primaryColor, setPrimaryColor] = useState("#1e78c8");
+  const [textColor, setTextColor] = useState("#ffffff");
   const [testEmail, setTestEmail] = useState("");
   const [testDialogOpen, setTestDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [loadedId, setLoadedId] = useState<string | null>(null);
-
-  const textColor = getContrastTextColor(primaryColor);
 
   const { data: existingTemplate } = useQuery({
     queryKey: ["email-template", schoolId, templateType],
@@ -168,6 +166,7 @@ export default function EmailTemplateEditor() {
     setSubject(existingTemplate.subject);
     setBodyHtml(existingTemplate.body_html);
     setPrimaryColor(existingTemplate.primary_color);
+    setTextColor(existingTemplate.text_color ?? "#ffffff");
   }
 
   const saveMutation = useMutation({
@@ -302,34 +301,74 @@ export default function EmailTemplateEditor() {
             </CardContent>
           </Card>
 
-          {/* Color */}
+          {/* Colores */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Color del encabezado</CardTitle>
+              <CardTitle className="text-sm">Colores del correo</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="h-10 w-10 rounded cursor-pointer border border-input"
-                />
-                <Input
-                  value={primaryColor}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setPrimaryColor(v);
-                  }}
-                  className="w-32 font-mono text-sm"
-                  maxLength={7}
-                />
-                <Badge
-                  style={{ backgroundColor: primaryColor, color: textColor }}
-                  className="text-xs"
-                >
-                  {textColor === "#ffffff" ? "Texto blanco" : "Texto negro"}
-                </Badge>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Color principal (encabezado y botones)</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="h-10 w-10 rounded cursor-pointer border border-input"
+                  />
+                  <Input
+                    value={primaryColor}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setPrimaryColor(v);
+                    }}
+                    className="w-32 font-mono text-sm"
+                    maxLength={7}
+                  />
+                  <div
+                    className="h-8 w-24 rounded border text-xs font-medium flex items-center justify-center"
+                    style={{ backgroundColor: primaryColor, color: textColor }}
+                  >
+                    Vista previa
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Color del texto del encabezado</Label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={textColor}
+                    onChange={(e) => setTextColor(e.target.value)}
+                    className="h-10 w-10 rounded cursor-pointer border border-input"
+                  />
+                  <Input
+                    value={textColor}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) setTextColor(v);
+                    }}
+                    className="w-32 font-mono text-sm"
+                    maxLength={7}
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTextColor("#ffffff")}
+                      className="h-8 px-3 rounded border text-xs font-medium bg-white text-black border-gray-300 hover:border-gray-400"
+                    >
+                      Blanco
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTextColor("#000000")}
+                      className="h-8 px-3 rounded border text-xs font-medium bg-black text-white hover:opacity-80"
+                    >
+                      Negro
+                    </button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
