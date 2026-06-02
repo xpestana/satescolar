@@ -146,7 +146,42 @@ function normalizeGrade(raw: unknown): string {
   return found ?? String(raw ?? "").trim();
 }
 
-function extractChild(obj: Record<string, unknown>): UIChild {
+// Bachillerato format: flat keys (cedula, nombre, apellido, grado, sexo...)
+function extractChildBachillerato(obj: Record<string, unknown>, repCedula = ""): UIChild {
+  const rawNombre = String(obj.nombre ?? "").trim();
+  const rawCedula = String(obj.cedula ?? "").trim();
+
+  const isNoNombre = /^no\s+(tengo|tiene)$/i.test(rawNombre);
+  const isNoCedula = /^no\s+(tengo|tiene)$/i.test(rawCedula);
+
+  const cedulaForDoc = isNoCedula ? repCedula : rawCedula;
+  const doc = normalizeDoc(cedulaForDoc);
+
+  const [pn, sn] = isNoNombre ? ["", ""] : splitTwo(rawNombre);
+  const [pa, sa] = splitTwo(obj.apellido);
+
+  const rawFecha = obj.fecha_nacimiento;
+  const fecha = rawFecha ? String(rawFecha).trim() : "";
+
+  return {
+    document_id: doc.document_id,
+    tipo_documento: doc.tipo_documento,
+    documento: doc.documento,
+    primer_nombre: pn,
+    segundo_nombre: sn,
+    primer_apellido: pa,
+    segundo_apellido: sa,
+    genero: mapGenero(obj.sexo),
+    fecha_nacimiento: fecha || FECHA_PLACEHOLDER,
+    nivel_grado: normalizeGrade(obj.grado),
+    calificacion: "",
+    entidad_federal: String(obj.entidad_federal ?? ""),
+    _origFecha: fecha,
+  };
+}
+
+// Primary format: numbered keys (cedula_hijo_1, nombre_hijo_1...)
+function extractChildPrimaria(obj: Record<string, unknown>): UIChild {
   const key = Object.keys(obj).find((k) => /^nombre_hijo_\d+$/.test(k));
   const n = key ? key.match(/(\d+)$/)![1] : "1";
   const get = (base: string) => obj[`${base}_hijo_${n}`];
@@ -174,6 +209,11 @@ function extractChild(obj: Record<string, unknown>): UIChild {
   };
 }
 
+function extractChild(obj: Record<string, unknown>, repCedula = ""): UIChild {
+  const isPrimaria = Object.keys(obj).some((k) => /^nombre_hijo_\d+$/.test(k));
+  return isPrimaria ? extractChildPrimaria(obj) : extractChildBachillerato(obj, repCedula);
+}
+
 function parseJson(raw: any): { reps: UIRep[]; docs: UITeacher[] } {
   const repsRaw: any[] = Array.isArray(raw?.representantes) ? raw.representantes : [];
   const docsRaw: any[] = Array.isArray(raw?.docentes) ? raw.docentes : [];
@@ -184,7 +224,8 @@ function parseJson(raw: any): { reps: UIRep[]; docs: UITeacher[] } {
     const email = fixEmail(r?.email);
     const [pn, sn] = splitTwo(r?.nombre);
     const [pa, sa] = splitTwo(r?.apellido);
-    const children = Array.isArray(r?.hijos) ? r.hijos.map((h: any) => extractChild(h)) : [];
+    const repCedula = normalizeCedula(r?.cedula);
+    const children = Array.isArray(r?.hijos) ? r.hijos.map((h: any) => extractChild(h, repCedula)) : [];
     const keyEmail = email.toLowerCase() || `__sin_email_${byEmail.size}`;
 
     const existing = byEmail.get(keyEmail);
@@ -364,6 +405,9 @@ export default function ImportData() {
   const unknownGrades = reps.flatMap((r) =>
     r.hijos.filter((c) => !GRADE_OPTIONS.includes(c.nivel_grado)).map((c) => c.nivel_grado),
   );
+  const missingNames = reps.flatMap((r) =>
+    r.hijos.filter((c) => !c.primer_nombre).map((c) => `hijo de ${r.primer_nombre} ${r.primer_apellido}`),
+  );
   const invalidEmails = [
     ...reps.filter((r) => !EMAIL_RE.test(r.email)).map((r) => r.email || "(vacío)"),
     ...docs.filter((d) => !EMAIL_RE.test(d.email)).map((d) => d.email || "(vacío)"),
@@ -422,7 +466,7 @@ export default function ImportData() {
       {parsed && (
         <>
           {/* Warnings */}
-          {(emailFixes.length > 0 || missingCedula.length > 0 || placeholderFechas.length > 0 || unknownGrades.length > 0 || invalidEmails.length > 0) && (
+          {(emailFixes.length > 0 || missingCedula.length > 0 || placeholderFechas.length > 0 || unknownGrades.length > 0 || invalidEmails.length > 0 || missingNames.length > 0) && (
             <Alert className="mb-6 border-orange-300 bg-orange-50 text-orange-900">
               <AlertTriangle className="h-4 w-4 text-orange-600" />
               <AlertTitle>Revisa estos datos antes de importar</AlertTitle>
@@ -441,6 +485,9 @@ export default function ImportData() {
                 )}
                 {unknownGrades.length > 0 && (
                   <div>🎓 <b>Grados no reconocidos</b> (sin inscripción): {[...new Set(unknownGrades)].join(", ")}</div>
+                )}
+                {missingNames.length > 0 && (
+                  <div>✏️ <b>Hijos sin nombre</b> (completa antes de importar): {missingNames.join(", ")}</div>
                 )}
               </AlertDescription>
             </Alert>
