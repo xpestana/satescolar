@@ -75,6 +75,13 @@ const FECHA_PLACEHOLDER = "2000-01-01";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ── Normalization helpers ──
+function removeAccents(s: string): string {
+  return s
+    .replace(/[áàäâ]/gi, "a").replace(/[éèëê]/gi, "e")
+    .replace(/[íìïî]/gi, "i").replace(/[óòöô]/gi, "o")
+    .replace(/[úùüû]/gi, "u").replace(/[ñ]/gi, "n");
+}
+
 function fixEmail(raw: unknown): string {
   let v = String(raw ?? "").trim();
   v = v.replace(/@gmail\.(vom|con|cm|comm|co|comb|cob|om|coom)$/i, "@gmail.com");
@@ -214,7 +221,57 @@ function extractChild(obj: Record<string, unknown>, repCedula = ""): UIChild {
   return isPrimaria ? extractChildPrimaria(obj) : extractChildBachillerato(obj, repCedula);
 }
 
-function parseJson(raw: any): { reps: UIRep[]; docs: UITeacher[] } {
+// Bachillerato docentes: no email, areas_formacion array, duplicates by cedula
+function parseBachilleratoDocentes(raw: any[]): { docs: UITeacher[]; subjects: string[] } {
+  const byCedula = new Map<string, { t: UITeacher; areas: Set<string> }>();
+  const allSubjects = new Set<string>();
+
+  for (const d of raw) {
+    const cedula = normalizeCedula(d?.cedula);
+    const rawAp = String(d?.apellidos ?? "").trim();
+    const rawNom = String(d?.nombres ?? "").trim();
+
+    // Some entries have full name packed into apellidos when nombres is empty
+    let pa: string, sa: string, pn: string, sn: string;
+    if (!rawNom) {
+      const tokens = rawAp.split(/\s+/).filter(Boolean);
+      [pa, sa, pn, sn] = [tokens[0] ?? "", tokens[1] ?? "", tokens[2] ?? "", tokens[3] ?? ""];
+    } else {
+      [pa, sa] = splitTwo(rawAp);
+      [pn, sn] = splitTwo(rawNom);
+    }
+
+    // Generate institutional email: primer_apellido.primer_nombre@mlk.edu.ve
+    const slug = (v: string) => removeAccents(v).toLowerCase().replace(/[^a-z]/g, "");
+    const emailBase = [slug(pa), slug(pn)].filter(Boolean).join(".");
+    const email = emailBase ? `${emailBase}@mlk.edu.ve` : "";
+
+    const areas: string[] = Array.isArray(d?.areas_formacion)
+      ? [...new Set(d.areas_formacion.map((a: any) => String(a?.nombre ?? "").trim()).filter(Boolean))]
+      : [];
+
+    areas.forEach((a) => allSubjects.add(a));
+
+    const key = cedula || `__${rawAp}_${rawNom}`;
+    if (byCedula.has(key)) {
+      areas.forEach((a) => byCedula.get(key)!.areas.add(a));
+    } else {
+      byCedula.set(key, {
+        t: { email, cedula, primer_nombre: pn, segundo_nombre: sn, primer_apellido: pa, segundo_apellido: sa, area_asignada: "", create_area: false },
+        areas: new Set(areas),
+      });
+    }
+  }
+
+  const docs: UITeacher[] = [];
+  for (const { t, areas } of byCedula.values()) {
+    t.area_asignada = [...areas].join(", ");
+    docs.push(t);
+  }
+  return { docs, subjects: [...allSubjects].sort() };
+}
+
+function parseJson(raw: any): { reps: UIRep[]; docs: UITeacher[]; subjects: string[] } {
   const repsRaw: any[] = Array.isArray(raw?.representantes) ? raw.representantes : [];
   const docsRaw: any[] = Array.isArray(raw?.docentes) ? raw.docentes : [];
 
@@ -249,23 +306,34 @@ function parseJson(raw: any): { reps: UIRep[]; docs: UITeacher[] } {
     });
   }
 
-  const docs: UITeacher[] = docsRaw.map((d: any) => {
-    const [pn, sn] = splitTwo(d?.nombres);
-    const [pa, sa] = splitTwo(d?.apellidos);
-    const area = String(d?.area_asignada ?? "").trim();
-    return {
-      email: fixEmail(d?.email),
-      cedula: normalizeCedula(d?.cedula),
-      primer_nombre: pn,
-      segundo_nombre: sn,
-      primer_apellido: pa,
-      segundo_apellido: sa,
-      area_asignada: area,
-      create_area: area.toLowerCase() !== "dirección general" && area.toLowerCase() !== "direccion general",
-    };
-  });
+  // Detect bachillerato docente format by presence of areas_formacion array
+  const isBachillerato = docsRaw.length > 0 && Array.isArray(docsRaw[0]?.areas_formacion);
+  let docs: UITeacher[];
+  let subjects: string[] = [];
 
-  return { reps: Array.from(byEmail.values()), docs };
+  if (isBachillerato) {
+    const result = parseBachilleratoDocentes(docsRaw);
+    docs = result.docs;
+    subjects = result.subjects;
+  } else {
+    docs = docsRaw.map((d: any) => {
+      const [pn, sn] = splitTwo(d?.nombres);
+      const [pa, sa] = splitTwo(d?.apellidos);
+      const area = String(d?.area_asignada ?? "").trim();
+      return {
+        email: fixEmail(d?.email),
+        cedula: normalizeCedula(d?.cedula),
+        primer_nombre: pn,
+        segundo_nombre: sn,
+        primer_apellido: pa,
+        segundo_apellido: sa,
+        area_asignada: area,
+        create_area: area.toLowerCase() !== "dirección general" && area.toLowerCase() !== "direccion general",
+      };
+    });
+  }
+
+  return { reps: Array.from(byEmail.values()), docs, subjects };
 }
 
 export default function ImportData() {
@@ -277,6 +345,7 @@ export default function ImportData() {
   const [parsed, setParsed] = useState(false);
   const [importing, setImporting] = useState(false);
   const [report, setReport] = useState<any>(null);
+  const [subjects, setSubjects] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -294,8 +363,8 @@ export default function ImportData() {
 
   const totalHijos = useMemo(() => reps.reduce((acc, r) => acc + r.hijos.length, 0), [reps]);
   const areasUnicas = useMemo(
-    () => new Set(docs.filter((d) => d.create_area).map((d) => d.area_asignada)).size,
-    [docs],
+    () => new Set(docs.filter((d) => d.create_area).map((d) => d.area_asignada)).size + subjects.length,
+    [docs, subjects],
   );
 
   const handleFile = async (file: File | null) => {
@@ -309,9 +378,10 @@ export default function ImportData() {
         toast.error("El JSON no contiene 'representantes' ni 'docentes'");
         return;
       }
-      const { reps: r, docs: d } = parseJson(raw);
+      const { reps: r, docs: d, subjects: s } = parseJson(raw);
       setReps(r);
       setDocs(d);
+      setSubjects(s);
       setParsed(true);
       toast.success(`Archivo analizado: ${r.length} familias, ${d.length} docentes`);
     } catch (e: any) {
@@ -369,6 +439,7 @@ export default function ImportData() {
       area_asignada: d.area_asignada,
       create_area: d.create_area,
     })),
+    subjects_to_create: subjects,
   });
 
   const handleImport = async () => {

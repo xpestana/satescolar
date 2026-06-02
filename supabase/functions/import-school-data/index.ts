@@ -126,6 +126,7 @@ export default async function handler(req: Request): Promise<Response> {
     const yearRangeInput: string = body?.school_year || "2024-2025";
     const representantes: ImportRepresentative[] = Array.isArray(body?.representantes) ? body.representantes : [];
     const docentes: ImportTeacher[] = Array.isArray(body?.docentes) ? body.docentes : [];
+    const subjectsToCreate: string[] = Array.isArray(body?.subjects_to_create) ? body.subjects_to_create : [];
 
     if (!schoolId) {
       return json({ error: "school_id es requerido" }, 400);
@@ -539,6 +540,11 @@ export default async function handler(req: Request): Promise<Response> {
         summary.errores++;
         failed.push(`Docente ${label}: ${(e as Error).message}`);
       }
+    }
+
+    // ── Standalone subjects (bachillerato: created without teacher assignment) ──
+    for (const name of subjectsToCreate) {
+      if (name) await ensureSubject(name);
     }
 
     return json({ success: true, summary, created, skipped, failed }, 200);
