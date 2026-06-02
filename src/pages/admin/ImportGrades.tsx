@@ -23,6 +23,20 @@ interface UIGrade {
   area_name: string;
   literal_numerico: string; // editable string
   literal: string;          // editable letter
+  final_status: string;     // "aprobado" | "no_aprobado" | ""
+}
+
+const STATUS_OPTIONS = [
+  { value: "aprobado", label: "Aprobado" },
+  { value: "no_aprobado", label: "No Aprobado" },
+  { value: "no_cursante", label: "No Cursante" },
+  { value: "pp", label: "PP" },
+];
+
+// > 10 => aprobado, en caso contrario no_aprobado (E = 10 o menos)
+function estadoFor(n: number): string {
+  if (isNaN(n)) return "";
+  return n > 10 ? "aprobado" : "no_aprobado";
 }
 
 const GRADE_OPTIONS = [
@@ -76,6 +90,7 @@ function parseGrades(raw: any): UIGrade[] {
         area_name: area,
         literal_numerico: Number.isNaN(num) ? String(calif) : String(num),
         literal: letterFor(num),
+        final_status: estadoFor(num),
       });
     }
   }
@@ -143,6 +158,7 @@ export default function ImportGrades() {
           area_name: r.area_name,
           literal_numerico: r.literal_numerico === "" ? null : Number(r.literal_numerico),
           literal: r.literal,
+          final_status: r.final_status || null,
         })),
       };
       const { data, error } = await supabase.functions.invoke("import-grades", { body: payload });
@@ -237,6 +253,7 @@ export default function ImportGrades() {
                       <TableHead>Área</TableHead>
                       <TableHead className="w-28">Núm. (Definitiva)</TableHead>
                       <TableHead className="w-20">Letra</TableHead>
+                      <TableHead className="w-36">Estado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -254,7 +271,7 @@ export default function ImportGrades() {
                             value={r.literal_numerico}
                             onChange={(e) => {
                               const v = e.target.value;
-                              updateRow(i, { literal_numerico: v, literal: v === "" ? "" : letterFor(Number(v)) });
+                              updateRow(i, { literal_numerico: v, literal: v === "" ? "" : letterFor(Number(v)), final_status: v === "" ? "" : estadoFor(Number(v)) });
                             }}
                           />
                         </TableCell>
@@ -262,6 +279,14 @@ export default function ImportGrades() {
                           <Input className={`${fieldCls} text-center font-semibold uppercase`} maxLength={1}
                             value={r.literal}
                             onChange={(e) => updateRow(i, { literal: e.target.value.toUpperCase().replace(/[^A-E]/g, "").slice(0, 1) })} />
+                        </TableCell>
+                        <TableCell>
+                          <Select value={r.final_status} onValueChange={(v) => updateRow(i, { final_status: v })}>
+                            <SelectTrigger className={fieldCls}><SelectValue placeholder="—" /></SelectTrigger>
+                            <SelectContent>
+                              {STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                       </TableRow>
                     ))}

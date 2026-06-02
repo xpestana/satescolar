@@ -22,6 +22,7 @@ interface GradeItem {
   area_name: string;
   literal_numerico: number | null;
   literal: string;
+  final_status: string | null;
 }
 
 function json(payload: unknown, status: number): Response {
@@ -174,6 +175,7 @@ export default async function handler(req: Request): Promise<Response> {
               momento: 0,
               literal: item.literal || "",
               literal_numerico: item.literal_numerico,
+              final_status: item.final_status || null,
               updated_at: new Date().toISOString(),
             },
             { onConflict: "student_id,assignment_id,momento" },
