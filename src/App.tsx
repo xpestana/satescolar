@@ -36,6 +36,7 @@ import SendEmail from "./pages/admin/SendEmail";
 import UsersList from "./pages/admin/UsersList";
 import AdminUsersList from "./pages/admin/AdminUsersList";
 import S3TestUpload from "./pages/admin/S3TestUpload";
+import ImportData from "./pages/admin/ImportData";
 import RepresentativeDashboard from "./pages/representative/RepresentativeDashboard";
 import RepresentativesList from "./pages/representative/RepresentativesList";
 import RepStudentsList from "./pages/representative/StudentsList";
@@ -334,6 +335,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <S3TestUpload />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/importar-datos"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <ImportData />
                   </ProtectedRoute>
                 }
               />

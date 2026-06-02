@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.send-test-email]
 verify_jwt = false
+
+[functions.import-school-data]
+verify_jwt = false
