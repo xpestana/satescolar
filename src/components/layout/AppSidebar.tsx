@@ -71,6 +71,7 @@ const navSections: NavSection[] = [
       { label: "Colegios", href: "/admin/colegios", icon: GraduationCap, requiredRole: "admin" },
       { label: "Enviar Email", href: "/admin/enviar-email", icon: Mail, requiredRole: "admin" },
       { label: "Importar Datos", href: "/admin/importar-datos", icon: Upload, requiredRole: "admin" },
+      { label: "Importar Calificaciones", href: "/admin/importar-calificaciones", icon: ClipboardCheck, requiredRole: "admin" },
       { label: "Prueba S3", href: "/admin/prueba-s3", icon: Upload, requiredRole: "admin" },
     ],
   },

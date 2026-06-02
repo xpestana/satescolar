@@ -37,6 +37,7 @@ import UsersList from "./pages/admin/UsersList";
 import AdminUsersList from "./pages/admin/AdminUsersList";
 import S3TestUpload from "./pages/admin/S3TestUpload";
 import ImportData from "./pages/admin/ImportData";
+import ImportGrades from "./pages/admin/ImportGrades";
 import RepresentativeDashboard from "./pages/representative/RepresentativeDashboard";
 import RepresentativesList from "./pages/representative/RepresentativesList";
 import RepStudentsList from "./pages/representative/StudentsList";
@@ -343,6 +344,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <ImportData />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/importar-calificaciones"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <ImportGrades />
                   </ProtectedRoute>
                 }
               />

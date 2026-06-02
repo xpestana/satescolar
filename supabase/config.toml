@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.import-school-data]
 verify_jwt = false
+
+[functions.import-grades]
+verify_jwt = false
