@@ -574,7 +574,7 @@ export async function downloadAllBachilleratoBoletas(params: {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Definitiva Final: promedio de los 3 momentos por materia
+// Definitiva Final: lee directamente momento=0 guardado en BD
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function downloadBachilleratoBoletaDefinitiva(
@@ -652,52 +652,42 @@ export async function downloadBachilleratoBoletaDefinitiva(
   const assignmentIds = validAssignments.map((a: any) => a.id);
 
   if (style === "boletin_completo") {
-    // For boletin_completo, reuse existing logic (already shows definitiva_final)
     return downloadBachilleratoBoleta({ ...params, momento: 1 });
   }
 
-  // SIMPLE — promedio de los 3 momentos
+  // SIMPLE — leer directamente momento=0 (definitiva guardada en BD)
   const [myGradesRes, allGradesRes] = await Promise.all([
     assignmentIds.length > 0
       ? supabase.from("final_grades")
-          .select("assignment_id, momento, grade_value, adjustment_points")
+          .select("assignment_id, grade_value, adjustment_points")
           .eq("student_id", studentId).eq("school_id", schoolId)
-          .in("momento", [1, 2, 3]).in("assignment_id", assignmentIds)
+          .eq("momento", 0).in("assignment_id", assignmentIds)
       : Promise.resolve({ data: [] }),
     assignmentIds.length > 0
       ? supabase.from("final_grades")
-          .select("student_id, momento, assignment_id, grade_value, adjustment_points")
+          .select("student_id, assignment_id, grade_value, adjustment_points")
           .eq("school_id", schoolId)
-          .in("momento", [1, 2, 3]).in("assignment_id", assignmentIds)
+          .eq("momento", 0).in("assignment_id", assignmentIds)
       : Promise.resolve({ data: [] }),
   ]);
 
   const myGrades = myGradesRes.data || [];
   const allGrades = allGradesRes.data || [];
 
-  // Per-subject average across all 3 momentos
-  const subjectSums: Record<string, { sum: number; count: number }> = {};
+  const myMap: Record<string, string> = {};
+  let mySum = 0, myCount = 0;
   myGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
     if (!isNaN(v)) {
-      if (!subjectSums[g.assignment_id]) subjectSums[g.assignment_id] = { sum: 0, count: 0 };
-      subjectSums[g.assignment_id].sum += v;
-      subjectSums[g.assignment_id].count++;
+      myMap[g.assignment_id] = Number.isInteger(v) ? String(v) : v.toFixed(2);
+      mySum += v; myCount++;
     }
   });
-
-  const myMap: Record<string, string> = {};
-  let overallSum = 0, overallCount = 0;
-  for (const [aid, { sum, count }] of Object.entries(subjectSums)) {
-    const avg = sum / count;
-    myMap[aid] = Number.isInteger(avg) ? String(avg) : avg.toFixed(2);
-    overallSum += avg; overallCount++;
-  }
-  const definitiva = overallCount > 0
-    ? (() => { const a = overallSum / overallCount; return Number.isInteger(a) ? String(a) : a.toFixed(2); })()
+  const definitiva = myCount > 0
+    ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? String(a) : a.toFixed(2); })()
     : "—";
 
-  // Section ranking based on all-momentos average
+  // Ranking basado en definitiva guardada (momento=0)
   const perStudent: Record<string, { sum: number; count: number }> = {};
   allGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
@@ -821,17 +811,17 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
     });
   }
 
-  // SIMPLE — promedio de los 3 momentos para todos los estudiantes
+  // SIMPLE — leer directamente momento=0 (definitiva guardada en BD)
   const gradesRes = assignmentIds.length > 0
     ? await supabase.from("final_grades")
-        .select("student_id, assignment_id, momento, grade_value, adjustment_points")
+        .select("student_id, assignment_id, grade_value, adjustment_points")
         .eq("school_id", schoolId)
-        .in("momento", [1, 2, 3])
+        .eq("momento", 0)
         .in("assignment_id", assignmentIds)
     : { data: [] };
   const allGrades: any[] = gradesRes.data || [];
 
-  // Section ranking based on all-momentos average
+  // Ranking basado en definitiva guardada (momento=0)
   const perStudent: Record<string, { sum: number; count: number }> = {};
   allGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
@@ -848,24 +838,17 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
   const bodies: string[] = [];
   for (const student of students) {
     const myGrades = allGrades.filter((g: any) => g.student_id === student.studentId);
-    const subjectSums: Record<string, { sum: number; count: number }> = {};
+    const myMap: Record<string, string> = {};
+    let mySum = 0, myCount = 0;
     myGrades.forEach((g: any) => {
       const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
       if (!isNaN(v)) {
-        if (!subjectSums[g.assignment_id]) subjectSums[g.assignment_id] = { sum: 0, count: 0 };
-        subjectSums[g.assignment_id].sum += v;
-        subjectSums[g.assignment_id].count++;
+        myMap[g.assignment_id] = Number.isInteger(v) ? String(v) : v.toFixed(2);
+        mySum += v; myCount++;
       }
     });
-    const myMap: Record<string, string> = {};
-    let overallSum = 0, overallCount = 0;
-    for (const [aid, { sum, count }] of Object.entries(subjectSums)) {
-      const avg = sum / count;
-      myMap[aid] = Number.isInteger(avg) ? String(avg) : avg.toFixed(2);
-      overallSum += avg; overallCount++;
-    }
-    const definitiva = overallCount > 0
-      ? (() => { const a = overallSum / overallCount; return Number.isInteger(a) ? String(a) : a.toFixed(2); })()
+    const definitiva = myCount > 0
+      ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? String(a) : a.toFixed(2); })()
       : "—";
     const positionIdx = ranked.findIndex((r) => r.sid === student.studentId);
     const position = positionIdx >= 0 ? positionIdx + 1 : 0;
