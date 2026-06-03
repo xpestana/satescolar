@@ -49,9 +49,15 @@ export interface BachilleratoConfig {
     signatures:        BoletinSignature[];
     // Layout controls
     margin_top:    number; // mm — top padding (print + screen)
-    margin_bottom: number; // mm — bottom padding = distance from signatures to bottom edge
+    margin_bottom: number; // mm — bottom page padding
     margin_sides:  number; // mm — left/right padding
     title_size:    number; // pt — "BOLETIN DE CALIFICACIONES" font size
+    // Signature block spacing
+    sig_gap_above:    number; // mm — space between grades table and signatures
+    sig_gap_below:    number; // mm — extra space below signature block
+    sig_image_height: number; // px — signature image height
+    sig_sello_height: number; // px — stamp image height
+    sig_pin_bottom:   boolean; // true = anchor signatures to page bottom
   };
   primaria?: {
     show_footer_logo:     boolean;
@@ -240,8 +246,30 @@ export const DEFAULT_BACHILLERATO_CONFIG: BachilleratoConfig = {
     margin_bottom: 6,
     margin_sides:  12,
     title_size:    14,
+    sig_gap_above:    4,
+    sig_gap_below:    0,
+    sig_image_height: 40,
+    sig_sello_height: 28,
+    sig_pin_bottom:   false,
   },
 };
+
+/** Example signers shown in /formatos preview when none are configured yet */
+export const SAMPLE_PREVIEW_SIGNATURES: BoletinSignature[] = [
+  { nombre: "Firma 1", cedula: "V-123456789", cargo: "Directora",    firma_url: "", sello_url: "" },
+  { nombre: "Firma 2", cedula: "V-123456789", cargo: "Coordinadora", firma_url: "", sello_url: "" },
+];
+
+/** Merges preview-only sample signatures without mutating saved template state */
+export function cfgForBoletinPreview(cfg: BachilleratoConfig): BachilleratoConfig {
+  if (cfg.style !== "boletin_completo" || !cfg.sections.signatures) return cfg;
+  const sigs = cfg.boletin?.signatures ?? [];
+  if (sigs.length > 0) return cfg;
+  return {
+    ...cfg,
+    boletin: { ...DEFAULT_BACHILLERATO_CONFIG.boletin!, ...cfg.boletin, signatures: SAMPLE_PREVIEW_SIGNATURES },
+  };
+}
 
 // Sample data used while editing (preview)
 export const SAMPLE_RENDER_DATA: BoletaRenderData = {
@@ -503,8 +531,50 @@ function fmtGrade(v: string | null | undefined): string {
   return v && v !== "0" && v !== "" ? v : "—";
 }
 
+function buildBoletinSignaturesHtml(
+  cfg: BachilleratoConfig,
+  signatures: BoletinSignature[],
+): string {
+  const sigGapAbove    = cfg.boletin?.sig_gap_above    ?? 4;
+  const sigGapBelow    = cfg.boletin?.sig_gap_below    ?? 0;
+  const sigImgH        = cfg.boletin?.sig_image_height ?? 40;
+  const sigSelloH      = cfg.boletin?.sig_sello_height ?? 28;
+  const cols = signatures.map((sig) => {
+    const firmaImg = sig.firma_url
+      ? `<img src="${esc(sig.firma_url)}" alt="Firma" style="height:${sigImgH}px;object-fit:contain;display:block;margin:0 auto 2px">`
+      : `<div style="height:${sigImgH}px"></div>`;
+    const selloImg = sig.sello_url
+      ? `<img src="${esc(sig.sello_url)}" alt="Sello" style="height:${sigSelloH}px;object-fit:contain;display:inline-block;vertical-align:middle;margin-left:6px">`
+      : "";
+    return `<div style="text-align:center;flex:1">
+      ${firmaImg}
+      <div style="border-top:1px solid #000;width:80%;margin:0 auto;padding-top:4px">
+        ${selloImg}
+        <div style="font-size:9pt;font-weight:600">${esc(sig.nombre)}</div>
+        ${sig.cedula ? `<div style="font-size:8.5pt">${esc(sig.cedula)}</div>` : ""}
+        ${sig.cargo  ? `<div style="font-size:8.5pt">${esc(sig.cargo)}</div>`  : ""}
+      </div>
+    </div>`;
+  });
+  return `<div class="sig-block" style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:${sigGapAbove}mm;margin-bottom:${sigGapBelow}mm">${cols.join("")}</div>`;
+}
+
+function boletinLayoutCss(
+  paperHeightMm: number,
+  mTop: number,
+  mBottom: number,
+  mSides: number,
+  pinBottom: boolean,
+): string {
+  const base = `.boletin{display:flex;flex-direction:column;padding:${mTop}mm ${mSides}mm ${mBottom}mm ${mSides}mm;width:100%;box-sizing:border-box}`;
+  if (pinBottom) {
+    return `${base};min-height:${paperHeightMm}mm}.sig-block{margin-top:auto}`;
+  }
+  return base;
+}
+
 function momentoCell(mg: BoletinMomentoGrade | null): string {
-  const td = `text-align:center;padding:2px 2px;border:1px solid #ccc;font-size:7.5pt`;
+  const td = `text-align:center;padding:4px 2px;border:1px solid #ccc;font-size:7.5pt;line-height:1.3`;
   if (!mg) return `<td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td>`;
   return [
     `<td style="${td}">${esc(fmtGrade(mg.nota))}</td>`,
@@ -529,6 +599,8 @@ export function generateBoletinCompletoHtml(
   const mBottom = cfg.boletin?.margin_bottom ?? 6;
   const mSides  = cfg.boletin?.margin_sides  ?? 12;
   const titlePt = cfg.boletin?.title_size    ?? 14;
+  const pinBottom = cfg.boletin?.sig_pin_bottom ?? false;
+  const boletinClass = pinBottom ? "boletin boletin--pin" : "boletin";
 
   // ── Header ─────────────────────────────────────────────────────────────────
   const logoHtml = hc.show_logo && data.school_logo
@@ -579,16 +651,16 @@ export function generateBoletinCompletoHtml(
   </div>`;
 
   // ── Grades table + promedios sidebar ──────────────────────────────────────
-  const thStyle = `background:${hdrBg};color:${hdrTxt};padding:2px 2px;border:1px solid #999;font-size:7pt;text-align:center;font-weight:600`;
+  const thStyle = `background:${hdrBg};color:${hdrTxt};padding:4px 2px;border:1px solid #999;font-size:7pt;text-align:center;font-weight:600;line-height:1.3`;
   const subjectRows = data.subjects.map((s, i) => {
     const bg = cfg.table.alt_row && i % 2 !== 0 ? (cfg.table.alt_row_color || "#f9fafb") : "#ffffff";
     return `<tr style="background:${bg}">
-      <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7.5pt">${s.number}</td>
-      <td style="padding:2px 3px;border:1px solid #ccc;font-size:7.5pt;text-transform:uppercase;word-break:break-word">${esc(s.name)}</td>
+      <td style="padding:4px 2px;border:1px solid #ccc;text-align:center;font-size:7.5pt;line-height:1.3">${s.number}</td>
+      <td style="padding:4px 3px;border:1px solid #ccc;font-size:7.5pt;line-height:1.3;text-transform:uppercase;word-break:break-word">${esc(s.name)}</td>
       ${momentoCell(s.m1)}
       ${momentoCell(s.m2)}
       ${momentoCell(s.m3)}
-      <td style="text-align:center;padding:2px 2px;border:1px solid #ccc;font-weight:700;font-size:7.5pt">${esc(fmtGrade(s.definitiva_final))}</td>
+      <td style="text-align:center;padding:4px 2px;border:1px solid #ccc;font-weight:700;font-size:7.5pt;line-height:1.3">${esc(fmtGrade(s.definitiva_final))}</td>
     </tr>`;
   }).join("\n");
 
@@ -620,64 +692,47 @@ export function generateBoletinCompletoHtml(
     <tbody>${subjectRows}</tbody>
   </table>`;
 
-  const boxStyle = (label: string, value: string) => `
-    <div style="border:1px solid #000;padding:3px 6px;margin-top:4px;text-align:center">
-      <div style="font-size:8pt">${label}</div>
-      <div style="font-size:11pt;font-weight:700">${esc(value)}</div>
-    </div>`;
-
   const hasM1 = data.avg_m1 && data.avg_m1 !== "0" && data.avg_m1 !== "—";
   const hasM2 = data.avg_m2 && data.avg_m2 !== "0" && data.avg_m2 !== "—";
   const hasM3 = data.avg_m3 && data.avg_m3 !== "0" && data.avg_m3 !== "—";
 
-  const promediosHtml = `
-  <div style="font-size:9pt;padding-left:8px;min-width:30mm;max-width:30mm;flex-shrink:0">
-    <div style="font-weight:700;margin-bottom:4px;font-size:9pt">Promedios</div>
-    <table style="width:100%;font-size:8.5pt;border-collapse:collapse;white-space:nowrap">
-      <tr><td style="padding-right:4px">I Momento:</td><td style="text-align:right;font-weight:600">${hasM1 ? esc(data.avg_m1) : "—"}</td></tr>
-      <tr><td style="padding-right:4px">II Momento:</td><td style="text-align:right;font-weight:600">${hasM2 ? esc(data.avg_m2) : "—"}</td></tr>
-      <tr><td style="padding-right:4px">III Momento:</td><td style="text-align:right;font-weight:600">${hasM3 ? esc(data.avg_m3) : "—"}</td></tr>
+  const promediosCellContent = `
+    <div style="font-weight:700;margin-bottom:4px;font-size:8.5pt;white-space:nowrap">Promedios</div>
+    <table style="width:100%;font-size:8pt;border-collapse:collapse">
+      <tr><td style="padding:1px 3px 1px 0;white-space:nowrap">I Momento:</td><td style="text-align:right;font-weight:600;padding-left:2px">${hasM1 ? esc(data.avg_m1) : "—"}</td></tr>
+      <tr><td style="padding:1px 3px 1px 0;white-space:nowrap">II Momento:</td><td style="text-align:right;font-weight:600;padding-left:2px">${hasM2 ? esc(data.avg_m2) : "—"}</td></tr>
+      <tr><td style="padding:1px 3px 1px 0;white-space:nowrap">III Momento:</td><td style="text-align:right;font-weight:600;padding-left:2px">${hasM3 ? esc(data.avg_m3) : "—"}</td></tr>
     </table>
-    ${boxStyle("Prom. del Estudiante", data.avg_student || "—")}
-    ${boxStyle("Prom. de la Sección", data.avg_section || "—")}
-  </div>`;
+    <div style="border:1px solid #000;padding:3px 4px;margin-top:5px;text-align:center">
+      <div style="font-size:7.5pt;line-height:1.2">Prom. del Estudiante</div>
+      <div style="font-size:11pt;font-weight:700;line-height:1.2">${esc(data.avg_student || "—")}</div>
+    </div>
+    <div style="border:1px solid #000;padding:3px 4px;margin-top:3px;text-align:center">
+      <div style="font-size:7.5pt;line-height:1.2">Prom. de la Sección</div>
+      <div style="font-size:11pt;font-weight:700;line-height:1.2">${esc(data.avg_section || "—")}</div>
+    </div>`;
 
   const mainHtml = `
-  <div style="display:flex;align-items:flex-start;margin-bottom:12px">
-    <div style="flex:1;min-width:0">${tableHtml}</div>
-    ${promediosHtml}
-  </div>`;
+  <table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+    <tr>
+      <td style="vertical-align:top;padding:0">${tableHtml}</td>
+      <td style="vertical-align:top;padding-left:8px;width:75px">${promediosCellContent}</td>
+    </tr>
+  </table>`;
 
   // ── Signatures (from template config) ────────────────────────────────────
   const cfgSigs = cfg.boletin?.signatures ?? [];
-  const sigHtml = cfg.sections.signatures && cfgSigs.length > 0 ? (() => {
-    const cols = cfgSigs.map((sig) => {
-      const firmaImg = sig.firma_url
-        ? `<img src="${esc(sig.firma_url)}" alt="Firma" style="height:52px;object-fit:contain;display:block;margin:0 auto 2px">`
-        : `<div style="height:52px"></div>`;
-      const selloImg = sig.sello_url
-        ? `<img src="${esc(sig.sello_url)}" alt="Sello" style="height:36px;object-fit:contain;display:inline-block;vertical-align:middle;margin-left:6px">`
-        : "";
-      return `<div style="text-align:center;flex:1">
-        ${firmaImg}
-        <div style="border-top:1px solid #000;width:80%;margin:0 auto;padding-top:6px">
-          ${selloImg}
-          <div style="font-size:9pt;font-weight:600">${esc(sig.nombre)}</div>
-          ${sig.cedula ? `<div style="font-size:8.5pt">${esc(sig.cedula)}</div>` : ""}
-          ${sig.cargo  ? `<div style="font-size:8.5pt">${esc(sig.cargo)}</div>`  : ""}
-        </div>
-      </div>`;
-    });
-    return `<div class="sig-block" style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:15px">${cols.join("")}</div>`;
-  })() : "";
+  const sigHtml = cfg.sections.signatures && cfgSigs.length > 0
+    ? buildBoletinSignaturesHtml(cfg, cfgSigs)
+    : "";
 
   // ── Full HTML ──────────────────────────────────────────────────────────────
-  const boletinDiv = `<div class="boletin">
-  ${headerHtml}
-  <hr style="border:none;border-top:2px solid ${accentColor};margin-bottom:6px">
+  const boletinDiv = `<div class="${boletinClass}">
+  ${cfg.sections.header ? headerHtml : ""}
+  ${cfg.sections.header ? `<hr style="border:none;border-top:2px solid ${accentColor};margin-bottom:6px">` : ""}
   ${titleHtml}
   ${studentHtml}
-  ${mainHtml}
+  ${cfg.sections.grades_table ? mainHtml : ""}
   ${sigHtml}
 </div>`;
 
@@ -690,18 +745,14 @@ export function generateBoletinCompletoHtml(
   <title>Boletín — ${esc(data.student_name)}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
+    html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white;overflow:visible}
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
-    @media print{
-      #controls{display:none!important}
-      .boletin{display:flex;flex-direction:column;min-height:${paperHeightMm}mm;padding:${mTop}mm ${mSides}mm ${mBottom}mm ${mSides}mm}
-      .sig-block{margin-top:auto}
-    }
+    @media print{#controls{display:none!important}}
     #controls{padding:10px 20px;background:white;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:10}
     #controls button{padding:7px 18px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500}
     #btn-print{background:#2563eb;color:white}
     #btn-close{background:#e2e8f0;color:#374151}
-    .boletin{padding:${mTop}mm ${mSides}mm ${mBottom}mm ${mSides}mm;width:100%}
+    ${boletinLayoutCss(paperHeightMm, mTop, mBottom, mSides, pinBottom)}
   </style>
 </head>
 <body>
@@ -964,12 +1015,13 @@ export function wrapAllBoletasHtml(
   paperWidthMm: number,
   paperHeightMm: number,
   boletaStyle: "simple" | "boletin_completo",
-  boletinMargins?: { top: number; bottom: number; sides: number },
+  boletinMargins?: { top: number; bottom: number; sides: number; sig_pin_bottom?: boolean },
 ): string {
   const pageMargin = boletaStyle === "boletin_completo" ? "0" : "12mm 15mm";
   const mt = boletinMargins?.top    ?? 4;
   const mb = boletinMargins?.bottom ?? 6;
   const ms = boletinMargins?.sides  ?? 12;
+  const pinBottom = boletinMargins?.sig_pin_bottom ?? false;
   const wrapped = bodies.map((b, i) =>
     `<div class="boleta-page${i === bodies.length - 1 ? " last" : ""}">${b}</div>`
   ).join("\n");
@@ -980,12 +1032,10 @@ export function wrapAllBoletasHtml(
   <title>Boletas — Sección completa</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
+    html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white;overflow:visible}
     @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:${pageMargin}}
     @media print{
       #controls{display:none!important}
-      .boletin{display:flex;flex-direction:column;min-height:${paperHeightMm}mm;padding:${mt}mm ${ms}mm ${mb}mm ${ms}mm}
-      .sig-block{margin-top:auto}
       .boleta-page{page-break-after:always}
       .boleta-page.last{page-break-after:avoid}
     }
@@ -999,7 +1049,7 @@ export function wrapAllBoletasHtml(
     #btn-print{background:#2563eb;color:white}
     #btn-close{background:#e2e8f0;color:#374151}
     .boleta{padding:14mm 15mm}
-    .boletin{padding:${mt}mm ${ms}mm ${mb}mm ${ms}mm;width:100%}
+    ${boletinLayoutCss(paperHeightMm, mt, mb, ms, pinBottom)}
     .boleta-page{page-break-after:always}
     .boleta-page.last{page-break-after:avoid}
   </style>

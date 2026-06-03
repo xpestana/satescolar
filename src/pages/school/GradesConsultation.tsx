@@ -1001,7 +1001,7 @@ export default function GradesConsultation() {
 
       {/* Boleta PDF preview modal */}
       <Dialog open={!!boletaModal} onOpenChange={(open) => { if (!open) closeBoletaModal(); }}>
-        <DialogContent className="max-w-5xl w-[95vw] h-[92vh] flex flex-col p-0 gap-0">
+        <DialogContent className="max-w-5xl w-[95vw] h-[92vh] flex flex-col p-0 gap-0 [&>button]:hidden">
           <DialogHeader className="flex flex-row items-center justify-between px-4 py-3 border-b shrink-0 space-y-0">
             <DialogTitle className="text-sm font-semibold truncate pr-4">
               {boletaModal?.title ?? "Boleta"}

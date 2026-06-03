@@ -22,9 +22,10 @@ export async function htmlToPdfBlob(
     paperH = parseFloat(match[2]);
   }
 
-  // Mount a hidden iframe and write the HTML into it
+  // Mount a hidden iframe — do NOT fix height to paperH or content gets clipped vs preview
   const iframe = document.createElement("iframe");
-  iframe.style.cssText = `position:fixed;left:-99999px;top:0;width:${paperW}mm;height:${paperH}mm;border:none;visibility:hidden;`;
+  iframe.style.cssText =
+    `position:fixed;left:-99999px;top:0;width:${paperW}mm;border:none;visibility:hidden;overflow:visible;`;
   document.body.appendChild(iframe);
 
   try {
@@ -52,28 +53,10 @@ export async function htmlToPdfBlob(
             }),
       ),
     );
-    // Give layout one more tick
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 100));
 
-    // Hide any in-document #controls bar before capture
     const controls = doc.getElementById("controls");
     if (controls) controls.style.display = "none";
-
-    const body = doc.body;
-    const headerEl = doc.getElementById("pdf-header") as HTMLElement | null;
-    const footerEl = doc.getElementById("pdf-footer") as HTMLElement | null;
-
-    const scale = 2;
-    const canvas = await html2canvas(body, {
-      scale,
-      useCORS: true,
-      logging: false,
-      backgroundColor: "#ffffff",
-      width: body.scrollWidth,
-      height: body.scrollHeight,
-      windowWidth: body.scrollWidth,
-      windowHeight: body.scrollHeight,
-    });
 
     const pdf = new jsPDF({
       orientation: paperH >= paperW ? "portrait" : "landscape",
@@ -81,87 +64,144 @@ export async function htmlToPdfBlob(
       format: [paperW, paperH],
     });
 
-    const pxPerMm = canvas.width / paperW;
-    const pageHpx = Math.floor(paperH * pxPerMm);
+    const scale = 2;
+    const headerEl = doc.getElementById("pdf-header") as HTMLElement | null;
+    const footerEl = doc.getElementById("pdf-footer") as HTMLElement | null;
 
     if (headerEl) {
-      // Header/footer-aware compositing: stamp header and footer on every PDF page.
-      // The rendered canvas layout is: [header][content][footer].
-      // We extract those slices from the single canvas and recompose each page.
-      const headerHpx = Math.round(headerEl.offsetHeight * scale);
-      const footerHpx = footerEl ? Math.round(footerEl.offsetHeight * scale) : 0;
-      // Continuation pages have no natural top-padding (content slice starts mid-document),
-      // so we add an explicit gap below the header to avoid the first line sitting flush
-      // against it. Page 1 already has the tbody top-padding from the canvas layout.
-      const contTopPadHpx = Math.round(8 * pxPerMm);
-      const firstPageAvailHpx = pageHpx - headerHpx - footerHpx;
-      const laterPageAvailHpx = firstPageAvailHpx - contTopPadHpx;
-      const contentTotalHpx = canvas.height - headerHpx - footerHpx;
-
-      let yOffset = 0;
-      let isFirstPage = true;
-      while (yOffset < contentTotalHpx) {
-        if (!isFirstPage) pdf.addPage();
-
-        const availableHpx = isFirstPage ? firstPageAvailHpx : laterPageAvailHpx;
-        const contentDestY  = isFirstPage ? headerHpx : headerHpx + contTopPadHpx;
-        isFirstPage = false;
-
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = canvas.width;
-        pageCanvas.height = pageHpx;
-        const ctx = pageCanvas.getContext("2d")!;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-
-        // Header — always from the top of the main canvas
-        ctx.drawImage(canvas, 0, 0, canvas.width, headerHpx, 0, 0, canvas.width, headerHpx);
-
-        // Content slice — on continuation pages starts lower to create breathing room
-        const sliceH = Math.min(availableHpx, contentTotalHpx - yOffset);
-        ctx.drawImage(canvas, 0, headerHpx + yOffset, canvas.width, sliceH, 0, contentDestY, canvas.width, sliceH);
-
-        // Footer — always from the bottom of the main canvas
-        if (footerHpx > 0) {
-          ctx.drawImage(
-            canvas,
-            0, canvas.height - footerHpx, canvas.width, footerHpx,
-            0, pageHpx - footerHpx, canvas.width, footerHpx,
-          );
-        }
-
-        pdf.addImage(pageCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, paperW, paperH);
-        yOffset += availableHpx;
-      }
-    } else {
-      // Fallback: simple canvas slicing (no header/footer repetition)
-      let yPx = 0;
-      let firstPage = true;
-      while (yPx < canvas.height) {
-        if (!firstPage) pdf.addPage();
-        firstPage = false;
-
-        const sliceH = Math.min(pageHpx, canvas.height - yPx);
-        const slice = document.createElement("canvas");
-        slice.width = canvas.width;
-        slice.height = sliceH;
-        const ctx = slice.getContext("2d");
-        if (ctx) {
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, slice.width, slice.height);
-          ctx.drawImage(canvas, 0, -yPx);
-        }
-
-        const sliceHmm = sliceH / pxPerMm;
-        pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, paperW, sliceHmm);
-
-        yPx += pageHpx;
-      }
+      await renderPrimariaWithHeaderFooter(pdf, doc.body, headerEl, footerEl, paperW, paperH, scale);
+      return pdf.output("blob");
     }
+
+    const pageEls = Array.from(doc.querySelectorAll(".boleta-page")) as HTMLElement[];
+    if (pageEls.length > 0) {
+      for (let i = 0; i < pageEls.length; i++) {
+        if (i > 0) pdf.addPage([paperW, paperH]);
+        await addElementAsPdfPage(pdf, pageEls[i], paperW, paperH, scale);
+      }
+      return pdf.output("blob");
+    }
+
+    const boletinEl = doc.querySelector(".boletin") as HTMLElement | null;
+    const root = boletinEl ?? doc.body;
+    await addElementAsPdfPage(pdf, root, paperW, paperH, scale);
 
     return pdf.output("blob");
   } finally {
     document.body.removeChild(iframe);
+  }
+}
+
+/** One logical page: capture element, scale down if taller than paperH, center on sheet. */
+async function addElementAsPdfPage(
+  pdf: jsPDF,
+  el: HTMLElement,
+  paperW: number,
+  paperH: number,
+  scale: number,
+): Promise<void> {
+  const canvas = await html2canvas(el, {
+    scale,
+    useCORS: true,
+    logging: false,
+    backgroundColor: "#ffffff",
+    width: el.scrollWidth,
+    height: el.scrollHeight,
+    windowWidth: el.scrollWidth,
+    windowHeight: el.scrollHeight,
+  });
+
+  const pxPerMm = canvas.width / paperW;
+  const pageHpx = paperH * pxPerMm;
+
+  const pageCanvas = document.createElement("canvas");
+  pageCanvas.width = canvas.width;
+  pageCanvas.height = Math.round(pageHpx);
+  const ctx = pageCanvas.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+  let drawW = canvas.width;
+  let drawH = canvas.height;
+
+  if (canvas.height > pageHpx) {
+    const fit = pageHpx / canvas.height;
+    drawW = canvas.width * fit;
+    drawH = pageHpx;
+    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, drawW, drawH);
+  } else {
+    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, drawW, drawH);
+  }
+
+  pdf.addImage(pageCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, paperW, paperH);
+}
+
+/** Primaria descriptivo: repeating header/footer slices (unchanged behavior). */
+async function renderPrimariaWithHeaderFooter(
+  pdf: jsPDF,
+  body: HTMLElement,
+  headerEl: HTMLElement,
+  footerEl: HTMLElement | null,
+  paperW: number,
+  paperH: number,
+  scale: number,
+): Promise<void> {
+  const canvas = await html2canvas(body, {
+    scale,
+    useCORS: true,
+    logging: false,
+    backgroundColor: "#ffffff",
+    width: body.scrollWidth,
+    height: body.scrollHeight,
+    windowWidth: body.scrollWidth,
+    windowHeight: body.scrollHeight,
+  });
+
+  const pxPerMm = canvas.width / paperW;
+  const pageHpx = Math.floor(paperH * pxPerMm);
+
+  const headerHpx = Math.round(headerEl.offsetHeight * scale);
+  const footerHpx = footerEl ? Math.round(footerEl.offsetHeight * scale) : 0;
+  const contTopPadHpx = Math.round(8 * pxPerMm);
+  const firstPageAvailHpx = pageHpx - headerHpx - footerHpx;
+  const laterPageAvailHpx = firstPageAvailHpx - contTopPadHpx;
+  const contentTotalHpx = canvas.height - headerHpx - footerHpx;
+
+  let yOffset = 0;
+  let isFirstPage = true;
+  while (yOffset < contentTotalHpx) {
+    if (!isFirstPage) pdf.addPage([paperW, paperH]);
+
+    const availableHpx = isFirstPage ? firstPageAvailHpx : laterPageAvailHpx;
+    const contentDestY = isFirstPage ? headerHpx : headerHpx + contTopPadHpx;
+    isFirstPage = false;
+
+    const pageCanvas = document.createElement("canvas");
+    pageCanvas.width = canvas.width;
+    pageCanvas.height = pageHpx;
+    const ctx = pageCanvas.getContext("2d")!;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+
+    ctx.drawImage(canvas, 0, 0, canvas.width, headerHpx, 0, 0, canvas.width, headerHpx);
+
+    const sliceH = Math.min(availableHpx, contentTotalHpx - yOffset);
+    ctx.drawImage(
+      canvas,
+      0, headerHpx + yOffset, canvas.width, sliceH,
+      0, contentDestY, canvas.width, sliceH,
+    );
+
+    if (footerHpx > 0) {
+      ctx.drawImage(
+        canvas,
+        0, canvas.height - footerHpx, canvas.width, footerHpx,
+        0, pageHpx - footerHpx, canvas.width, footerHpx,
+      );
+    }
+
+    pdf.addImage(pageCanvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, paperW, paperH);
+    yOffset += availableHpx;
   }
 }
 
@@ -185,7 +225,6 @@ export async function downloadHtmlAsPdf(
     a.click();
     document.body.removeChild(a);
   } finally {
-    // Revoke after a tick so the browser has time to start the download
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 }

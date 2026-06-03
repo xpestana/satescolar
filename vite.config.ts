@@ -11,6 +11,15 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      // Same as nginx prod: /img-proxy/{s3-host}/path → https://{s3-host}/path
+      "/img-proxy": {
+        target: "https://satescolar.s3.us-east-1.amazonaws.com",
+        changeOrigin: true,
+        rewrite: (path) =>
+          path.replace(/^\/img-proxy\/[^/]+\.amazonaws\.com/, ""),
+      },
+    },
   },
   plugins: [
     react(),

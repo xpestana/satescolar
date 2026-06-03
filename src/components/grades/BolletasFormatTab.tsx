@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -16,7 +16,7 @@ import {
 import {
   BachilleratoConfig, BachilleratoTemplate, BoletinSignature,
   DEFAULT_BACHILLERATO_CONFIG, SAMPLE_RENDER_DATA, generateBoletaHtml,
-  SAMPLE_BOLETIN_COMPLETO_DATA, generateBoletinCompletoHtml,
+  SAMPLE_BOLETIN_COMPLETO_DATA, generateBoletinCompletoHtml, cfgForBoletinPreview,
   SAMPLE_PRIMARY_DESCRIPTIVE_DATA, generatePrimaryDescriptiveHtml,
 } from "@/lib/bachilleratoTemplate";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -302,7 +302,7 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
           <NumRow label="Margen superior" unit="mm" min={0} max={30}
             value={cfg.boletin?.margin_top ?? 4}
             onChange={(v) => updBoletin({ margin_top: v })} />
-          <NumRow label="Margen inferior / firmas" unit="mm" min={0} max={60}
+          <NumRow label="Margen inferior de página" unit="mm" min={0} max={60}
             value={cfg.boletin?.margin_bottom ?? 6}
             onChange={(v) => updBoletin({ margin_bottom: v })} />
           <NumRow label="Márgenes laterales" unit="mm" min={0} max={30}
@@ -326,15 +326,55 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
         </div>
 
         {/* Firmas */}
-        <Section label="Firmas" enabled={cfg.sections.signatures} onToggle={() => sect("signatures")}>
-          {cfg.sections.signatures && (
-            <SignatureEditor
-              sigs={cfg.boletin?.signatures ?? []}
-              onChange={(s) => updBoletin({ signatures: s })}
-              schoolId={schoolId}
+        <div className="border rounded-md overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 bg-muted/40">
+            <Switch
+              checked={cfg.sections.signatures}
+              onCheckedChange={() => sect("signatures")}
+              className="scale-75"
             />
+            <span className="text-sm font-medium flex-1">Firmas</span>
+          </div>
+          {cfg.sections.signatures && (
+            <div className="p-3 space-y-3 border-t bg-background">
+              <div className="border rounded-md p-3 space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Espaciado de firmas
+                </Label>
+                <NumRow label="Espacio sobre firmas" unit="mm" min={0} max={30}
+                  value={cfg.boletin?.sig_gap_above ?? 4}
+                  onChange={(v) => updBoletin({ sig_gap_above: v })} />
+                <NumRow label="Espacio bajo firmas" unit="mm" min={0} max={20}
+                  value={cfg.boletin?.sig_gap_below ?? 0}
+                  onChange={(v) => updBoletin({ sig_gap_below: v })} />
+                <NumRow label="Altura imagen firma" unit="px" min={20} max={60}
+                  value={cfg.boletin?.sig_image_height ?? 40}
+                  onChange={(v) => updBoletin({ sig_image_height: v })} />
+                <NumRow label="Altura sello" unit="px" min={0} max={50}
+                  value={cfg.boletin?.sig_sello_height ?? 28}
+                  onChange={(v) => updBoletin({ sig_sello_height: v })} />
+                <ToggleRow label="Anclar firmas al pie de la hoja" value={cfg.boletin?.sig_pin_bottom ?? false}
+                  onChange={(v) => updBoletin({ sig_pin_bottom: v })} />
+                <p className="text-xs text-muted-foreground">
+                  Para media hoja (140 mm) deja desactivado el anclaje y reduce espacio/altura si las firmas no caben.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Firmantes
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Sube imagen de firma y sello. Guarda la plantilla para aplicar en boletas de secundaria.
+                </p>
+                <SignatureEditor
+                  sigs={cfg.boletin?.signatures ?? []}
+                  onChange={(s) => updBoletin({ signatures: s })}
+                  schoolId={schoolId}
+                />
+              </div>
+            </div>
           )}
-        </Section>
+        </div>
       </div>
     );
   }
@@ -534,9 +574,16 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
 function BoletaPreview({ cfg, paperW, paperH }: {
   cfg: BachilleratoConfig; paperW: number; paperH: number;
 }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const html = useMemo(() => {
+    const previewCfg = cfg.style === "boletin_completo" ? cfgForBoletinPreview(cfg) : cfg;
     if (cfg.style === "boletin_completo")
-      return generateBoletinCompletoHtml(cfg, SAMPLE_BOLETIN_COMPLETO_DATA, paperW, paperH);
+      return generateBoletinCompletoHtml(
+        previewCfg,
+        { ...SAMPLE_BOLETIN_COMPLETO_DATA, mention: previewCfg.boletin?.mention ?? SAMPLE_BOLETIN_COMPLETO_DATA.mention },
+        paperW,
+        paperH,
+      );
     if (cfg.style === "primaria_descriptivo")
       return generatePrimaryDescriptiveHtml(cfg, SAMPLE_PRIMARY_DESCRIPTIVE_DATA, paperW, paperH);
     return generateBoletaHtml(cfg, SAMPLE_RENDER_DATA, paperW, paperH);
@@ -548,24 +595,44 @@ function BoletaPreview({ cfg, paperW, paperH }: {
   const previewW = 700;
   const scale = previewW / naturalW;
   const previewH = naturalH * scale;
+  const [scaledContentH, setScaledContentH] = useState(previewH);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const fitHeight = () => {
+      const doc = iframe.contentDocument;
+      const h = doc?.body.scrollHeight ?? naturalH;
+      iframe.style.height = `${h}px`;
+      setScaledContentH(h * scale);
+    };
+    iframe.addEventListener("load", fitHeight);
+    return () => iframe.removeEventListener("load", fitHeight);
+  }, [html, naturalH, scale]);
 
   return (
     <div className="flex flex-col items-center gap-2">
       <span className="text-xs text-muted-foreground">Vista previa (datos de ejemplo)</span>
-      <div className="border rounded shadow-sm overflow-hidden bg-white"
-        style={{ width: previewW, height: previewH, position: "relative", flexShrink: 0 }}>
-        <iframe
-          srcDoc={html}
-          title="Boleta preview"
-          style={{
-            width: naturalW,
-            height: naturalH,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-            border: "none",
-            pointerEvents: "none",
-          }}
-        />
+      <div className="border rounded shadow-sm overflow-y-auto overflow-x-hidden bg-white"
+        style={{ width: previewW, maxHeight: Math.max(previewH * 1.5, scaledContentH), position: "relative", flexShrink: 0 }}>
+        <div style={{ width: previewW, height: scaledContentH, position: "relative" }}>
+          <iframe
+            ref={iframeRef}
+            srcDoc={html}
+            title="Boleta preview"
+            style={{
+              width: naturalW,
+              height: naturalH,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+              border: "none",
+              pointerEvents: "none",
+              position: "absolute",
+              top: 0,
+              left: 0,
+            }}
+          />
+        </div>
       </div>
     </div>
   );
