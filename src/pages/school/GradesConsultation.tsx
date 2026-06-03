@@ -16,7 +16,7 @@ import { Search, Loader2, Eye, Check, ChevronsUpDown, Download, X } from "lucide
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
-import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas } from "@/lib/bachilleratoBoleta";
+import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas, downloadBachilleratoBoletaDefinitiva, downloadAllBachilleratoBoletasDefinitiva } from "@/lib/bachilleratoBoleta";
 import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
 import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
 
@@ -62,6 +62,8 @@ export default function GradesConsultation() {
   const [openGcrpTeacher, setOpenGcrpTeacher] = useState(false);
   const [downloadingStudentId, setDownloadingStudentId] = useState<string | null>(null);
   const [downloadingAll, setDownloadingAll] = useState(false);
+  const [downloadingStudentIdFinal, setDownloadingStudentIdFinal] = useState<string | null>(null);
+  const [downloadingAllFinal, setDownloadingAllFinal] = useState(false);
   const [boletaModal, setBoletaModal] = useState<
     { blobUrl: string; filename: string; title: string } | null
   >(null);
@@ -593,84 +595,165 @@ export default function GradesConsultation() {
                         <span className="text-sm text-muted-foreground">{sectionLabel}</span>
                         <Badge variant="outline">{filteredStudents.length} estudiantes</Badge>
                         {PRIMARY_GRADES.has(sectionData?.grade_level ?? "") && students.length > 0 && (
-                          <Button
-                            size="sm"
-                            className="h-8 gap-1.5 text-xs"
-                            disabled={downloadingAll}
-                            onClick={async () => {
-                              if (!schoolId || !selectedSection) return;
-                              setDownloadingAll(true);
-                              try {
-                                const html = await downloadAllPrimaryDescriptiveBoletas({
-                                  schoolId,
-                                  sectionId: selectedSection,
-                                  sectionName: sectionData?.name ?? "",
-                                  gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
-                                  gradeKey: sectionData?.grade_level ?? "",
-                                  yearId: effectiveYear,
-                                  yearRange,
-                                  momento: selectedMomento,
-                                  students: students.map((s: any) => ({
-                                    studentId: s.student_id,
-                                    studentName: s.student_name,
-                                    documentId: s.document_id ?? null,
-                                  })),
-                                });
-                                await openBoletaPreview(
-                                  html,
-                                  `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
-                                  `Sección ${sectionData?.name ?? ""} — todas las boletas`,
-                                );
-                              } finally {
-                                setDownloadingAll(false);
-                              }
-                            }}
-                          >
-                            {downloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                            Descargar todas las boletas
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs"
+                              disabled={downloadingAll}
+                              onClick={async () => {
+                                if (!schoolId || !selectedSection) return;
+                                setDownloadingAll(true);
+                                try {
+                                  const html = await downloadAllPrimaryDescriptiveBoletas({
+                                    schoolId,
+                                    sectionId: selectedSection,
+                                    sectionName: sectionData?.name ?? "",
+                                    gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                    gradeKey: sectionData?.grade_level ?? "",
+                                    yearId: effectiveYear,
+                                    yearRange,
+                                    momento: selectedMomento,
+                                    students: students.map((s: any) => ({
+                                      studentId: s.student_id,
+                                      studentName: s.student_name,
+                                      documentId: s.document_id ?? null,
+                                    })),
+                                  });
+                                  await openBoletaPreview(
+                                    html,
+                                    `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
+                                    `Sección ${sectionData?.name ?? ""} — todas las boletas`,
+                                  );
+                                } finally {
+                                  setDownloadingAll(false);
+                                }
+                              }}
+                            >
+                              {downloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                              Descargar todas las boletas
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1.5 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                              disabled={downloadingAllFinal}
+                              onClick={async () => {
+                                if (!schoolId || !selectedSection) return;
+                                setDownloadingAllFinal(true);
+                                try {
+                                  const html = await downloadAllPrimaryDescriptiveBoletas({
+                                    schoolId,
+                                    sectionId: selectedSection,
+                                    sectionName: sectionData?.name ?? "",
+                                    gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                    gradeKey: sectionData?.grade_level ?? "",
+                                    yearId: effectiveYear,
+                                    yearRange,
+                                    momento: 3,
+                                    students: students.map((s: any) => ({
+                                      studentId: s.student_id,
+                                      studentName: s.student_name,
+                                      documentId: s.document_id ?? null,
+                                    })),
+                                  });
+                                  await openBoletaPreview(
+                                    html,
+                                    `Boletas_${sectionData?.name ?? "seccion"}_Definitiva_${yearRange}.pdf`,
+                                    `Sección ${sectionData?.name ?? ""} — Definitiva Final`,
+                                  );
+                                } finally {
+                                  setDownloadingAllFinal(false);
+                                }
+                              }}
+                            >
+                              {downloadingAllFinal ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                              Descargar todas Definitiva Final
+                            </Button>
+                          </>
                         )}
                         {isSecondary && students.length > 0 && (
-                          <Button
-                            size="sm"
-                            className="h-8 gap-1.5 text-xs"
-                            disabled={downloadingAll}
-                            onClick={async () => {
-                              if (!schoolId || !selectedSection) return;
-                              setDownloadingAll(true);
-                              try {
-                                const html = await downloadAllBachilleratoBoletas({
-                                  schoolId,
-                                  sectionId: selectedSection,
-                                  sectionName: sectionData?.name ?? "",
-                                  gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
-                                  gradeKey: sectionData?.grade_level ?? "",
-                                  yearId: effectiveYear,
-                                  yearRange,
-                                  momento: selectedMomento,
-                                  students: students.map((s: any) => ({
-                                    studentId: s.student_id,
-                                    studentName: s.student_name,
-                                    documentId: s.document_id ?? null,
-                                  })),
-                                });
-                                await openBoletaPreview(
-                                  html,
-                                  `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
-                                  `Sección ${sectionData?.name ?? ""} — todas las boletas`,
-                                );
-                              } finally {
-                                setDownloadingAll(false);
-                              }
-                            }}
-                          >
-                            {downloadingAll ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Download className="h-3.5 w-3.5" />
-                            )}
-                            Descargar todas las boletas
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              className="h-8 gap-1.5 text-xs"
+                              disabled={downloadingAll}
+                              onClick={async () => {
+                                if (!schoolId || !selectedSection) return;
+                                setDownloadingAll(true);
+                                try {
+                                  const html = await downloadAllBachilleratoBoletas({
+                                    schoolId,
+                                    sectionId: selectedSection,
+                                    sectionName: sectionData?.name ?? "",
+                                    gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                    gradeKey: sectionData?.grade_level ?? "",
+                                    yearId: effectiveYear,
+                                    yearRange,
+                                    momento: selectedMomento,
+                                    students: students.map((s: any) => ({
+                                      studentId: s.student_id,
+                                      studentName: s.student_name,
+                                      documentId: s.document_id ?? null,
+                                    })),
+                                  });
+                                  await openBoletaPreview(
+                                    html,
+                                    `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
+                                    `Sección ${sectionData?.name ?? ""} — todas las boletas`,
+                                  );
+                                } finally {
+                                  setDownloadingAll(false);
+                                }
+                              }}
+                            >
+                              {downloadingAll ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Download className="h-3.5 w-3.5" />
+                              )}
+                              Descargar todas las boletas
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1.5 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                              disabled={downloadingAllFinal}
+                              onClick={async () => {
+                                if (!schoolId || !selectedSection) return;
+                                setDownloadingAllFinal(true);
+                                try {
+                                  const html = await downloadAllBachilleratoBoletasDefinitiva({
+                                    schoolId,
+                                    sectionId: selectedSection,
+                                    sectionName: sectionData?.name ?? "",
+                                    gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                    gradeKey: sectionData?.grade_level ?? "",
+                                    yearId: effectiveYear,
+                                    yearRange,
+                                    students: students.map((s: any) => ({
+                                      studentId: s.student_id,
+                                      studentName: s.student_name,
+                                      documentId: s.document_id ?? null,
+                                    })),
+                                  });
+                                  await openBoletaPreview(
+                                    html,
+                                    `Boletas_${sectionData?.name ?? "seccion"}_Definitiva_${yearRange}.pdf`,
+                                    `Sección ${sectionData?.name ?? ""} — Definitiva Final`,
+                                  );
+                                } finally {
+                                  setDownloadingAllFinal(false);
+                                }
+                              }}
+                            >
+                              {downloadingAllFinal ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Download className="h-3.5 w-3.5" />
+                              )}
+                              Descargar todas Definitiva Final
+                            </Button>
+                          </>
                         )}
                       </div>
                       <div className="relative w-64">
@@ -691,7 +774,7 @@ export default function GradesConsultation() {
                             <TableHead className="min-w-[50px] text-center">#</TableHead>
                             <TableHead className="min-w-[220px]">Nombre del Alumno</TableHead>
                             <TableHead className="min-w-[100px]">Cédula</TableHead>
-                            <TableHead className="min-w-[150px] text-center">Acciones</TableHead>
+                            <TableHead className="min-w-[320px] text-center">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -708,89 +791,172 @@ export default function GradesConsultation() {
                                 <TableCell className="font-medium">{s.student_name}</TableCell>
                                 <TableCell className="text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
                                 <TableCell className="text-center">
+                                  <div className="flex items-center justify-center gap-2 flex-wrap">
                                   {isSecondary ? (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-7 gap-1.5 text-xs"
-                                      disabled={downloadingStudentId === s.student_id}
-                                      onClick={async () => {
-                                        if (!schoolId) return;
-                                        setDownloadingStudentId(s.student_id);
-                                        try {
-                                          const html = await downloadBachilleratoBoleta({
-                                            schoolId,
-                                            studentId: s.student_id,
-                                            studentName: s.student_name,
-                                            documentId: s.document_id ?? null,
-                                            sectionId: selectedSection,
-                                            sectionName: sectionData?.name ?? "",
-                                            gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
-                                            gradeKey: sectionData?.grade_level ?? "",
-                                            yearId: effectiveYear,
-                                            yearRange,
-                                            momento: selectedMomento,
-                                          });
-                                          await openBoletaPreview(
-                                            html,
-                                            `Boleta_${s.student_name}_M${selectedMomento}.pdf`,
-                                            s.student_name,
-                                          );
-                                        } finally {
-                                          setDownloadingStudentId(null);
-                                        }
-                                      }}
-                                    >
-                                      {downloadingStudentId === s.student_id ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      ) : (
-                                        <Download className="h-3.5 w-3.5" />
-                                      )}
-                                      Descargar Boleta
-                                    </Button>
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 gap-1.5 text-xs"
+                                        disabled={downloadingStudentId === s.student_id}
+                                        onClick={async () => {
+                                          if (!schoolId) return;
+                                          setDownloadingStudentId(s.student_id);
+                                          try {
+                                            const html = await downloadBachilleratoBoleta({
+                                              schoolId,
+                                              studentId: s.student_id,
+                                              studentName: s.student_name,
+                                              documentId: s.document_id ?? null,
+                                              sectionId: selectedSection,
+                                              sectionName: sectionData?.name ?? "",
+                                              gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                              gradeKey: sectionData?.grade_level ?? "",
+                                              yearId: effectiveYear,
+                                              yearRange,
+                                              momento: selectedMomento,
+                                            });
+                                            await openBoletaPreview(
+                                              html,
+                                              `Boleta_${s.student_name}_M${selectedMomento}.pdf`,
+                                              s.student_name,
+                                            );
+                                          } finally {
+                                            setDownloadingStudentId(null);
+                                          }
+                                        }}
+                                      >
+                                        {downloadingStudentId === s.student_id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Download className="h-3.5 w-3.5" />
+                                        )}
+                                        Descargar Boleta
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 gap-1.5 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                        disabled={downloadingStudentIdFinal === s.student_id}
+                                        onClick={async () => {
+                                          if (!schoolId) return;
+                                          setDownloadingStudentIdFinal(s.student_id);
+                                          try {
+                                            const html = await downloadBachilleratoBoletaDefinitiva({
+                                              schoolId,
+                                              studentId: s.student_id,
+                                              studentName: s.student_name,
+                                              documentId: s.document_id ?? null,
+                                              sectionId: selectedSection,
+                                              sectionName: sectionData?.name ?? "",
+                                              gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                              gradeKey: sectionData?.grade_level ?? "",
+                                              yearId: effectiveYear,
+                                              yearRange,
+                                            });
+                                            await openBoletaPreview(
+                                              html,
+                                              `Boleta_${s.student_name}_Definitiva.pdf`,
+                                              `${s.student_name} — Definitiva Final`,
+                                            );
+                                          } finally {
+                                            setDownloadingStudentIdFinal(null);
+                                          }
+                                        }}
+                                      >
+                                        {downloadingStudentIdFinal === s.student_id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Download className="h-3.5 w-3.5" />
+                                        )}
+                                        Descargar Definitiva Final
+                                      </Button>
+                                    </>
                                   ) : PRIMARY_GRADES.has(sectionData?.grade_level ?? "") ? (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="h-7 gap-1.5 text-xs"
-                                      disabled={downloadingStudentId === s.student_id}
-                                      onClick={async () => {
-                                        if (!schoolId) return;
-                                        setDownloadingStudentId(s.student_id);
-                                        try {
-                                          const html = await downloadPrimaryDescriptiveBoleta({
-                                            schoolId,
-                                            studentId: s.student_id,
-                                            studentName: s.student_name,
-                                            documentId: s.document_id ?? null,
-                                            sectionId: selectedSection,
-                                            sectionName: sectionData?.name ?? "",
-                                            gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
-                                            gradeKey: sectionData?.grade_level ?? "",
-                                            yearId: effectiveYear,
-                                            yearRange,
-                                            momento: selectedMomento,
-                                          });
-                                          await openBoletaPreview(
-                                            html,
-                                            `Boleta_${s.student_name}_M${selectedMomento}.pdf`,
-                                            s.student_name,
-                                          );
-                                        } finally {
-                                          setDownloadingStudentId(null);
-                                        }
-                                      }}
-                                    >
-                                      {downloadingStudentId === s.student_id ? (
-                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                      ) : (
-                                        <Download className="h-3.5 w-3.5" />
-                                      )}
-                                      Descargar Boleta
-                                    </Button>
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 gap-1.5 text-xs"
+                                        disabled={downloadingStudentId === s.student_id}
+                                        onClick={async () => {
+                                          if (!schoolId) return;
+                                          setDownloadingStudentId(s.student_id);
+                                          try {
+                                            const html = await downloadPrimaryDescriptiveBoleta({
+                                              schoolId,
+                                              studentId: s.student_id,
+                                              studentName: s.student_name,
+                                              documentId: s.document_id ?? null,
+                                              sectionId: selectedSection,
+                                              sectionName: sectionData?.name ?? "",
+                                              gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                              gradeKey: sectionData?.grade_level ?? "",
+                                              yearId: effectiveYear,
+                                              yearRange,
+                                              momento: selectedMomento,
+                                            });
+                                            await openBoletaPreview(
+                                              html,
+                                              `Boleta_${s.student_name}_M${selectedMomento}.pdf`,
+                                              s.student_name,
+                                            );
+                                          } finally {
+                                            setDownloadingStudentId(null);
+                                          }
+                                        }}
+                                      >
+                                        {downloadingStudentId === s.student_id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Download className="h-3.5 w-3.5" />
+                                        )}
+                                        Descargar Boleta
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 gap-1.5 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                        disabled={downloadingStudentIdFinal === s.student_id}
+                                        onClick={async () => {
+                                          if (!schoolId) return;
+                                          setDownloadingStudentIdFinal(s.student_id);
+                                          try {
+                                            const html = await downloadPrimaryDescriptiveBoleta({
+                                              schoolId,
+                                              studentId: s.student_id,
+                                              studentName: s.student_name,
+                                              documentId: s.document_id ?? null,
+                                              sectionId: selectedSection,
+                                              sectionName: sectionData?.name ?? "",
+                                              gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
+                                              gradeKey: sectionData?.grade_level ?? "",
+                                              yearId: effectiveYear,
+                                              yearRange,
+                                              momento: 3,
+                                            });
+                                            await openBoletaPreview(
+                                              html,
+                                              `Boleta_${s.student_name}_Definitiva.pdf`,
+                                              `${s.student_name} — Definitiva Final`,
+                                            );
+                                          } finally {
+                                            setDownloadingStudentIdFinal(null);
+                                          }
+                                        }}
+                                      >
+                                        {downloadingStudentIdFinal === s.student_id ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                          <Download className="h-3.5 w-3.5" />
+                                        )}
+                                        Descargar Definitiva Final
+                                      </Button>
+                                    </>
                                   ) : (
                                     <span className="text-xs text-muted-foreground">Próximamente</span>
                                   )}
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             ))

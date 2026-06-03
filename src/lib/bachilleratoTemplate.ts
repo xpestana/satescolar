@@ -172,12 +172,13 @@ export interface BoletaRenderData {
     show_rif:                boolean;
   };
   // Student
-  student_name:  string;
-  document_id:   string;
-  grade_label:   string;
-  section_name:  string;
-  year_range:    string;
-  momento:       number;
+  student_name:        string;
+  document_id:         string;
+  grade_label:         string;
+  section_name:        string;
+  year_range:          string;
+  momento:             number;
+  momentoOverrideLabel?: string;
   // Grades
   subjects:      Array<{ name: string; grade: string }>;
   definitiva:    string;
@@ -379,7 +380,7 @@ export function generateBoletaHtml(
   const titleHtml = cfg.sections.title ? `
   <div style="text-align:center;background:${cfg.title.bg_color};color:${cfg.title.text_color};padding:8px 12px;margin-bottom:14px;border-radius:4px">
     <div style="font-size:${cfg.title.font_size}pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">${esc(cfg.title.text)}</div>
-    <div style="font-size:10pt;margin-top:2px">Año Escolar ${esc(data.year_range)} &mdash; ${momentoLabel} Momento</div>
+    <div style="font-size:10pt;margin-top:2px">Año Escolar ${esc(data.year_range)} &mdash; ${data.momentoOverrideLabel ?? `${momentoLabel} Momento`}</div>
   </div>` : "";
 
   // ── Student info ──────────────────────────────────────────────────────────
@@ -432,7 +433,7 @@ export function generateBoletaHtml(
   })();
   const definitvaCard = cfg.summary.show_definitiva ? `
     <div style="background:${cfg.summary.definitiva_bg};border:1px solid ${cfg.summary.definitiva_border};border-radius:8px;padding:12px;text-align:center">
-      <div style="font-size:8pt;color:#4b5563;text-transform:uppercase;letter-spacing:0.4px">Definitiva del Momento</div>
+      <div style="font-size:8pt;color:#4b5563;text-transform:uppercase;letter-spacing:0.4px">${data.momentoOverrideLabel ?? "Definitiva del Momento"}</div>
       <div style="font-size:24pt;font-weight:700;color:${defColor};margin-top:4px">${esc(data.definitiva || "—")}</div>
     </div>` : "";
   const posCard = cfg.summary.show_position ? `
