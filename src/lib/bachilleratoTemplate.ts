@@ -283,9 +283,11 @@ const sampleM1 = (n: string, a: string, i: number): BoletinMomentoGrade => {
   return { nota: n, ajuste: a || "0", definitiva: Number.isInteger(def) ? String(def) : def.toFixed(2), inasistencias: i };
 };
 
+const SAMPLE_LOGO_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='70' viewBox='0 0 70 70'%3E%3Crect width='70' height='70' rx='8' fill='%23dbeafe'/%3E%3Crect x='10' y='28' width='50' height='32' rx='3' fill='%231e40af'/%3E%3Crect x='22' y='18' width='26' height='14' rx='2' fill='%231e40af'/%3E%3Crect x='28' y='43' width='14' height='17' fill='%23dbeafe'/%3E%3Ccircle cx='22' cy='37' r='4' fill='%23dbeafe'/%3E%3Ccircle cx='48' cy='37' r='4' fill='%23dbeafe'/%3E%3C/svg%3E";
+
 export const SAMPLE_BOLETIN_COMPLETO_DATA: BoletinCompletoRenderData = {
   school_name:      "UE COLEGIO EJEMPLO",
-  school_logo:      "",
+  school_logo:      SAMPLE_LOGO_PLACEHOLDER,
   dea_code:         "CO-12345",
   statistical_code: "ES-67890",
   address:          "Av. Las Americas, Sector Santa Barbara Este",
@@ -502,7 +504,7 @@ function fmtGrade(v: string | null | undefined): string {
 }
 
 function momentoCell(mg: BoletinMomentoGrade | null): string {
-  const td = `text-align:center;padding:2px 2px;border:1px solid #ccc;font-size:8pt;overflow:hidden`;
+  const td = `text-align:center;padding:2px 2px;border:1px solid #ccc;font-size:7.5pt`;
   if (!mg) return `<td style="${td}"></td><td style="${td}"></td><td style="${td}"></td><td style="${td}"></td>`;
   return [
     `<td style="${td}">${esc(fmtGrade(mg.nota))}</td>`,
@@ -530,10 +532,10 @@ export function generateBoletinCompletoHtml(
 
   // ── Header ─────────────────────────────────────────────────────────────────
   const logoHtml = hc.show_logo && data.school_logo
-    ? `<img src="${esc(data.school_logo)}" alt="Logo" style="height:70px;width:auto;object-fit:contain;margin-right:10px">`
+    ? `<img src="${esc(data.school_logo)}" alt="Logo" style="height:68px;width:auto;max-width:68px;object-fit:contain;display:block">`
     : "";
 
-  const leftLines = [
+  const centerLines = [
     hc.show_name       ? `<div style="font-size:${cfg.header.name_font_size}pt;font-weight:700;text-transform:uppercase">${esc(data.school_name)}</div>` : "",
     hc.show_address    ? `<div style="font-size:${cfg.header.sub_font_size}pt">${esc(data.address)}</div>` : "",
     hc.show_dea_code   ? `<div style="font-size:${cfg.header.sub_font_size}pt">Cód. DEA: ${esc(data.dea_code)}</div>` : "",
@@ -542,14 +544,15 @@ export function generateBoletinCompletoHtml(
   ].filter(Boolean).join("");
 
   const rightBlock = `
-    <div style="text-align:right;font-size:${cfg.header.sub_font_size}pt;line-height:1.6">
+    <div style="text-align:right;font-size:${cfg.header.sub_font_size}pt;line-height:1.6;white-space:nowrap">
       <div>Año Escolar ${esc(data.year_range)}</div>
       ${data.position > 0 ? `<div>Posición en la sección: ${data.position}</div>` : ""}
     </div>`;
 
   const headerHtml = `
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">
-    <div style="display:flex;align-items:center">${logoHtml}<div>${leftLines}</div></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:8px">
+    ${logoHtml ? `<div style="flex-shrink:0">${logoHtml}</div>` : ""}
+    <div style="flex:1;min-width:0">${centerLines}</div>
     ${rightBlock}
   </div>`;
 
@@ -576,28 +579,28 @@ export function generateBoletinCompletoHtml(
   </div>`;
 
   // ── Grades table + promedios sidebar ──────────────────────────────────────
-  const thStyle = `background:${hdrBg};color:${hdrTxt};padding:3px 3px;border:1px solid #999;font-size:7.5pt;text-align:center;font-weight:600;overflow:hidden`;
+  const thStyle = `background:${hdrBg};color:${hdrTxt};padding:2px 2px;border:1px solid #999;font-size:7pt;text-align:center;font-weight:600`;
   const subjectRows = data.subjects.map((s, i) => {
     const bg = cfg.table.alt_row && i % 2 !== 0 ? (cfg.table.alt_row_color || "#f9fafb") : "#ffffff";
     return `<tr style="background:${bg}">
-      <td style="padding:2px 3px;border:1px solid #ccc;text-align:center;font-size:8pt">${s.number}</td>
-      <td style="padding:2px 4px;border:1px solid #ccc;font-size:8pt;text-transform:uppercase;word-break:break-word">${esc(s.name)}</td>
+      <td style="padding:2px 2px;border:1px solid #ccc;text-align:center;font-size:7.5pt">${s.number}</td>
+      <td style="padding:2px 3px;border:1px solid #ccc;font-size:7.5pt;text-transform:uppercase;word-break:break-word">${esc(s.name)}</td>
       ${momentoCell(s.m1)}
       ${momentoCell(s.m2)}
       ${momentoCell(s.m3)}
-      <td style="text-align:center;padding:2px 3px;border:1px solid #ccc;font-weight:700;font-size:8pt">${esc(fmtGrade(s.definitiva_final))}</td>
+      <td style="text-align:center;padding:2px 2px;border:1px solid #ccc;font-weight:700;font-size:7.5pt">${esc(fmtGrade(s.definitiva_final))}</td>
     </tr>`;
   }).join("\n");
 
   const tableHtml = `
-  <table style="border-collapse:collapse;font-size:8pt;width:100%;table-layout:fixed">
+  <table style="border-collapse:collapse;font-size:7.5pt;width:100%;table-layout:fixed">
     <colgroup>
-      <col style="width:20px">
-      <col><!-- Asignatura: fills remaining space -->
-      <col style="width:22px"><col style="width:20px"><col style="width:26px"><col style="width:20px">
-      <col style="width:22px"><col style="width:20px"><col style="width:26px"><col style="width:20px">
-      <col style="width:22px"><col style="width:20px"><col style="width:26px"><col style="width:20px">
-      <col style="width:26px">
+      <col style="width:3%">
+      <col style="width:44%">
+      <col style="width:5%"><col style="width:3%"><col style="width:5%"><col style="width:3%">
+      <col style="width:5%"><col style="width:3%"><col style="width:5%"><col style="width:3%">
+      <col style="width:5%"><col style="width:3%"><col style="width:5%"><col style="width:3%">
+      <col style="width:5%">
     </colgroup>
     <thead>
       <tr>
@@ -628,7 +631,7 @@ export function generateBoletinCompletoHtml(
   const hasM3 = data.avg_m3 && data.avg_m3 !== "0" && data.avg_m3 !== "—";
 
   const promediosHtml = `
-  <div style="font-size:9pt;padding-left:10px;width:135px;flex-shrink:0">
+  <div style="font-size:9pt;padding-left:8px;min-width:30mm;max-width:30mm;flex-shrink:0">
     <div style="font-weight:700;margin-bottom:4px;font-size:9pt">Promedios</div>
     <table style="width:100%;font-size:8.5pt;border-collapse:collapse;white-space:nowrap">
       <tr><td style="padding-right:4px">I Momento:</td><td style="text-align:right;font-weight:600">${hasM1 ? esc(data.avg_m1) : "—"}</td></tr>
@@ -641,7 +644,7 @@ export function generateBoletinCompletoHtml(
 
   const mainHtml = `
   <div style="display:flex;align-items:flex-start;margin-bottom:12px">
-    <div style="flex:1;min-width:0;overflow:hidden">${tableHtml}</div>
+    <div style="flex:1;min-width:0">${tableHtml}</div>
     ${promediosHtml}
   </div>`;
 
