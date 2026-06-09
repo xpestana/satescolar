@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -194,8 +194,9 @@ export default function PaymentRegistration() {
 
   const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
+  useEffect(() => { setCurrentPage(1); }, [allRows, gradeFilter, sectionFilter, search]);
+
   const filtered = useMemo(() => {
-    setCurrentPage(1);
     let result = allRows;
     if (gradeFilter !== "all") result = result.filter((e: any) => e.sections?.grade_level === gradeFilter);
     if (sectionFilter !== "all") result = result.filter((e: any) => e.section_id === sectionFilter);
