@@ -23,6 +23,7 @@ import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
 import { PaymentHistoryModal } from "@/components/payments/PaymentHistoryModal";
 import { PaymentReportsTab } from "@/components/payments/PaymentReportsTab";
 import { useToast } from "@/hooks/use-toast";
+import { Pagination } from "@/components/ui/data-pagination";
 
 export default function PaymentRegistration() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -33,6 +34,8 @@ export default function PaymentRegistration() {
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [sectionFilter, setSectionFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 20;
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [selectedEnrollment, setSelectedEnrollment] = useState<any>(null);
   const [selectedStudentPlan, setSelectedStudentPlan] = useState<any>(null);
@@ -192,6 +195,7 @@ export default function PaymentRegistration() {
   const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const filtered = useMemo(() => {
+    setCurrentPage(1);
     let result = allRows;
     if (gradeFilter !== "all") result = result.filter((e: any) => e.sections?.grade_level === gradeFilter);
     if (sectionFilter !== "all") result = result.filter((e: any) => e.section_id === sectionFilter);
@@ -204,7 +208,10 @@ export default function PaymentRegistration() {
       });
     }
     return result;
-  }, [enrollments, gradeFilter, sectionFilter, search]);
+  }, [allRows, gradeFilter, sectionFilter, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   // Assign plan mutation
   const assignPlanMut = useMutation({
@@ -377,7 +384,7 @@ export default function PaymentRegistration() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((e: any) => {
+                    {paginated.map((e: any) => {
                       const fd = e.students?.form_data as any;
                       const fullName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
                       const pending = balanceMap[e.students?.id] || 0;
@@ -429,6 +436,15 @@ export default function PaymentRegistration() {
                     {filtered.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No se encontraron estudiantes</TableCell></TableRow>}
                   </TableBody>
                 </Table>
+              )}
+              {filtered.length > 0 && (
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  totalItems={filtered.length}
+                  itemsPerPage={PAGE_SIZE}
+                />
               )}
             </CardContent>
           </Card>
