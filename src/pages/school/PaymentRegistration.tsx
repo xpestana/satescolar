@@ -57,7 +57,7 @@ export default function PaymentRegistration() {
   });
 
   // Enrollments with student data
-  const { data: enrollments = [], isLoading } = useQuery({
+  const { data: enrollments = [], isLoading: enrollmentsLoading } = useQuery({
     queryKey: ["enrolled-students-payments", schoolId, activeYear?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("enrollments")
@@ -70,6 +70,30 @@ export default function PaymentRegistration() {
     },
     enabled: !!schoolId && !!activeYear?.id,
   });
+
+  // All non-graduated/completed students for this school (to show unenrolled ones too)
+  const { data: allSchoolStudents = [], isLoading: studentsLoading } = useQuery({
+    queryKey: ["all-school-students-payments", schoolId],
+    queryFn: async () => {
+      const { data: ss, error: ssError } = await supabase
+        .from("student_schools")
+        .select("student_id")
+        .eq("school_id", schoolId!);
+      if (ssError) throw ssError;
+      const ids = ss.map((r: any) => r.student_id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, document_id, form_data, family_id, photo_url, status")
+        .in("id", ids)
+        .in("status", ["active", "suspended"]);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  const isLoading = enrollmentsLoading || studentsLoading;
 
   // Student payment plans
   const { data: studentPlans = [] } = useQuery({
@@ -156,10 +180,19 @@ export default function PaymentRegistration() {
 
   const grades = useMemo(() => [...new Set(sections.map((s: any) => s.grade_level))], [sections]);
 
+  // Build unified rows: enrolled students + unenrolled students
+  const allRows = useMemo(() => {
+    const enrolledIds = new Set(enrollments.map((e: any) => e.students?.id));
+    const unenrolled = allSchoolStudents
+      .filter((s: any) => !enrolledIds.has(s.id))
+      .map((s: any) => ({ id: `unenrolled-${s.id}`, students: s, sections: null, section_id: null }));
+    return [...enrollments, ...unenrolled];
+  }, [enrollments, allSchoolStudents]);
+
   const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
   const filtered = useMemo(() => {
-    let result = enrollments;
+    let result = allRows;
     if (gradeFilter !== "all") result = result.filter((e: any) => e.sections?.grade_level === gradeFilter);
     if (sectionFilter !== "all") result = result.filter((e: any) => e.section_id === sectionFilter);
     if (search.trim()) {
