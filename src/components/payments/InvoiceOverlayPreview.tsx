@@ -3,6 +3,7 @@ import { OVERLAY_FIELDS, InvoiceTemplate, OverlayField } from "@/pages/school/In
 // Demo data for preview
 const SAMPLE_DATA: Record<string, string> = {
   invoice_number:      "016725",
+  control_number:      "00-00016725",
   date_day:            "11",
   date_month:          "05",
   date_year:           "2026",

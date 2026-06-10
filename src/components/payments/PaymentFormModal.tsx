@@ -60,6 +60,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   // Invoice data
   const [invoice, setInvoice] = useState({ name: "", rif: "", phone: "", address: "" });
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [controlNumber, setControlNumber] = useState("");
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
   const autoSelectedRef = useRef(false);
@@ -162,6 +163,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
       setMethods([createMethodLine()]);
       setObservations("");
       setInvoiceNumber("");
+      setControlNumber("");
       if (fromReport) {
         setObservations(`Confirmación del reporte ${fromReport.reference_code || ""} · ${fromReport.notes || ""}`.trim());
         const m = createMethodLine();
@@ -268,6 +270,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         status: "completed",
         observations: observations || null,
         invoice_number: invoiceNumber.trim(),
+        control_number: controlNumber.trim(),
         invoice_name: invoice.name || null,
         invoice_rif: invoice.rif || null,
         invoice_phone: invoice.phone || null,
@@ -375,10 +378,14 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                   <Label className="text-xs">N° de Factura <span className="text-destructive">*</span></Label>
                   <Input className="h-8 text-sm" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Obligatorio" required />
                 </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">N° de Control</Label>
+                  <Input className="h-8 text-sm" value={controlNumber} onChange={(e) => setControlNumber(e.target.value)} placeholder="ej: 00-00016725" />
+                </div>
                 <div className="space-y-1"><Label className="text-xs">RIF / Cédula</Label><Input className="h-8 text-sm" value={invoice.rif} onChange={(e) => setInvoice({ ...invoice, rif: e.target.value })} /></div>
                 <div className="space-y-1"><Label className="text-xs">Nombre / Razón Social</Label><Input className="h-8 text-sm" value={invoice.name} onChange={(e) => setInvoice({ ...invoice, name: e.target.value })} /></div>
                 <div className="space-y-1"><Label className="text-xs">Teléfono</Label><Input className="h-8 text-sm" value={invoice.phone} onChange={(e) => setInvoice({ ...invoice, phone: e.target.value })} /></div>
-                <div className="space-y-1 md:col-span-4"><Label className="text-xs">Dirección</Label><Input className="h-8 text-sm" value={invoice.address} onChange={(e) => setInvoice({ ...invoice, address: e.target.value })} /></div>
+                <div className="space-y-1 md:col-span-3"><Label className="text-xs">Dirección</Label><Input className="h-8 text-sm" value={invoice.address} onChange={(e) => setInvoice({ ...invoice, address: e.target.value })} /></div>
               </div>
             </CardContent>
           </Card>

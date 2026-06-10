@@ -6,6 +6,7 @@ const CANVAS_W = 560; // px display width
 /** Sample values for the static (non-concept) fields */
 const STATIC_SAMPLE: Record<string, string> = {
   invoice_number:      "016725",
+  control_number:      "00-00016725",
   date_day:            "11",
   date_month:          "05",
   date_year:           "2026",

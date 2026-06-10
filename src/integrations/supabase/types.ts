@@ -2265,6 +2265,8 @@ export type Database = {
           concept_id: string
           created_at: string
           currency: string | null
+          discount_type: string
+          discount_value: number
           display_order: number
           due_day: number | null
           due_month: number | null
@@ -2278,6 +2280,8 @@ export type Database = {
           concept_id: string
           created_at?: string
           currency?: string | null
+          discount_type?: string
+          discount_value?: number
           display_order?: number
           due_day?: number | null
           due_month?: number | null
@@ -2291,6 +2295,8 @@ export type Database = {
           concept_id?: string
           created_at?: string
           currency?: string | null
+          discount_type?: string
+          discount_value?: number
           display_order?: number
           due_day?: number | null
           due_month?: number | null
@@ -2505,6 +2511,7 @@ export type Database = {
           created_at: string
           created_by: string
           id: string
+          control_number: string
           invoice_address: string | null
           invoice_name: string | null
           invoice_number: string
@@ -2523,6 +2530,7 @@ export type Database = {
           voided_by: string | null
         }
         Insert: {
+          control_number?: string
           created_at?: string
           created_by: string
           id?: string
@@ -2544,6 +2552,7 @@ export type Database = {
           voided_by?: string | null
         }
         Update: {
+          control_number?: string
           created_at?: string
           created_by?: string
           id?: string
