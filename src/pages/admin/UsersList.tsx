@@ -295,6 +295,16 @@ export default function UsersList() {
 
         if (roleError) throw roleError;
 
+        // Update password if provided
+        if (formData.password) {
+          const { data: pwdData, error: pwdError } = await supabase.functions.invoke(
+            "update-user-password",
+            { body: { user_id: editingUserId, new_password: formData.password } }
+          );
+          if (pwdError) throw pwdError;
+          if (pwdData?.error) throw new Error(pwdData.error);
+        }
+
         toast.success("Usuario actualizado correctamente");
       } else {
         // Create new user via edge function
