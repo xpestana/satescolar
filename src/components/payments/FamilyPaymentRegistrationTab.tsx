@@ -41,12 +41,35 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
   const [historyFamily, setHistoryFamily] = useState<FamilyRow | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
-  // Inscripciones del año activo con datos del estudiante (incluye status y family_id)
+  // Estudiantes activos/suspendidos del colegio (inscritos o no).
+  // Egresados/culminados quedan excluidos junto con sus cuotas.
+  const { data: schoolStudents = [], isLoading: studentsLoading } = useQuery({
+    queryKey: ["family-reg-students", schoolId],
+    queryFn: async () => {
+      const { data: ss, error: ssError } = await supabase
+        .from("student_schools")
+        .select("student_id")
+        .eq("school_id", schoolId);
+      if (ssError) throw ssError;
+      const ids = ss.map((r: any) => r.student_id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, document_id, form_data, family_id, photo_url, status")
+        .in("id", ids)
+        .in("status", ["active", "suspended"]);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Inscripciones del año activo (para mostrar grado/sección si está inscrito)
   const { data: enrollments = [], isLoading: enrollmentsLoading } = useQuery({
     queryKey: ["family-reg-enrollments", schoolId, activeYear?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("enrollments")
-        .select("*, students(id, document_id, form_data, family_id, photo_url, status), sections(id, name, grade_level)")
+        .select("*, sections(id, name, grade_level)")
         .eq("school_id", schoolId)
         .eq("school_year_id", activeYear.id)
         .order("created_at");
@@ -56,10 +79,10 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
     enabled: !!schoolId && !!activeYear?.id,
   });
 
-  // Familias de los estudiantes inscritos
+  // Familias de los estudiantes activos/suspendidos
   const familyIds = useMemo(
-    () => [...new Set(enrollments.map((e: any) => e.students?.family_id).filter(Boolean))] as string[],
-    [enrollments],
+    () => [...new Set(schoolStudents.map((s: any) => s.family_id).filter(Boolean))] as string[],
+    [schoolStudents],
   );
 
   const { data: families = [], isLoading: familiesLoading } = useQuery({
@@ -117,22 +140,23 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
     return map;
   }, [allBalances]);
 
-  // Filas: una por familia con hijos inscritos
+  // Filas: una por familia con hijos activos/suspendidos (inscritos o no)
   const allRows: FamilyRow[] = useMemo(() => {
+    const enrollmentByStudent: Record<string, any> = {};
+    enrollments.forEach((e: any) => { enrollmentByStudent[e.student_id] = e; });
     const byFamily: Record<string, any[]> = {};
-    enrollments.forEach((e: any) => {
-      const fid = e.students?.family_id;
-      if (!fid) return;
-      if (!byFamily[fid]) byFamily[fid] = [];
-      byFamily[fid].push(e);
+    schoolStudents.forEach((s: any) => {
+      if (!s.family_id) return;
+      if (!byFamily[s.family_id]) byFamily[s.family_id] = [];
+      byFamily[s.family_id].push(s);
     });
     return families
       .map((f: any) => {
-        const childEnrollments = byFamily[f.id] || [];
-        const children: FamilyChildRow[] = childEnrollments.map((e: any) => ({
-          student: e.students,
-          enrollment: e,
-          plan: planMap[e.students?.id] || null,
+        const childStudents = byFamily[f.id] || [];
+        const children: FamilyChildRow[] = childStudents.map((s: any) => ({
+          student: s,
+          enrollment: enrollmentByStudent[s.id] || null,
+          plan: planMap[s.id] || null,
         }));
         const pending = children.reduce((s, c) => s + (balanceMap[c.student?.id] || 0), 0);
         return {
@@ -149,7 +173,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
           `${b.family.father_last_name || ""} ${b.family.mother_last_name || ""}`,
         ),
       );
-  }, [families, enrollments, planMap, balanceMap]);
+  }, [families, schoolStudents, enrollments, planMap, balanceMap]);
 
   const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -184,7 +208,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
     enabled: visibleUserIds.length > 0,
   });
 
-  const isLoading = enrollmentsLoading || familiesLoading;
+  const isLoading = studentsLoading || enrollmentsLoading || familiesLoading;
 
   const familyName = (f: any) => [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "Sin apellidos";
 
@@ -208,7 +232,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Familia</TableHead>
-                  <TableHead>Estudiantes Inscritos</TableHead>
+                  <TableHead>Estudiantes</TableHead>
                   <TableHead>Saldo Pendiente</TableHead>
                   <TableHead className="w-48">Acción</TableHead>
                 </TableRow>
@@ -233,9 +257,13 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
                         {row.children.map((c) => (
                           <div key={c.student.id} className="flex flex-wrap items-center gap-1.5 text-sm">
                             <span className="font-medium">{studentFullName(c.student)}</span>
-                            <Badge variant="outline" className="text-[10px]">
-                              {formatGradeLevel(c.enrollment?.sections?.grade_level)}{c.enrollment?.sections?.name ? ` - ${c.enrollment.sections.name}` : ""}
-                            </Badge>
+                            {c.enrollment ? (
+                              <Badge variant="outline" className="text-[10px]">
+                                {formatGradeLevel(c.enrollment?.sections?.grade_level)}{c.enrollment?.sections?.name ? ` - ${c.enrollment.sections.name}` : ""}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] text-muted-foreground">No inscrito</Badge>
+                            )}
                             <Badge variant={c.student?.status === "active" ? "secondary" : "destructive"} className="text-[10px]">
                               {c.student?.status === "active" ? "Activo" : c.student?.status === "suspended" ? "Suspendido" : c.student?.status || "—"}
                             </Badge>
@@ -276,7 +304,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
                   </TableRow>
                 ))}
                 {filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No se encontraron familias con estudiantes inscritos</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No se encontraron familias con estudiantes activos</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

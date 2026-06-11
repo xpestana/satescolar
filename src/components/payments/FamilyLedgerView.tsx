@@ -40,12 +40,35 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
   const [voidPaymentId, setVoidPaymentId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
 
-  // Inscripciones del año activo
-  const { data: enrollments = [], isLoading } = useQuery({
+  // Estudiantes activos/suspendidos del colegio (inscritos o no).
+  // Egresados/culminados quedan excluidos junto con sus cuotas.
+  const { data: schoolStudents = [], isLoading } = useQuery({
+    queryKey: ["family-ledger-students", schoolId],
+    queryFn: async () => {
+      const { data: ss, error: ssError } = await supabase
+        .from("student_schools")
+        .select("student_id")
+        .eq("school_id", schoolId);
+      if (ssError) throw ssError;
+      const ids = ss.map((r: any) => r.student_id);
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from("students")
+        .select("id, document_id, form_data, family_id, status")
+        .in("id", ids)
+        .in("status", ["active", "suspended"]);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Inscripciones del año activo (para mostrar grado/sección si está inscrito)
+  const { data: enrollments = [] } = useQuery({
     queryKey: ["family-ledger-enrollments", schoolId, activeYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
-        .select("*, students(id, document_id, form_data, family_id), sections(name, grade_level)")
+        .select("*, sections(name, grade_level)")
         .eq("school_id", schoolId)
         .eq("school_year_id", activeYear.id);
       return data || [];
@@ -54,8 +77,8 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
   });
 
   const familyIds = useMemo(
-    () => [...new Set(enrollments.map((e: any) => e.students?.family_id).filter(Boolean))] as string[],
-    [enrollments],
+    () => [...new Set(schoolStudents.map((s: any) => s.family_id).filter(Boolean))] as string[],
+    [schoolStudents],
   );
 
   const { data: families = [] } = useQuery({
@@ -69,28 +92,34 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
     enabled: familyIds.length > 0,
   });
 
-  const enrollmentsByFamily = useMemo(() => {
-    const map: Record<string, any[]> = {};
-    enrollments.forEach((e: any) => {
-      const fid = e.students?.family_id;
-      if (!fid) return;
-      if (!map[fid]) map[fid] = [];
-      map[fid].push(e);
+  const enrollmentByStudent = useMemo(() => {
+    const m: Record<string, any> = {};
+    enrollments.forEach((e: any) => { m[e.student_id] = e; });
+    return m;
+  }, [enrollments]);
+
+  // Hijos activos/suspendidos por familia, cada uno con su inscripción si la tiene
+  const childrenByFamily = useMemo(() => {
+    const map: Record<string, Array<{ student: any; enrollment: any | null }>> = {};
+    schoolStudents.forEach((s: any) => {
+      if (!s.family_id) return;
+      if (!map[s.family_id]) map[s.family_id] = [];
+      map[s.family_id].push({ student: s, enrollment: enrollmentByStudent[s.id] || null });
     });
     return map;
-  }, [enrollments]);
+  }, [schoolStudents, enrollmentByStudent]);
 
   const familyName = (f: any) => [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "Sin apellidos";
 
   const selectedFamily = families.find((f: any) => f.id === selectedFamilyId);
-  const familyEnrollments = selectedFamilyId ? (enrollmentsByFamily[selectedFamilyId] || []) : [];
-  const childIds = useMemo(() => familyEnrollments.map((e: any) => e.students?.id).filter(Boolean), [familyEnrollments]);
+  const familyChildren = selectedFamilyId ? (childrenByFamily[selectedFamilyId] || []) : [];
+  const childIds = useMemo(() => familyChildren.map((c) => c.student?.id).filter(Boolean), [familyChildren]);
 
   const studentNameMap = useMemo(() => {
     const m: Record<string, string> = {};
-    familyEnrollments.forEach((e: any) => { m[e.students?.id] = studentFullName(e.students); });
+    familyChildren.forEach((c) => { m[c.student?.id] = studentFullName(c.student); });
     return m;
-  }, [familyEnrollments]);
+  }, [familyChildren]);
 
   // Pagos: familiares + individuales históricos de los hijos
   const { data: payments = [] } = useQuery({
@@ -158,16 +187,16 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
 
   const filteredFamilies = useMemo(() => {
     const rows = families
-      .filter((f: any) => (enrollmentsByFamily[f.id] || []).length > 0)
+      .filter((f: any) => (childrenByFamily[f.id] || []).length > 0)
       .sort((a: any, b: any) => familyName(a).localeCompare(familyName(b)));
     if (!search.trim()) return rows;
     const q = normalize(search);
     return rows.filter((f: any) => {
       if (normalize(familyName(f)).includes(q)) return true;
-      return (enrollmentsByFamily[f.id] || []).some((e: any) =>
-        normalize(studentFullName(e.students)).includes(q) || normalize(e.students?.document_id || "").includes(q));
+      return (childrenByFamily[f.id] || []).some((c) =>
+        normalize(studentFullName(c.student)).includes(q) || normalize(c.student?.document_id || "").includes(q));
     });
-  }, [families, enrollmentsByFamily, search]);
+  }, [families, childrenByFamily, search]);
 
   const totalCharges = useMemo(() => balances.reduce((s: number, b: any) => s + (b.total_amount || 0), 0), [balances]);
   const totalDebt = useMemo(() => balances.reduce((s: number, b: any) => s + (b.balance || 0), 0), [balances]);
@@ -197,7 +226,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
     let grade = "";
     let section = "";
     if (!payment.family_id && payment.student_id) {
-      const e = familyEnrollments.find((en: any) => en.students?.id === payment.student_id);
+      const e = enrollmentByStudent[payment.student_id];
       grade = e?.sections?.grade_level || "";
       section = e?.sections?.name || "";
     }
@@ -293,7 +322,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
           <CardContent className="p-0">
             {isLoading ? <div className="space-y-3 my-6">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
               <Table>
-                <TableHeader><TableRow><TableHead>Familia</TableHead><TableHead>Estudiantes Inscritos</TableHead><TableHead className="w-20"></TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Familia</TableHead><TableHead>Estudiantes</TableHead><TableHead className="w-20"></TableHead></TableRow></TableHeader>
                 <TableBody>
                   {filteredFamilies.map((f: any) => (
                     <TableRow key={f.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedFamilyId(f.id)}>
@@ -307,9 +336,9 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1.5">
-                          {(enrollmentsByFamily[f.id] || []).map((e: any) => (
-                            <Badge key={e.id} variant="outline" className="text-xs">
-                              {studentFullName(e.students)} · {formatGradeLevel(e.sections?.grade_level)}{e.sections?.name ? ` - ${e.sections.name}` : ""}
+                          {(childrenByFamily[f.id] || []).map((c) => (
+                            <Badge key={c.student.id} variant="outline" className="text-xs">
+                              {studentFullName(c.student)} · {c.enrollment ? `${formatGradeLevel(c.enrollment.sections?.grade_level)}${c.enrollment.sections?.name ? ` - ${c.enrollment.sections.name}` : ""}` : "No inscrito"}
                             </Badge>
                           ))}
                         </div>
@@ -333,7 +362,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
 
       {/* Family summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Familia</p><p className="font-bold">{familyName(selectedFamily)}</p><p className="text-xs text-muted-foreground mt-1">{familyEnrollments.length} estudiante(s) inscrito(s)</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Familia</p><p className="font-bold">{familyName(selectedFamily)}</p><p className="text-xs text-muted-foreground mt-1">{familyChildren.length} estudiante(s)</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Total Cargos</p><p className="font-bold">{totalCharges.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Total Pagado</p><p className="font-bold text-green-600">{totalPaid.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Saldo Pendiente</p><p className={`font-bold ${totalDebt > 0 ? "text-destructive" : "text-green-600"}`}>{totalDebt.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></CardContent></Card>
@@ -346,15 +375,15 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
           <Table>
             <TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead>Total</TableHead><TableHead>Pagado</TableHead><TableHead>Pendiente</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
             <TableBody>
-              {familyEnrollments.map((e: any) => {
-                const sid = e.students?.id;
+              {familyChildren.map((c) => {
+                const sid = c.student?.id;
                 const childBalances = balancesByStudent[sid] || [];
                 return [
                   <TableRow key={`header-${sid}`} className="bg-muted/40 hover:bg-muted/40">
                     <TableCell colSpan={5}>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">{studentFullName(e.students)}</span>
-                        <Badge variant="outline" className="text-xs">{formatGradeLevel(e.sections?.grade_level)}{e.sections?.name ? ` - ${e.sections.name}` : ""}</Badge>
+                        <span className="font-semibold">{studentFullName(c.student)}</span>
+                        <Badge variant="outline" className="text-xs">{c.enrollment ? `${formatGradeLevel(c.enrollment.sections?.grade_level)}${c.enrollment.sections?.name ? ` - ${c.enrollment.sections.name}` : ""}` : "No inscrito"}</Badge>
                       </div>
                     </TableCell>
                   </TableRow>,

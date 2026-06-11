@@ -333,7 +333,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                   <p className="font-medium flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{familyName}</p>
                 </div>
                 <div><span className="text-muted-foreground">Correo:</span><p className="font-medium">{family?.email || "—"}</p></div>
-                <div><span className="text-muted-foreground">Estudiantes inscritos:</span><p className="font-medium">{familyStudents.length}</p></div>
+                <div><span className="text-muted-foreground">Estudiantes:</span><p className="font-medium">{familyStudents.length}</p></div>
               </div>
             </CardContent>
           </Card>
@@ -367,7 +367,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
             </CardHeader>
             <CardContent>
               {familyStudents.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">Esta familia no tiene estudiantes inscritos en el año escolar activo.</p>
+                <p className="text-sm text-muted-foreground py-4 text-center">Esta familia no tiene estudiantes activos.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -387,7 +387,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                       const childBalances = (balancesByStudent[sid] || []).filter((b: any) => b.balance > 0);
                       const allSelected = childBalances.length > 0 && childBalances.every((b: any) => b.id in selectedConcepts);
                       const childSelected = selectedTotalByStudent[sid] || 0;
-                      const grade = formatGradeLevel(child.enrollment?.sections?.grade_level);
+                      const grade = child.enrollment ? formatGradeLevel(child.enrollment?.sections?.grade_level) : "No inscrito";
                       const section = child.enrollment?.sections?.name || "";
                       return [
                         <TableRow key={`header-${sid}`} className="bg-muted/40 hover:bg-muted/40">
