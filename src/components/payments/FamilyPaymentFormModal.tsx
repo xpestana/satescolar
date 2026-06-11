@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,10 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, Receipt, AlertTriangle, CheckCheck } from "lucide-react";
+import { Plus, Trash2, Loader2, Receipt, AlertTriangle, Users } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
+import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 
 interface PaymentMethodLine {
   id: string;
@@ -30,8 +30,6 @@ interface PaymentMethodLine {
   details: string;
 }
 
-import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
-
 const today = () => new Date().toISOString().split("T")[0];
 
 function createMethodLine(): PaymentMethodLine {
@@ -40,31 +38,35 @@ function createMethodLine(): PaymentMethodLine {
 
 const EXCHANGE_RATE_TOLERANCE_VES = 1.0;
 
+export interface FamilyChildRow {
+  student: any;
+  enrollment: any;
+  plan: any | null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  student: any;
-  enrollment: any;
+  family: any; // { id, user_id, father_last_name, mother_last_name, email? }
+  familyStudents: FamilyChildRow[];
   schoolId: string;
   schoolYearId: string;
-  initialStudentPlan?: any;
-  fromReport?: any;
   onSaved?: (paymentId: string) => void;
 }
 
-export function PaymentFormModal({ open, onOpenChange, student, enrollment, schoolId, schoolYearId, initialStudentPlan, fromReport, onSaved }: Props) {
+export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStudents, schoolId, schoolYearId, onSaved }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  // Invoice data
   const [invoice, setInvoice] = useState({ name: "", rif: "", phone: "", address: "" });
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [controlNumber, setControlNumber] = useState("");
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
-  const autoSelectedRef = useRef(false);
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
+
+  const studentIds = useMemo(() => familyStudents.map((c) => c.student?.id).filter(Boolean), [familyStudents]);
 
   // Load school payment methods
   const { data: schoolMethods = [] } = useQuery({
@@ -76,7 +78,6 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     enabled: open,
   });
 
-  // Build method options from school config, fallback to METHOD_TYPE_LABELS if none configured
   const methodOptions = schoolMethods.length > 0
     ? schoolMethods.map((sm: any) => ({ value: sm.id, label: `${sm.label}`, config: sm.config, method_type: sm.method_type }))
     : Object.entries(METHOD_TYPE_LABELS).map(([k, v]) => ({ value: k, label: v, config: {}, method_type: k }));
@@ -91,59 +92,39 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     enabled: open,
   });
 
-  // Load student plan + balances
-  const { data: studentPlan } = useQuery({
-    queryKey: ["student-payment-plan", student?.id, schoolId, schoolYearId],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("student_payment_plans")
-        .select("*, payment_plans(name)")
-        .eq("student_id", student.id)
-        .eq("school_year_id", schoolYearId)
-        .eq("school_id", schoolId)
-        .order("assigned_at", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (error) throw error;
-      return data?.[0] || null;
-    },
-    initialData: initialStudentPlan || undefined,
-    enabled: open && !!student?.id,
-  });
-
+  // Balances de todos los hijos de la familia
   const { data: balances = [] } = useQuery({
-    queryKey: ["student-balances", student?.id, schoolYearId],
+    queryKey: ["family-students-balances", family?.id, schoolYearId, studentIds],
     queryFn: async () => {
       const { data, error } = await supabase.from("student_concept_balances")
         .select("*, payment_plan_concepts(amount, display_order, is_mandatory, is_recurring, due_day, payment_concepts(name, concept_type))")
-        .eq("student_id", student.id)
+        .in("student_id", studentIds)
         .eq("school_year_id", schoolYearId)
         .eq("school_id", schoolId)
         .order("updated_at");
       if (error) throw error;
-      return data;
+      return data || [];
     },
-    enabled: open && !!student?.id,
+    enabled: open && studentIds.length > 0,
   });
 
-  // Load representative for invoice defaults
+  // Representante principal para prefill de factura
   const { data: primaryRep } = useQuery({
-    queryKey: ["primary-rep", student?.family_id],
+    queryKey: ["primary-rep", family?.id],
     queryFn: async () => {
       const { data } = await supabase.from("representatives")
         .select("*")
-        .eq("family_id", student.family_id)
+        .eq("family_id", family.id)
         .eq("is_primary", true)
         .maybeSingle();
       return data;
     },
-    enabled: open && !!student?.family_id,
+    enabled: open && !!family?.id,
   });
 
-  // Set invoice defaults from representative
   useEffect(() => {
     if (primaryRep && open) {
       const fd = primaryRep.form_data as Record<string, any> | null;
-      // Use document_id directly — it already contains the prefix (e.g. "V-12345678")
       const doc = primaryRep.document_id || "";
       const fullName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
       setInvoice({
@@ -155,49 +136,22 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     }
   }, [primaryRep, open]);
 
-  // Reset on open + prefill from report if any
+  // Reset on open
   useEffect(() => {
     if (open) {
-      autoSelectedRef.current = false;
       setSelectedConcepts({});
       setMethods([createMethodLine()]);
       setObservations("");
       setInvoiceNumber("");
       setControlNumber("");
-      if (fromReport) {
-        setObservations(`Confirmación del reporte ${fromReport.reference_code || ""} · ${fromReport.notes || ""}`.trim());
-        const m = createMethodLine();
-        m.method = fromReport.school_payment_method_id || m.method;
-        m.currency = fromReport.currency_reported || "VES";
-        m.amount_original = String(fromReport.amount_reported || "");
-        m.bank_name = fromReport.payer_bank_name || "";
-        m.reference_code = fromReport.reference_code || "";
-        m.payment_date = fromReport.payment_date || today();
-        const r = m.currency === "VES" ? 1 : (rates.find((x) => x.currency === m.currency)?.rate_to_ves || 1);
-        m.exchange_rate = String(r);
-        m.amount_ves = ((parseFloat(m.amount_original) || 0) * r).toFixed(2);
-        m.details = `Reportado por familia · ${fromReport.payer_document || ""} ${fromReport.payer_phone || ""}`.trim();
-        setMethods([m]);
-      }
     }
-  }, [open, fromReport]);
-
-  // Auto-select concept matching the payment report
-  useEffect(() => {
-    if (!open || !fromReport || autoSelectedRef.current || balances.length === 0) return;
-    const match = balances.find((b: any) => b.plan_concept_id === fromReport.plan_concept_id && b.balance > 0);
-    if (match) {
-      setSelectedConcepts({ [match.id]: match.balance.toFixed(2) });
-      autoSelectedRef.current = true;
-    }
-  }, [balances, open, fromReport]);
+  }, [open]);
 
   const getRate = (currency: string) => {
     if (currency === "VES") return 1;
     return rates.find((r) => r.currency === currency)?.rate_to_ves || 0;
   };
 
-  // Recalc method VES when currency/amount/rate changes
   const updateMethodField = (id: string, field: string, value: string) => {
     setMethods((prev) => prev.map((m) => {
       if (m.id !== id) return m;
@@ -223,24 +177,46 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     });
   };
 
-  // Cierra un saldo residual (típicamente diferencia por tasa de cambio) marcándolo como pagado
-  const closeBalanceMut = useMutation({
-    mutationFn: async (bal: any) => {
-      const { error } = await supabase.from("student_concept_balances").update({
-        paid_amount: bal.total_amount,
-        balance: 0,
-        status: "paid",
-        last_payment_date: today(),
-      }).eq("id", bal.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["student-balances"] });
-      qc.invalidateQueries({ queryKey: ["all-student-balances"] });
-      toast({ title: "Concepto marcado como completo", description: "El saldo residual fue ajustado por diferencia cambiaria." });
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
+  // Balances agrupados por hijo (solo pendientes)
+  const balancesByStudent = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    balances.forEach((b: any) => {
+      if (!map[b.student_id]) map[b.student_id] = [];
+      map[b.student_id].push(b);
+    });
+    return map;
+  }, [balances]);
+
+  const studentName = (student: any) => [
+    (student?.form_data as any)?.primer_nombre,
+    (student?.form_data as any)?.segundo_nombre,
+    (student?.form_data as any)?.primer_apellido,
+    (student?.form_data as any)?.segundo_apellido,
+  ].filter(Boolean).join(" ") || "Sin nombre";
+
+  // Selecciona/deselecciona todos los pendientes de un hijo
+  const toggleAllForStudent = (studentId: string) => {
+    const pendings = (balancesByStudent[studentId] || []).filter((b: any) => b.balance > 0);
+    const allSelected = pendings.length > 0 && pendings.every((b: any) => b.id in selectedConcepts);
+    setSelectedConcepts((prev) => {
+      const next = { ...prev };
+      pendings.forEach((b: any) => {
+        if (allSelected) delete next[b.id];
+        else next[b.id] = b.balance.toFixed(2);
+      });
+      return next;
+    });
+  };
+
+  const selectedTotalByStudent = useMemo(() => {
+    const map: Record<string, number> = {};
+    Object.entries(selectedConcepts).forEach(([balanceId, amountStr]) => {
+      const bal = balances.find((b: any) => b.id === balanceId);
+      if (!bal) return;
+      map[bal.student_id] = (map[bal.student_id] || 0) + (parseFloat(amountStr) || 0);
+    });
+    return map;
+  }, [selectedConcepts, balances]);
 
   const totalConcepts = useMemo(() =>
     Object.values(selectedConcepts).reduce((s, v) => s + (parseFloat(v) || 0), 0), [selectedConcepts]);
@@ -250,7 +226,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   const difference = totalMethods - totalConcepts;
 
-  // Save payment
+  // Guardar pago familiar: 1 factura única, items atribuidos por hijo
   const saveMut = useMutation({
     mutationFn: async () => {
       if (!invoiceNumber.trim()) throw new Error("El N° de factura es obligatorio");
@@ -259,10 +235,10 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
       if (totalMethods <= 0) throw new Error("El monto total debe ser mayor a 0");
       if (Math.abs(difference) > 0.01 && difference < 0) throw new Error("El monto pagado es insuficiente para cubrir los conceptos seleccionados");
 
-      // Create payment
       const { data: payment, error: payErr } = await supabase.from("payments").insert({
         school_id: schoolId,
-        student_id: student.id,
+        student_id: null,
+        family_id: family.id,
         school_year_id: schoolYearId,
         created_by: user!.id,
         payment_date: methods[0]?.payment_date || today(),
@@ -275,17 +251,16 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         invoice_rif: invoice.rif || null,
         invoice_phone: invoice.phone || null,
         invoice_address: invoice.address || null,
-      }).select("id").single();
+      } as any).select("id").single();
       if (payErr) throw payErr;
 
-      // Insert payment items
       const items = Object.entries(selectedConcepts).map(([balanceId, amountStr]) => {
-        const bal = balances.find((b) => b.id === balanceId);
+        const bal = balances.find((b: any) => b.id === balanceId);
         const amount = parseFloat(amountStr) || 0;
         return {
           payment_id: payment.id,
           plan_concept_id: bal!.plan_concept_id,
-          student_id: student.id,
+          student_id: bal!.student_id,
           amount_ves: amount,
           is_partial: amount < (bal?.balance || 0) - 0.01,
         };
@@ -293,7 +268,6 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
       const { error: itemErr } = await supabase.from("payment_items").insert(items as any);
       if (itemErr) throw itemErr;
 
-      // Insert payment method entries
       const methodEntries = methods.filter((m) => parseFloat(m.amount_original) > 0).map((m) => ({
         payment_id: payment.id,
         method: m.method,
@@ -311,10 +285,10 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         if (methErr) throw methErr;
       }
 
-      // Update student concept balances
+      // Actualizar saldos de cada hijo
       for (const [balanceId, amountStr] of Object.entries(selectedConcepts)) {
         const amount = parseFloat(amountStr) || 0;
-        const bal = balances.find((b) => b.id === balanceId);
+        const bal = balances.find((b: any) => b.id === balanceId);
         if (!bal) continue;
         const newPaid = parseFloat(((bal.paid_amount || 0) + amount).toFixed(2));
         const newBalance = parseFloat(((bal.total_amount || 0) - newPaid).toFixed(2));
@@ -331,9 +305,10 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
       return payment.id;
     },
     onSuccess: (paymentId: string) => {
-      qc.invalidateQueries({ queryKey: ["student-balances"] });
+      qc.invalidateQueries({ queryKey: ["family-students-balances"] });
+      qc.invalidateQueries({ queryKey: ["families-payment-registration"] });
+      qc.invalidateQueries({ queryKey: ["all-student-balances"] });
       qc.invalidateQueries({ queryKey: ["payments"] });
-      qc.invalidateQueries({ queryKey: ["enrolled-students-payments"] });
       toast({ title: "Pago registrado exitosamente" });
       onSaved?.(paymentId);
       onOpenChange(false);
@@ -341,36 +316,29 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const studentName = student ? [
-    (student.form_data as any)?.primer_nombre,
-    (student.form_data as any)?.segundo_nombre,
-    (student.form_data as any)?.primer_apellido,
-    (student.form_data as any)?.segundo_apellido,
-  ].filter(Boolean).join(" ") : "";
-
-  const sectionName = enrollment?.sections?.name || "";
-  const gradeName = formatGradeLevel(enrollment?.sections?.grade_level);
-  const resolvedStudentPlan = studentPlan || initialStudentPlan;
+  const familyName = [family?.father_last_name, family?.mother_last_name].filter(Boolean).join(" ") || "Familia";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" />Registrar Pago</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" />Registrar Pago Familiar</DialogTitle></DialogHeader>
 
         <div className="space-y-6">
-          {/* Student Info */}
+          {/* Family Info */}
           <Card>
             <CardContent className="pt-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div><span className="text-muted-foreground">Estudiante:</span><p className="font-medium">{studentName}</p></div>
-                <div><span className="text-muted-foreground">Cédula:</span><p className="font-medium">{student?.document_id || "—"}</p></div>
-                <div><span className="text-muted-foreground">Grado/Sección:</span><p className="font-medium">{gradeName} - {sectionName}</p></div>
-                <div><span className="text-muted-foreground">Plan:</span><p className="font-medium">{resolvedStudentPlan?.payment_plans?.name || <Badge variant="destructive">Sin plan</Badge>}</p></div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Familia:</span>
+                  <p className="font-medium flex items-center gap-1.5"><Users className="h-4 w-4 text-primary" />{familyName}</p>
+                </div>
+                <div><span className="text-muted-foreground">Correo:</span><p className="font-medium">{family?.email || "—"}</p></div>
+                <div><span className="text-muted-foreground">Estudiantes inscritos:</span><p className="font-medium">{familyStudents.length}</p></div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Invoice Data */}
+          {/* Invoice Data — UNA factura para toda la familia */}
           <Card>
             <CardHeader className="py-3"><CardTitle className="text-sm">Datos de Factura</CardTitle></CardHeader>
             <CardContent>
@@ -391,15 +359,15 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
             </CardContent>
           </Card>
 
-          {/* Concepts Selection */}
+          {/* Concepts grouped by child */}
           <Card>
             <CardHeader className="py-3 flex flex-row items-center justify-between">
               <CardTitle className="text-sm">Conceptos a Cancelar</CardTitle>
               <Badge variant="outline">Total: {totalConcepts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</Badge>
             </CardHeader>
             <CardContent>
-              {balances.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">No hay conceptos pendientes. Asegúrese de que el alumno tenga un plan asignado con saldos inicializados.</p>
+              {familyStudents.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">Esta familia no tiene estudiantes inscritos en el año escolar activo.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -414,60 +382,81 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {balances.filter((b) => b.balance > 0).map((b: any) => {
-                      const conceptName = (b.payment_plan_concepts as any)?.payment_concepts?.name || "—";
-                      const cur = b.currency || "VES";
-                      const isSelected = b.id in selectedConcepts;
-                      return (
-                        <TableRow key={b.id} className={isSelected ? "bg-primary/5" : ""}>
-                          <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, b.balance)} /></TableCell>
-                          <TableCell className="font-medium">
-                            {conceptName}
-                            {cur !== "VES" && (
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                ({Number(b.original_amount || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur} @ {Number(b.exchange_rate_snapshot || 1).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
-                              </span>
+                    {familyStudents.map((child) => {
+                      const sid = child.student?.id;
+                      const childBalances = (balancesByStudent[sid] || []).filter((b: any) => b.balance > 0);
+                      const allSelected = childBalances.length > 0 && childBalances.every((b: any) => b.id in selectedConcepts);
+                      const childSelected = selectedTotalByStudent[sid] || 0;
+                      const grade = formatGradeLevel(child.enrollment?.sections?.grade_level);
+                      const section = child.enrollment?.sections?.name || "";
+                      return [
+                        <TableRow key={`header-${sid}`} className="bg-muted/40 hover:bg-muted/40">
+                          <TableCell>
+                            {childBalances.length > 0 && (
+                              <Checkbox checked={allSelected} onCheckedChange={() => toggleAllForStudent(sid)} title="Seleccionar todos los conceptos de este estudiante" />
                             )}
                           </TableCell>
-                          <TableCell>{b.total_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell className="font-medium">{b.balance?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell>
-                            <Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>
-                              {b.status === "paid" ? "Pagado" : b.status === "partial" ? "Parcial" : "Pendiente"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
+                          <TableCell colSpan={5}>
                             <div className="flex items-center gap-2">
-                              {isSelected && (
-                                <Input
-                                  type="number"
-                                  step="0.01"
-                                  className="h-7 w-28 text-xs"
-                                  value={selectedConcepts[b.id]}
-                                  onChange={(e) => {
-                                    const val = Math.min(parseFloat(e.target.value) || 0, b.balance);
-                                    setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
-                                  }}
-                                />
-                              )}
-                              {b.paid_amount > 0 && b.balance > 0 && b.balance < (b.total_amount * 0.05) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs gap-1"
-                                  title="Cerrar saldo residual por diferencia cambiaria"
-                                  disabled={closeBalanceMut.isPending}
-                                  onClick={() => closeBalanceMut.mutate(b)}
-                                >
-                                  <CheckCheck className="h-3 w-3" />
-                                  Marcar completo
-                                </Button>
-                              )}
+                              <span className="font-semibold">{studentName(child.student)}</span>
+                              <Badge variant="outline" className="text-xs">{grade}{section ? ` - ${section}` : ""}</Badge>
+                              {!child.plan && <Badge variant="destructive" className="text-xs">Sin plan</Badge>}
                             </div>
                           </TableCell>
-                        </TableRow>
-                      );
+                          <TableCell>
+                            {childSelected > 0 && (
+                              <span className="text-xs font-medium text-primary">{childSelected.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span>
+                            )}
+                          </TableCell>
+                        </TableRow>,
+                        ...(childBalances.length === 0 ? [
+                          <TableRow key={`empty-${sid}`}>
+                            <TableCell></TableCell>
+                            <TableCell colSpan={6} className="text-xs text-muted-foreground py-2">
+                              {child.plan ? "Sin conceptos pendientes — al día." : "Este estudiante no tiene plan de pago asignado."}
+                            </TableCell>
+                          </TableRow>,
+                        ] : childBalances.map((b: any) => {
+                          const conceptName = (b.payment_plan_concepts as any)?.payment_concepts?.name || "—";
+                          const cur = b.currency || "VES";
+                          const isSelected = b.id in selectedConcepts;
+                          return (
+                            <TableRow key={b.id} className={isSelected ? "bg-primary/5" : ""}>
+                              <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, b.balance)} /></TableCell>
+                              <TableCell className="font-medium">
+                                {conceptName}
+                                {cur !== "VES" && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    ({Number(b.original_amount || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur} @ {Number(b.exchange_rate_snapshot || 1).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell>{b.total_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell className="font-medium">{b.balance?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell>
+                                <Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>
+                                  {b.status === "paid" ? "Pagado" : b.status === "partial" ? "Parcial" : "Pendiente"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {isSelected && (
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    className="h-7 w-28 text-xs"
+                                    value={selectedConcepts[b.id]}
+                                    onChange={(e) => {
+                                      const val = Math.min(parseFloat(e.target.value) || 0, b.balance);
+                                      setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
+                                    }}
+                                  />
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })),
+                      ];
                     })}
                   </TableBody>
                 </Table>
@@ -542,7 +531,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
           {/* Summary */}
           <Card className={Math.abs(difference) > 0.01 ? "border-yellow-500" : "border-green-500"}>
-            <CardContent className="pt-4">
+            <CardContent className="pt-4 space-y-3">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Total Conceptos:</span><p className="text-lg font-bold">{totalConcepts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
                 <div><span className="text-muted-foreground">Total Pagado:</span><p className="text-lg font-bold">{totalMethods.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
@@ -555,8 +544,17 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                   </p>
                 </div>
               </div>
+              {Object.keys(selectedTotalByStudent).length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1 border-t">
+                  {familyStudents.filter((c) => (selectedTotalByStudent[c.student?.id] || 0) > 0).map((c) => (
+                    <Badge key={c.student.id} variant="secondary" className="text-xs">
+                      {studentName(c.student)}: {(selectedTotalByStudent[c.student.id] || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                    </Badge>
+                  ))}
+                </div>
+              )}
               {Math.abs(difference) > 0.01 && (
-                <div className="flex items-center gap-2 mt-2 text-xs text-yellow-600"><AlertTriangle className="h-4 w-4" />{difference > 0 ? "Existe un sobrepago. Verifique los montos." : "El monto pagado no cubre el total seleccionado."}</div>
+                <div className="flex items-center gap-2 text-xs text-yellow-600"><AlertTriangle className="h-4 w-4" />{difference > 0 ? "Existe un sobrepago. Verifique los montos." : "El monto pagado no cubre el total seleccionado."}</div>
               )}
             </CardContent>
           </Card>

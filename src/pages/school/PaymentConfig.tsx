@@ -20,8 +20,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Edit, Trash2, Loader2, Package, FileText, Link2, CreditCard } from "lucide-react";
+import { Plus, Edit, Trash2, Loader2, Package, FileText, Link2, CreditCard, Settings } from "lucide-react";
 import { PaymentMethodsTab } from "@/components/payments/PaymentMethodsTab";
+import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
 
 function calcFinalAmount(amount: number, discountType: string, discountValue: number): number {
   if (discountType === "percentage") return Math.max(0, amount * (1 - discountValue / 100));
@@ -658,10 +659,12 @@ export default function PaymentConfig() {
           <TabsTrigger value="concepts" className="gap-2"><Package className="h-4 w-4" />Conceptos</TabsTrigger>
           <TabsTrigger value="plans" className="gap-2"><FileText className="h-4 w-4" />Planes</TabsTrigger>
           <TabsTrigger value="methods" className="gap-2"><CreditCard className="h-4 w-4" />Métodos de Pago</TabsTrigger>
+          <TabsTrigger value="settings" className="gap-2"><Settings className="h-4 w-4" />Configuraciones</TabsTrigger>
         </TabsList>
         <TabsContent value="concepts"><ConceptsTab schoolId={schoolId} /></TabsContent>
         <TabsContent value="plans"><PlansTab schoolId={schoolId} /></TabsContent>
         <TabsContent value="methods"><PaymentMethodsTab schoolId={schoolId} /></TabsContent>
+        <TabsContent value="settings"><PaymentSettingsTab schoolId={schoolId} /></TabsContent>
       </Tabs>
     </DashboardLayout>
   );

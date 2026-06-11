@@ -22,11 +22,14 @@ import { formatGradeLevel } from "@/lib/utils";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
 import { PaymentHistoryModal } from "@/components/payments/PaymentHistoryModal";
 import { PaymentReportsTab } from "@/components/payments/PaymentReportsTab";
+import { FamilyPaymentRegistrationTab } from "@/components/payments/FamilyPaymentRegistrationTab";
+import { useBillingMode } from "@/hooks/useBillingMode";
 import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/ui/data-pagination";
 
 export default function PaymentRegistration() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
+  const { billingMode, isLoading: billingModeLoading } = useBillingMode(schoolId);
   const { toast } = useToast();
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -342,6 +345,13 @@ export default function PaymentRegistration() {
         <TabsContent value="registro">
       {!activeYear ? (
         <Card><CardContent className="py-8 text-center text-muted-foreground">No hay un año escolar activo configurado.</CardContent></Card>
+      ) : billingModeLoading ? (
+        <div className="space-y-3 py-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+      ) : billingMode === "family" ? (
+        <>
+          <FamilyPaymentRegistrationTab schoolId={schoolId} activeYear={activeYear} />
+          <ExchangeRateWidget schoolId={schoolId} />
+        </>
       ) : (
         <>
           {/* Filters */}

@@ -13,9 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, Search, AlertTriangle, Mail, Eye } from "lucide-react";
+import { useBillingMode } from "@/hooks/useBillingMode";
+import { DelinquentFamiliesView } from "@/components/payments/DelinquentFamiliesView";
 
 export default function DelinquentStudents() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
+  const { billingMode, isLoading: billingModeLoading } = useBillingMode(schoolId);
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -43,7 +46,7 @@ export default function DelinquentStudents() {
       if (error) throw error;
       return (data || []) as Array<{ student_id: string; total_owed: number; concepts: any[] }>;
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!activeYear?.id && billingMode === "student",
   });
 
   // Get enrollments for student info
@@ -141,7 +144,21 @@ export default function DelinquentStudents() {
     return notifications.filter((n: any) => n.student_id === selectedStudentId);
   }, [selectedStudentId, notifications]);
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
+  if (schoolLoading || !schoolId || billingModeLoading) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
+
+  // Modo familia: morosidad consolidada por familia
+  if (billingMode === "family") {
+    return (
+      <DashboardLayout>
+        <PageHeader title="Familias Morosas" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Morosos" }]} />
+        {activeYear?.id ? (
+          <DelinquentFamiliesView schoolId={schoolId} schoolYearId={activeYear.id} />
+        ) : (
+          <Card><CardContent className="py-8 text-center text-muted-foreground">No hay un año escolar activo configurado.</CardContent></Card>
+        )}
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

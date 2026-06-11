@@ -1,4 +1,4 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -6,27 +6,36 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, History, Trash2, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
+import { Loader2, History, Trash2, ChevronDown, ChevronRight, AlertTriangle, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  studentId: string;
-  studentName: string;
+  familyId: string;
+  familyName: string;
+  studentIds: string[];
+  studentNames: Record<string, string>;
   schoolId: string;
   schoolYearId: string;
 }
 
-export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName, schoolId, schoolYearId }: Props) {
+export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, familyName, studentIds, studentNames, schoolId, schoolYearId }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // Incluye pagos familiares (family_id) y pagos individuales históricos de los hijos
+  const orFilter = useMemo(() => {
+    const parts = [`family_id.eq.${familyId}`];
+    if (studentIds.length > 0) parts.push(`student_id.in.(${studentIds.join(",")})`);
+    return parts.join(",");
+  }, [familyId, studentIds]);
+
   const { data: payments = [], isLoading } = useQuery({
-    queryKey: ["student-payment-history", studentId, schoolYearId],
+    queryKey: ["family-payment-history", familyId, schoolYearId],
     queryFn: async () => {
       const { data, error } = (await supabase.from("payments")
         .select(`
@@ -34,7 +43,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
           payment_items!payment_items_payment_id_fkey(id, plan_concept_id, student_id, amount_ves, is_partial, payment_plan_concepts(payment_concepts(name))),
           payment_method_entries!payment_method_entries_payment_id_fkey(id, method, currency, amount_original, exchange_rate, amount_ves, reference_code, bank_name, payment_date)
         `)
-        .eq("student_id", studentId)
+        .or(orFilter)
         .eq("school_year_id", schoolYearId)
         .eq("school_id", schoolId)
         .order("payment_date", { ascending: false })
@@ -42,7 +51,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
       if (error) throw error;
       return (data || []) as any[];
     },
-    enabled: open && !!studentId,
+    enabled: open && !!familyId,
   });
 
   const { data: schoolMethods = [] } = useQuery({
@@ -65,10 +74,10 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
       const payment = payments.find((p: any) => p.id === paymentId);
       if (!payment) throw new Error("Pago no encontrado");
 
-      // 1) Reverse balances on student_concept_balances
+      // 1) Revertir saldos por hijo (item.student_id) con fallback al pago
       for (const item of payment.payment_items || []) {
-        // item.student_id cubre pagos familiares e items con backfill; fallback al pago/modal
-        const balanceStudentId = item.student_id ?? payment.student_id ?? studentId;
+        const balanceStudentId = item.student_id ?? payment.student_id;
+        if (!balanceStudentId) continue;
         const { data: bal } = await supabase.from("student_concept_balances")
           .select("*")
           .eq("student_id", balanceStudentId)
@@ -92,11 +101,11 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
       if (error) throw error;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["student-payment-history"] });
+      qc.invalidateQueries({ queryKey: ["family-payment-history"] });
+      qc.invalidateQueries({ queryKey: ["family-students-balances"] });
+      qc.invalidateQueries({ queryKey: ["families-payment-registration"] });
       qc.invalidateQueries({ queryKey: ["all-student-balances"] });
-      qc.invalidateQueries({ queryKey: ["student-balances"] });
-      qc.invalidateQueries({ queryKey: ["enrolled-students-payments"] });
-      toast({ title: "Pago eliminado", description: "Los saldos del estudiante fueron restaurados." });
+      toast({ title: "Pago eliminado", description: "Los saldos de los estudiantes fueron restaurados." });
       setConfirmDeleteId(null);
     },
     onError: (e: any) => toast({ title: "Error al eliminar", description: e.message, variant: "destructive" }),
@@ -112,14 +121,14 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
-            Historial de Pagos — {studentName}
+            Historial de Pagos — Familia {familyName}
           </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
           <div className="py-10 text-center"><Loader2 className="animate-spin h-6 w-6 mx-auto" /></div>
         ) : payments.length === 0 ? (
-          <Card><CardContent className="py-8 text-center text-muted-foreground">No hay pagos registrados para este estudiante.</CardContent></Card>
+          <Card><CardContent className="py-8 text-center text-muted-foreground">No hay pagos registrados para esta familia.</CardContent></Card>
         ) : (
           <>
             <div className="flex justify-between items-center mb-2 text-sm">
@@ -132,6 +141,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                   <TableHead className="w-8"></TableHead>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Factura</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead>Conceptos</TableHead>
                   <TableHead>Total VES</TableHead>
                   <TableHead>Estado</TableHead>
@@ -154,6 +164,13 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                         {p.invoice_name || "—"}
                         {p.invoice_rif && <div className="text-muted-foreground">{p.invoice_rif}</div>}
                       </TableCell>
+                      <TableCell>
+                        {p.family_id ? (
+                          <Badge variant="secondary" className="text-xs gap-1"><Users className="h-3 w-3" />Familiar</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">{studentNames[p.student_id] || "Estudiante"}</Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs">{(p.payment_items || []).length} concepto(s)</TableCell>
                       <TableCell className="font-medium">{Number(p.total_amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>
@@ -167,13 +184,18 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                     </TableRow>
                     {expanded[p.id] && (
                       <TableRow key={p.id + "-detail"} className="bg-muted/30">
-                        <TableCell colSpan={7} className="p-3">
+                        <TableCell colSpan={8} className="p-3">
                           <div className="grid md:grid-cols-2 gap-4 text-xs">
                             <div>
                               <p className="font-semibold mb-1">Conceptos pagados</p>
                               {(p.payment_items || []).map((it: any) => (
                                 <div key={it.id} className="flex justify-between border-b py-1">
-                                  <span>{it.payment_plan_concepts?.payment_concepts?.name || "Concepto"}{it.is_partial ? " (parcial)" : ""}</span>
+                                  <span>
+                                    {it.payment_plan_concepts?.payment_concepts?.name || "Concepto"}{it.is_partial ? " (parcial)" : ""}
+                                    {(it.student_id || p.student_id) && (
+                                      <span className="text-muted-foreground"> · {studentNames[it.student_id || p.student_id] || "Estudiante"}</span>
+                                    )}
+                                  </span>
                                   <span className="font-medium">{Number(it.amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span>
                                 </div>
                               ))}
@@ -207,7 +229,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-destructive" />Eliminar pago</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción eliminará el pago y restaurará los saldos pendientes de los conceptos asociados. No se puede deshacer.
+                Esta acción eliminará el pago y restaurará los saldos pendientes de los conceptos asociados de cada estudiante. No se puede deshacer.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
