@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -74,10 +74,12 @@ interface Props {
 export function EnrollStudentModal({ open, onOpenChange, student, activeYear, sections, schoolId, onSuccess }: Props) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [enrollmentType, setEnrollmentType] = useState("");
   const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split("T")[0]);
   const [observations, setObservations] = useState("");
+  const [selectedPlanId, setSelectedPlanId] = useState("none");
 
   // Fetch existing enrollment data for pre-population
   const { data: existingEnrollment } = useQuery({
@@ -96,6 +98,40 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!student.id && !!activeYear.id && !!schoolId && student.isEnrolled,
   });
 
+  // Planes de pago activos del colegio (asignación opcional al inscribir)
+  const { data: availablePlans = [] } = useQuery({
+    queryKey: ["available-plans", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_plans")
+        .select("id, name, description")
+        .eq("school_id", schoolId)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId && open,
+  });
+
+  // Plan actual del estudiante (si ya tiene uno asignado este año)
+  const { data: currentPlan } = useQuery({
+    queryKey: ["student-current-plan", student.id, activeYear.id, schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("student_payment_plans")
+        .select("id, plan_id")
+        .eq("student_id", student.id)
+        .eq("school_year_id", activeYear.id)
+        .eq("school_id", schoolId)
+        .order("assigned_at", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data?.[0] || null;
+    },
+    enabled: !!student.id && !!activeYear.id && !!schoolId && open,
+  });
+
   // Pre-populate form when existing enrollment loads
   useEffect(() => {
     if (existingEnrollment && open) {
@@ -105,6 +141,11 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       setObservations(existingEnrollment.observations || "");
     }
   }, [existingEnrollment, open]);
+
+  // Pre-populate plan select with the student's current plan
+  useEffect(() => {
+    if (open) setSelectedPlanId(currentPlan?.plan_id || "none");
+  }, [currentPlan, open]);
 
   // Reset when modal closes
   useEffect(() => {
@@ -229,8 +270,34 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         } as any, { onConflict: "student_id,school_year_id,school_id" });
 
       if (error) throw error;
+
+      // Asignación opcional de plan de pago ("none" = dejar sin plan por ahora)
+      if (selectedPlanId && selectedPlanId !== "none") {
+        if (currentPlan) {
+          if (currentPlan.plan_id !== selectedPlanId) {
+            const { error: planErr } = await supabase
+              .from("student_payment_plans")
+              .update({ plan_id: selectedPlanId, assigned_at: new Date().toISOString() })
+              .eq("id", currentPlan.id);
+            if (planErr) throw planErr;
+          }
+        } else {
+          const { error: planErr } = await supabase
+            .from("student_payment_plans")
+            .insert({
+              student_id: student.id,
+              plan_id: selectedPlanId,
+              school_id: schoolId,
+              school_year_id: activeYear.id,
+            });
+          if (planErr) throw planErr;
+        }
+      }
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-student-plans"] });
+      qc.invalidateQueries({ queryKey: ["all-student-balances"] });
+      qc.invalidateQueries({ queryKey: ["student-current-plan"] });
       toast({ title: "Estudiante inscrito", description: "La inscripción se realizó correctamente." });
       onSuccess();
     },
@@ -412,6 +479,21 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
               <SelectContent>
                 {ENROLLMENT_TYPES.map(type => (
                   <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium">Plan de Pago</Label>
+            <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Sin plan por ahora..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin plan por ahora</SelectItem>
+                {availablePlans.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -1,14 +1,18 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, CreditCard, AlertTriangle, History, Users } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, CreditCard, AlertTriangle, History, Users, Loader2 } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/ui/data-pagination";
 import { FamilyPaymentFormModal, type FamilyChildRow } from "@/components/payments/FamilyPaymentFormModal";
 import { FamilyPaymentHistoryModal } from "@/components/payments/FamilyPaymentHistoryModal";
@@ -34,12 +38,19 @@ const studentFullName = (student: any) => {
 };
 
 export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [paymentFamily, setPaymentFamily] = useState<FamilyRow | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [historyFamily, setHistoryFamily] = useState<FamilyRow | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Asignación de plan por estudiante
+  const [planOpen, setPlanOpen] = useState(false);
+  const [planChild, setPlanChild] = useState<FamilyChildRow | null>(null);
+  const [planId, setPlanId] = useState("");
 
   // Estudiantes activos/suspendidos del colegio (inscritos o no).
   // Egresados/culminados quedan excluidos junto con sus cuotas.
@@ -139,6 +150,85 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
     });
     return map;
   }, [allBalances]);
+
+  // Planes disponibles para asignación
+  const { data: availablePlans = [] } = useQuery({
+    queryKey: ["available-plans", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("payment_plans")
+        .select("id, name, description")
+        .eq("school_id", schoolId)
+        .eq("is_active", true)
+        .order("name");
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  const invalidatePlans = () => {
+    qc.invalidateQueries({ queryKey: ["all-student-plans"] });
+    qc.invalidateQueries({ queryKey: ["all-student-balances"] });
+    qc.invalidateQueries({ queryKey: ["family-students-balances"] });
+  };
+
+  const assignPlanMut = useMutation({
+    mutationFn: async () => {
+      if (!planChild?.student?.id || !planId || !activeYear?.id) throw new Error("Datos incompletos");
+      const currentPlan = planMap[planChild.student.id];
+      if (currentPlan) {
+        if (currentPlan.plan_id === planId) return;
+        const { error } = await supabase
+          .from("student_payment_plans")
+          .update({ plan_id: planId, assigned_at: new Date().toISOString() })
+          .eq("id", currentPlan.id);
+        if (error) throw error;
+        return;
+      }
+      const { error } = await supabase
+        .from("student_payment_plans")
+        .insert({
+          student_id: planChild.student.id,
+          plan_id: planId,
+          school_id: schoolId,
+          school_year_id: activeYear.id,
+        });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidatePlans();
+      toast({ title: planMap[planChild?.student?.id || ""] ? "Plan actualizado exitosamente" : "Plan asignado exitosamente" });
+      setPlanOpen(false);
+      setPlanId("");
+      setPlanChild(null);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const removePlanMut = useMutation({
+    mutationFn: async () => {
+      const currentPlan = planMap[planChild?.student?.id || ""];
+      if (!currentPlan) return;
+      const { error } = await supabase
+        .from("student_payment_plans")
+        .delete()
+        .eq("id", currentPlan.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidatePlans();
+      toast({ title: "Plan retirado", description: "Los pagos registrados se conservaron en el historial." });
+      setPlanOpen(false);
+      setPlanId("");
+      setPlanChild(null);
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const openPlanDialog = (child: FamilyChildRow) => {
+    setPlanChild(child);
+    setPlanId(planMap[child.student?.id]?.plan_id || "");
+    setPlanOpen(true);
+  };
 
   // Filas: una por familia con hijos activos/suspendidos (inscritos o no)
   const allRows: FamilyRow[] = useMemo(() => {
@@ -267,7 +357,25 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
                             <Badge variant={c.student?.status === "active" ? "secondary" : "destructive"} className="text-[10px]">
                               {c.student?.status === "active" ? "Activo" : c.student?.status === "suspended" ? "Suspendido" : c.student?.status || "—"}
                             </Badge>
-                            {!c.plan && <Badge variant="destructive" className="text-[10px]">Sin plan</Badge>}
+                            {c.plan ? (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] cursor-pointer hover:bg-muted"
+                                title="Cambiar plan de pago"
+                                onClick={() => openPlanDialog(c)}
+                              >
+                                {c.plan?.payment_plans?.name || "Plan"}
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="destructive"
+                                className="text-[10px] cursor-pointer hover:opacity-80"
+                                title="Asignar plan de pago"
+                                onClick={() => openPlanDialog(c)}
+                              >
+                                Sin plan
+                              </Badge>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -346,6 +454,61 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
           schoolYearId={activeYear.id}
         />
       )}
+
+      {/* Assign Plan Dialog */}
+      <Dialog open={planOpen} onOpenChange={(v) => { if (!v) { setPlanOpen(false); setPlanId(""); setPlanChild(null); } else setPlanOpen(v); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{planMap[planChild?.student?.id || ""] ? "Cambiar Plan de Pago" : "Asignar Plan de Pago"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm">
+              <span className="text-muted-foreground">Estudiante: </span>
+              <span className="font-medium">{planChild ? studentFullName(planChild.student) : ""}</span>
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Seleccione el plan de pago para este estudiante. Si cambia o retira el plan, los pagos ya registrados se conservarán en el historial.
+            </p>
+            {planMap[planChild?.student?.id || ""] && (
+              <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                <span className="text-muted-foreground">Plan actual: </span>
+                <span className="font-medium">{planMap[planChild?.student?.id || ""]?.payment_plans?.name || "—"}</span>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Plan de Pago *</Label>
+              <Select value={planId} onValueChange={setPlanId}>
+                <SelectTrigger><SelectValue placeholder="Seleccione un plan" /></SelectTrigger>
+                <SelectContent>
+                  {availablePlans.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      {p.description ? ` — ${p.description}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            {planMap[planChild?.student?.id || ""] && (
+              <Button
+                variant="destructive"
+                onClick={() => removePlanMut.mutate()}
+                disabled={removePlanMut.isPending || assignPlanMut.isPending}
+              >
+                {removePlanMut.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
+                Dejar sin plan
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setPlanOpen(false)}>Cancelar</Button>
+            <Button onClick={() => assignPlanMut.mutate()} disabled={!planId || assignPlanMut.isPending}>
+              {assignPlanMut.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
+              {planMap[planChild?.student?.id || ""] ? "Guardar cambio" : "Asignar Plan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
