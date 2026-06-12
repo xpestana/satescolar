@@ -20,6 +20,7 @@ import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeader
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
 import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { ViewTeacherModal } from "@/components/search/ViewTeacherModal";
+import { ViewFamilyModal } from "@/components/families/ViewFamilyModal";
 import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 import {
   DndContext,
@@ -104,6 +105,7 @@ export default function AdvancedSearch() {
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [exportColumns, setExportColumns] = useState<string[] | null>(null);
   const [viewRecord, setViewRecord] = useState<any>(null);
+  const [viewFamilyId, setViewFamilyId] = useState<string | null>(null);
   const [filterPrimary, setFilterPrimary] = useState<boolean | null>(null);
 
   const sensors = useSensors(
@@ -769,7 +771,7 @@ export default function AdvancedSearch() {
                               <div className="flex items-center gap-0.5">
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setViewRecord(record)}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => formType === "teacher" ? setViewRecord(record) : setViewFamilyId((record as any).family_id)}>
                                       <Eye className="h-4 w-4" />
                                     </Button>
                                   </TooltipTrigger>
@@ -836,13 +838,12 @@ export default function AdvancedSearch() {
       </div>
 
       {formType !== "teacher" ? (
-        <ViewRecordModal
-          open={!!viewRecord}
-          onClose={() => setViewRecord(null)}
-          record={viewRecord}
-          formType={formType as "student" | "representative"}
-          columns={orderedActiveColumns}
-          getTextValue={getTextValue}
+        <ViewFamilyModal
+          open={!!viewFamilyId}
+          onClose={() => setViewFamilyId(null)}
+          familyId={viewFamilyId || ""}
+          schoolId={schoolId || ""}
+          onSuspendToggle={() => {}}
         />
       ) : (
         <ViewTeacherModal
