@@ -47,11 +47,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Eye, 
-  EyeOff, 
+  Plus,
+  Trash2,
+  Edit,
   GripVertical,
   Type,
   Mail,
@@ -63,7 +61,8 @@ import {
   CheckSquare,
   Upload,
   ArrowLeft,
-  FolderOpen
+  FolderOpen,
+  Camera,
 } from "lucide-react";
 import { FormGroupsManager } from "@/components/forms/FormGroupsManager";
 import { isEffectivelyRequired, isProtectedField } from "@/lib/protected-fields";
@@ -196,10 +195,47 @@ export default function FormFieldsEditor() {
     enabled: !!schoolId && isValidType,
   });
 
-  const displayFields: FormField[] = fields.map((field) => ({
-    ...field,
-    is_required: isEffectivelyRequired(formType, field.field_name, field.is_required),
-  }));
+  const photoField = fields.find((f) => f.field_name === "foto_perfil") ?? null;
+
+  const displayFields: FormField[] = fields
+    .filter((f) => f.field_name !== "foto_perfil")
+    .map((field) => ({
+      ...field,
+      is_required: isEffectivelyRequired(formType, field.field_name, field.is_required),
+    }));
+
+  // Insert the photo field for this school/formType if it doesn't exist yet
+  const insertPhotoFieldMutation = useMutation({
+    mutationFn: async () => {
+      if (!schoolId) throw new Error("No school");
+      const { error } = await supabase
+        .from("form_fields")
+        .upsert(
+          {
+            school_id: schoolId,
+            form_type: formType,
+            field_name: "foto_perfil",
+            field_label: "Foto de Perfil",
+            field_type: "file",
+            is_required: true,
+            is_visible: true,
+            field_order: -1,
+          },
+          { onConflict: "school_id,form_type,field_name", ignoreDuplicates: true },
+        );
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["form-fields"] });
+    },
+  });
+
+  useEffect(() => {
+    if (isLoading || isLoadingSchool || !schoolId || !isValidType) return;
+    if (!photoField) {
+      insertPhotoFieldMutation.mutate();
+    }
+  }, [isLoading, isLoadingSchool, schoolId, isValidType, photoField]);
 
   // Fetch form field groups
   const { data: groups = [] } = useQuery({
@@ -478,67 +514,52 @@ export default function FormFieldsEditor() {
             <TableBody>
               {isLoading || isLoadingSchool ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Cargando...
                   </TableCell>
                 </TableRow>
-              ) : displayFields.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    No hay campos configurados. Haz clic en "Agregar Campo" para comenzar.
-                  </TableCell>
-                </TableRow>
               ) : (
-                displayFields.map((field, index) => {
-                  const TypeIcon = getFieldTypeIcon(field.field_type);
-                  const isProtected = isProtectedField(formType, field.field_name);
-                  return (
-                    <TableRow key={field.id} className={!field.is_visible ? "opacity-50" : ""}>
+                <>
+                  {/* Photo field — always first, only required is togglable */}
+                  {photoField && (
+                    <TableRow>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <GripVertical className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">{index + 1}</span>
+                          <GripVertical className="h-4 w-4 text-muted-foreground opacity-0" />
+                          <span className="text-muted-foreground">0</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div>
-                            <p className="font-medium">{field.field_label}</p>
-                            <p className="text-xs text-muted-foreground">{field.field_name}</p>
+                            <p className="font-medium">Foto de Perfil</p>
+                            <p className="text-xs text-muted-foreground">foto_perfil</p>
                           </div>
-                          {isProtected && (
-                            <Badge variant="outline" className="text-xs border-amber-300 text-amber-600">
-                              Obligatorio
-                            </Badge>
-                          )}
+                          <Badge variant="secondary" className="text-xs">Sistema</Badge>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">
-                          {groups.find(g => g.id === field.group_id)?.name || "Sin grupo"}
-                        </Badge>
+                        <Badge variant="secondary">—</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <TypeIcon className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{getFieldTypeLabel(field.field_type)}</span>
+                          <Camera className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">Imagen</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <button
                           type="button"
-                          disabled={isProtected || toggleRequiredMutation.isPending}
+                          disabled={toggleRequiredMutation.isPending}
                           onClick={() =>
-                            !isProtected &&
                             toggleRequiredMutation.mutate({
-                              id: field.id,
-                              is_required: !field.is_required,
+                              id: photoField.id,
+                              is_required: !photoField.is_required,
                             })
                           }
-                          className="disabled:cursor-not-allowed disabled:opacity-60"
-                          title={isProtected ? "Este campo es siempre obligatorio" : field.is_required ? "Clic para quitar requerido" : "Clic para marcar como requerido"}
+                          title={photoField.is_required ? "Clic para quitar requerido" : "Clic para marcar como requerido"}
                         >
-                          {field.is_required ? (
+                          {photoField.is_required ? (
                             <Badge variant="default" className="bg-primary hover:bg-primary/80 cursor-pointer transition-colors">Sí</Badge>
                           ) : (
                             <Badge variant="outline" className="hover:border-primary hover:text-primary cursor-pointer transition-colors">No</Badge>
@@ -546,38 +567,112 @@ export default function FormFieldsEditor() {
                         </button>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Switch
-                          checked={field.is_visible}
-                          disabled={isProtected}
-                          onCheckedChange={(checked) => 
-                            toggleVisibilityMutation.mutate({ id: field.id, is_visible: checked })
-                          }
-                        />
+                        <Switch checked={true} disabled />
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditModal(field)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteId(field.id)}
-                            disabled={isProtected}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:cursor-not-allowed"
-                            title={isProtected ? "Este campo es obligatorio y no se puede eliminar" : undefined}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                      <TableCell className="text-right" />
+                    </TableRow>
+                  )}
+
+                  {displayFields.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        {photoField
+                          ? 'Haz clic en "Agregar Campo" para añadir más campos al formulario.'
+                          : 'No hay campos configurados. Haz clic en "Agregar Campo" para comenzar.'}
                       </TableCell>
                     </TableRow>
-                  );
-                })
+                  ) : (
+                    displayFields.map((field, index) => {
+                      const TypeIcon = getFieldTypeIcon(field.field_type);
+                      const isProtected = isProtectedField(formType, field.field_name);
+                      return (
+                        <TableRow key={field.id} className={!field.is_visible ? "opacity-50" : ""}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <GripVertical className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">{index + 1}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <p className="font-medium">{field.field_label}</p>
+                                <p className="text-xs text-muted-foreground">{field.field_name}</p>
+                              </div>
+                              {isProtected && (
+                                <Badge variant="outline" className="text-xs border-amber-300 text-amber-600">
+                                  Obligatorio
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {groups.find(g => g.id === field.group_id)?.name || "Sin grupo"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <TypeIcon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{getFieldTypeLabel(field.field_type)}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <button
+                              type="button"
+                              disabled={isProtected || toggleRequiredMutation.isPending}
+                              onClick={() =>
+                                !isProtected &&
+                                toggleRequiredMutation.mutate({
+                                  id: field.id,
+                                  is_required: !field.is_required,
+                                })
+                              }
+                              className="disabled:cursor-not-allowed disabled:opacity-60"
+                              title={isProtected ? "Este campo es siempre obligatorio" : field.is_required ? "Clic para quitar requerido" : "Clic para marcar como requerido"}
+                            >
+                              {field.is_required ? (
+                                <Badge variant="default" className="bg-primary hover:bg-primary/80 cursor-pointer transition-colors">Sí</Badge>
+                              ) : (
+                                <Badge variant="outline" className="hover:border-primary hover:text-primary cursor-pointer transition-colors">No</Badge>
+                              )}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Switch
+                              checked={field.is_visible}
+                              disabled={isProtected}
+                              onCheckedChange={(checked) =>
+                                toggleVisibilityMutation.mutate({ id: field.id, is_visible: checked })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditModal(field)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setDeleteId(field.id)}
+                                disabled={isProtected}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                                title={isProtected ? "Este campo es obligatorio y no se puede eliminar" : undefined}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </>
               )}
             </TableBody>
           </Table>

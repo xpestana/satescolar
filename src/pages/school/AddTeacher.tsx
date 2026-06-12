@@ -212,10 +212,13 @@ export default function AddTeacher() {
     setFormData((prev) => ({ ...prev, [fieldName]: value }));
   };
 
+  const isPhotoRequired = formFields.find((f) => f.field_name === "foto_perfil")?.is_required ?? true;
+  const visibleFormFields = formFields.filter((f) => f.field_name !== "foto_perfil");
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!photoBlob && !existingTeacher?.photo_url) {
+    if (isPhotoRequired && !photoBlob && !existingTeacher?.photo_url) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -291,7 +294,7 @@ export default function AddTeacher() {
         {isDataReady ? (
           <GroupedFormFields
             key={isEditing ? existingTeacher?.id : 'new'}
-            fields={formFields}
+            fields={visibleFormFields}
             groups={formGroups}
             formData={formData}
             onFieldChange={handleFieldChange}
