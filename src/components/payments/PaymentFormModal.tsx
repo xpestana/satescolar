@@ -236,11 +236,15 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   useEffect(() => {
     if (!open || !fromReport || autoSelectedRef.current || balances.length === 0) return;
     const match = balances.find((b: any) => b.plan_concept_id === fromReport.plan_concept_id && b.balance > 0);
-    if (match) {
-      setSelectedConcepts({ [match.id]: match.balance.toFixed(2) });
-      autoSelectedRef.current = true;
-    }
-  }, [balances, open, fromReport]);
+    if (!match) return;
+    const matchCurrency = match.currency || "VES";
+    if (matchCurrency !== "VES" && rates.length === 0) return; // Wait for rates to load before calculating
+    const currentRate = matchCurrency === "VES" ? 1 : (rates.find((r: any) => r.currency === matchCurrency)?.rate_to_ves || match.exchange_rate_snapshot || 1);
+    const displayTotal = matchCurrency === "VES" ? (match.total_amount || 0) : (match.original_amount || 0) * currentRate;
+    const displayBalance = Math.max(0, displayTotal - (match.paid_amount || 0));
+    setSelectedConcepts({ [match.id]: displayBalance.toFixed(2) });
+    autoSelectedRef.current = true;
+  }, [balances, rates, open, fromReport]);
 
   const getRate = (currency: string) => {
     if (currency === "VES") return 1;
