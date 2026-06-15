@@ -25,6 +25,16 @@ export default function PaymentDashboard() {
     enabled: !!schoolId,
   });
 
+  // School payment methods (para resolver UUID → label en el resumen)
+  const { data: schoolMethods = [] } = useQuery({
+    queryKey: ["school-payment-methods", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("school_payment_methods").select("id, label, method_type").eq("school_id", schoolId!).eq("is_active", true);
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
   // Recent payments
   const { data: recentPayments = [], isLoading } = useQuery({
     queryKey: ["recent-payments", schoolId, activeYear?.id],
@@ -69,16 +79,23 @@ export default function PaymentDashboard() {
   ).size;
   const delinquentCount = billingMode === "family" ? delinquentFamilies : delinquentStudents;
 
-  // Today methods breakdown
+  // Today methods breakdown — resuelve UUID de school_payment_method a su label
+  const methodLabelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (schoolMethods as any[]).forEach((sm) => { map[sm.id] = sm.label; });
+    return map;
+  }, [schoolMethods]);
+
   const todayByMethod = useMemo(() => {
     const map: Record<string, number> = {};
     todayPayments.forEach((p: any) => {
       (p.payment_method_entries || []).forEach((m: any) => {
-        map[m.method] = (map[m.method] || 0) + (m.amount_ves || 0);
+        const label = methodLabelMap[m.method] || m.method;
+        map[label] = (map[label] || 0) + (m.amount_ves || 0);
       });
     });
     return Object.entries(map);
-  }, [todayPayments]);
+  }, [todayPayments, methodLabelMap]);
 
   if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
@@ -146,7 +163,7 @@ export default function PaymentDashboard() {
           <CardContent>
             {isLoading ? <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div> : (
               <Table>
-                <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>{billingMode === "family" ? "Estudiante / Familia" : "Estudiante"}</TableHead><TableHead>Monto</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>{billingMode === "family" ? "Estudiante / Familia" : "Estudiante"}</TableHead><TableHead>N° Factura</TableHead><TableHead>N° Control</TableHead><TableHead>Monto</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {recentPayments.slice(0, 10).map((p: any) => {
                     const fd = p.students?.form_data as any;
@@ -157,6 +174,8 @@ export default function PaymentDashboard() {
                       <TableRow key={p.id}>
                         <TableCell className="text-xs">{new Date(p.payment_date).toLocaleDateString("es-VE")}</TableCell>
                         <TableCell className="text-sm">{name}</TableCell>
+                        <TableCell className="text-xs font-mono">{p.invoice_number || "—"}</TableCell>
+                        <TableCell className="text-xs font-mono">{p.control_number || "—"}</TableCell>
                         <TableCell className="font-medium text-sm">{p.total_amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       </TableRow>
                     );
