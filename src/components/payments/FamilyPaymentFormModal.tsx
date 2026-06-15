@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,9 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, Receipt, AlertTriangle, Users } from "lucide-react";
+import { Plus, Trash2, Loader2, Receipt, AlertTriangle, Users, Pencil } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
+
+interface InvoiceProfile {
+  id: string;
+  name: string;
+  rif: string;
+  phone: string;
+  address: string;
+}
 
 interface PaymentMethodLine {
   id: string;
@@ -60,6 +68,10 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
   const qc = useQueryClient();
 
   const [invoice, setInvoice] = useState({ name: "", rif: "", phone: "", address: "" });
+  const [invoiceReady, setInvoiceReady] = useState(false);
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [includeOtros, setIncludeOtros] = useState(false);
+  const invoiceInitializedRef = useRef(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [controlNumber, setControlNumber] = useState("");
   const [observations, setObservations] = useState("");
@@ -92,6 +104,19 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
     enabled: open,
   });
 
+  // Datos de la familia: default de factura guardado + campos de contacto
+  const { data: familyData, isLoading: isLoadingFamily } = useQuery({
+    queryKey: ["family-default-invoice", family?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("families")
+        .select("default_invoice, contact_phone, address")
+        .eq("id", family.id)
+        .single();
+      return data;
+    },
+    enabled: open && !!family?.id,
+  });
+
   // Balances de todos los hijos de la familia
   const { data: balances = [] } = useQuery({
     queryKey: ["family-students-balances", family?.id, schoolYearId, studentIds],
@@ -108,37 +133,65 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
     enabled: open && studentIds.length > 0,
   });
 
-  // Representante principal para prefill de factura
-  const { data: primaryRep } = useQuery({
-    queryKey: ["primary-rep", family?.id],
+  // Todos los representantes de la familia (para prefill con prioridad: principal → primero)
+  const { data: representatives = [], isLoading: isLoadingReps } = useQuery({
+    queryKey: ["family-representatives", family?.id],
     queryFn: async () => {
       const { data } = await supabase.from("representatives")
         .select("*")
         .eq("family_id", family.id)
-        .eq("is_primary", true)
-        .maybeSingle();
-      return data;
+        .order("created_at");
+      return data || [];
     },
     enabled: open && !!family?.id,
   });
 
+  const effectivePrimaryRep = useMemo(() =>
+    representatives.find((r: any) => r.is_primary) || representatives[0] || null,
+    [representatives]
+  );
+
+  const profiles = useMemo((): InvoiceProfile[] => {
+    const raw = familyData?.default_invoice;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw as InvoiceProfile[];
+    const obj = raw as any;
+    if (obj.name || obj.rif) return [{ id: crypto.randomUUID(), name: obj.name || "", rif: obj.rif || "", phone: obj.phone || "", address: obj.address || "" }];
+    return [];
+  }, [familyData]);
+
+  // Inicializar datos de factura una sola vez por apertura del modal
   useEffect(() => {
-    if (primaryRep && open) {
-      const fd = primaryRep.form_data as Record<string, any> | null;
-      const doc = primaryRep.document_id || "";
-      const fullName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
-      setInvoice({
-        rif: doc,
-        name: fullName || "",
-        phone: primaryRep.phone || fd?.numero_contacto || "",
-        address: "",
-      });
+    if (!open || invoiceInitializedRef.current || isLoadingFamily || isLoadingReps) return;
+
+    if (profiles.length === 0) {
+      // Sin perfiles guardados: pre-llenar desde representante o campos de familia
+      if (effectivePrimaryRep) {
+        const fd = effectivePrimaryRep.form_data as Record<string, any> | null;
+        const fullName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
+        setInvoice({
+          rif: effectivePrimaryRep.document_id || "",
+          name: fullName || "",
+          phone: effectivePrimaryRep.phone || fd?.numero_contacto || (familyData as any)?.contact_phone || "",
+          address: (familyData as any)?.address || "",
+        });
+      } else {
+        setInvoice({ name: "", rif: "", phone: (familyData as any)?.contact_phone || "", address: (familyData as any)?.address || "" });
+      }
     }
-  }, [primaryRep, open]);
+    // Si hay perfiles, el usuario elige desde la lista — no pre-llenamos ni confirmamos
+
+    invoiceInitializedRef.current = true;
+  }, [open, familyData, profiles, effectivePrimaryRep, isLoadingFamily, isLoadingReps]);
 
   // Reset on open
   useEffect(() => {
     if (open) {
+      invoiceInitializedRef.current = false;
+      setInvoice({ name: "", rif: "", phone: "", address: "" });
+      setInvoiceReady(false);
+      setEditingProfileId(null);
+      setIncludeOtros(false);
       setSelectedConcepts({});
       setMethods([createMethodLine()]);
       setObservations("");
@@ -226,6 +279,42 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
 
   const difference = totalMethods - totalConcepts;
 
+  // Guardar o actualizar perfil de factura en el array de la familia
+  const saveProfileMut = useMutation({
+    mutationFn: async () => {
+      const current = Array.isArray(familyData?.default_invoice) ? (familyData!.default_invoice as InvoiceProfile[]) : [];
+      const profileId = editingProfileId || crypto.randomUUID();
+      const newProfile: InvoiceProfile = { id: profileId, name: invoice.name, rif: invoice.rif, phone: invoice.phone, address: invoice.address };
+      const updated = editingProfileId
+        ? current.map((p) => p.id === editingProfileId ? newProfile : p)
+        : [...current, newProfile];
+      const { error } = await supabase.from("families").update({ default_invoice: updated } as any).eq("id", family.id);
+      if (error) throw error;
+      return profileId;
+    },
+    onSuccess: (profileId) => {
+      qc.invalidateQueries({ queryKey: ["family-default-invoice", family.id] });
+      setEditingProfileId(profileId);
+      toast({ title: editingProfileId ? "Perfil actualizado" : "Perfil de factura guardado" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Eliminar perfil de factura del array
+  const deleteProfileMut = useMutation({
+    mutationFn: async (profileId: string) => {
+      const current = Array.isArray(familyData?.default_invoice) ? (familyData!.default_invoice as InvoiceProfile[]) : [];
+      const updated = current.filter((p) => p.id !== profileId);
+      const { error } = await supabase.from("families").update({ default_invoice: updated } as any).eq("id", family.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["family-default-invoice", family.id] });
+      toast({ title: "Perfil eliminado" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   // Guardar pago familiar: 1 factura única, items atribuidos por hijo
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -302,6 +391,18 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
           last_payment_date: today(),
         }).eq("id", balanceId);
       }
+
+      // Guardar sobrepago en "Otros" si el usuario lo indicó
+      if (includeOtros && difference > 0.01) {
+        await supabase.from("payment_others").insert({
+          payment_id: payment.id,
+          school_id: schoolId,
+          amount_ves: parseFloat(difference.toFixed(2)),
+          invoice_number: invoiceNumber.trim() || null,
+          created_by: user!.id,
+        });
+      }
+
       return payment.id;
     },
     onSuccess: (paymentId: string) => {
@@ -320,7 +421,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[70vw] max-w-[70vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" />Registrar Pago Familiar</DialogTitle></DialogHeader>
 
         <div className="space-y-6">
@@ -338,11 +439,10 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
             </CardContent>
           </Card>
 
-          {/* Invoice Data — UNA factura para toda la familia */}
+          {/* N° Factura y N° Control — datos por pago, siempre visibles */}
           <Card>
-            <CardHeader className="py-3"><CardTitle className="text-sm">Datos de Factura</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">N° de Factura <span className="text-destructive">*</span></Label>
                   <Input className="h-8 text-sm" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Obligatorio" required />
@@ -351,14 +451,74 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                   <Label className="text-xs">N° de Control</Label>
                   <Input className="h-8 text-sm" value={controlNumber} onChange={(e) => setControlNumber(e.target.value)} placeholder="ej: 00-00016725" />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Datos del cliente para la factura */}
+          <Card>
+            <CardHeader className="py-3"><CardTitle className="text-sm">Datos de Factura</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {/* Lista de perfiles guardados */}
+              {profiles.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground font-medium">Perfiles guardados — haz clic para seleccionar</p>
+                  {profiles.map((p) => (
+                    <div
+                      key={p.id}
+                      className={`flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer hover:bg-accent transition-colors ${editingProfileId === p.id ? "border-primary bg-primary/5" : ""}`}
+                      onClick={() => { setInvoice({ name: p.name, rif: p.rif, phone: p.phone, address: p.address }); setInvoiceReady(true); setEditingProfileId(null); }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{p.name || p.rif || "Sin nombre"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{[p.phone, p.address].filter(Boolean).join(" · ")}</p>
+                      </div>
+                      <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" title="Editar perfil" onClick={() => { setInvoice({ name: p.name, rif: p.rif, phone: p.phone, address: p.address }); setEditingProfileId(p.id); setInvoiceReady(false); }}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" title="Eliminar perfil" disabled={deleteProfileMut.isPending} onClick={() => deleteProfileMut.mutate(p.id)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-1" />
+                </div>
+              )}
+
+              {/* Campos editables */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="space-y-1"><Label className="text-xs">RIF / Cédula</Label><Input className="h-8 text-sm" value={invoice.rif} onChange={(e) => setInvoice({ ...invoice, rif: e.target.value })} /></div>
                 <div className="space-y-1"><Label className="text-xs">Nombre / Razón Social</Label><Input className="h-8 text-sm" value={invoice.name} onChange={(e) => setInvoice({ ...invoice, name: e.target.value })} /></div>
                 <div className="space-y-1"><Label className="text-xs">Teléfono</Label><Input className="h-8 text-sm" value={invoice.phone} onChange={(e) => setInvoice({ ...invoice, phone: e.target.value })} /></div>
                 <div className="space-y-1 md:col-span-3"><Label className="text-xs">Dirección</Label><Input className="h-8 text-sm" value={invoice.address} onChange={(e) => setInvoice({ ...invoice, address: e.target.value })} /></div>
               </div>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={() => saveProfileMut.mutate()}
+                  disabled={saveProfileMut.isPending}
+                >
+                  {saveProfileMut.isPending && <Loader2 className="animate-spin h-3 w-3 mr-1" />}
+                  {editingProfileId ? "Actualizar perfil" : "Guardar como predeterminado"}
+                </Button>
+                {!invoiceReady ? (
+                  <Button size="sm" onClick={() => setInvoiceReady(true)}>
+                    Confirmar datos de factura
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => { setInvoiceReady(false); setEditingProfileId(null); }}>
+                    Editar datos de factura
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
 
+          {invoiceReady && <>
           {/* Concepts grouped by child */}
           <Card>
             <CardHeader className="py-3 flex flex-row items-center justify-between">
@@ -530,16 +690,16 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
           </div>
 
           {/* Summary */}
-          <Card className={Math.abs(difference) > 0.01 ? "border-yellow-500" : "border-green-500"}>
+          <Card className={difference < -0.01 ? "border-destructive" : (difference > 0.01 && !includeOtros) ? "border-yellow-500" : "border-green-500"}>
             <CardContent className="pt-4 space-y-3">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Total Conceptos:</span><p className="text-lg font-bold">{totalConcepts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
                 <div><span className="text-muted-foreground">Total Pagado:</span><p className="text-lg font-bold">{totalMethods.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
                 <div>
                   <span className="text-muted-foreground">Diferencia:</span>
-                  <p className={`text-lg font-bold ${Math.abs(difference) < 0.01 ? "text-green-600" : difference > 0 ? "text-blue-600" : "text-destructive"}`}>
+                  <p className={`text-lg font-bold ${Math.abs(difference) < 0.01 ? "text-green-600" : difference > 0 ? (includeOtros ? "text-green-600" : "text-blue-600") : "text-destructive"}`}>
                     {difference > 0 ? "+" : ""}{difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
-                    {difference > 0.01 && " (Sobrepago)"}
+                    {difference > 0.01 && (includeOtros ? " → Otros" : " (Sobrepago)")}
                     {difference < -0.01 && " (Insuficiente)"}
                   </p>
                 </div>
@@ -553,8 +713,32 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                   ))}
                 </div>
               )}
-              {Math.abs(difference) > 0.01 && (
-                <div className="flex items-center gap-2 text-xs text-yellow-600"><AlertTriangle className="h-4 w-4" />{difference > 0 ? "Existe un sobrepago. Verifique los montos." : "El monto pagado no cubre el total seleccionado."}</div>
+              {difference > 0.01 && (
+                <div className="flex items-center justify-between border-t pt-2">
+                  {!includeOtros ? (
+                    <>
+                      <div className="flex items-center gap-2 text-xs text-yellow-600">
+                        <AlertTriangle className="h-4 w-4" />
+                        Existe un sobrepago de {difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES.
+                      </div>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setIncludeOtros(true)}>
+                        + Agregar a Otros
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 text-xs text-green-600">
+                        <span className="font-medium">{difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span> se registrarán en <span className="font-medium">Otros</span> al guardar.
+                      </div>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => setIncludeOtros(false)}>
+                        Quitar
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+              {difference < -0.01 && (
+                <div className="flex items-center gap-2 text-xs text-destructive"><AlertTriangle className="h-4 w-4" />El monto pagado no cubre el total seleccionado.</div>
               )}
             </CardContent>
           </Card>
@@ -566,6 +750,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
               Registrar Pago
             </Button>
           </div>
+          </>}
         </div>
       </DialogContent>
     </Dialog>
