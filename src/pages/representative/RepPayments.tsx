@@ -56,7 +56,7 @@ export default function RepPayments() {
       try {
         const result = await ensureFreshBcvRates();
         if (!cancelled && result.updated) {
-          qc.invalidateQueries({ queryKey: ["family-delinquent-balances-rep"] });
+          qc.invalidateQueries({ queryKey: ["family-all-balances-rep"] });
         }
       } catch {
         if (!cancelled) {
@@ -74,12 +74,11 @@ export default function RepPayments() {
     };
   }, [schoolId, qc, toast]);
 
-  // Misma lógica de morosidad que el colegio (RPC alineado con get_delinquent_students).
   const { data: balances = [] } = useQuery({
-    queryKey: ["family-delinquent-balances-rep", familyId, schoolId, schoolYear?.id],
+    queryKey: ["family-all-balances-rep", familyId, schoolId, schoolYear?.id],
     queryFn: async () => {
       if (!familyId || !schoolId || !schoolYear?.id) return [];
-      const { data, error } = await (supabase.rpc as any)("get_delinquent_balances_for_family", {
+      const { data, error } = await (supabase.rpc as any)("get_all_balances_for_family", {
         _family_id: familyId,
         _school_id: schoolId,
         _school_year_id: schoolYear.id,
@@ -92,6 +91,7 @@ export default function RepPayments() {
         balance_ves_today: number;
         rate_to_ves_today: number;
         rate_updated_at: string | null;
+        is_overdue: boolean;
       }>;
       return rows
         .map((r) => ({
@@ -101,6 +101,7 @@ export default function RepPayments() {
           balance_ves_today: Number(r.balance_ves_today) || 0,
           rate_to_ves_today: Number(r.rate_to_ves_today) || 0,
           rate_updated_at: r.rate_updated_at,
+          is_overdue: r.is_overdue,
         }))
         .filter(Boolean) as any[];
     },
@@ -139,7 +140,7 @@ export default function RepPayments() {
 
   const studentMap = new Map(students.map((s) => [s.id, s]));
 
-  const delinquentCount = balances.length;
+  const delinquentCount = balances.filter((b: any) => b.is_overdue).length;
 
   return (
     <DashboardLayout>
@@ -156,17 +157,17 @@ export default function RepPayments() {
 
       <Tabs defaultValue="pendientes" className="w-full">
         <TabsList>
-          <TabsTrigger value="pendientes">Cuotas vencidas</TabsTrigger>
+          <TabsTrigger value="pendientes">Mis cuotas {balances.length > 0 && `(${balances.length})`}</TabsTrigger>
           <TabsTrigger value="metodos">Métodos de pago del colegio</TabsTrigger>
           <TabsTrigger value="historial">Mis reportes ({reports.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="pendientes" className="space-y-4 mt-4">
           {balances.length === 0 ? (
-            <Card><CardContent className="py-10 text-center text-muted-foreground">No hay cuotas vencidas (morosidad) en este momento. Las cuotas por vencer no se muestran aquí.</CardContent></Card>
+            <Card><CardContent className="py-10 text-center text-muted-foreground">No tienes cuotas pendientes en este momento.</CardContent></Card>
           ) : (
             students.map((s) => {
-              const stBalances = balances.filter((b) => b.student_id === s.id);
+              const stBalances = balances.filter((b: any) => b.student_id === s.id);
               if (stBalances.length === 0) return null;
               return (
                 <Card key={s.id}>
@@ -178,7 +179,7 @@ export default function RepPayments() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Concepto</TableHead>
-                          <TableHead>Saldo vencido</TableHead>
+                          <TableHead>Saldo pendiente</TableHead>
                           <TableHead>Equivalente VES (hoy)</TableHead>
                           <TableHead>Estado</TableHead>
                           <TableHead className="w-32">Acción</TableHead>
@@ -186,40 +187,46 @@ export default function RepPayments() {
                       </TableHeader>
                       <TableBody>
                         {stBalances.map((b: any) => (
-                            <TableRow key={b.id}>
-                              <TableCell className="font-medium">
-                                {b.payment_plan_concepts?.payment_concepts?.name || "Concepto"}
-                                {b.concept_currency !== "VES" && (
-                                  <span className="ml-2 text-xs text-muted-foreground">({b.concept_currency})</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <p>{Number(b.remaining_original_amount).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {b.concept_currency}</p>
+                          <TableRow
+                            key={b.id}
+                            className={b.is_overdue ? "bg-red-50 hover:bg-red-100" : "bg-green-50 hover:bg-green-100"}
+                          >
+                            <TableCell className="font-medium">
+                              {b.payment_plan_concepts?.payment_concepts?.name || "Concepto"}
+                              {b.concept_currency !== "VES" && (
+                                <span className="ml-2 text-xs text-muted-foreground">({b.concept_currency})</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p>{Number(b.remaining_original_amount).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {b.concept_currency}</p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Tasa hoy: {Number(b.rate_to_ves_today || 1).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p>{Number(b.balance_ves_today).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES</p>
+                                {b.rate_updated_at && (
                                   <p className="text-[11px] text-muted-foreground">
-                                    Tasa hoy: {Number(b.rate_to_ves_today || 1).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    Actualizada: {new Date(b.rate_updated_at).toLocaleDateString("es-VE")}
                                   </p>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <div>
-                                  <p>{Number(b.balance_ves_today).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} VES</p>
-                                  {b.rate_updated_at && (
-                                    <p className="text-[11px] text-muted-foreground">
-                                      Actualizada: {new Date(b.rate_updated_at).toLocaleDateString("es-VE")}
-                                    </p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className="bg-orange-500 hover:bg-orange-600">Vencida</Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Button size="sm" onClick={() => setReportTarget({ student: s, balance: b })}>
-                                  <Receipt className="h-3 w-3 mr-1" />Reportar pago
-                                </Button>
-                              </TableCell>
-                            </TableRow>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {b.is_overdue
+                                ? <Badge className="bg-red-500 hover:bg-red-600">Vencida</Badge>
+                                : <Badge className="bg-green-600 hover:bg-green-700">Por vencer</Badge>
+                              }
+                            </TableCell>
+                            <TableCell>
+                              <Button size="sm" onClick={() => setReportTarget({ student: s, balance: b })}>
+                                <Receipt className="h-3 w-3 mr-1" />Reportar pago
+                              </Button>
+                            </TableCell>
+                          </TableRow>
                         ))}
                       </TableBody>
                     </Table>

@@ -90,7 +90,7 @@ function ConceptsTab({ schoolId }: { schoolId: string }) {
   const closeDialog = () => { setOpen(false); setEditId(null); setForm({ name: "", description: "", concept_type: "mensualidad", default_amount: "", currency: "VES", is_active: true }); };
   const openEdit = (c: any) => { setEditId(c.id); setForm({ name: c.name, description: c.description || "", concept_type: c.concept_type, default_amount: c.default_amount?.toString() || "0", currency: c.currency || "VES", is_active: c.is_active }); setOpen(true); };
 
-  const typeLabels: Record<string, string> = { inscripcion: "Inscripción", mensualidad: "Mensualidad", uniforme: "Uniforme", transporte: "Transporte", laboratorio: "Laboratorio", otro: "Otro" };
+  const typeLabels: Record<string, string> = { inscripcion: "Inscripción", mensualidad: "Mensualidad", uniforme: "Uniforme", transporte: "Transporte", laboratorio: "Laboratorio", seguro_escolar: "Seguro Escolar", otro: "Otro" };
 
   return (
     <Card>
