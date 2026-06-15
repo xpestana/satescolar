@@ -247,6 +247,10 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     return rates.find((r) => r.currency === currency)?.rate_to_ves || 0;
   };
 
+  // Use current exchange rate for display/calculation instead of frozen snapshot
+  const getDisplayTotal = (b: any) => b.currency === "VES" ? (b.total_amount || 0) : (b.original_amount || 0) * getRate(b.currency || "VES");
+  const getDisplayBalance = (b: any) => Math.max(0, getDisplayTotal(b) - (b.paid_amount || 0));
+
   // Recalc method VES when currency/amount/rate changes
   const updateMethodField = (id: string, field: string, value: string) => {
     setMethods((prev) => prev.map((m) => {
@@ -276,8 +280,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   // Cierra un saldo residual (típicamente diferencia por tasa de cambio) marcándolo como pagado
   const closeBalanceMut = useMutation({
     mutationFn: async (bal: any) => {
+      const currentRate = getRate(bal.currency || "VES");
+      const newTotalAmount = getDisplayTotal(bal);
       const { error } = await supabase.from("student_concept_balances").update({
-        paid_amount: bal.total_amount,
+        exchange_rate_snapshot: currentRate,
+        total_amount: newTotalAmount,
+        paid_amount: newTotalAmount,
         balance: 0,
         status: "paid",
         last_payment_date: today(),
@@ -373,7 +381,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
           plan_concept_id: bal!.plan_concept_id,
           student_id: student.id,
           amount_ves: amount,
-          is_partial: amount < (bal?.balance || 0) - 0.01,
+          is_partial: amount < getDisplayBalance(bal!) - 0.01,
         };
       });
       const { error: itemErr } = await supabase.from("payment_items").insert(items as any);
@@ -402,13 +410,17 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         const amount = parseFloat(amountStr) || 0;
         const bal = balances.find((b) => b.id === balanceId);
         if (!bal) continue;
+        const currentRate = getRate(bal.currency || "VES");
+        const newTotalAmount = getDisplayTotal(bal);
         const newPaid = parseFloat(((bal.paid_amount || 0) + amount).toFixed(2));
-        const newBalance = parseFloat(((bal.total_amount || 0) - newPaid).toFixed(2));
+        const newBalance = parseFloat((newTotalAmount - newPaid).toFixed(2));
         // Absorb residuals ≤ EXCHANGE_RATE_TOLERANCE_VES caused by exchange rate drift
         const effectiveBalance = newBalance > 0 && newBalance <= EXCHANGE_RATE_TOLERANCE_VES ? 0 : Math.max(0, newBalance);
         const newStatus = effectiveBalance <= 0 ? "paid" : "partial";
         await supabase.from("student_concept_balances").update({
-          paid_amount: effectiveBalance <= 0 ? bal.total_amount : newPaid,
+          exchange_rate_snapshot: currentRate,
+          total_amount: newTotalAmount,
+          paid_amount: effectiveBalance <= 0 ? newTotalAmount : newPaid,
           balance: effectiveBalance,
           status: newStatus,
           last_payment_date: today(),
@@ -575,20 +587,22 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                       const conceptName = (b.payment_plan_concepts as any)?.payment_concepts?.name || "—";
                       const cur = b.currency || "VES";
                       const isSelected = b.id in selectedConcepts;
+                      const displayTotal = getDisplayTotal(b);
+                      const displayBalance = getDisplayBalance(b);
                       return (
                         <TableRow key={b.id} className={isSelected ? "bg-primary/5" : ""}>
-                          <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, b.balance)} /></TableCell>
+                          <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, displayBalance)} /></TableCell>
                           <TableCell className="font-medium">
                             {conceptName}
                             {cur !== "VES" && (
                               <span className="ml-2 text-xs text-muted-foreground">
-                                ({Number(b.original_amount || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur} @ {Number(b.exchange_rate_snapshot || 1).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
+                                ({Number(b.original_amount || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur} @ {Number(getRate(cur)).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
                               </span>
                             )}
                           </TableCell>
-                          <TableCell>{b.total_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell>{displayTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell className="font-medium">{b.balance?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="font-medium">{displayBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell>
                             <Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>
                               {b.status === "paid" ? "Pagado" : b.status === "partial" ? "Parcial" : "Pendiente"}
@@ -603,12 +617,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                                   className="h-7 w-28 text-xs"
                                   value={selectedConcepts[b.id]}
                                   onChange={(e) => {
-                                    const val = Math.min(parseFloat(e.target.value) || 0, b.balance);
+                                    const val = Math.min(parseFloat(e.target.value) || 0, displayBalance);
                                     setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
                                   }}
                                 />
                               )}
-                              {b.paid_amount > 0 && b.balance > 0 && b.balance < (b.total_amount * 0.05) && (
+                              {b.paid_amount > 0 && displayBalance > 0 && displayBalance < (displayTotal * 0.05) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
