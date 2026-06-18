@@ -18,10 +18,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap, Columns, FileDown, FileSpreadsheet, GripVertical, Download } from "lucide-react";
+import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap, Columns, FileDown, FileSpreadsheet, GripVertical, Download, Trash2 } from "lucide-react";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EnrollStudentModal } from "@/components/enrollments/EnrollStudentModal";
 import { Pagination } from "@/components/ui/data-pagination";
 import { checkStudentCompleteness, ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
@@ -54,6 +58,7 @@ interface StudentWithEnrollment {
   family_id: string;
   familyName: string;
   isEnrolled: boolean;
+  enrollmentId?: string;
   enrollmentSection?: string;
   enrollmentType?: string;
   enrollmentGradeLevel?: string;
@@ -87,6 +92,9 @@ export default function EnrollmentsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<StudentWithEnrollment | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<StudentWithEnrollment | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
@@ -327,16 +335,17 @@ export default function EnrollmentsList() {
 
       const familyMap = new Map(families?.map(f => [f.id, `${f.father_last_name || ""} ${f.mother_last_name || ""}`.trim() || "Sin apellido"]) || []);
 
-      let enrollmentMap = new Map<string, { section: string; type: string; gradeLevel: string; year: string }>();
+      let enrollmentMap = new Map<string, { id: string; section: string; type: string; gradeLevel: string; year: string }>();
       if (resolvedYear?.id) {
         const { data: enrollments } = await supabase
           .from("enrollments")
-          .select("student_id, section_id, enrollment_type, sections(name, grade_level)")
+          .select("id, student_id, section_id, enrollment_type, sections(name, grade_level)")
           .eq("school_year_id", resolvedYear.id)
           .eq("school_id", schoolId);
 
         enrollments?.forEach((e: any) => {
           enrollmentMap.set(e.student_id, {
+            id: e.id,
             section: e.sections?.name || "",
             type: e.enrollment_type || "",
             gradeLevel: e.sections?.grade_level || "",
@@ -353,6 +362,7 @@ export default function EnrollmentsList() {
         family_id: s.family_id,
         familyName: familyMap.get(s.family_id) || "",
         isEnrolled: enrollmentMap.has(s.id),
+        enrollmentId: enrollmentMap.get(s.id)?.id,
         enrollmentSection: enrollmentMap.get(s.id)?.section,
         enrollmentType: enrollmentMap.get(s.id)?.type,
         enrollmentGradeLevel: enrollmentMap.get(s.id)?.gradeLevel,
@@ -635,6 +645,32 @@ export default function EnrollmentsList() {
     setIsModalOpen(true);
   };
 
+  const handleConfirmDelete = (student: StudentWithEnrollment) => {
+    setStudentToDelete(student);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteEnrollment = async () => {
+    if (!studentToDelete?.enrollmentId) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("enrollments")
+        .delete()
+        .eq("id", studentToDelete.enrollmentId);
+      if (error) throw error;
+      toast.success(`Inscripción de ${getStudentName(studentToDelete.form_data)} eliminada correctamente.`);
+      queryClient.invalidateQueries({ queryKey: ["enrollment-students"] });
+      setIsDeleteModalOpen(false);
+      setStudentToDelete(null);
+    } catch (err) {
+      console.error("Error deleting enrollment:", err);
+      toast.error("Error al eliminar la inscripción. Intente nuevamente.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const totalColSpan = 2 + visibleDynamicColumns.length + (isColVisible("_estado") ? 1 : 0) + (isColVisible("_nombre") ? 1 : 0) + (isColVisible("_cedula") ? 1 : 0) + (isColVisible("_familia") ? 1 : 0) + (isColVisible("_grado") ? 1 : 0);
 
   const breadcrumbs = [
@@ -893,6 +929,18 @@ export default function EnrollmentsList() {
                                 <FileDown className="h-4 w-4 mr-2" />
                                 Descargar Planilla
                               </DropdownMenuItem>
+                              {student.isEnrolled && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => handleConfirmDelete(student)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Eliminar Inscripción
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -965,6 +1013,42 @@ export default function EnrollmentsList() {
           }}
         />
       )}
+
+      <AlertDialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar inscripción?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar la inscripción de{" "}
+              <span className="font-semibold text-foreground">
+                {getStudentName(studentToDelete?.form_data ?? null)}
+              </span>
+              {studentToDelete?.enrollmentGradeLevel && (
+                <>
+                  {" "}en{" "}
+                  <span className="font-semibold text-foreground">
+                    {GRADE_LEVEL_LABELS[studentToDelete.enrollmentGradeLevel] || studentToDelete.enrollmentGradeLevel}
+                    {studentToDelete.enrollmentSection ? ` / ${studentToDelete.enrollmentSection}` : ""}
+                  </span>
+                </>
+              )}
+              {" "}del año escolar{" "}
+              <span className="font-semibold text-foreground">{resolvedYear?.year_range}</span>.
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEnrollment}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Sí, eliminar inscripción"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }
