@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, Users, Info, Hammer, Settings2, Building2, Hash } from "lucide-react";
+import { Loader2, Download, FileText, Users, Info, Hammer, Settings2, Building2, Hash, ClipboardList } from "lucide-react";
 import { DocumentBuilder } from "@/components/utilities/DocumentBuilder";
 import { usePlanillasConfig } from "@/hooks/usePlanillasConfig";
 import { DatosComunes } from "@/components/planillas/config/DatosComunes";
@@ -19,6 +19,7 @@ import { CodigosEducacion } from "@/components/planillas/config/CodigosEducacion
 import { ConfiguracionRFRE } from "@/components/planillas/config/ConfiguracionRFRE";
 import { useSabanaConfig } from "@/hooks/useSabanaConfig";
 import { SabanaConfigPanel } from "@/components/planillas/sabana/SabanaConfigPanel";
+import { ResumenFinalTab } from "@/components/planillas/resumen-final/ResumenFinalTab";
 import { SabanaPreview } from "@/components/planillas/sabana/SabanaPreview";
 import { generateSabanaPdf, SECONDARY_GRADES, GRADE_LABELS, StudentRow } from "@/lib/sabana-pdf";
 import jsPDF from "jspdf";
@@ -327,6 +328,9 @@ export default function GradeSheets() {
             <TabsTrigger value="sabana" className="gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Sábana de Notas
             </TabsTrigger>
+            <TabsTrigger value="resumen-final" className="gap-1.5">
+              <ClipboardList className="h-3.5 w-3.5" /> Resumen Final
+            </TabsTrigger>
             <TabsTrigger value="configuraciones" className="gap-1.5">
               <Settings2 className="h-3.5 w-3.5" /> Configuraciones
             </TabsTrigger>
@@ -477,6 +481,10 @@ export default function GradeSheets() {
                 <SabanaPreview config={sabanaConfig} momento={selectedMomento} />
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="resumen-final" className="mt-4">
+            <ResumenFinalTab />
           </TabsContent>
 
           <TabsContent value="configuraciones" className="mt-4">
