@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export interface SabanaDisplayConfig {
   headerColor: string;    // hex, e.g. "#2980B9"
@@ -25,15 +25,51 @@ export function hexToRgb(hex: string): [number, number, number] {
   ];
 }
 
-export function useSabanaConfig() {
+interface UseSabanaConfigOptions {
+  /** DB value to initialize from once loaded */
+  initialConfig?: SabanaDisplayConfig;
+  /** Called with debounce after every user change */
+  onSave?: (config: SabanaDisplayConfig) => void;
+}
+
+export function useSabanaConfig({ initialConfig, onSave }: UseSabanaConfigOptions = {}) {
   const [config, setConfig] = useState<SabanaDisplayConfig>(DEFAULT_SABANA_CONFIG);
 
+  // Avoid re-initializing once the user has made changes
+  const hasUserChanged = useRef(false);
+  // Keep latest onSave ref to avoid stale closures
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  // Timer for debounce
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // One-time init from DB (ignored if user already changed something)
+  useEffect(() => {
+    if (initialConfig && !hasUserChanged.current) {
+      const hasValues = Object.keys(initialConfig).length > 0;
+      if (hasValues) setConfig(initialConfig);
+    }
+  }, [initialConfig]);
+
+  function scheduleSave(next: SabanaDisplayConfig) {
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => onSaveRef.current?.(next), 600);
+  }
+
   function updateConfig(partial: Partial<SabanaDisplayConfig>) {
-    setConfig(prev => ({ ...prev, ...partial }));
+    hasUserChanged.current = true;
+    setConfig(prev => {
+      const next = { ...prev, ...partial };
+      scheduleSave(next);
+      return next;
+    });
   }
 
   function resetConfig() {
+    hasUserChanged.current = true;
+    clearTimeout(saveTimerRef.current);
     setConfig(DEFAULT_SABANA_CONFIG);
+    onSaveRef.current?.(DEFAULT_SABANA_CONFIG);
   }
 
   return { config, updateConfig, resetConfig };

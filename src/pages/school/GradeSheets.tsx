@@ -31,7 +31,10 @@ export default function GradeSheets() {
   const [selectedMomento, setSelectedMomento] = useState<string>("1");
   const [downloading, setDownloading] = useState<string | null>(null);
   const planillasConfig = usePlanillasConfig();
-  const { config: sabanaConfig, updateConfig, resetConfig } = useSabanaConfig();
+  const { config: sabanaConfig, updateConfig, resetConfig } = useSabanaConfig({
+    initialConfig: planillasConfig.sabanaDisplayConfig,
+    onSave: planillasConfig.saveSabanaDisplayConfig.mutate,
+  });
 
   const { data: schoolYears } = useQuery({
     queryKey: ["school-years", schoolId],

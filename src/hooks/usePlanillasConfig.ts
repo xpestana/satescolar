@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import { SabanaDisplayConfig, DEFAULT_SABANA_CONFIG } from "@/hooks/useSabanaConfig";
 
 export interface SchoolHeader {
   codigo_plantel: string;
@@ -47,6 +48,7 @@ export interface PlanillasConfig {
   school_header: SchoolHeader;
   education_codes: EducationCodes;
   rfre_config: RfreConfig;
+  sabana_display_config: SabanaDisplayConfig;
 }
 
 const EMPTY_SCHOOL_HEADER: SchoolHeader = {
@@ -92,7 +94,7 @@ export function usePlanillasConfig() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("planilla_general_config")
-        .select("id, school_id, school_header, education_codes, rfre_config")
+        .select("id, school_id, school_header, education_codes, rfre_config, sabana_display_config")
         .eq("school_id", schoolId!)
         .maybeSingle();
       if (error) throw error;
@@ -155,14 +157,34 @@ export function usePlanillasConfig() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["planillas-config", schoolId] }),
   });
 
+  const saveSabanaDisplayConfig = useMutation({
+    mutationFn: async (sabana_display_config: SabanaDisplayConfig) => {
+      if (config?.id) {
+        const { error } = await supabase
+          .from("planilla_general_config")
+          .update({ sabana_display_config } as any)
+          .eq("id", config.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("planilla_general_config")
+          .insert({ school_id: schoolId!, sabana_display_config } as any);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["planillas-config", schoolId] }),
+  });
+
   return {
     config,
     isLoading,
     schoolHeader: (config?.school_header as SchoolHeader) ?? EMPTY_SCHOOL_HEADER,
     educationCodes: (config?.education_codes as EducationCodes) ?? EMPTY_EDUCATION_CODES,
     rfreConfig: (config?.rfre_config as RfreConfig) ?? EMPTY_RFRE_CONFIG,
+    sabanaDisplayConfig: (config?.sabana_display_config as SabanaDisplayConfig | undefined) ?? undefined,
     saveSchoolHeader,
     saveEducationCodes,
     saveRfreConfig,
+    saveSabanaDisplayConfig,
   };
 }
