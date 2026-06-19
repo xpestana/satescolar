@@ -1,22 +1,85 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { type EducationCodes, type usePlanillasConfig } from "@/hooks/usePlanillasConfig";
+import { supabase } from "@/integrations/supabase/client";
+import { useSchoolId } from "@/hooks/useSchoolId";
+import {
+  type EducationCodes,
+  type SeccionMencionConfig,
+  type usePlanillasConfig,
+} from "@/hooks/usePlanillasConfig";
+
+const SECONDARY_GRADES = ["1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano"] as const;
+const GRADE_LABELS: Record<string, string> = {
+  "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
+  "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
+};
+
+const DEFAULT_MENCION: SeccionMencionConfig = { tipo: "con_mencion", mencion_texto: "CIENCIA Y TECNOLOGÍA" };
 
 type Props = ReturnType<typeof usePlanillasConfig>;
 
 export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading }: Pick<Props, "educationCodes" | "saveEducationCodes" | "isLoading">) {
+  const { schoolId } = useSchoolId();
   const [form, setForm] = useState<EducationCodes>(educationCodes);
+  const [selectedSection, setSelectedSection] = useState<string>("");
 
   useEffect(() => { setForm(educationCodes); }, [educationCodes]);
 
   const set = (key: keyof EducationCodes) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
+  // Fetch secondary sections for active school year
+  const { data: sections = [], isLoading: sectionsLoading } = useQuery({
+    queryKey: ["secondary-sections-config", schoolId],
+    queryFn: async () => {
+      const { data: activeYear } = await supabase
+        .from("school_years")
+        .select("id")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (!activeYear) return [];
+
+      const { data, error } = await supabase
+        .from("sections")
+        .select("id, grade_level, name")
+        .eq("school_id", schoolId!)
+        .eq("school_year_id", activeYear.id)
+        .in("grade_level", [...SECONDARY_GRADES])
+        .order("grade_level")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []).sort((a, b) => {
+        const iA = SECONDARY_GRADES.indexOf(a.grade_level as any);
+        const iB = SECONDARY_GRADES.indexOf(b.grade_level as any);
+        return iA !== iB ? iA - iB : a.name.localeCompare(b.name);
+      });
+    },
+    enabled: !!schoolId,
+  });
+
+  const currentConfig: SeccionMencionConfig =
+    form.menciones_seccion?.[selectedSection] ?? DEFAULT_MENCION;
+
+  const updateSeccionConfig = (updates: Partial<SeccionMencionConfig>) => {
+    if (!selectedSection) return;
+    setForm((prev) => ({
+      ...prev,
+      menciones_seccion: {
+        ...prev.menciones_seccion,
+        [selectedSection]: { ...currentConfig, ...updates },
+      },
+    }));
+  };
 
   const handleSave = () => {
     saveEducationCodes.mutate(form, {
@@ -41,7 +104,9 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
         <CardTitle>Datos de cabeceras</CardTitle>
         <CardDescription>Aqui se llenan los codigos utilizados en cada area</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
+
+        {/* ─── Códigos generales ─── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="educacion_inicial">Educación Inicial</Label>
@@ -68,8 +133,12 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
             <Input id="educacion_media_tecnica" value={form.educacion_media_tecnica} onChange={set("educacion_media_tecnica")} placeholder="Ej. EMT 00000" />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="codigo_titulo">Código Titulo</Label>
-            <Input id="codigo_titulo" value={form.codigo_titulo} onChange={set("codigo_titulo")} placeholder="Ej. 00000" />
+            <Label htmlFor="codigo_titulo">Código Titulo (Sin Mención)</Label>
+            <Input id="codigo_titulo" value={form.codigo_titulo} onChange={set("codigo_titulo")} placeholder="Ej. 31059" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="codigo_mencion">Código Titulo (Con Mención)</Label>
+            <Input id="codigo_mencion" value={form.codigo_mencion} onChange={set("codigo_mencion")} placeholder="Ej. 31060" />
           </div>
         </div>
 
@@ -87,7 +156,71 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
           />
         </div>
 
-        <div className="flex justify-start pt-2">
+        <Separator />
+
+        {/* ─── Menciones por sección ─── */}
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm font-medium">Selección del tipo de Mención para la Educación Media General:</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Configura el código y la mención específica para cada año y sección.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-4">
+            <Label>Seleccione la sección</Label>
+            <Select value={selectedSection} onValueChange={setSelectedSection}>
+              <SelectTrigger>
+                {sectionsLoading
+                  ? <span className="text-muted-foreground">Cargando secciones...</span>
+                  : <SelectValue placeholder="Seleccione una sección..." />
+                }
+              </SelectTrigger>
+              <SelectContent>
+                {sections.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {GRADE_LABELS[s.grade_level] ?? s.grade_level} Sección: {s.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedSection && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div className="space-y-1.5">
+                <Label>Codigo</Label>
+                <Select
+                  value={currentConfig.tipo}
+                  onValueChange={(v) => updateSeccionConfig({ tipo: v as SeccionMencionConfig["tipo"] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="con_mencion">
+                      {form.codigo_mencion || "31060"} (Con Mención)
+                    </SelectItem>
+                    <SelectItem value="sin_mencion">
+                      {form.codigo_titulo || "31059"} (Sin Mención)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {currentConfig.tipo === "con_mencion" && (
+                <div className="space-y-1.5">
+                  <Label className="text-primary">Mención en:</Label>
+                  <Input
+                    value={currentConfig.mencion_texto}
+                    onChange={(e) => updateSeccionConfig({ mencion_texto: e.target.value })}
+                    placeholder="Ej. CIENCIAS NATURALES"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-start pt-1">
           <Button onClick={handleSave} disabled={saveEducationCodes.isPending}>
             {saveEducationCodes.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             Guardar

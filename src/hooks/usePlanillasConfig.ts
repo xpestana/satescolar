@@ -19,6 +19,11 @@ export interface SchoolHeader {
   cedula_funcionario: string;
 }
 
+export interface SeccionMencionConfig {
+  tipo: "con_mencion" | "sin_mencion";
+  mencion_texto: string;
+}
+
 export interface EducationCodes {
   educacion_inicial: string;
   codigos_educacion_inicial: string;
@@ -27,7 +32,9 @@ export interface EducationCodes {
   educacion_media_general: string;
   educacion_media_tecnica: string;
   codigo_titulo: string;
+  codigo_mencion: string;
   mencion_media_general: string;
+  menciones_seccion: Record<string, SeccionMencionConfig>;
 }
 
 export interface RfreConfig {
@@ -67,7 +74,9 @@ const EMPTY_EDUCATION_CODES: EducationCodes = {
   educacion_media_general: "",
   educacion_media_tecnica: "",
   codigo_titulo: "",
+  codigo_mencion: "31060",
   mencion_media_general: "",
+  menciones_seccion: {},
 };
 
 const EMPTY_RFRE_CONFIG: RfreConfig = {
