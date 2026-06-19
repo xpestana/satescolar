@@ -29,7 +29,6 @@ import UtilitiesSettings from "./pages/school/UtilitiesSettings";
 import GradesSettings from "./pages/school/GradesSettings";
 import GradesConsultation from "./pages/school/GradesConsultation";
 import GradeSheets from "./pages/school/GradeSheets";
-import PlanillasConfiguracion from "./pages/school/PlanillasConfiguracion";
 import EmailSender from "./pages/school/EmailSender";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
@@ -178,14 +177,6 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRole="school">
                     <GradeSheets />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/planillas/configuracion"
-                element={
-                  <ProtectedRoute requiredRole="school">
-                    <PlanillasConfiguracion />
                   </ProtectedRoute>
                 }
               />

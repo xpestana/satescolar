@@ -11,8 +11,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, Users, Info, Hammer } from "lucide-react";
+import { Loader2, Download, FileText, Users, Info, Hammer, Settings2 } from "lucide-react";
 import { DocumentBuilder } from "@/components/utilities/DocumentBuilder";
+import { usePlanillasConfig } from "@/hooks/usePlanillasConfig";
+import { DatosComunes } from "@/components/planillas/config/DatosComunes";
+import { CodigosEducacion } from "@/components/planillas/config/CodigosEducacion";
+import { ConfiguracionRFRE } from "@/components/planillas/config/ConfiguracionRFRE";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { addArialFont } from "@/lib/pdf-fonts";
@@ -42,6 +46,7 @@ export default function GradeSheets() {
   const [selectedYearId, setSelectedYearId] = useState<string>("");
   const [selectedMomento, setSelectedMomento] = useState<string>("1");
   const [downloading, setDownloading] = useState<string | null>(null);
+  const planillasConfig = usePlanillasConfig();
 
   // School years
   const { data: schoolYears } = useQuery({
@@ -720,6 +725,9 @@ export default function GradeSheets() {
             <TabsTrigger value="sabana" className="gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Sábana de Notas
             </TabsTrigger>
+            <TabsTrigger value="configuraciones" className="gap-1.5">
+              <Settings2 className="h-3.5 w-3.5" /> Configuraciones
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="constructor" className="mt-4">
@@ -833,6 +841,37 @@ export default function GradeSheets() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="configuraciones" className="space-y-6 mt-4">
+            <Tabs defaultValue="datos-comunes">
+              <TabsList className="mb-4">
+                <TabsTrigger value="datos-comunes">Datos comunes</TabsTrigger>
+                <TabsTrigger value="codigos">Códigos</TabsTrigger>
+                <TabsTrigger value="rfre">Configuraciones RFRE</TabsTrigger>
+              </TabsList>
+              <TabsContent value="datos-comunes">
+                <DatosComunes
+                  schoolHeader={planillasConfig.schoolHeader}
+                  saveSchoolHeader={planillasConfig.saveSchoolHeader}
+                  isLoading={planillasConfig.isLoading}
+                />
+              </TabsContent>
+              <TabsContent value="codigos">
+                <CodigosEducacion
+                  educationCodes={planillasConfig.educationCodes}
+                  saveEducationCodes={planillasConfig.saveEducationCodes}
+                  isLoading={planillasConfig.isLoading}
+                />
+              </TabsContent>
+              <TabsContent value="rfre">
+                <ConfiguracionRFRE
+                  rfreConfig={planillasConfig.rfreConfig}
+                  saveRfreConfig={planillasConfig.saveRfreConfig}
+                  isLoading={planillasConfig.isLoading}
+                />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
         </Tabs>
