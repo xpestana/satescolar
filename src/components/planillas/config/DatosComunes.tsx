@@ -44,42 +44,42 @@ export function DatosComunes({ schoolHeader, saveSchoolHeader, isLoading }: Pick
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="codigo_plantel">Codigo del plantel <span className="text-destructive">*</span></Label>
-            <Input id="codigo_plantel" value={form.codigo_plantel} onChange={set("codigo_plantel")} placeholder="PD17261412" />
+            <Input id="codigo_plantel" value={form.codigo_plantel} onChange={set("codigo_plantel")} placeholder="Ej. AB12345678" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="nombre_plantel">Nombre del plantel <span className="text-destructive">*</span></Label>
-            <Input id="nombre_plantel" value={form.nombre_plantel} onChange={set("nombre_plantel")} placeholder="UNIDAD EDUCATIVA COLEGIO SANTO DOMINGO DE GUZMÁN" />
+            <Input id="nombre_plantel" value={form.nombre_plantel} onChange={set("nombre_plantel")} placeholder="Ej. UNIDAD EDUCATIVA MI ESCUELA" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="telefono_plantel">Telefono del plantel <span className="text-destructive">*</span></Label>
-            <Input id="telefono_plantel" value={form.telefono_plantel} onChange={set("telefono_plantel")} placeholder="0274 - 2667989" />
+            <Input id="telefono_plantel" value={form.telefono_plantel} onChange={set("telefono_plantel")} placeholder="Ej. 0212 - 5550000" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="entidad_federal">Entidad federal <span className="text-destructive">*</span></Label>
-            <Input id="entidad_federal" value={form.entidad_federal} onChange={set("entidad_federal")} placeholder="MÉRIDA" />
+            <Input id="entidad_federal" value={form.entidad_federal} onChange={set("entidad_federal")} placeholder="Ej. CARACAS" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="zona_educativa">Zona Educativa <span className="text-destructive">*</span></Label>
-            <Input id="zona_educativa" value={form.zona_educativa} onChange={set("zona_educativa")} placeholder="Nº 14 Mérida" />
+            <Input id="zona_educativa" value={form.zona_educativa} onChange={set("zona_educativa")} placeholder="Ej. Nº 1 Capital" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="director">Director(a) <span className="text-destructive">*</span></Label>
-            <Input id="director" value={form.director} onChange={set("director")} placeholder="PEREZ PRIETO MARIA TERESA" />
+            <Input id="director" value={form.director} onChange={set("director")} placeholder="Ej. GARCÍA RODRÍGUEZ JUAN" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="cedula_director">Cédula de identidad <span className="text-destructive">*</span></Label>
-            <Input id="cedula_director" value={form.cedula_director} onChange={set("cedula_director")} placeholder="V 7.276.231" />
+            <Input id="cedula_director" value={form.cedula_director} onChange={set("cedula_director")} placeholder="Ej. V 10.000.000" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="direccion_plantel">Dirección del plantel <span className="text-destructive">*</span></Label>
-            <Input id="direccion_plantel" value={form.direccion_plantel} onChange={set("direccion_plantel")} placeholder="AV. LAS AMERICAS SECTOR SANTA BARBARA ESTE" />
+            <Input id="direccion_plantel" value={form.direccion_plantel} onChange={set("direccion_plantel")} placeholder="Ej. AV. PRINCIPAL, SECTOR LOS PINOS" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="municipio_plantel">Municipio del plantel <span className="text-destructive">*</span></Label>
-            <Input id="municipio_plantel" value={form.municipio_plantel} onChange={set("municipio_plantel")} placeholder="LIBERTADOR" />
+            <Input id="municipio_plantel" value={form.municipio_plantel} onChange={set("municipio_plantel")} placeholder="Ej. SUCRE" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="fecha_remision">Fecha de Remisión</Label>
@@ -87,19 +87,19 @@ export function DatosComunes({ schoolHeader, saveSchoolHeader, isLoading }: Pick
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="coordinador_control_estudio">Coordinador de Control de Estudio <span className="text-destructive">*</span></Label>
-            <Input id="coordinador_control_estudio" value={form.coordinador_control_estudio} onChange={set("coordinador_control_estudio")} placeholder="VELEZ DIAZ PAOLA" />
+            <Input id="coordinador_control_estudio" value={form.coordinador_control_estudio} onChange={set("coordinador_control_estudio")} placeholder="Ej. MARTÍNEZ LÓPEZ ANA" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="cedula_coordinador">Cédula de identidad del Coordinador <span className="text-destructive">*</span></Label>
-            <Input id="cedula_coordinador" value={form.cedula_coordinador} onChange={set("cedula_coordinador")} placeholder="V 23.212.281" />
+            <Input id="cedula_coordinador" value={form.cedula_coordinador} onChange={set("cedula_coordinador")} placeholder="Ej. V 15.000.000" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="funcionario_ministerio">Funcionario Designado por el Ministerio de Educación <span className="text-destructive">*</span></Label>
-            <Input id="funcionario_ministerio" value={form.funcionario_ministerio} onChange={set("funcionario_ministerio")} placeholder="DÍAZ LOBO BEATRIZ" />
+            <Input id="funcionario_ministerio" value={form.funcionario_ministerio} onChange={set("funcionario_ministerio")} placeholder="Ej. TORRES MEDINA CARLOS" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="cedula_funcionario">Cédula de identidad del Funcionario <span className="text-destructive">*</span></Label>
-            <Input id="cedula_funcionario" value={form.cedula_funcionario} onChange={set("cedula_funcionario")} placeholder="V 9.472.930" />
+            <Input id="cedula_funcionario" value={form.cedula_funcionario} onChange={set("cedula_funcionario")} placeholder="Ej. V 12.000.000" />
           </div>
         </div>
 

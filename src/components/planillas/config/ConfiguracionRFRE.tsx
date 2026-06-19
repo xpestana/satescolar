@@ -46,7 +46,7 @@ export function ConfiguracionRFRE({ rfreConfig, saveRfreConfig, isLoading }: Pic
             id="acronimo_gcrp"
             value={form.acronimo_gcrp}
             onChange={(e) => setForm({ acronimo_gcrp: e.target.value })}
-            placeholder="GCRP"
+            placeholder="Ej. GCRP"
           />
         </div>
 

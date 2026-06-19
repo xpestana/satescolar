@@ -45,31 +45,31 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="educacion_inicial">Educación Inicial</Label>
-            <Input id="educacion_inicial" value={form.educacion_inicial} onChange={set("educacion_inicial")} placeholder="Ej. EI - 01 - 02" />
+            <Input id="educacion_inicial" value={form.educacion_inicial} onChange={set("educacion_inicial")} placeholder="Ej. EI - 01 - 00" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="codigos_educacion_inicial">Códigos Educación Inicial</Label>
-            <Input id="codigos_educacion_inicial" value={form.codigos_educacion_inicial} onChange={set("codigos_educacion_inicial")} placeholder="Ej. 10001" />
+            <Input id="codigos_educacion_inicial" value={form.codigos_educacion_inicial} onChange={set("codigos_educacion_inicial")} placeholder="Ej. 00001" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="educacion_primaria">Educación Primaria</Label>
-            <Input id="educacion_primaria" value={form.educacion_primaria} onChange={set("educacion_primaria")} placeholder="DEA – 06 – 04" />
+            <Input id="educacion_primaria" value={form.educacion_primaria} onChange={set("educacion_primaria")} placeholder="Ej. DEA - 00 - 00" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="codigos_educacion_primaria">Códigos Educación Primaria</Label>
-            <Input id="codigos_educacion_primaria" value={form.codigos_educacion_primaria} onChange={set("codigos_educacion_primaria")} placeholder="Ej. 20002" />
+            <Input id="codigos_educacion_primaria" value={form.codigos_educacion_primaria} onChange={set("codigos_educacion_primaria")} placeholder="Ej. 00002" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="educacion_media_general">Educación Media General</Label>
-            <Input id="educacion_media_general" value={form.educacion_media_general} onChange={set("educacion_media_general")} placeholder="EMG CT 31060" />
+            <Input id="educacion_media_general" value={form.educacion_media_general} onChange={set("educacion_media_general")} placeholder="Ej. EMG CT 00000" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="educacion_media_tecnica">Educación Media Técnica</Label>
-            <Input id="educacion_media_tecnica" value={form.educacion_media_tecnica} onChange={set("educacion_media_tecnica")} placeholder="Ej. EMT 31061" />
+            <Input id="educacion_media_tecnica" value={form.educacion_media_tecnica} onChange={set("educacion_media_tecnica")} placeholder="Ej. EMT 00000" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="codigo_titulo">Código Titulo</Label>
-            <Input id="codigo_titulo" value={form.codigo_titulo} onChange={set("codigo_titulo")} placeholder="31059" />
+            <Input id="codigo_titulo" value={form.codigo_titulo} onChange={set("codigo_titulo")} placeholder="Ej. 00000" />
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
             id="mencion_media_general"
             value={form.mencion_media_general}
             onChange={set("mencion_media_general")}
-            placeholder="CIENCIA Y TECNOLOGÍA"
+            placeholder="Ej. CIENCIAS NATURALES"
             className="resize-none"
             rows={2}
           />
