@@ -27,6 +27,7 @@ import {
   Upload,
   BarChart2,
   BarChart3,
+  Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -99,6 +100,7 @@ const navSections: NavSection[] = [
     items: [
       { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school", permission: "emails.send" },
       { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school", permission: "planillas.config" },
+      { label: "Config. Planillas", href: "/planillas/configuracion", icon: Settings2, requiredRole: "school", permission: "planillas.config" },
       { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school", permission: "attendance.scan" },
       { label: "Registro de Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school", permission: "attendance.view" },
       { label: "Dashboard Asistencia", href: "/utilidades/asistencias-dashboard", icon: BarChart2, requiredRole: "school", permission: "attendance.view" },
