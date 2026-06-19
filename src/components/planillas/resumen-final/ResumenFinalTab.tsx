@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Users } from "lucide-react";
+import { Loader2, Users, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { useResumenFinalConfig, type ResumenFinalConfigRow } from "@/hooks/useResumenFinalConfig";
+import { useResumenFinalConfig } from "@/hooks/useResumenFinalConfig";
+import { fetchResumenFinalDocxData } from "@/hooks/useResumenFinalDocxData";
+import { generateResumenFinalDocx, downloadBlob } from "@/lib/resumen-final-docx";
 
 const ALL_GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal",
@@ -46,6 +48,8 @@ export function ResumenFinalTab() {
   const [selectedYearId, setSelectedYearId] = useState<string>("");
   const [selectedKey, setSelectedKey] = useState<string>("");
   const [form, setForm] = useState(EMPTY_FORM);
+  const [downloadKey, setDownloadKey] = useState<string>("all");
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Fetch school years
   const { data: schoolYears = [] } = useQuery({
@@ -83,7 +87,39 @@ export function ResumenFinalTab() {
   const handleYearChange = (yearId: string) => {
     setSelectedYearId(yearId);
     setSelectedKey("");
+    setDownloadKey("all");
     setForm(EMPTY_FORM);
+  };
+
+  const handleDownload = async () => {
+    if (!schoolId || !selectedYearId || isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const yearLabel = schoolYears.find(y => y.id === selectedYearId)?.year_range ?? selectedYearId;
+      if (downloadKey === "all") {
+        const allData = await Promise.all(
+          sectionParts.map(sp =>
+            fetchResumenFinalDocxData(schoolId, selectedYearId, sp.section.id, sp.parte)
+          )
+        );
+        const blob = await generateResumenFinalDocx(allData);
+        downloadBlob(blob, `Resumen_Final_${yearLabel.replace(/\//g, "-")}.docx`);
+      } else {
+        const [sectionId, parteStr] = downloadKey.split("__");
+        const parte = parseInt(parteStr, 10);
+        const sp = sectionParts.find(s => s.section.id === sectionId && s.parte === parte);
+        const data = await fetchResumenFinalDocxData(schoolId, selectedYearId, sectionId, parte);
+        const gradeLabel = ALL_GRADE_LABELS[sp?.section.grade_level ?? ""] ?? sp?.section.grade_level ?? "";
+        const filename = `Resumen_Final_${gradeLabel}_${sp?.section.name ?? "Sec"}_P${parte}.docx`.replace(/\s+/g, "_");
+        const blob = await generateResumenFinalDocx(data);
+        downloadBlob(blob, filename);
+      }
+      toast.success("Planilla generada y descargada");
+    } catch (e: any) {
+      toast.error(`Error al generar: ${e.message ?? "Error desconocido"}`);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleSave = () => {
@@ -180,6 +216,57 @@ export function ResumenFinalTab() {
           )}
         </CardContent>
       </Card>
+
+      {/* Download card */}
+      {selectedYearId && sectionParts.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileDown className="h-4 w-4" />
+              Generar Planilla Word
+            </CardTitle>
+            <CardDescription>
+              Descarga la planilla en formato .docx (Legal/Oficio, Times New Roman 10pt).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-4">
+              <Label>Seleccione qué descargar</Label>
+              <Select value={downloadKey} onValueChange={setDownloadKey}>
+                <SelectTrigger>
+                  {isLoading
+                    ? <span className="text-muted-foreground text-sm">Cargando secciones...</span>
+                    : <SelectValue />
+                  }
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    Todas las secciones ({sectionParts.length} {sectionParts.length === 1 ? "planilla" : "planillas"})
+                  </SelectItem>
+                  {sectionParts.map((sp) => {
+                    const key = `${sp.section.id}__${sp.parte}`;
+                    const label = ALL_GRADE_LABELS[sp.section.grade_level] ?? sp.section.grade_level;
+                    return (
+                      <SelectItem key={key} value={key}>
+                        {label} Sección: {sp.section.name}
+                        {sp.totalParts > 1 && ` — parte ${sp.parte} de ${sp.totalParts}`}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-start">
+              <Button onClick={handleDownload} disabled={isGenerating || isLoading}>
+                {isGenerating
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generando…</>
+                  : <><FileDown className="h-4 w-4 mr-2" />Descargar Word</>
+                }
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Config panel */}
       {selectedKey && selectedPart && (
