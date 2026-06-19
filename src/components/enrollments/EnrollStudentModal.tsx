@@ -20,6 +20,25 @@ import { isEffectivelyRequired } from "@/lib/protected-fields";
 
 import { AlertTriangle, GraduationCap, Users, UserPen } from "lucide-react";
 
+const GRADE_PROGRESSION: Record<string, string> = {
+  pre_maternal: "maternal",
+  maternal: "i_nivel",
+  i_nivel: "ii_nivel",
+  ii_nivel: "iii_nivel",
+  iii_nivel: "1_grado",
+  "1_grado": "2_grado",
+  "2_grado": "3_grado",
+  "3_grado": "4_grado",
+  "4_grado": "5_grado",
+  "5_grado": "6_grado",
+  "6_grado": "1_ano",
+  "1_ano": "2_ano",
+  "2_ano": "3_ano",
+  "3_ano": "4_ano",
+  "4_ano": "5_ano",
+  "5_ano": "6_ano",
+};
+
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal",
   maternal: "Maternal",
@@ -43,6 +62,10 @@ const GRADE_LABELS: Record<string, string> = {
   media_tecnica: "Media Técnica",
   "6_ano": "6to Año",
 };
+
+const GRADE_LABEL_TO_KEY = Object.fromEntries(
+  Object.entries(GRADE_LABELS).map(([k, v]) => [v, k])
+);
 
 const ENROLLMENT_TYPES = [
   "Regular",
@@ -80,6 +103,13 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
   const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split("T")[0]);
   const [observations, setObservations] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState("none");
+
+  // Grado actual y siguiente — computados aquí para usarlos en los effects
+  const studentGradeKey = (() => {
+    const label = student.form_data?.nivel_grado as string | undefined;
+    return label ? (GRADE_LABEL_TO_KEY[label] || label) : undefined;
+  })();
+  const nextGradeKey = studentGradeKey ? GRADE_PROGRESSION[studentGradeKey] : undefined;
 
   // Fetch existing enrollment data for pre-population
   const { data: existingEnrollment } = useQuery({
@@ -158,6 +188,14 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       }
     }
   }, [open, student.isEnrolled]);
+
+  // Auto-seleccionar la primera sección del grado siguiente en inscripciones nuevas
+  useEffect(() => {
+    if (open && !student.isEnrolled && nextGradeKey && sections.length > 0) {
+      const firstNextSection = sections.find(s => s.grade_level === nextGradeKey);
+      if (firstNextSection) setSelectedSectionId(firstNextSection.id);
+    }
+  }, [open, student.isEnrolled, nextGradeKey, sections]);
 
   // Fetch display config for this school
   const { data: displayConfig = [] } = useQuery({
@@ -271,6 +309,18 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
 
       if (error) throw error;
 
+      // Sincronizar nivel_grado del estudiante con el grado de la sección inscrita
+      const enrolledSection = sections.find(s => s.id === selectedSectionId);
+      if (enrolledSection) {
+        const newGradeLabel = GRADE_LABELS[enrolledSection.grade_level] || enrolledSection.grade_level;
+        const updatedFormData = { ...(student.form_data || {}), nivel_grado: newGradeLabel };
+        const { error: studentErr } = await supabase
+          .from("students")
+          .update({ form_data: updatedFormData })
+          .eq("id", student.id);
+        if (studentErr) throw studentErr;
+      }
+
       // Asignación opcional de plan de pago ("none" = dejar sin plan por ahora)
       if (selectedPlanId && selectedPlanId !== "none") {
         if (currentPlan) {
@@ -298,6 +348,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       qc.invalidateQueries({ queryKey: ["all-student-plans"] });
       qc.invalidateQueries({ queryKey: ["all-student-balances"] });
       qc.invalidateQueries({ queryKey: ["student-current-plan"] });
+      qc.invalidateQueries({ queryKey: ["enrollment-students"] });
       toast({ title: "Estudiante inscrito", description: "La inscripción se realizó correctamente." });
       onSuccess();
     },
@@ -324,16 +375,12 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         { name: "nivel_grado", label: "Grado" },
       ];
 
-  // Reverse map: label -> enum key
-  const GRADE_LABEL_TO_KEY = Object.fromEntries(
-    Object.entries(GRADE_LABELS).map(([k, v]) => [v, k])
-  );
-
-  // Filter sections by student's grade level
-  const studentGradeLabel = student.form_data?.nivel_grado as string | undefined;
-  const studentGradeKey = studentGradeLabel ? (GRADE_LABEL_TO_KEY[studentGradeLabel] || studentGradeLabel) : undefined;
+  // Mostrar secciones del grado actual y del siguiente (si existe progresión)
   const filteredSections = studentGradeKey
-    ? sections.filter(s => s.grade_level === studentGradeKey)
+    ? sections.filter(s =>
+        s.grade_level === studentGradeKey ||
+        (nextGradeKey && s.grade_level === nextGradeKey)
+      )
     : sections;
 
   const hasNoSections = filteredSections.length === 0;
