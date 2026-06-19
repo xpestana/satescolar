@@ -37,26 +37,16 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
   const set = (key: keyof EducationCodes) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
-  // Fetch secondary sections for active school year
+  // Fetch secondary sections (sections are global per school, not tied to a school year)
   const { data: sections = [], isLoading: sectionsLoading } = useQuery({
     queryKey: ["secondary-sections-config", schoolId],
     queryFn: async () => {
-      const { data: activeYear } = await supabase
-        .from("school_years")
-        .select("id")
-        .eq("school_id", schoolId!)
-        .eq("is_active", true)
-        .maybeSingle();
-      if (!activeYear) return [];
-
       const { data, error } = await supabase
         .from("sections")
         .select("id, grade_level, name")
         .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear.id)
         .in("grade_level", [...SECONDARY_GRADES])
-        .order("grade_level")
-        .order("name");
+        .order("name", { ascending: true });
       if (error) throw error;
       return (data ?? []).sort((a, b) => {
         const iA = SECONDARY_GRADES.indexOf(a.grade_level as any);
