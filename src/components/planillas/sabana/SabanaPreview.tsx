@@ -50,9 +50,16 @@ function td(fontSize: number, halign: CSSProperties["textAlign"] = "center", ext
     padding: "1.5mm 1mm",
     border: "0.1mm solid #000",
     whiteSpace: "nowrap",
+    verticalAlign: "middle",
     ...extra,
   };
 }
+
+const NAME_WRAP: CSSProperties = {
+  whiteSpace: "normal",
+  wordBreak: "break-word",
+  lineHeight: 1.3,
+};
 
 interface Props {
   config: SabanaDisplayConfig;
@@ -123,7 +130,7 @@ export function SabanaPreview({ config, momento }: Props) {
                     <tr>
                       <th rowSpan={2} style={th(headerColor, headerFontSize, { width: "5mm" })}>N°</th>
                       <th rowSpan={2} style={th(headerColor, headerFontSize, { width: "18mm" })}>Cédula</th>
-                      <th rowSpan={2} style={th(headerColor, headerFontSize, { textAlign: "left", width: "32mm" })}>Apellidos y Nombres</th>
+                      <th rowSpan={2} style={th(headerColor, headerFontSize, { textAlign: "left", width: "36mm", whiteSpace: "normal" })}>Apellidos y Nombres</th>
                       {subjects.map(s => (
                         <th key={s} colSpan={4} style={th(headerColor, headerFontSize)}>{s}</th>
                       ))}
@@ -143,7 +150,7 @@ export function SabanaPreview({ config, momento }: Props) {
                   <tr>
                     <th style={th(headerColor, headerFontSize, { width: "6mm" })}>N°</th>
                     <th style={th(headerColor, headerFontSize, { width: "20mm" })}>Cédula</th>
-                    <th style={th(headerColor, headerFontSize, { textAlign: "left", width: "38mm" })}>Apellidos y Nombres</th>
+                    <th style={th(headerColor, headerFontSize, { textAlign: "left", width: "44mm", whiteSpace: "normal" })}>Apellidos y Nombres</th>
                     {subjects.map(s => <th key={s} style={th(headerColor, headerFontSize)}>{s}</th>)}
                     <th style={th(headerColor, headerFontSize, { width: "10mm" })}>Prom</th>
                     <th style={th(headerColor, headerFontSize, { width: "8mm" })}>Pos</th>
@@ -156,7 +163,7 @@ export function SabanaPreview({ config, momento }: Props) {
                   <tr key={student.n}>
                     <td style={td(tableFontSize)}>{student.n}</td>
                     <td style={td(tableFontSize)}>{student.cedula}</td>
-                    <td style={td(tableFontSize, "left")}>{student.name}</td>
+                    <td style={td(tableFontSize, "left", NAME_WRAP)}>{student.name}</td>
                     {isDefinitiva
                       ? subjects.map((_, si) => (
                           <Fragment key={si}>
@@ -186,7 +193,7 @@ export function SabanaPreview({ config, momento }: Props) {
                 <tr style={{ backgroundColor: "#E6F0FA" }}>
                   <td style={td(tableFontSize, "center", { fontWeight: "bold" })}></td>
                   <td style={td(tableFontSize, "center", { fontWeight: "bold" })}></td>
-                  <td style={td(tableFontSize, "left", { fontWeight: "bold" })}>PROMEDIOS</td>
+                  <td style={td(tableFontSize, "left", { ...NAME_WRAP, fontWeight: "bold" })}>PROMEDIOS</td>
                   {isDefinitiva
                     ? subjects.map((_, si) => (
                         <Fragment key={si}>
