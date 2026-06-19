@@ -34,7 +34,7 @@ export interface EducationCodes {
   codigo_titulo: string;
   codigo_mencion: string;
   mencion_media_general: string;
-  menciones_seccion: Record<string, SeccionMencionConfig>;
+  menciones_seccion: Record<string, Record<string, SeccionMencionConfig>>;
 }
 
 export interface RfreConfig {
