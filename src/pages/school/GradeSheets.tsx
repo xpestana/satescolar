@@ -843,34 +843,36 @@ export default function GradeSheets() {
             )}
           </TabsContent>
 
-          <TabsContent value="configuraciones" className="space-y-6 mt-4">
-            <Tabs defaultValue="datos-comunes">
-              <TabsList className="mb-4">
-                <TabsTrigger value="datos-comunes">Datos comunes</TabsTrigger>
-                <TabsTrigger value="codigos">Códigos</TabsTrigger>
-                <TabsTrigger value="rfre">Configuraciones RFRE</TabsTrigger>
+          <TabsContent value="configuraciones" className="mt-4">
+            <Tabs defaultValue="datos-comunes" orientation="vertical" className="flex gap-6">
+              <TabsList className="flex flex-col h-auto w-48 shrink-0 items-stretch gap-1 bg-muted/50 p-2 rounded-lg">
+                <TabsTrigger value="datos-comunes" className="justify-start text-left">Datos comunes</TabsTrigger>
+                <TabsTrigger value="codigos" className="justify-start text-left">Códigos</TabsTrigger>
+                <TabsTrigger value="rfre" className="justify-start text-left">Configuraciones RFRE</TabsTrigger>
               </TabsList>
-              <TabsContent value="datos-comunes">
-                <DatosComunes
-                  schoolHeader={planillasConfig.schoolHeader}
-                  saveSchoolHeader={planillasConfig.saveSchoolHeader}
-                  isLoading={planillasConfig.isLoading}
-                />
-              </TabsContent>
-              <TabsContent value="codigos">
-                <CodigosEducacion
-                  educationCodes={planillasConfig.educationCodes}
-                  saveEducationCodes={planillasConfig.saveEducationCodes}
-                  isLoading={planillasConfig.isLoading}
-                />
-              </TabsContent>
-              <TabsContent value="rfre">
-                <ConfiguracionRFRE
-                  rfreConfig={planillasConfig.rfreConfig}
-                  saveRfreConfig={planillasConfig.saveRfreConfig}
-                  isLoading={planillasConfig.isLoading}
-                />
-              </TabsContent>
+              <div className="flex-1 min-w-0">
+                <TabsContent value="datos-comunes" className="mt-0">
+                  <DatosComunes
+                    schoolHeader={planillasConfig.schoolHeader}
+                    saveSchoolHeader={planillasConfig.saveSchoolHeader}
+                    isLoading={planillasConfig.isLoading}
+                  />
+                </TabsContent>
+                <TabsContent value="codigos" className="mt-0">
+                  <CodigosEducacion
+                    educationCodes={planillasConfig.educationCodes}
+                    saveEducationCodes={planillasConfig.saveEducationCodes}
+                    isLoading={planillasConfig.isLoading}
+                  />
+                </TabsContent>
+                <TabsContent value="rfre" className="mt-0">
+                  <ConfiguracionRFRE
+                    rfreConfig={planillasConfig.rfreConfig}
+                    saveRfreConfig={planillasConfig.saveRfreConfig}
+                    isLoading={planillasConfig.isLoading}
+                  />
+                </TabsContent>
+              </div>
             </Tabs>
           </TabsContent>
 
