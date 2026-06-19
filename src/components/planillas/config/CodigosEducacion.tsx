@@ -156,14 +156,6 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
             <Label htmlFor="educacion_media_tecnica">Educación Media Técnica</Label>
             <Input id="educacion_media_tecnica" value={form.educacion_media_tecnica} onChange={set("educacion_media_tecnica")} placeholder="Ej. EMT 00000" />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="codigo_titulo">Código Titulo (Sin Mención)</Label>
-            <Input id="codigo_titulo" value={form.codigo_titulo} onChange={set("codigo_titulo")} placeholder="Ej. 31059" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="codigo_mencion">Código Titulo (Con Mención)</Label>
-            <Input id="codigo_mencion" value={form.codigo_mencion} onChange={set("codigo_mencion")} placeholder="Ej. 31060" />
-          </div>
         </div>
 
         <div className="space-y-1.5">
