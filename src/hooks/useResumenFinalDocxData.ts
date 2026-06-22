@@ -72,6 +72,90 @@ function teacherName(fd: Record<string, any> | null): string {
 
 const CALC_PARTS = (count: number) => Math.max(1, Math.ceil(count / 35));
 
+const GEO_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
+const GEO_FIELD_NAMES = [
+  "estado_nacimiento",
+  "municipio_nacimiento",
+  "ciudad_nacimiento",
+  "parroquia_nacimiento",
+  "estado",
+  "municipio",
+  "ciudad",
+  "parroquia",
+  "lugar_nacimiento",
+];
+
+function resolveGeoName(
+  value: string | undefined | null,
+  geoCache: Record<string, string>,
+): string {
+  if (!value) return "";
+  const v = String(value).trim();
+  if (GEO_UUID_PATTERN.test(v)) return geoCache[v] || "";
+  return v;
+}
+
+async function buildGeoCache(
+  formDataList: Record<string, unknown>[],
+): Promise<Record<string, string>> {
+  const uuids = new Set<string>();
+  for (const fd of formDataList) {
+    for (const key of GEO_FIELD_NAMES) {
+      const val = fd[key];
+      if (typeof val === "string" && GEO_UUID_PATTERN.test(val)) uuids.add(val);
+    }
+    for (const val of Object.values(fd)) {
+      if (typeof val === "string" && GEO_UUID_PATTERN.test(val)) uuids.add(val);
+    }
+  }
+  if (uuids.size === 0) return {};
+
+  const ids = Array.from(uuids);
+  const [statesR, munisR, citiesR, parishesR] = await Promise.all([
+    supabase.from("states").select("id, name").in("id", ids),
+    supabase.from("municipalities").select("id, name").in("id", ids),
+    supabase.from("cities").select("id, name").in("id", ids),
+    supabase.from("parishes").select("id, name").in("id", ids),
+  ]);
+
+  const cache: Record<string, string> = {};
+  for (const row of statesR.data || []) cache[row.id] = row.name;
+  for (const row of munisR.data || []) cache[row.id] = row.name;
+  for (const row of citiesR.data || []) cache[row.id] = row.name;
+  for (const row of parishesR.data || []) cache[row.id] = row.name;
+  return cache;
+}
+
+function lugarNacimientoFromForm(
+  fd: Record<string, unknown>,
+  geoCache: Record<string, string>,
+): string {
+  const city = resolveGeoName(fd.ciudad_nacimiento as string, geoCache);
+  if (city) return city;
+  const muni = resolveGeoName(fd.municipio_nacimiento as string, geoCache);
+  if (muni) return muni;
+  const parish = resolveGeoName(fd.parroquia_nacimiento as string, geoCache);
+  if (parish) return parish;
+  const lugar = fd.lugar_nacimiento;
+  if (typeof lugar === "string" && lugar.trim()) {
+    return resolveGeoName(lugar, geoCache) || lugar.trim();
+  }
+  return "";
+}
+
+function entidadFederalFromForm(
+  fd: Record<string, unknown>,
+  geoCache: Record<string, string>,
+): string {
+  const ef = fd.entidad_federal;
+  if (typeof ef === "string" && ef.trim() && !GEO_UUID_PATTERN.test(ef.trim())) {
+    return ef.trim().toUpperCase().substring(0, 2);
+  }
+  const state = resolveGeoName(fd.estado_nacimiento as string, geoCache);
+  if (state) return state.toUpperCase().substring(0, 2);
+  return "";
+}
+
 export async function fetchResumenFinalDocxData(
   schoolId: string,
   schoolYearId: string,
@@ -216,9 +300,15 @@ export async function fetchResumenFinalDocxData(
   const gradeMap = new Map<string, { grade_value: string | null; adjustment_points: number; final_status: string | null; evaluation_type: string | null }>();
   gradesData.forEach(g => gradeMap.set(gradeKey(g.student_id, g.assignment_id), g));
 
+  const geoCache = await buildGeoCache(
+    pageStudentIds
+      .map((sid) => (studentsMap.get(sid)?.form_data || {}) as Record<string, unknown>)
+      .filter((fd) => Object.keys(fd).length > 0),
+  );
+
   const studentRows: StudentDocxRow[] = pageStudentIds.map((sid, idx) => {
     const student = studentsMap.get(sid);
-    const fd = (student?.form_data || {}) as any;
+    const fd = (student?.form_data || {}) as Record<string, unknown>;
 
     const apellidos = [fd.primer_apellido, fd.segundo_apellido].filter(Boolean).join(" ").toUpperCase();
     const nombres = [fd.primer_nombre, fd.segundo_nombre].filter(Boolean).join(" ").toUpperCase();
@@ -250,12 +340,12 @@ export async function fetchResumenFinalDocxData(
     }
 
     return {
-      nro: start + idx + 1,
+      nro: idx + 1,
       cedula: student?.document_id || "",
       apellidos,
       nombres,
-      lugarNacimiento: (fd.lugar_nacimiento || fd.municipio_nacimiento || "").toUpperCase(),
-      entidadFederal: (fd.entidad_federal || fd.estado_nacimiento || "").toUpperCase().substring(0, 2),
+      lugarNacimiento: lugarNacimientoFromForm(fd, geoCache).toUpperCase(),
+      entidadFederal: entidadFederalFromForm(fd, geoCache),
       sexo: (fd.sexo || fd.genero || "").toUpperCase().substring(0, 1),
       diaNac,
       mesNac,

@@ -226,7 +226,7 @@ export function ResumenFinalTab() {
               Generar Planilla Word
             </CardTitle>
             <CardDescription>
-              Descarga la planilla en formato .docx (Legal/Oficio, Times New Roman 10pt).
+              Descarga la planilla en formato .docx (Legal/Oficio, Arial 10).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

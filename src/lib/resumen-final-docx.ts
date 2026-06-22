@@ -14,33 +14,42 @@ import {
   UnderlineType,
   VerticalAlign,
   WidthType,
+  HeightRule,
 } from "docx";
-import type { ResumenFinalDocxData } from "@/hooks/useResumenFinalDocxData";
+import type {
+  ResumenFinalDocxData,
+  StudentDocxRow,
+} from "@/hooks/useResumenFinalDocxData";
 
 // ─── página Oficio (21.59 × 35.56 cm) ───────────────────────────────
 const PAGE_W = 12240;
 const PAGE_H = 20160;
 const cmToTwips = (cm: number) => Math.round((cm / 2.54) * 1440);
 const MARGIN_LR = cmToTwips(0.5);
-const MARGIN_TOP = cmToTwips(1.27);
+const MARGIN_TOP = cmToTwips(0.64); // compacto (~mitad de 1.27 cm)
 const MARGIN_BOTTOM = MARGIN_LR;
 const CONTENT_W = PAGE_W - MARGIN_LR * 2;
-const PARA_SPACE_BEFORE = 16; // 0.8 pt
+const PARA_SPACE_BEFORE = 8;
+const HDR_BLOCK_GAP = 0; // espacio logo/cabecera → sección II (usar mkCompactGap)
+const ST_TABLE_GAP = 5; // espacio sección II → tabla estudiantes
+
 const PARA_SPACE_AFTER = 0;
 
 // ─── cabecera — ajustar aquí ─────────────────────────────────────────
 const LOGO_URL =
   "https://satescolar.s3.us-east-1.amazonaws.com/planillas/LOGO+ANTERIOR.png";
-const LOGO_WIDTH_RATIO = 0.4;
+const LOGO_WIDTH_RATIO = 0.32;
+const LOGO_MAX_HEIGHT_PX = 76; // limita altura logo → evita hueco bajo punto I
 const HDR_TITLE_INDENT = 200;
 const HDR_FONT = "Arial";
 const HDR_TITLE_SIZE = 9;
 const HDR_BODY_SIZE = 9;
-const HDR_LINE_SPACING = 200;
+const HDR_LINE_SPACING = 180;
 const BODY_LABEL_SIZE = 9; // títulos / etiquetas
 const BODY_DATA_SIZE = 10; // datos desde BD
-const IE_LINE_SPACING = 180; // interlineado compacto sección II
-const IE_ROW_GAP = 68; // separación vertical entre filas (~1.2 mm)
+const IE_LINE_SPACING = 175; // interlineado sección II
+const IE_ROW_GAP = 34; // separación vertical entre filas sección II
+const IE_TITLE_PAD_TOP = 6; // padding interno celda título II (no el hueco bajo logo)
 // fila código + epónimo (5 columnas: lbl | línea | gap | lbl | línea)
 const IE_LBL_COD = 2800;
 const IE_LINE_COD = 1600;
@@ -93,6 +102,53 @@ const IE_DIR_CED_ROW_COLS = [
   IE_LBL_CEDULA,
   IE_LINE_CEDULA,
 ];
+// ─── tabla III + IV (estudiantes) — ajustar aquí ─────────────────────
+const ST_TABLE_W = 11674; // ancho total (= IE_ROW_W)
+const ST_COL_III = 7588; // III Identificación del Estudiante (~65%)
+const ST_COL_IV = 4086; // IV Resumen Final del Rendimiento (~35%)
+const ST_TABLE_FONT_SIZE = 9.5; // Arial 9.5 — solo tabla III/IV
+const ST_HDR_FONT_SIZE = ST_TABLE_FONT_SIZE;
+const ST_CELL_PAD = 10;
+// subcolumnas III (suma = ST_COL_III = 7588)
+const ST_III_NRO = 320;
+const ST_III_CED = 1250;
+const ST_III_APE = 1500;
+const ST_III_NOM = 1500;
+const ST_III_LUG = 1220;
+const ST_III_EF = 370;
+const ST_III_SEX = 260;
+const ST_III_DIA = 335;
+const ST_III_MES = 335;
+const ST_III_ANO = 400;
+const ST_III_FECHA_W = 1068; // ST_III_DIA + ST_III_MES + ST_III_ANO
+const ST_HDR_VERT_PAD_TOP = 6;
+const ST_HDR_VERT_PAD_BOTTOM = 5;
+const ST_HDR_VERT_LINE = 190; // ≥ altura Arial 9.5pt
+const ST_HDR_CELL_PAD_TOP = 14; // aire arriba (N°, Cédula, etc.)
+const ST_HDR_CELL_PAD_BOTTOM = 5;
+const ST_HDR_MULTILINE_BEFORE = 7; // espacio 1ª línea multilínea
+const ST_HDR_ROW1_MIN = 400; // altura mín. fila N°…Fecha de nacimiento
+const ST_HDR_ROW2_MIN = 500; // altura mín. fila DIA / MES / AÑO
+const ST_III_COLS = [
+  ST_III_NRO,
+  ST_III_CED,
+  ST_III_APE,
+  ST_III_NOM,
+  ST_III_LUG,
+  ST_III_EF,
+  ST_III_SEX,
+  ST_III_DIA,
+  ST_III_MES,
+  ST_III_ANO,
+];
+const ST_ALL_COLS = [...ST_III_COLS, ST_COL_IV];
+const ST_ROWS_PER_PAGE = 35;
+const ST_DATA_FONT_SIZE = ST_TABLE_FONT_SIZE; // Arial 9.5, normal
+const ST_DATA_ROW_MIN = 300; // altura mínima fila alumno (ajustable)
+const ST_DATA_CELL_PAD = 0;
+const ST_DATA_CELL_PAD_LEFT = 40; // padding izquierdo filas de datos
+const ST_EMPTY = "***";
+const ST_EMPTY_SHORT = "*"; // EF, SEXO, DIA, MES, AÑO
 const W_LBL_ANO = 1580;
 const W_LBL_TIPO = 1800; // "Tipo de Evaluación:" en una sola línea
 const W_LINE_TIPO = 700; // línea corta solo para "Final"
@@ -108,6 +164,14 @@ const BORDERS_NONE = {
   right: BN,
   insideHorizontal: BN,
   insideVertical: BN,
+};
+const BORDERS_GRID = {
+  top: BS,
+  bottom: BS,
+  left: BS,
+  right: BS,
+  insideHorizontal: BS,
+  insideVertical: BS,
 };
 
 type TxtOpts = {
@@ -161,6 +225,58 @@ function hdrP(
   });
 }
 
+function tblP(
+  text: string,
+  opts?: {
+    bold?: boolean;
+    size?: number;
+    align?: (typeof AlignmentType)[keyof typeof AlignmentType];
+  },
+): Paragraph {
+  return new Paragraph({
+    children: [
+      t(text, {
+        size: opts?.size ?? ST_HDR_FONT_SIZE,
+        bold: opts?.bold ?? false,
+      }),
+    ],
+    alignment: opts?.align ?? AlignmentType.CENTER,
+    spacing: { before: 0, after: 0, line: 200, lineRule: "exact" as const },
+  });
+}
+
+function tblPMulti(text: string, bold = true): Paragraph[] {
+  return text.split("\n").map(
+    (line, i) =>
+      new Paragraph({
+        children: [t(line, { size: ST_HDR_FONT_SIZE, bold })],
+        alignment: AlignmentType.CENTER,
+        spacing: {
+          before: i === 0 ? ST_HDR_MULTILINE_BEFORE : 0,
+          after: 0,
+          line: 180,
+          lineRule: "exact" as const,
+        },
+      }),
+  );
+}
+
+function tblPVertical(word: string, line = ST_HDR_VERT_LINE): Paragraph[] {
+  return word.split("").map(
+    (letter) =>
+      new Paragraph({
+        children: [t(letter, { size: ST_HDR_FONT_SIZE, bold: true })],
+        alignment: AlignmentType.CENTER,
+        spacing: {
+          before: 0,
+          after: 0,
+          line,
+          lineRule: "atLeast" as const,
+        },
+      }),
+  );
+}
+
 function mesAnioFromYearRange(yearRange: string): string {
   const match = yearRange.match(/(\d{4})\s*[-–/]\s*(\d{4})/);
   return match ? `Julio ${match[2]}` : "";
@@ -186,27 +302,47 @@ function logoImageSize(
   const dims = getPngDimensions(logoBuffer);
   if (!dims?.width || !dims?.height)
     return { width: widthPx, height: Math.round(widthPx * 0.15) };
-  return {
-    width: widthPx,
-    height: Math.round(widthPx * (dims.height / dims.width)),
-  };
+
+  let width = widthPx;
+  let height = Math.round(widthPx * (dims.height / dims.width));
+  if (height > LOGO_MAX_HEIGHT_PX) {
+    const scale = LOGO_MAX_HEIGHT_PX / height;
+    height = LOGO_MAX_HEIGHT_PX;
+    width = Math.round(width * scale);
+  }
+  return { width, height };
+}
+
+function mkCompactGap(before = 0): Paragraph {
+  return new Paragraph({
+    spacing: { before, after: 0, line: 20, lineRule: "exact" as const },
+    children: [t("", { size: 1 })],
+  });
 }
 
 function mkRow(cells: TableCell[]): TableRow {
   return new TableRow({ children: cells });
 }
 
+function mkStHdrRow(cells: TableCell[], minHeight: number): TableRow {
+  return new TableRow({
+    children: cells,
+    height: { value: minHeight, rule: HeightRule.ATLEAST },
+  });
+}
+
 function mkFixedTable(
   rows: TableRow[],
   tableWidth: number,
   columnWidths: number[],
+  borders: typeof BORDERS_NONE | typeof BORDERS_GRID = BORDERS_NONE,
 ): Table {
   return new Table({
     width: { size: tableWidth, type: WidthType.DXA },
     columnWidths,
     layout: TableLayoutType.FIXED,
     rows,
-    borders: BORDERS_NONE,
+    borders,
   });
 }
 
@@ -256,11 +392,16 @@ function mkIeLineCell(
   });
 }
 
-function mkLabelCell(w: number, text: string, span = 1): TableCell {
+function mkLabelCell(
+  w: number,
+  text: string,
+  span = 1,
+  bold = false,
+): TableCell {
   return new TableCell({
     ...(span > 1 ? { columnSpan: span } : {}),
     width: { size: w, type: WidthType.DXA },
-    children: [hdrP(t(text, { size: HDR_BODY_SIZE }))],
+    children: [hdrP(t(text, { size: HDR_BODY_SIZE, bold }))],
     borders: BORDERS_NONE,
     verticalAlign: VerticalAlign.BOTTOM,
     margins: { top: 0, bottom: 0, left: 0, right: 4 },
@@ -275,6 +416,224 @@ function mkBottomLineCell(w: number, value = "", span = 1): TableCell {
     borders: { top: BN, left: BN, right: BN, bottom: BS },
     verticalAlign: VerticalAlign.BOTTOM,
     margins: { top: 0, bottom: 0, left: 4, right: 0 },
+  });
+}
+
+function mkStTitleCell(
+  w: number,
+  text: string,
+  side: "left" | "right",
+  columnSpan = 1,
+): TableCell {
+  return new TableCell({
+    ...(columnSpan > 1 ? { columnSpan } : {}),
+    width: { size: w, type: WidthType.DXA },
+    children: [
+      tblP(text, {
+        bold: true,
+        size: ST_HDR_FONT_SIZE,
+        align: AlignmentType.LEFT,
+      }),
+    ],
+    verticalAlign: VerticalAlign.CENTER,
+    margins: {
+      top: ST_CELL_PAD,
+      bottom: ST_CELL_PAD,
+      left: side === "left" ? 8 : 20,
+      right: 20,
+    },
+  });
+}
+
+type StHdrCellOpts = {
+  rowSpan?: number;
+  columnSpan?: number;
+  multiline?: string;
+  vertical?: boolean;
+  vertCompact?: boolean; // EF, SEXO, DIA, MES, AÑO
+};
+
+function mkStHdrCell(w: number, text: string, opts?: StHdrCellOpts): TableCell {
+  const children = opts?.multiline
+    ? tblPMulti(opts.multiline)
+    : opts?.vertical
+      ? tblPVertical(text, ST_HDR_VERT_LINE)
+      : [tblP(text, { bold: true, size: ST_HDR_FONT_SIZE })];
+
+  const padTop = opts?.vertCompact ? ST_HDR_VERT_PAD_TOP : ST_HDR_CELL_PAD_TOP;
+  const padBottom = opts?.vertCompact
+    ? ST_HDR_VERT_PAD_BOTTOM
+    : ST_HDR_CELL_PAD_BOTTOM;
+
+  return new TableCell({
+    ...(opts?.rowSpan ? { rowSpan: opts.rowSpan } : {}),
+    ...(opts?.columnSpan ? { columnSpan: opts.columnSpan } : {}),
+    width: { size: w, type: WidthType.DXA },
+    children,
+    verticalAlign: VerticalAlign.CENTER,
+    margins: {
+      top: padTop,
+      bottom: padBottom,
+      left: opts?.vertCompact ? 2 : 8,
+      right: opts?.vertCompact ? 2 : 8,
+    },
+  });
+}
+
+function formatStField(value: string, empty = ST_EMPTY): string {
+  const v = (value ?? "").trim();
+  return v ? v.toUpperCase() : empty;
+}
+
+function formatStNro(n: number): string {
+  return String(n);
+}
+
+function emptyStudentRow(nro: number): StudentDocxRow {
+  return {
+    nro,
+    cedula: "",
+    apellidos: "",
+    nombres: "",
+    lugarNacimiento: "",
+    entidadFederal: "",
+    sexo: "",
+    diaNac: "",
+    mesNac: "",
+    anioNac: "",
+    grades: {},
+    gcrpAssignmentId: null,
+    grupoName: "",
+  };
+}
+
+function padStudentsPage(students: StudentDocxRow[]): StudentDocxRow[] {
+  const rows = [...students];
+  for (let nro = rows.length + 1; nro <= ST_ROWS_PER_PAGE; nro++) {
+    rows.push(emptyStudentRow(nro));
+  }
+  return rows.slice(0, ST_ROWS_PER_PAGE);
+}
+
+function mkStDataCell(
+  w: number,
+  text: string,
+  align: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.LEFT,
+): TableCell {
+  return new TableCell({
+    width: { size: w, type: WidthType.DXA },
+    children: [
+      new Paragraph({
+        children: [t(text, { size: ST_DATA_FONT_SIZE, bold: false })],
+        alignment: align,
+        spacing: { before: 0, after: 0, line: 200, lineRule: "exact" as const },
+      }),
+    ],
+    verticalAlign: VerticalAlign.CENTER,
+    margins: {
+      top: ST_DATA_CELL_PAD,
+      bottom: ST_DATA_CELL_PAD,
+      left: align === AlignmentType.CENTER ? 0 : ST_DATA_CELL_PAD_LEFT,
+      right: 0,
+    },
+  });
+}
+
+function mkStDataRow(row: StudentDocxRow): TableRow {
+  return mkStHdrRow(
+    [
+      mkStDataCell(ST_III_NRO, formatStNro(row.nro)),
+      mkStDataCell(ST_III_CED, formatStField(row.cedula)),
+      mkStDataCell(ST_III_APE, formatStField(row.apellidos)),
+      mkStDataCell(ST_III_NOM, formatStField(row.nombres)),
+      mkStDataCell(ST_III_LUG, formatStField(row.lugarNacimiento)),
+      mkStDataCell(
+        ST_III_EF,
+        formatStField(row.entidadFederal, ST_EMPTY_SHORT),
+      ),
+      mkStDataCell(ST_III_SEX, formatStField(row.sexo, ST_EMPTY_SHORT)),
+      mkStDataCell(
+        ST_III_DIA,
+        formatStField(row.diaNac, ST_EMPTY_SHORT),
+        AlignmentType.CENTER,
+      ),
+      mkStDataCell(
+        ST_III_MES,
+        formatStField(row.mesNac, ST_EMPTY_SHORT),
+        AlignmentType.CENTER,
+      ),
+      mkStDataCell(
+        ST_III_ANO,
+        formatStField(row.anioNac, ST_EMPTY_SHORT),
+        AlignmentType.CENTER,
+      ),
+      mkStDataCell(ST_COL_IV, ""),
+    ],
+    ST_DATA_ROW_MIN,
+  );
+}
+
+function buildEstudiantesBlock(data: ResumenFinalDocxData): Table {
+  const dataRows = padStudentsPage(data.students).map((row) =>
+    mkStDataRow(row),
+  );
+
+  return new Table({
+    width: { size: ST_TABLE_W, type: WidthType.DXA },
+    columnWidths: ST_ALL_COLS,
+    layout: TableLayoutType.FIXED,
+    borders: BORDERS_GRID,
+    rows: [
+      mkRow([
+        mkStTitleCell(
+          ST_COL_III,
+          "III: Identificación del Estudiante",
+          "left",
+          ST_III_COLS.length,
+        ),
+        mkStTitleCell(ST_COL_IV, "IV: Resumen Final del Rendimiento", "right"),
+      ]),
+      mkStHdrRow(
+        [
+          mkStHdrCell(ST_III_NRO, "N°", { rowSpan: 2 }),
+          mkStHdrCell(ST_III_CED, "", {
+            rowSpan: 2,
+            multiline: "Cédula de\nidentidad",
+          }),
+          mkStHdrCell(ST_III_APE, "Apellidos", { rowSpan: 2 }),
+          mkStHdrCell(ST_III_NOM, "Nombres", { rowSpan: 2 }),
+          mkStHdrCell(ST_III_LUG, "", {
+            rowSpan: 2,
+            multiline: "Lugar de\nnacimiento",
+          }),
+          mkStHdrCell(ST_III_EF, "EF", {
+            rowSpan: 2,
+            vertical: true,
+            vertCompact: true,
+          }),
+          mkStHdrCell(ST_III_SEX, "SEXO", {
+            rowSpan: 2,
+            vertical: true,
+            vertCompact: true,
+          }),
+          mkStHdrCell(ST_III_FECHA_W, "", {
+            columnSpan: 3,
+            multiline: "Fecha de\nnacimiento",
+          }),
+          mkStHdrCell(ST_COL_IV, "", { rowSpan: 2 }),
+        ],
+        ST_HDR_ROW1_MIN,
+      ),
+      mkStHdrRow(
+        [
+          mkStHdrCell(ST_III_DIA, "DIA", { vertical: true, vertCompact: true }),
+          mkStHdrCell(ST_III_MES, "MES", { vertical: true, vertCompact: true }),
+          mkStHdrCell(ST_III_ANO, "AÑO", { vertical: true, vertCompact: true }),
+        ],
+        ST_HDR_ROW2_MIN,
+      ),
+      ...dataRows,
+    ],
   });
 }
 
@@ -321,13 +680,13 @@ async function buildHeaderBlock(
   const fieldsTable = mkFixedTable(
     [
       mkRow([
-        mkLabelCell(W_LBL_COL0, "I. AÑO Escolar:"),
+        mkLabelCell(W_LBL_COL0, "I. AÑO Escolar:", 1, true),
         mkBottomLineCell(wLineAnoSpan, data.yearRange, 3),
       ]),
       mkRow([
-        mkLabelCell(W_LBL_COL0, "Tipo de Evaluación:"),
+        mkLabelCell(W_LBL_COL0, "Tipo de Evaluación:", 1, true),
         mkBottomLineCell(W_LINE_TIPO, "Final"),
-        mkLabelCell(W_LBL_MES, "     Mes y AÑO:"),
+        mkLabelCell(W_LBL_MES, "     Mes y AÑO:", 1, true),
         mkBottomLineCell(wLineMes, mesAnioFromYearRange(data.yearRange)),
       ]),
     ],
@@ -344,6 +703,7 @@ async function buildHeaderBlock(
             hdrP(
               t("RESUMEN FINAL DEL RENDIMIENTO ESTUDIANTIL", {
                 size: HDR_TITLE_SIZE,
+                bold: true,
                 underline: true,
               }),
               AlignmentType.CENTER,
@@ -351,6 +711,7 @@ async function buildHeaderBlock(
             hdrP(
               t(`Código del Formato: EMG ${data.tipoPlanilla}`, {
                 size: HDR_BODY_SIZE,
+                bold: true,
               }),
               AlignmentType.CENTER,
             ),
@@ -405,7 +766,12 @@ function buildInstitucionBlock(data: ResumenFinalDocxData): Table {
             ),
           ],
           borders: BORDERS_NONE,
-          margins: { top: 40, bottom: IE_ROW_GAP, left: 0, right: 0 },
+          margins: {
+            top: IE_TITLE_PAD_TOP,
+            bottom: IE_ROW_GAP,
+            left: 0,
+            right: 0,
+          },
         }),
       ]),
       mkRow([
@@ -538,8 +904,10 @@ async function buildDocumentContent(
 ): Promise<(Paragraph | Table)[]> {
   return [
     await buildHeaderBlock(data, logoBuffer),
-    new Paragraph({ spacing: { before: 40, after: 0 } }),
+    ...(HDR_BLOCK_GAP > 0 ? [mkCompactGap(HDR_BLOCK_GAP)] : []),
     buildInstitucionBlock(data),
+    ...(ST_TABLE_GAP > 0 ? [mkCompactGap(ST_TABLE_GAP)] : []),
+    buildEstudiantesBlock(data),
   ];
 }
 
