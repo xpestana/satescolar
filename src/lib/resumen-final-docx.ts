@@ -25,11 +25,11 @@ import type {
 const PAGE_W = 18410;           // ~32.47 cm — igual que UEH referencia (última sección)
 const PAGE_H = 31660;           // ~55.80 cm — igual que UEH referencia
 const cmToTwips = (cm: number) => Math.round((cm / 2.54) * 1440);
-const MARGIN_LEFT = 141;        // ~0.25 cm (UEH XML: w:left="141")
-const MARGIN_RIGHT = 283;       // ~0.50 cm (UEH XML: w:right="283")
-const MARGIN_TOP = 1760;        // ~3.10 cm (UEH XML: w:top="1760")
-const MARGIN_BOTTOM = 280;      // ~0.49 cm (UEH XML: w:bottom="280")
-const CONTENT_W = PAGE_W - MARGIN_LEFT - MARGIN_RIGHT; // 17986
+const MARGIN_LEFT = cmToTwips(0.8);   // 0.8 cm
+const MARGIN_RIGHT = cmToTwips(0.8);  // 0.8 cm
+const MARGIN_TOP = cmToTwips(0.8);    // 0.8 cm
+const MARGIN_BOTTOM = cmToTwips(0.8); // 0.8 cm
+const CONTENT_W = PAGE_W - MARGIN_LEFT - MARGIN_RIGHT; // 17502
 const PARA_SPACE_BEFORE = 8;
 const HDR_BLOCK_GAP = 0; // espacio logo/cabecera → sección II (usar mkCompactGap)
 const ST_TABLE_GAP = 5; // espacio sección II → tabla estudiantes
@@ -56,15 +56,15 @@ const IE_LBL_COD = 2800;
 const IE_LINE_COD = 1600;
 const IE_GAP = 500;
 const IE_LBL_EPO = 1000;
-const IE_LINE_EPO = 12086; // hasta margen derecho (CONTENT_W 17986)
-const IE_ROW_W = 17986; // ancho total filas sección II (= CONTENT_W)
+const IE_LINE_EPO = 11602; // hasta margen derecho (CONTENT_W 17502)
+const IE_ROW_W = 17502; // ancho total filas sección II (= CONTENT_W)
 const IE_ROW_COLS = [IE_LBL_COD, IE_LINE_COD, IE_GAP, IE_LBL_EPO, IE_LINE_EPO];
 // fila dirección + gap + teléfono
 const IE_LBL_DIR = 900;
-const IE_LINE_DIR = 13074; // ajustado a CONTENT_W 17986
+const IE_LINE_DIR = 12676; // ajustado a CONTENT_W 17502
 const IE_DIR_TEL_GAP = 300;
 const IE_LBL_TEL = 900;
-const IE_LINE_TEL = 2812; // ajustado a CONTENT_W 17986
+const IE_LINE_TEL = 2726; // ajustado a CONTENT_W 17502
 const IE_DIR_ROW_COLS = [
   IE_LBL_DIR,
   IE_LINE_DIR,
@@ -74,12 +74,12 @@ const IE_DIR_ROW_COLS = [
 ];
 // fila municipio | gap | entidad federal | gap | zona educativa
 const IE_LBL_MUN = 600;
-const IE_LINE_MUN = 4895; // ajustado a CONTENT_W 17986
+const IE_LINE_MUN = 4734; // ajustado a CONTENT_W 17502
 const IE_MUN_ENT_GAP = 500;
 const IE_LBL_ENT = 800;
-const IE_LINE_ENT = 4895; // ajustado a CONTENT_W 17986
+const IE_LINE_ENT = 4734; // ajustado a CONTENT_W 17502
 const IE_LBL_ZONA = 900;
-const IE_LINE_ZONA = 4896; // ajustado a CONTENT_W 17986
+const IE_LINE_ZONA = 4734; // ajustado a CONTENT_W 17502
 const IE_MUN_ROW_COLS = [
   IE_LBL_MUN,
   IE_LINE_MUN,
@@ -92,10 +92,10 @@ const IE_MUN_ROW_COLS = [
 ];
 // fila director (a) | gap | cédula de identidad
 const IE_LBL_DIRECTOR = 950;
-const IE_LINE_DIRECTOR = 10500; // ajustado a CONTENT_W 17986
+const IE_LINE_DIRECTOR = 10160; // ajustado a CONTENT_W 17502
 const IE_DIR_CED_GAP = 500;
 const IE_LBL_CEDULA = 1600;
-const IE_LINE_CEDULA = 4436; // ajustado a CONTENT_W 17986
+const IE_LINE_CEDULA = 4292; // ajustado a CONTENT_W 17502
 const IE_DIR_CED_ROW_COLS = [
   IE_LBL_DIRECTOR,
   IE_LINE_DIRECTOR,
@@ -104,24 +104,24 @@ const IE_DIR_CED_ROW_COLS = [
   IE_LINE_CEDULA,
 ];
 // ─── tabla III + IV (estudiantes) — ajustar aquí ─────────────────────
-const ST_TABLE_W = 17986; // ancho total (= CONTENT_W)
-const ST_COL_III = 11511; // III Identificación del Estudiante (~64%)
-const ST_COL_IV = 6475; // IV Resumen Final del Rendimiento (~36%)
+const ST_TABLE_W = 17502; // ancho total (= CONTENT_W)
+const ST_COL_III = 11201; // III Identificación del Estudiante (~64%)
+const ST_COL_IV = 6301; // IV Resumen Final del Rendimiento (~36%)
 const ST_TABLE_FONT_SIZE = 9; // Arial 9 — solo tabla III/IV (UEH referencia)
 const ST_HDR_FONT_SIZE = ST_TABLE_FONT_SIZE;
 const ST_CELL_PAD = 10;
-// subcolumnas III (suma = ST_COL_III = 11511)
-const ST_III_NRO = 485;
-const ST_III_CED = 1896;
-const ST_III_APE = 2351;
-const ST_III_NOM = 2350;
-const ST_III_LUG = 1851;
-const ST_III_EF = 561;
-const ST_III_SEX = 394;
-const ST_III_DIA = 508;
-const ST_III_MES = 508;
-const ST_III_ANO = 607;
-const ST_III_FECHA_W = 1623; // ST_III_DIA + ST_III_MES + ST_III_ANO
+// subcolumnas III (suma = ST_COL_III = 11201)
+const ST_III_NRO = 472;
+const ST_III_CED = 1845;
+const ST_III_APE = 2287;
+const ST_III_NOM = 2286;
+const ST_III_LUG = 1801;
+const ST_III_EF = 546;
+const ST_III_SEX = 384;
+const ST_III_DIA = 495;
+const ST_III_MES = 495;
+const ST_III_ANO = 590;
+const ST_III_FECHA_W = 1580; // ST_III_DIA + ST_III_MES + ST_III_ANO
 const ST_HDR_VERT_PAD_TOP = 6;
 const ST_HDR_VERT_PAD_BOTTOM = 5;
 const ST_HDR_VERT_LINE = 180; // ≥ altura Arial 9pt
