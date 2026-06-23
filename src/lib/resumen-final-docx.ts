@@ -21,14 +21,15 @@ import type {
   StudentDocxRow,
 } from "@/hooks/useResumenFinalDocxData";
 
-// ─── página Oficio (21.59 × 35.56 cm) ───────────────────────────────
-const PAGE_W = 12240;
-const PAGE_H = 20160;
+// ─── página (estrategia UEH: hoja virtual alta y ancha para que entre todo en una sola página lógica) ──
+const PAGE_W = 18410;           // ~32.47 cm — igual que UEH referencia (última sección)
+const PAGE_H = 31660;           // ~55.80 cm — igual que UEH referencia
 const cmToTwips = (cm: number) => Math.round((cm / 2.54) * 1440);
-const MARGIN_LR = cmToTwips(0.5);
-const MARGIN_TOP = cmToTwips(0.64); // compacto (~mitad de 1.27 cm)
-const MARGIN_BOTTOM = MARGIN_LR;
-const CONTENT_W = PAGE_W - MARGIN_LR * 2;
+const MARGIN_LEFT = 141;        // ~0.25 cm (UEH XML: w:left="141")
+const MARGIN_RIGHT = 283;       // ~0.50 cm (UEH XML: w:right="283")
+const MARGIN_TOP = 1760;        // ~3.10 cm (UEH XML: w:top="1760")
+const MARGIN_BOTTOM = 280;      // ~0.49 cm (UEH XML: w:bottom="280")
+const CONTENT_W = PAGE_W - MARGIN_LEFT - MARGIN_RIGHT; // 17986
 const PARA_SPACE_BEFORE = 8;
 const HDR_BLOCK_GAP = 0; // espacio logo/cabecera → sección II (usar mkCompactGap)
 const ST_TABLE_GAP = 5; // espacio sección II → tabla estudiantes
@@ -55,15 +56,15 @@ const IE_LBL_COD = 2800;
 const IE_LINE_COD = 1600;
 const IE_GAP = 500;
 const IE_LBL_EPO = 1000;
-const IE_LINE_EPO = 5774; // hasta margen derecho
-const IE_ROW_W = 11674; // ancho total filas sección II (= CONTENT_W)
+const IE_LINE_EPO = 12086; // hasta margen derecho (CONTENT_W 17986)
+const IE_ROW_W = 17986; // ancho total filas sección II (= CONTENT_W)
 const IE_ROW_COLS = [IE_LBL_COD, IE_LINE_COD, IE_GAP, IE_LBL_EPO, IE_LINE_EPO];
 // fila dirección + gap + teléfono
 const IE_LBL_DIR = 900;
-const IE_LINE_DIR = 7926;
+const IE_LINE_DIR = 13074; // ajustado a CONTENT_W 17986
 const IE_DIR_TEL_GAP = 300;
 const IE_LBL_TEL = 900;
-const IE_LINE_TEL = 1648; // hasta margen derecho
+const IE_LINE_TEL = 2812; // ajustado a CONTENT_W 17986
 const IE_DIR_ROW_COLS = [
   IE_LBL_DIR,
   IE_LINE_DIR,
@@ -73,12 +74,12 @@ const IE_DIR_ROW_COLS = [
 ];
 // fila municipio | gap | entidad federal | gap | zona educativa
 const IE_LBL_MUN = 600;
-const IE_LINE_MUN = 1000;
+const IE_LINE_MUN = 4895; // ajustado a CONTENT_W 17986
 const IE_MUN_ENT_GAP = 500;
 const IE_LBL_ENT = 800;
-const IE_LINE_ENT = 1500;
+const IE_LINE_ENT = 4895; // ajustado a CONTENT_W 17986
 const IE_LBL_ZONA = 900;
-const IE_LINE_ZONA = 1500;
+const IE_LINE_ZONA = 4896; // ajustado a CONTENT_W 17986
 const IE_MUN_ROW_COLS = [
   IE_LBL_MUN,
   IE_LINE_MUN,
@@ -91,10 +92,10 @@ const IE_MUN_ROW_COLS = [
 ];
 // fila director (a) | gap | cédula de identidad
 const IE_LBL_DIRECTOR = 950;
-const IE_LINE_DIRECTOR = 4766;
+const IE_LINE_DIRECTOR = 10500; // ajustado a CONTENT_W 17986
 const IE_DIR_CED_GAP = 500;
 const IE_LBL_CEDULA = 1600;
-const IE_LINE_CEDULA = 2000;
+const IE_LINE_CEDULA = 4436; // ajustado a CONTENT_W 17986
 const IE_DIR_CED_ROW_COLS = [
   IE_LBL_DIRECTOR,
   IE_LINE_DIRECTOR,
@@ -103,32 +104,32 @@ const IE_DIR_CED_ROW_COLS = [
   IE_LINE_CEDULA,
 ];
 // ─── tabla III + IV (estudiantes) — ajustar aquí ─────────────────────
-const ST_TABLE_W = 11674; // ancho total (= IE_ROW_W)
-const ST_COL_III = 7588; // III Identificación del Estudiante (~65%)
-const ST_COL_IV = 4086; // IV Resumen Final del Rendimiento (~35%)
-const ST_TABLE_FONT_SIZE = 9.5; // Arial 9.5 — solo tabla III/IV
+const ST_TABLE_W = 17986; // ancho total (= CONTENT_W)
+const ST_COL_III = 11511; // III Identificación del Estudiante (~64%)
+const ST_COL_IV = 6475; // IV Resumen Final del Rendimiento (~36%)
+const ST_TABLE_FONT_SIZE = 9; // Arial 9 — solo tabla III/IV (UEH referencia)
 const ST_HDR_FONT_SIZE = ST_TABLE_FONT_SIZE;
 const ST_CELL_PAD = 10;
-// subcolumnas III (suma = ST_COL_III = 7588)
-const ST_III_NRO = 320;
-const ST_III_CED = 1250;
-const ST_III_APE = 1500;
-const ST_III_NOM = 1500;
-const ST_III_LUG = 1220;
-const ST_III_EF = 370;
-const ST_III_SEX = 260;
-const ST_III_DIA = 335;
-const ST_III_MES = 335;
-const ST_III_ANO = 400;
-const ST_III_FECHA_W = 1068; // ST_III_DIA + ST_III_MES + ST_III_ANO
+// subcolumnas III (suma = ST_COL_III = 11511)
+const ST_III_NRO = 485;
+const ST_III_CED = 1896;
+const ST_III_APE = 2351;
+const ST_III_NOM = 2350;
+const ST_III_LUG = 1851;
+const ST_III_EF = 561;
+const ST_III_SEX = 394;
+const ST_III_DIA = 508;
+const ST_III_MES = 508;
+const ST_III_ANO = 607;
+const ST_III_FECHA_W = 1623; // ST_III_DIA + ST_III_MES + ST_III_ANO
 const ST_HDR_VERT_PAD_TOP = 6;
 const ST_HDR_VERT_PAD_BOTTOM = 5;
-const ST_HDR_VERT_LINE = 190; // ≥ altura Arial 9.5pt
+const ST_HDR_VERT_LINE = 180; // ≥ altura Arial 9pt
 const ST_HDR_CELL_PAD_TOP = 14; // aire arriba (N°, Cédula, etc.)
 const ST_HDR_CELL_PAD_BOTTOM = 5;
 const ST_HDR_MULTILINE_BEFORE = 7; // espacio 1ª línea multilínea
-const ST_HDR_ROW1_MIN = 400; // altura mín. fila N°…Fecha de nacimiento
-const ST_HDR_ROW2_MIN = 500; // altura mín. fila DIA / MES / AÑO
+const ST_HDR_ROW1_MIN = 415; // altura mín. fila N°…Fecha de nacimiento (UEH: 415)
+const ST_HDR_ROW2_MIN = 465; // altura mín. fila DIA / MES / AÑO (UEH: 465)
 const ST_III_COLS = [
   ST_III_NRO,
   ST_III_CED,
@@ -144,7 +145,7 @@ const ST_III_COLS = [
 const ST_ALL_COLS = [...ST_III_COLS, ST_COL_IV];
 const ST_ROWS_PER_PAGE = 35;
 const ST_DATA_FONT_SIZE = ST_TABLE_FONT_SIZE; // Arial 9.5, normal
-const ST_DATA_ROW_MIN = 300; // altura mínima fila alumno (ajustable)
+const ST_DATA_ROW_MIN = 412; // altura mínima fila alumno (UEH: 412)
 const ST_DATA_CELL_PAD = 0;
 const ST_DATA_CELL_PAD_LEFT = 40; // padding izquierdo filas de datos
 const ST_EMPTY = "***";
@@ -933,8 +934,8 @@ export async function generateResumenFinalDocx(
           margin: {
             top: MARGIN_TOP,
             bottom: MARGIN_BOTTOM,
-            left: MARGIN_LR,
-            right: MARGIN_LR,
+            left: MARGIN_LEFT,
+            right: MARGIN_RIGHT,
           },
         },
       },
