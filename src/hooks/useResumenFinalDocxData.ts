@@ -230,9 +230,20 @@ export async function fetchResumenFinalDocxData(
     gcrpAssignmentsData = (data ?? []).filter(a => (a.school_subjects as any)?.subject_type === "gcrp");
   }
 
+  const gcrpOrder = new Map(
+    gcrpAssignmentsData.map((a, i) => [a.id, (a.school_subjects as any)?.display_order ?? i]),
+  );
   const studentGcrpMap = new Map<string, string>();
-  (gcrpLinks ?? []).forEach(l => {
-    if (gcrpAssignmentIds.includes(l.assignment_id)) {
+  const sortedGcrpLinks = [...(gcrpLinks ?? [])].sort((a, b) => {
+    const oa = gcrpOrder.get(a.assignment_id) ?? 999;
+    const ob = gcrpOrder.get(b.assignment_id) ?? 999;
+    return oa - ob;
+  });
+  sortedGcrpLinks.forEach((l) => {
+    if (
+      gcrpAssignmentIds.includes(l.assignment_id) &&
+      !studentGcrpMap.has(l.student_id)
+    ) {
       studentGcrpMap.set(l.student_id, l.assignment_id);
     }
   });
