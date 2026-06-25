@@ -25,7 +25,7 @@ export interface StudentDocxRow {
   mesNac: string;
   anioNac: string;
   grades: Record<string, string>; // assignmentId → display value
-  gcrpAssignmentId: string | null; // which GCRP assignment this student belongs to
+  gpGrade: string; // promedio GCRP (momento 0) o literal
   grupoName: string;
 }
 
@@ -65,9 +65,160 @@ function gradeDisplay(gradeValue: string | null, adjPoints: number, evalType: st
   return Number.isInteger(num) ? String(num) : num.toFixed(1);
 }
 
+function formatGradeAverage(values: number[]): string {
+  if (values.length === 0) return "";
+  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  const rounded = Math.round(avg * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+type GradeRecord = {
+  student_id: string;
+  assignment_id: string;
+  grade_value: string | null;
+  adjustment_points: number;
+  final_status: string | null;
+};
+
+function computeGpGradeAndGrupo(
+  studentId: string,
+  gcrpAssignmentIds: string[],
+  gcrpAssignmentsData: AssignmentWithSubject[],
+  gradeMap: Map<string, GradeRecord>,
+  gradeKey: (sid: string, aid: string) => string,
+): { gpGrade: string; grupoName: string } {
+  if (gcrpAssignmentIds.length === 0) return { gpGrade: "", grupoName: "" };
+
+  const numericGrades: number[] = [];
+  const literalGrades: string[] = [];
+  const grupoNames: string[] = [];
+
+  for (const aid of gcrpAssignmentIds) {
+    const assignment = gcrpAssignmentsData.find((a) => a.id === aid);
+    const subj = assignment?.school_subjects;
+    if (!subj) continue;
+
+    if (subj.name) grupoNames.push(subj.name);
+
+    const g = gradeMap.get(gradeKey(studentId, aid));
+    if (!g) continue;
+
+    const evalType = subj.evaluation_type || "numeric";
+    if (evalType === "literal") {
+      const lit = gradeDisplay(g.grade_value, g.adjustment_points, evalType, g.final_status);
+      if (lit) literalGrades.push(lit);
+      continue;
+    }
+
+    const display = gradeDisplay(g.grade_value, g.adjustment_points, evalType, g.final_status);
+    const num = parseFloat(display);
+    if (!isNaN(num)) numericGrades.push(num);
+  }
+
+  const gpGrade =
+    numericGrades.length > 0
+      ? formatGradeAverage(numericGrades)
+      : literalGrades[0] ?? "";
+
+  const grupoName = [...new Set(grupoNames)].join(", ");
+
+  return { gpGrade, grupoName };
+}
+
 function teacherName(fd: Record<string, any> | null): string {
   if (!fd) return "";
   return `${fd.primer_apellido || fd.apellido || ""} ${fd.segundo_apellido || ""} ${fd.primer_nombre || fd.nombre || ""} ${fd.segundo_nombre || ""}`.replace(/\s+/g, " ").trim().toUpperCase();
+}
+
+type AssignmentWithSubject = {
+  id: string;
+  subject_id: string;
+  teacher: unknown;
+  school_subjects: {
+    id: string;
+    name: string;
+    abbreviation: string;
+    display_order: number;
+    show_in_planilla: boolean;
+    evaluation_type: string;
+    subject_type: string;
+    is_suspended: boolean;
+  } | null;
+};
+
+function isRegularPlanillaAssignment(a: AssignmentWithSubject): boolean {
+  const s = a.school_subjects;
+  if (!s) return false;
+  if (s.is_suspended) return false;
+  if (s.subject_type === "gcrp") return false;
+  if (s.show_in_planilla === false) return false;
+  return true;
+}
+
+function dedupeAssignmentsBySubject(assignments: AssignmentWithSubject[]): AssignmentWithSubject[] {
+  const bySubject = new Map<string, AssignmentWithSubject>();
+  for (const a of assignments) {
+    const existing = bySubject.get(a.subject_id);
+    if (!existing) {
+      bySubject.set(a.subject_id, a);
+      continue;
+    }
+    const orderA = a.school_subjects?.display_order ?? 999;
+    const orderB = existing.school_subjects?.display_order ?? 999;
+    if (orderA < orderB) bySubject.set(a.subject_id, a);
+  }
+  return Array.from(bySubject.values()).sort(
+    (a, b) => (a.school_subjects?.display_order ?? 999) - (b.school_subjects?.display_order ?? 999),
+  );
+}
+
+async function fetchRegularAssignmentsForSection(
+  schoolId: string,
+  schoolYearId: string,
+  sectionId: string,
+): Promise<AssignmentWithSubject[]> {
+  const { data, error } = await supabase
+    .from("subject_teacher_assignments")
+    .select("id, subject_id, teacher:teacher_id(id, document_id, form_data), school_subjects(id, name, abbreviation, display_order, show_in_planilla, evaluation_type, subject_type, is_suspended)")
+    .eq("school_id", schoolId)
+    .eq("school_year_id", schoolYearId)
+    .eq("section_id", sectionId)
+    .eq("is_suspended", false);
+
+  if (error) throw new Error(`Error al cargar materias de la sección: ${error.message}`);
+
+  return dedupeAssignmentsBySubject(
+    ((data ?? []) as AssignmentWithSubject[]).filter(isRegularPlanillaAssignment),
+  );
+}
+
+export async function fetchResumenFinalSubjectsPreview(
+  schoolId: string,
+  schoolYearId: string,
+  sectionId: string,
+): Promise<{ abbreviations: string[]; count: number }> {
+  const assignments = await fetchRegularAssignmentsForSection(schoolId, schoolYearId, sectionId);
+  const abbreviations = assignments.map((a) => {
+    const s = a.school_subjects!;
+    return (s.abbreviation || s.name.substring(0, 2)).toUpperCase();
+  });
+  return { abbreviations, count: abbreviations.length };
+}
+
+export async function fetchResumenFinalSubjectsForEditor(
+  schoolId: string,
+  schoolYearId: string,
+  sectionId: string,
+): Promise<Array<{ id: string; name: string; abbreviation: string }>> {
+  const assignments = await fetchRegularAssignmentsForSection(schoolId, schoolYearId, sectionId);
+  return assignments.map((a) => {
+    const s = a.school_subjects!;
+    return {
+      id: s.id,
+      name: s.name,
+      abbreviation: s.abbreviation || s.name.substring(0, 2).toUpperCase(),
+    };
+  });
 }
 
 const CALC_PARTS = (count: number) => Math.max(1, Math.ceil(count / 35));
@@ -200,52 +351,45 @@ export async function fetchResumenFinalDocxData(
   const studentsMap = new Map((students ?? []).map(s => [s.id, s]));
 
   // 6. regular subject assignments for this section
-  const { data: regAssignments } = await supabase
-    .from("subject_teacher_assignments")
-    .select("id, subject_id, teacher:teacher_id(id, document_id, form_data), school_subjects(id, name, abbreviation, display_order, show_in_planilla, evaluation_type, subject_type)")
-    .eq("school_id", schoolId)
-    .eq("school_year_id", schoolYearId)
-    .eq("section_id", sectionId)
-    .eq("is_suspended", false);
-
-  const regularAssignments = (regAssignments ?? [])
-    .filter(a => (a.school_subjects as any)?.show_in_planilla !== false && (a.school_subjects as any)?.subject_type !== "gcrp")
-    .sort((a, b) => ((a.school_subjects as any)?.display_order ?? 999) - ((b.school_subjects as any)?.display_order ?? 999));
+  const regularAssignments = await fetchRegularAssignmentsForSection(schoolId, schoolYearId, sectionId);
 
   // 7. GCRP assignments via gcrp_assignment_students for these students
-  const { data: gcrpLinks } = await supabase
+  const { data: gcrpLinks, error: gcrpLinksError } = await supabase
     .from("gcrp_assignment_students")
     .select("assignment_id, student_id")
     .eq("school_id", schoolId)
     .in("student_id", pageStudentIds);
+  if (gcrpLinksError) throw new Error(`Error al cargar asignaciones GCRP: ${gcrpLinksError.message}`);
 
   const gcrpAssignmentIds = [...new Set((gcrpLinks ?? []).map(l => l.assignment_id))];
-  let gcrpAssignmentsData: any[] = [];
+  let gcrpAssignmentsData: AssignmentWithSubject[] = [];
   if (gcrpAssignmentIds.length > 0) {
-    const { data } = await supabase
+    const { data, error: gcrpAssignError } = await supabase
       .from("subject_teacher_assignments")
-      .select("id, subject_id, teacher:teacher_id(id, document_id, form_data), school_subjects(id, name, abbreviation, display_order, show_in_planilla, evaluation_type, subject_type)")
+      .select("id, subject_id, teacher:teacher_id(id, document_id, form_data), school_subjects(id, name, abbreviation, display_order, show_in_planilla, evaluation_type, subject_type, is_suspended)")
       .in("id", gcrpAssignmentIds)
+      .eq("school_year_id", schoolYearId)
       .eq("is_suspended", false);
-    gcrpAssignmentsData = (data ?? []).filter(a => (a.school_subjects as any)?.subject_type === "gcrp");
+    if (gcrpAssignError) throw new Error(`Error al cargar materias GCRP: ${gcrpAssignError.message}`);
+    gcrpAssignmentsData = ((data ?? []) as AssignmentWithSubject[]).filter(
+      (a) => a.school_subjects?.subject_type === "gcrp" && !a.school_subjects?.is_suspended,
+    );
   }
 
   const gcrpOrder = new Map(
-    gcrpAssignmentsData.map((a, i) => [a.id, (a.school_subjects as any)?.display_order ?? i]),
+    gcrpAssignmentsData.map((a, i) => [a.id, a.school_subjects?.display_order ?? i]),
   );
-  const studentGcrpMap = new Map<string, string>();
+  const studentGcrpAssignments = new Map<string, string[]>();
   const sortedGcrpLinks = [...(gcrpLinks ?? [])].sort((a, b) => {
     const oa = gcrpOrder.get(a.assignment_id) ?? 999;
     const ob = gcrpOrder.get(b.assignment_id) ?? 999;
     return oa - ob;
   });
   sortedGcrpLinks.forEach((l) => {
-    if (
-      gcrpAssignmentIds.includes(l.assignment_id) &&
-      !studentGcrpMap.has(l.student_id)
-    ) {
-      studentGcrpMap.set(l.student_id, l.assignment_id);
-    }
+    if (!gcrpAssignmentIds.includes(l.assignment_id)) return;
+    const list = studentGcrpAssignments.get(l.student_id) ?? [];
+    if (!list.includes(l.assignment_id)) list.push(l.assignment_id);
+    studentGcrpAssignments.set(l.student_id, list);
   });
 
   // 8. all assignment IDs for grade query
@@ -254,17 +398,18 @@ export async function fetchResumenFinalDocxData(
     ...gcrpAssignmentsData.map(a => a.id),
   ];
 
-  // 9. grades (momento=0 = definitiva guardada)
-  let gradesData: any[] = [];
+  // 9. notas definitivas guardadas (momento = 0, periodo cero)
+  let gradesData: GradeRecord[] = [];
   if (allAssignmentIds.length > 0 && pageStudentIds.length > 0) {
-    const { data } = await supabase
+    const { data, error: gradesError } = await supabase
       .from("final_grades")
-      .select("student_id, assignment_id, grade_value, adjustment_points, final_status, evaluation_type")
+      .select("student_id, assignment_id, grade_value, adjustment_points, final_status")
       .eq("school_id", schoolId)
       .eq("momento", 0)
       .in("assignment_id", allAssignmentIds)
       .in("student_id", pageStudentIds);
-    gradesData = data ?? [];
+    if (gradesError) throw new Error(`Error al cargar notas definitivas: ${gradesError.message}`);
+    gradesData = (data ?? []) as GradeRecord[];
   }
 
   // 10. resumen_final_config
@@ -277,13 +422,28 @@ export async function fetchResumenFinalDocxData(
     .eq("parte", parte)
     .maybeSingle();
 
+  const tipoPlanilla = (rfConfig?.tipo_planilla as "31059" | "31060") ?? "31059";
+
+  // 11. subject name/abbreviation overrides for this planilla type
+  const { data: overridesData } = await supabase
+    .from("resumen_final_subject_overrides")
+    .select("subject_id, custom_name, custom_abbreviation")
+    .eq("school_id", schoolId)
+    .eq("school_year_id", schoolYearId)
+    .eq("planilla_type", tipoPlanilla);
+  const overridesMap = new Map(
+    ((overridesData ?? []) as Array<{ subject_id: string; custom_name: string | null; custom_abbreviation: string | null }>)
+      .map((o) => [o.subject_id, o]),
+  );
+
   const regularSubjects: SubjectCol[] = regularAssignments.map(a => {
-    const s = a.school_subjects as any;
+    const s = a.school_subjects!;
     const t = (a.teacher as any);
+    const ov = overridesMap.get(s.id);
     return {
       id: s.id,
-      name: s.name,
-      abbreviation: s.abbreviation || s.name.substring(0, 2).toUpperCase(),
+      name: ov?.custom_name || s.name,
+      abbreviation: ov?.custom_abbreviation || s.abbreviation || s.name.substring(0, 2).toUpperCase(),
       evaluationType: s.evaluation_type || "numeric",
       isGcrp: false,
       assignmentId: a.id,
@@ -293,7 +453,7 @@ export async function fetchResumenFinalDocxData(
   });
 
   const gcrpSubjects: SubjectCol[] = gcrpAssignmentsData.map(a => {
-    const s = a.school_subjects as any;
+    const s = a.school_subjects!;
     const t = (a.teacher as any);
     return {
       id: s.id,
@@ -308,8 +468,8 @@ export async function fetchResumenFinalDocxData(
   });
 
   const gradeKey = (sid: string, aid: string) => `${sid}:${aid}`;
-  const gradeMap = new Map<string, { grade_value: string | null; adjustment_points: number; final_status: string | null; evaluation_type: string | null }>();
-  gradesData.forEach(g => gradeMap.set(gradeKey(g.student_id, g.assignment_id), g));
+  const gradeMap = new Map<string, GradeRecord>();
+  gradesData.forEach((g) => gradeMap.set(gradeKey(g.student_id, g.assignment_id), g));
 
   const geoCache = await buildGeoCache(
     pageStudentIds
@@ -325,19 +485,29 @@ export async function fetchResumenFinalDocxData(
     const nombres = [fd.primer_nombre, fd.segundo_nombre].filter(Boolean).join(" ").toUpperCase();
 
     const grades: Record<string, string> = {};
-    [...regularAssignments, ...gcrpAssignmentsData].forEach(a => {
+    regularAssignments.forEach((a) => {
       const g = gradeMap.get(gradeKey(sid, a.id));
-      const subj = a.school_subjects as any;
-      if (g) {
-        grades[a.id] = gradeDisplay(g.grade_value, g.adjustment_points, subj?.evaluation_type || "", g.final_status);
+      const subj = a.school_subjects;
+      if (g && subj) {
+        grades[a.id] = gradeDisplay(
+          g.grade_value,
+          g.adjustment_points,
+          subj.evaluation_type || "numeric",
+          g.final_status,
+        );
       } else {
         grades[a.id] = "";
       }
     });
 
-    const gcrpAssignmentId = studentGcrpMap.get(sid) ?? null;
-    const gcrpAssignment = gcrpAssignmentsData.find(a => a.id === gcrpAssignmentId);
-    const grupoName = (gcrpAssignment?.school_subjects as any)?.name || "";
+    const gcrpIds = studentGcrpAssignments.get(sid) ?? [];
+    const { gpGrade, grupoName } = computeGpGradeAndGrupo(
+      sid,
+      gcrpIds,
+      gcrpAssignmentsData,
+      gradeMap,
+      gradeKey,
+    );
 
     let diaNac = "", mesNac = "", anioNac = "";
     const fechaNac = fd.fecha_nacimiento as string | undefined;
@@ -362,7 +532,7 @@ export async function fetchResumenFinalDocxData(
       mesNac,
       anioNac,
       grades,
-      gcrpAssignmentId,
+      gpGrade,
       grupoName: grupoName.toUpperCase(),
     };
   });
@@ -390,7 +560,7 @@ export async function fetchResumenFinalDocxData(
     regularSubjects,
     gcrpSubjects,
     students: studentRows,
-    tipoPlanilla: (rfConfig?.tipo_planilla as "31059" | "31060") ?? "31059",
+    tipoPlanilla,
     observaciones: rfConfig?.observaciones || "",
     nombreProfesor: rfConfig?.nombre_profesor || "",
     cedulaProfesor: rfConfig?.cedula_profesor || "",

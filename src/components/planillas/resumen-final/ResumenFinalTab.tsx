@@ -8,12 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Loader2, Users, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useResumenFinalConfig } from "@/hooks/useResumenFinalConfig";
-import { fetchResumenFinalDocxData } from "@/hooks/useResumenFinalDocxData";
+import { useResumenFinalSubjectOverrides } from "@/hooks/useResumenFinalSubjectOverrides";
+import {
+  fetchResumenFinalDocxData,
+  fetchResumenFinalSubjectsPreview,
+  fetchResumenFinalSubjectsForEditor,
+} from "@/hooks/useResumenFinalDocxData";
 import { generateResumenFinalDocx, downloadBlob } from "@/lib/resumen-final-docx";
 
 const ALL_GRADE_LABELS: Record<string, string> = {
@@ -43,6 +49,8 @@ const EMPTY_FORM = {
   cedula_profesor: "",
 };
 
+type SubjectEdit = { name: string; abbreviation: string };
+
 export function ResumenFinalTab() {
   const { schoolId } = useSchoolId();
   const [selectedYearId, setSelectedYearId] = useState<string>("");
@@ -50,6 +58,7 @@ export function ResumenFinalTab() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [downloadKey, setDownloadKey] = useState<string>("all");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [subjectEdits, setSubjectEdits] = useState<Record<string, SubjectEdit>>({});
 
   // Fetch school years
   const { data: schoolYears = [] } = useQuery({
@@ -89,6 +98,50 @@ export function ResumenFinalTab() {
     setSelectedKey("");
     setDownloadKey("all");
     setForm(EMPTY_FORM);
+    setSubjectEdits({});
+  };
+
+  // Selected section's subjects (for the override editor)
+  const selectedSectionId = selectedKey ? selectedKey.split("__")[0] : "";
+  const { data: editorSubjects = [], isLoading: editorSubjectsLoading } = useQuery({
+    queryKey: ["resumen-final-editor-subjects", schoolId, selectedYearId, selectedSectionId],
+    queryFn: () => fetchResumenFinalSubjectsForEditor(schoolId!, selectedYearId, selectedSectionId),
+    enabled: !!schoolId && !!selectedYearId && !!selectedSectionId,
+  });
+
+  // Overrides for the current planilla type
+  const { overridesMap, saveOverrides } = useResumenFinalSubjectOverrides(
+    schoolId ?? null,
+    selectedYearId,
+    form.tipo_planilla,
+  );
+
+  // Sync subject edits when subjects or overrides change (or planilla type changes)
+  useEffect(() => {
+    if (!editorSubjects.length) return;
+    const edits: Record<string, SubjectEdit> = {};
+    for (const s of editorSubjects) {
+      const ov = overridesMap.get(s.id);
+      edits[s.id] = {
+        name: ov?.custom_name ?? s.name,
+        abbreviation: ov?.custom_abbreviation ?? s.abbreviation,
+      };
+    }
+    setSubjectEdits(edits);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorSubjects, form.tipo_planilla, overridesMap.size]);
+
+  const handleSaveSubjectOverrides = () => {
+    if (!schoolId || !selectedYearId || !editorSubjects.length) return;
+    const rows = editorSubjects.map((s) => ({
+      subject_id: s.id,
+      custom_name: subjectEdits[s.id]?.name?.trim() || null,
+      custom_abbreviation: subjectEdits[s.id]?.abbreviation?.trim() || null,
+    }));
+    saveOverrides.mutate(rows, {
+      onSuccess: () => toast.success("Nombres de materias guardados"),
+      onError: (e: any) => toast.error(e.message || "Error al guardar nombres"),
+    });
   };
 
   const handleDownload = async () => {
@@ -102,8 +155,11 @@ export function ResumenFinalTab() {
             fetchResumenFinalDocxData(schoolId, selectedYearId, sp.section.id, sp.parte)
           )
         );
-        const blob = await generateResumenFinalDocx(allData);
-        downloadBlob(blob, `Resumen_Final_${yearLabel.replace(/\//g, "-")}.docx`);
+        const results = await generateResumenFinalDocx(allData);
+        for (const r of results) {
+          const suffix = results.length > 1 ? `_${r.tipoPlanilla}` : "";
+          downloadBlob(r.blob, `Resumen_Final_${yearLabel.replace(/\//g, "-")}${suffix}.docx`);
+        }
       } else {
         const [sectionId, parteStr] = downloadKey.split("__");
         const parte = parseInt(parteStr, 10);
@@ -111,8 +167,8 @@ export function ResumenFinalTab() {
         const data = await fetchResumenFinalDocxData(schoolId, selectedYearId, sectionId, parte);
         const gradeLabel = ALL_GRADE_LABELS[sp?.section.grade_level ?? ""] ?? sp?.section.grade_level ?? "";
         const filename = `Resumen_Final_${gradeLabel}_${sp?.section.name ?? "Sec"}_P${parte}.docx`.replace(/\s+/g, "_");
-        const blob = await generateResumenFinalDocx(data);
-        downloadBlob(blob, filename);
+        const results = await generateResumenFinalDocx([data]);
+        downloadBlob(results[0].blob, filename);
       }
       toast.success("Planilla generada y descargada");
     } catch (e: any) {
@@ -138,6 +194,15 @@ export function ResumenFinalTab() {
 
   const selectedPart = sectionParts.find((sp) => `${sp.section.id}__${sp.parte}` === selectedKey);
   const configuredCount = sectionParts.filter((sp) => sp.config !== null).length;
+
+  const previewSectionId =
+    downloadKey !== "all" ? downloadKey.split("__")[0] : sectionParts[0]?.section.id ?? "";
+
+  const { data: subjectsPreview, isLoading: previewLoading } = useQuery({
+    queryKey: ["resumen-final-subjects-preview", schoolId, selectedYearId, previewSectionId],
+    queryFn: () => fetchResumenFinalSubjectsPreview(schoolId!, selectedYearId, previewSectionId),
+    enabled: !!schoolId && !!selectedYearId && !!previewSectionId,
+  });
 
   return (
     <div className="space-y-5">
@@ -216,57 +281,6 @@ export function ResumenFinalTab() {
           )}
         </CardContent>
       </Card>
-
-      {/* Download card */}
-      {selectedYearId && sectionParts.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileDown className="h-4 w-4" />
-              Generar Planilla Word
-            </CardTitle>
-            <CardDescription>
-              Descarga la planilla en formato .docx (Legal/Oficio, Arial 10).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-4">
-              <Label>Seleccione qué descargar</Label>
-              <Select value={downloadKey} onValueChange={setDownloadKey}>
-                <SelectTrigger>
-                  {isLoading
-                    ? <span className="text-muted-foreground text-sm">Cargando secciones...</span>
-                    : <SelectValue />
-                  }
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    Todas las secciones ({sectionParts.length} {sectionParts.length === 1 ? "planilla" : "planillas"})
-                  </SelectItem>
-                  {sectionParts.map((sp) => {
-                    const key = `${sp.section.id}__${sp.parte}`;
-                    const label = ALL_GRADE_LABELS[sp.section.grade_level] ?? sp.section.grade_level;
-                    return (
-                      <SelectItem key={key} value={key}>
-                        {label} Sección: {sp.section.name}
-                        {sp.totalParts > 1 && ` — parte ${sp.parte} de ${sp.totalParts}`}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-start">
-              <Button onClick={handleDownload} disabled={isGenerating || isLoading}>
-                {isGenerating
-                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generando…</>
-                  : <><FileDown className="h-4 w-4 mr-2" />Descargar Word</>
-                }
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Config panel */}
       {selectedKey && selectedPart && (
@@ -357,6 +371,161 @@ export function ResumenFinalTab() {
               <Button onClick={handleSave} disabled={saveConfig.isPending}>
                 {saveConfig.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
                 Guardar
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Subject name/abbreviation editor */}
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium">Nombres de Materias</p>
+                <p className="text-xs text-muted-foreground">
+                  Los cambios aplican a todas las secciones con planilla {form.tipo_planilla} en este año escolar.
+                </p>
+              </div>
+              {editorSubjectsLoading ? (
+                <p className="text-sm text-muted-foreground">Cargando materias…</p>
+              ) : editorSubjects.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay materias asignadas a esta sección.</p>
+              ) : (
+                <div className="rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground w-8">#</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Nombre</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground w-28">Sigla</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {editorSubjects.map((s, i) => (
+                        <tr key={s.id} className="hover:bg-muted/20 transition-colors">
+                          <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
+                          <td className="px-3 py-1.5">
+                            <Input
+                              value={subjectEdits[s.id]?.name ?? s.name}
+                              onChange={(e) =>
+                                setSubjectEdits((prev) => ({
+                                  ...prev,
+                                  [s.id]: { ...prev[s.id], name: e.target.value },
+                                }))
+                              }
+                              className="h-8 text-sm border-0 shadow-none focus-visible:ring-1 bg-transparent"
+                            />
+                          </td>
+                          <td className="px-3 py-1.5">
+                            <Input
+                              value={subjectEdits[s.id]?.abbreviation ?? s.abbreviation}
+                              onChange={(e) =>
+                                setSubjectEdits((prev) => ({
+                                  ...prev,
+                                  [s.id]: { ...prev[s.id], abbreviation: e.target.value },
+                                }))
+                              }
+                              className="h-8 text-sm border-0 shadow-none focus-visible:ring-1 bg-transparent"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {editorSubjects.length > 0 && (
+                <div className="flex justify-start">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSaveSubjectOverrides}
+                    disabled={saveOverrides.isPending}
+                  >
+                    {saveOverrides.isPending && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                    Guardar nombres
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Download card — always last */}
+      {selectedYearId && sectionParts.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileDown className="h-4 w-4" />
+              Generar Planilla Word
+            </CardTitle>
+            <CardDescription>
+              Descarga la planilla en formato .docx (Legal/Oficio, Arial 10).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-4">
+              <Label>Seleccione qué descargar</Label>
+              <Select value={downloadKey} onValueChange={setDownloadKey}>
+                <SelectTrigger>
+                  {isLoading
+                    ? <span className="text-muted-foreground text-sm">Cargando secciones...</span>
+                    : <SelectValue />
+                  }
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    Todas las secciones ({sectionParts.length} {sectionParts.length === 1 ? "planilla" : "planillas"})
+                  </SelectItem>
+                  {sectionParts.map((sp) => {
+                    const key = `${sp.section.id}__${sp.parte}`;
+                    const label = ALL_GRADE_LABELS[sp.section.grade_level] ?? sp.section.grade_level;
+                    return (
+                      <SelectItem key={key} value={key}>
+                        {label} Sección: {sp.section.name}
+                        {sp.totalParts > 1 && ` — parte ${sp.parte} de ${sp.totalParts}`}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            {previewLoading ? (
+              <p className="text-sm text-muted-foreground">Cargando materias…</p>
+            ) : subjectsPreview && subjectsPreview.count > 0 ? (
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                <p className="text-sm font-medium">
+                  Área Común: {subjectsPreview.count} materia{subjectsPreview.count !== 1 ? "s" : ""}
+                  {downloadKey === "all" && sectionParts.length > 1 && (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}(vista de la primera sección; cada sección usa sus propias materias)
+                    </span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {subjectsPreview.abbreviations.map((abbr, i) => (
+                    <Badge key={`${abbr}-${i}`} variant="outline" className="font-mono text-xs">
+                      {i + 1}. {abbr}
+                    </Badge>
+                  ))}
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {subjectsPreview.count + 1}. GP
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    GRUPO
+                  </Badge>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No hay materias registradas para esta sección en el año escolar seleccionado.
+              </p>
+            )}
+            <div className="flex justify-start">
+              <Button onClick={handleDownload} disabled={isGenerating || isLoading}>
+                {isGenerating
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generando…</>
+                  : <><FileDown className="h-4 w-4 mr-2" />Descargar Word</>
+                }
               </Button>
             </div>
           </CardContent>
