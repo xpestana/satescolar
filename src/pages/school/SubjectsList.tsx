@@ -34,7 +34,7 @@ interface Subject {
 interface SubjectForm {
   name: string;
   abbreviation: string;
-  subject_type: "regular" | "gcrp";
+  subject_type: "regular" | "gcrp" | "orientacion" | "innovacion_tecnologica_productiva";
   show_in_report_card: boolean;
   show_in_planilla: boolean;
   evaluation_type: "numeric" | "literal";
@@ -149,7 +149,7 @@ export default function SubjectsList() {
     setForm({
       name: subject.name,
       abbreviation: (subject as any).abbreviation || "",
-      subject_type: subject.subject_type as "regular" | "gcrp",
+      subject_type: subject.subject_type as "regular" | "gcrp" | "orientacion" | "innovacion_tecnologica_productiva",
       show_in_report_card: subject.show_in_report_card,
       show_in_planilla: subject.show_in_planilla,
       evaluation_type: subject.evaluation_type as "numeric" | "literal",
@@ -320,13 +320,15 @@ export default function SubjectsList() {
 
             <div className="space-y-2">
               <Label>Tipo de Área</Label>
-              <Select value={form.subject_type} onValueChange={(v) => setForm({ ...form, subject_type: v as "regular" | "gcrp" })}>
+              <Select value={form.subject_type} onValueChange={(v) => setForm({ ...form, subject_type: v as "regular" | "gcrp" | "orientacion" | "innovacion_tecnologica_productiva" })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="regular">Regular</SelectItem>
                   <SelectItem value="gcrp">GCRP</SelectItem>
+                  <SelectItem value="orientacion">Orientación</SelectItem>
+                  <SelectItem value="innovacion_tecnologica_productiva">Innovación Tecnológica Productiva</SelectItem>
                 </SelectContent>
               </Select>
             </div>
