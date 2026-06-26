@@ -53,9 +53,8 @@ const IE_ROW_GAP = 34; // separación vertical entre filas sección II
 const IE_TITLE_PAD_TOP = 6; // padding interno celda título II (no el hueco bajo logo)
 // ─── tabla III + IV (estudiantes) — ajustar aquí ─────────────────────
 const ST_COL_III_FIXED = 11201; // III fijo — no cambia con materias
-const IV_MATERIA_W = 450; // ancho columna materia regular (UEH)
-const IV_GP_W = 700; // columna GP
-const IV_GRUPO_W = 2250; // columna GRUPO (nombre del grupo GCRP)
+const IV_MATERIA_W = 450; // ancho columna materia regular
+const IV_PRODUCTIVE_W = 700; // ancho columna materia productiva (más ancho para encabezado)
 const ST_TABLE_FONT_SIZE = 9; // Arial 9 — cabeceras tabla III/IV
 const ST_HDR_FONT_SIZE = ST_TABLE_FONT_SIZE;
 const ST_CELL_PAD = 10;
@@ -84,9 +83,9 @@ const ST_HDR_ROW1_MIN = 415; // altura mín. fila N°…Fecha de nacimiento (UEH
 const ST_HDR_ROW2_MIN = 465; // altura mín. fila DIA / MES / AÑO (UEH: 465)
 const ST_IV_HDR_ROW0 = 415; // título IV
 const ST_IV_HDR_ROW1 = 465; // ÁREAS DE FORMACIÓN
-const ST_IV_HDR_ROW2 = 415; // ÁREA COMÚN
+const ST_IV_HDR_ROW2 = 415; // COMPONENTE GENERAL / COMPONENTE PRODUCTIVO
 const ST_IV_HDR_ROW3 = 365; // números 1…N
-const ST_IV_HDR_ROW4 = 415; // siglas + GP
+const ST_IV_HDR_ROW4 = 415; // siglas
 const III_HDR_ROW_SPAN = 4; // filas cabecera III (1–4) antes de datos
 const FECHA_SUB_ROW_SPAN = 3; // DIA/MES/AÑO cubren filas 2–4
 // ─── pie de tabla (totales V–IX) — UEH página 40 ─────────────────────
@@ -146,22 +145,21 @@ type SheetLayout = {
   ieMunRowCols: number[];
   ieDirCedRowCols: number[];
   nRegular: number;
+  nProductive: number;
   nIvCols: number;
-  ivGpIndex: number;
-  ivGrupoIndex: number;
 };
 
 function rowH(layout: SheetLayout, baseHeight: number, minHeight = 180): number {
   return Math.max(minHeight, Math.round(baseHeight * layout.vScale));
 }
 
-function estimateProfesoresBlockHeight(nRegular: number): number {
-  const profH = FOOT_V_HDR_H * 2 + nRegular * FOOT_V_DATA_H + FOOT_V_GP_H;
+function estimateProfesoresBlockHeight(nRegular: number, nProductive: number): number {
+  const profH = FOOT_V_HDR_H * 2 + (nRegular + nProductive) * FOOT_V_DATA_H;
   const cursoH = FOOT_V_HDR_H + 6 * FOOT_V_DATA_H;
   return Math.max(profH, cursoH);
 }
 
-function estimateContentHeightTwips(nRegular: number): number {
+function estimateContentHeightTwips(nRegular: number, nProductive: number): number {
   return (
     HEADER_BLOCK_ESTIMATE +
     INSTITUTION_BLOCK_ESTIMATE +
@@ -173,17 +171,17 @@ function estimateContentHeightTwips(nRegular: number): number {
     ST_IV_HDR_ROW4 +
     ST_ROWS_PER_PAGE * ST_DATA_ROW_MIN +
     5 * FOOT_TOTAL_ROW_H +
-    estimateProfesoresBlockHeight(nRegular) +
+    estimateProfesoresBlockHeight(nRegular, nProductive) +
     FOOT_OBS_H +
     6 * FOOT_SIG_ROW_H +
     FOOT_SIG_SEAL_H
   );
 }
 
-function computeVerticalScale(nRegular: number): number {
+function computeVerticalScale(nRegular: number, nProductive: number): number {
   const usable = PAGE_H - MARGIN_TOP - MARGIN_BOTTOM;
   const fixed = HEADER_BLOCK_ESTIMATE + INSTITUTION_BLOCK_ESTIMATE + ST_TABLE_GAP;
-  const total = estimateContentHeightTwips(nRegular);
+  const total = estimateContentHeightTwips(nRegular, nProductive);
   if (total <= usable) return 1;
   const scalable = total - fixed;
   if (scalable <= 0) return V_SCALE_MIN;
@@ -227,13 +225,13 @@ function computeIeDirCedRowCols(contentW: number): number[] {
 
 function computeSheetLayout(data: ResumenFinalDocxData): SheetLayout {
   const nRegular = data.regularSubjects.length;
-  const vScale = computeVerticalScale(nRegular);
+  const nProductive = data.productiveSubjects.length;
+  const vScale = computeVerticalScale(nRegular, nProductive);
   const stIiiCols = [...ST_III_COLS];
   const stColIii = ST_COL_III_FIXED;
   const stIvCols = [
     ...Array(nRegular).fill(IV_MATERIA_W),
-    IV_GP_W,
-    IV_GRUPO_W,
+    ...Array(nProductive).fill(IV_PRODUCTIVE_W),
   ];
   const stColIv = stIvCols.reduce((a, b) => a + b, 0);
   const contentW = stColIii + stColIv;
@@ -256,9 +254,8 @@ function computeSheetLayout(data: ResumenFinalDocxData): SheetLayout {
     ieMunRowCols: computeIeMunRowCols(contentW),
     ieDirCedRowCols: computeIeDirCedRowCols(contentW),
     nRegular,
+    nProductive,
     nIvCols: stIvCols.length,
-    ivGpIndex: nRegular,
-    ivGrupoIndex: nRegular + 1,
   };
 }
 
@@ -471,14 +468,15 @@ function buildProfesoresTable(
           rowH(layout, FOOT_V_DATA_H),
         ),
       ),
-      mkProfRow(
-        String(subjects.length + 1),
-        "GP",
-        "PARTICIPACIÓN EN GRUPOS DE CREACIÓN, RECREACIÓN Y PRODUCCIÓN",
-        "**********",
-        "**********",
-        rowH(layout, FOOT_V_GP_H, 320),
-        true,
+      ...data.productiveSubjects.map((s, i) =>
+        mkProfRow(
+          String(subjects.length + i + 1),
+          s.abbreviation.toUpperCase(),
+          s.name.toUpperCase(),
+          s.teacherName,
+          s.teacherCedula,
+          rowH(layout, FOOT_V_DATA_H),
+        ),
       ),
     ],
   });
@@ -1069,8 +1067,6 @@ function emptyStudentRow(nro: number): StudentDocxRow {
     mesNac: "",
     anioNac: "",
     grades: {},
-    gpGrade: "",
-    grupoName: "",
   };
 }
 
@@ -1109,18 +1105,25 @@ function mkStDataCell(
 function mkStDataRow(
   row: StudentDocxRow,
   layout: SheetLayout,
-  subjects: ResumenFinalDocxData["regularSubjects"],
+  regularSubjects: ResumenFinalDocxData["regularSubjects"],
+  productiveSubjects: ResumenFinalDocxData["productiveSubjects"],
   isEmpty: boolean,
 ): TableRow {
-  const ivGradeCells = subjects.map((s, i) =>
+  const { nRegular } = layout;
+  const regularCells = regularSubjects.map((s, i) =>
     mkStDataCell(
       layout.stIvCols[i],
       isEmpty ? "" : (row.grades[s.assignmentId] ?? ""),
       AlignmentType.CENTER,
     ),
   );
-  const gpGrade = isEmpty ? "" : row.gpGrade;
-  const grupoName = isEmpty ? "" : row.grupoName;
+  const productiveCells = productiveSubjects.map((s, i) =>
+    mkStDataCell(
+      layout.stIvCols[nRegular + i],
+      isEmpty ? "" : (row.grades[s.assignmentId] ?? ""),
+      AlignmentType.CENTER,
+    ),
+  );
 
   return mkStHdrRow(
     [
@@ -1149,13 +1152,8 @@ function mkStDataRow(
         formatStField(row.anioNac, ST_EMPTY_SHORT),
         AlignmentType.CENTER,
       ),
-      ...ivGradeCells,
-      mkStDataCell(layout.stIvCols[layout.ivGpIndex], gpGrade, AlignmentType.CENTER),
-      mkStDataCell(
-        layout.stIvCols[layout.ivGrupoIndex],
-        grupoName,
-        AlignmentType.LEFT,
-      ),
+      ...regularCells,
+      ...productiveCells,
     ],
     rowH(layout, ST_DATA_ROW_MIN, 280),
   );
@@ -1165,15 +1163,13 @@ function buildEstudiantesBlock(
   data: ResumenFinalDocxData,
   layout: SheetLayout,
 ): Table {
-  const { nRegular, nIvCols } = layout;
-  const subjects = data.regularSubjects;
+  const { nRegular, nProductive, nIvCols } = layout;
+  const regularSubjects = data.regularSubjects;
+  const productiveSubjects = data.productiveSubjects;
   const padded = padStudentsPage(data.students);
   const dataRows = padded.map((row, idx) =>
-    mkStDataRow(row, layout, subjects, idx >= data.students.length),
+    mkStDataRow(row, layout, regularSubjects, productiveSubjects, idx >= data.students.length),
   );
-
-  const participacionLabel =
-    "PARTICIPACIÓN EN GRUPOS DE\nCREACIÓN, RECREACIÓN Y\nPRODUCCIÓN";
 
   return new Table({
     width: { size: layout.stTableW, type: WidthType.DXA },
@@ -1193,7 +1189,7 @@ function buildEstudiantesBlock(
             layout.stColIv,
             "IV: Resumen Final del Rendimiento",
             "right",
-            layout.nIvCols,
+            nIvCols,
           ),
         ],
         rowH(layout, ST_TITLE_ROW_MIN, 280),
@@ -1225,13 +1221,8 @@ function buildEstudiantesBlock(
             columnSpan: 3,
             multiline: "Fecha de\nnacimiento",
           }),
-          mkStHdrCell(ivColSpanW(layout, 0, nRegular), "ÁREAS DE FORMACIÓN", {
-            columnSpan: nRegular,
-          }),
-          mkStHdrCell(ivColSpanW(layout, nRegular, 2), "", {
-            columnSpan: 2,
-            verticalMerge: VerticalMergeType.RESTART,
-            multiline: participacionLabel,
+          mkStHdrCell(ivColSpanW(layout, 0, nIvCols), "ÁREAS DE FORMACIÓN", {
+            columnSpan: nIvCols,
           }),
         ],
         rowH(layout, ST_IV_HDR_ROW1, 280),
@@ -1253,32 +1244,36 @@ function buildEstudiantesBlock(
             vertical: true,
             vertCompact: true,
           }),
-          mkStHdrCell(ivColSpanW(layout, 0, nRegular), "ÁREA COMÚN", {
+          mkStHdrCell(ivColSpanW(layout, 0, nRegular), "COMPONENTE GENERAL", {
             columnSpan: nRegular,
           }),
-          mkIvMergeContinue(layout, nRegular, 2),
+          ...(nProductive > 0
+            ? [mkStHdrCell(ivColSpanW(layout, nRegular, nProductive), "COMPONENTE PRODUCTIVO", {
+                columnSpan: nProductive,
+              })]
+            : []),
         ],
         rowH(layout, ST_IV_HDR_ROW2, 280),
       ),
       mkStHdrRow(
         [
-          ...subjects.map((_, i) =>
+          ...regularSubjects.map((_, i) =>
             mkStHdrCell(layout.stIvCols[i], String(i + 1)),
           ),
-          mkStHdrCell(layout.stIvCols[nRegular], String(nRegular + 1)),
-          mkStHdrCell(layout.stIvCols[nRegular + 1], "GRUPO", {
-            verticalMerge: VerticalMergeType.RESTART,
-          }),
+          ...productiveSubjects.map((_, i) =>
+            mkStHdrCell(layout.stIvCols[nRegular + i], String(nRegular + i + 1)),
+          ),
         ],
         rowH(layout, ST_IV_HDR_ROW3, 260),
       ),
       mkStHdrRow(
         [
-          ...subjects.map((s, i) =>
+          ...regularSubjects.map((s, i) =>
             mkStHdrCell(layout.stIvCols[i], s.abbreviation.toUpperCase()),
           ),
-          mkStHdrCell(layout.stIvCols[nRegular], "GP"),
-          mkIvMergeContinue(layout, nRegular + 1, 1),
+          ...productiveSubjects.map((s, i) =>
+            mkStHdrCell(layout.stIvCols[nRegular + i], s.abbreviation.toUpperCase()),
+          ),
         ],
         rowH(layout, ST_IV_HDR_ROW4, 280),
       ),

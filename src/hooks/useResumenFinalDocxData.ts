@@ -24,9 +24,7 @@ export interface StudentDocxRow {
   diaNac: string;
   mesNac: string;
   anioNac: string;
-  grades: Record<string, string>; // assignmentId → display value
-  gpGrade: string; // promedio GCRP (momento 0) o literal
-  grupoName: string;
+  grades: Record<string, string>; // assignmentId → display value (regular + productive)
 }
 
 export interface ResumenFinalDocxData {
@@ -41,7 +39,7 @@ export interface ResumenFinalDocxData {
   studentsInPage: number;
   // subjects
   regularSubjects: SubjectCol[];
-  gcrpSubjects: SubjectCol[];
+  productiveSubjects: SubjectCol[];
   // students (sliced for this parte, max 35)
   students: StudentDocxRow[];
   // config
@@ -65,13 +63,6 @@ function gradeDisplay(gradeValue: string | null, adjPoints: number, evalType: st
   return Number.isInteger(num) ? String(num) : num.toFixed(1);
 }
 
-function formatGradeAverage(values: number[]): string {
-  if (values.length === 0) return "";
-  const avg = values.reduce((a, b) => a + b, 0) / values.length;
-  const rounded = Math.round(avg * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-}
-
 type GradeRecord = {
   student_id: string;
   assignment_id: string;
@@ -79,51 +70,6 @@ type GradeRecord = {
   adjustment_points: number;
   final_status: string | null;
 };
-
-function computeGpGradeAndGrupo(
-  studentId: string,
-  gcrpAssignmentIds: string[],
-  gcrpAssignmentsData: AssignmentWithSubject[],
-  gradeMap: Map<string, GradeRecord>,
-  gradeKey: (sid: string, aid: string) => string,
-): { gpGrade: string; grupoName: string } {
-  if (gcrpAssignmentIds.length === 0) return { gpGrade: "", grupoName: "" };
-
-  const numericGrades: number[] = [];
-  const literalGrades: string[] = [];
-  const grupoNames: string[] = [];
-
-  for (const aid of gcrpAssignmentIds) {
-    const assignment = gcrpAssignmentsData.find((a) => a.id === aid);
-    const subj = assignment?.school_subjects;
-    if (!subj) continue;
-
-    if (subj.name) grupoNames.push(subj.name);
-
-    const g = gradeMap.get(gradeKey(studentId, aid));
-    if (!g) continue;
-
-    const evalType = subj.evaluation_type || "numeric";
-    if (evalType === "literal") {
-      const lit = gradeDisplay(g.grade_value, g.adjustment_points, evalType, g.final_status);
-      if (lit) literalGrades.push(lit);
-      continue;
-    }
-
-    const display = gradeDisplay(g.grade_value, g.adjustment_points, evalType, g.final_status);
-    const num = parseFloat(display);
-    if (!isNaN(num)) numericGrades.push(num);
-  }
-
-  const gpGrade =
-    numericGrades.length > 0
-      ? formatGradeAverage(numericGrades)
-      : literalGrades[0] ?? "";
-
-  const grupoName = [...new Set(grupoNames)].join(", ");
-
-  return { gpGrade, grupoName };
-}
 
 function teacherName(fd: Record<string, any> | null): string {
   if (!fd) return "";
@@ -150,7 +96,16 @@ function isRegularPlanillaAssignment(a: AssignmentWithSubject): boolean {
   const s = a.school_subjects;
   if (!s) return false;
   if (s.is_suspended) return false;
-  if (s.subject_type === "gcrp") return false;
+  if (s.subject_type !== "regular") return false;
+  if (s.show_in_planilla === false) return false;
+  return true;
+}
+
+function isProductivePlanillaAssignment(a: AssignmentWithSubject): boolean {
+  const s = a.school_subjects;
+  if (!s) return false;
+  if (s.is_suspended) return false;
+  if (s.subject_type === "regular") return false;
   if (s.show_in_planilla === false) return false;
   return true;
 }
@@ -196,13 +151,32 @@ export async function fetchResumenFinalSubjectsPreview(
   schoolId: string,
   schoolYearId: string,
   sectionId: string,
-): Promise<{ abbreviations: string[]; count: number }> {
-  const assignments = await fetchRegularAssignmentsForSection(schoolId, schoolYearId, sectionId);
-  const abbreviations = assignments.map((a) => {
+): Promise<{ abbreviations: string[]; count: number; productiveAbbreviations: string[] }> {
+  const [regularAssignments, productiveData] = await Promise.all([
+    fetchRegularAssignmentsForSection(schoolId, schoolYearId, sectionId),
+    supabase
+      .from("subject_teacher_assignments")
+      .select("id, subject_id, school_subjects(id, name, abbreviation, display_order, show_in_planilla, subject_type, is_suspended)")
+      .eq("school_id", schoolId)
+      .eq("school_year_id", schoolYearId)
+      .eq("section_id", sectionId)
+      .eq("is_suspended", false),
+  ]);
+
+  const abbreviations = regularAssignments.map((a) => {
     const s = a.school_subjects!;
     return (s.abbreviation || s.name.substring(0, 2)).toUpperCase();
   });
-  return { abbreviations, count: abbreviations.length };
+
+  const productiveAssignments = dedupeAssignmentsBySubject(
+    ((productiveData.data ?? []) as AssignmentWithSubject[]).filter(isProductivePlanillaAssignment),
+  );
+  const productiveAbbreviations = productiveAssignments.map((a) => {
+    const s = a.school_subjects!;
+    return (s.abbreviation || s.name.substring(0, 2)).toUpperCase();
+  });
+
+  return { abbreviations, count: abbreviations.length, productiveAbbreviations };
 }
 
 export async function fetchResumenFinalSubjectsForEditor(
@@ -353,7 +327,20 @@ export async function fetchResumenFinalDocxData(
   // 6. regular subject assignments for this section
   const regularAssignments = await fetchRegularAssignmentsForSection(schoolId, schoolYearId, sectionId);
 
-  // 7. GCRP assignments via gcrp_assignment_students for these students
+  // 7a. Productive (non-regular) assignments via section: orientacion, innovacion, etc.
+  const { data: sectionProductiveData, error: sectProdError } = await supabase
+    .from("subject_teacher_assignments")
+    .select("id, subject_id, teacher:teacher_id(id, document_id, form_data), school_subjects(id, name, abbreviation, display_order, show_in_planilla, evaluation_type, subject_type, is_suspended)")
+    .eq("school_id", schoolId)
+    .eq("school_year_id", schoolYearId)
+    .eq("section_id", sectionId)
+    .eq("is_suspended", false);
+  if (sectProdError) throw new Error(`Error al cargar materias productivas: ${sectProdError.message}`);
+  const sectionProductiveAssignments = dedupeAssignmentsBySubject(
+    ((sectionProductiveData ?? []) as AssignmentWithSubject[]).filter(isProductivePlanillaAssignment),
+  );
+
+  // 7b. GCRP assignments via gcrp_assignment_students (linked per-student, not per-section)
   const { data: gcrpLinks, error: gcrpLinksError } = await supabase
     .from("gcrp_assignment_students")
     .select("assignment_id, student_id")
@@ -371,31 +358,19 @@ export async function fetchResumenFinalDocxData(
       .eq("school_year_id", schoolYearId)
       .eq("is_suspended", false);
     if (gcrpAssignError) throw new Error(`Error al cargar materias GCRP: ${gcrpAssignError.message}`);
-    gcrpAssignmentsData = ((data ?? []) as AssignmentWithSubject[]).filter(
-      (a) => a.school_subjects?.subject_type === "gcrp" && !a.school_subjects?.is_suspended,
+    gcrpAssignmentsData = dedupeAssignmentsBySubject(
+      ((data ?? []) as AssignmentWithSubject[]).filter(isProductivePlanillaAssignment),
     );
   }
 
-  const gcrpOrder = new Map(
-    gcrpAssignmentsData.map((a, i) => [a.id, a.school_subjects?.display_order ?? i]),
-  );
-  const studentGcrpAssignments = new Map<string, string[]>();
-  const sortedGcrpLinks = [...(gcrpLinks ?? [])].sort((a, b) => {
-    const oa = gcrpOrder.get(a.assignment_id) ?? 999;
-    const ob = gcrpOrder.get(b.assignment_id) ?? 999;
-    return oa - ob;
-  });
-  sortedGcrpLinks.forEach((l) => {
-    if (!gcrpAssignmentIds.includes(l.assignment_id)) return;
-    const list = studentGcrpAssignments.get(l.student_id) ?? [];
-    if (!list.includes(l.assignment_id)) list.push(l.assignment_id);
-    studentGcrpAssignments.set(l.student_id, list);
-  });
+  // Merge section-level productive + GCRP per-student, deduplicate by subject_id
+  const allProductiveRaw = [...sectionProductiveAssignments, ...gcrpAssignmentsData];
+  const productiveAssignments = dedupeAssignmentsBySubject(allProductiveRaw);
 
   // 8. all assignment IDs for grade query
   const allAssignmentIds = [
     ...regularAssignments.map(a => a.id),
-    ...gcrpAssignmentsData.map(a => a.id),
+    ...productiveAssignments.map(a => a.id),
   ];
 
   // 9. notas definitivas guardadas (momento = 0, periodo cero)
@@ -452,15 +427,16 @@ export async function fetchResumenFinalDocxData(
     };
   });
 
-  const gcrpSubjects: SubjectCol[] = gcrpAssignmentsData.map(a => {
+  const productiveSubjects: SubjectCol[] = productiveAssignments.map(a => {
     const s = a.school_subjects!;
     const t = (a.teacher as any);
+    const ov = overridesMap.get(s.id);
     return {
       id: s.id,
-      name: s.name,
-      abbreviation: s.abbreviation || s.name.substring(0, 2).toUpperCase(),
+      name: ov?.custom_name || s.name,
+      abbreviation: ov?.custom_abbreviation || s.abbreviation || s.name.substring(0, 2).toUpperCase(),
       evaluationType: s.evaluation_type || "numeric",
-      isGcrp: true,
+      isGcrp: s.subject_type === "gcrp",
       assignmentId: a.id,
       teacherName: teacherName(t?.form_data),
       teacherCedula: t?.document_id || "",
@@ -485,7 +461,7 @@ export async function fetchResumenFinalDocxData(
     const nombres = [fd.primer_nombre, fd.segundo_nombre].filter(Boolean).join(" ").toUpperCase();
 
     const grades: Record<string, string> = {};
-    regularAssignments.forEach((a) => {
+    [...regularAssignments, ...productiveAssignments].forEach((a) => {
       const g = gradeMap.get(gradeKey(sid, a.id));
       const subj = a.school_subjects;
       if (g && subj) {
@@ -499,15 +475,6 @@ export async function fetchResumenFinalDocxData(
         grades[a.id] = "";
       }
     });
-
-    const gcrpIds = studentGcrpAssignments.get(sid) ?? [];
-    const { gpGrade, grupoName } = computeGpGradeAndGrupo(
-      sid,
-      gcrpIds,
-      gcrpAssignmentsData,
-      gradeMap,
-      gradeKey,
-    );
 
     let diaNac = "", mesNac = "", anioNac = "";
     const fechaNac = fd.fecha_nacimiento as string | undefined;
@@ -532,8 +499,6 @@ export async function fetchResumenFinalDocxData(
       mesNac,
       anioNac,
       grades,
-      gpGrade,
-      grupoName: grupoName.toUpperCase(),
     };
   });
 
@@ -558,7 +523,7 @@ export async function fetchResumenFinalDocxData(
     totalStudentsInSection,
     studentsInPage: inscritos,
     regularSubjects,
-    gcrpSubjects,
+    productiveSubjects,
     students: studentRows,
     tipoPlanilla,
     observaciones: rfConfig?.observaciones || "",

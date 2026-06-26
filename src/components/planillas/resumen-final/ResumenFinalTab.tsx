@@ -494,7 +494,12 @@ export function ResumenFinalTab() {
             ) : subjectsPreview && subjectsPreview.count > 0 ? (
               <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
                 <p className="text-sm font-medium">
-                  Área Común: {subjectsPreview.count} materia{subjectsPreview.count !== 1 ? "s" : ""}
+                  Comp. General: {subjectsPreview.count} materia{subjectsPreview.count !== 1 ? "s" : ""}
+                  {subjectsPreview.productiveAbbreviations.length > 0 && (
+                    <span className="text-muted-foreground font-normal">
+                      {" "}· Comp. Productivo: {subjectsPreview.productiveAbbreviations.length}
+                    </span>
+                  )}
                   {downloadKey === "all" && sectionParts.length > 1 && (
                     <span className="text-muted-foreground font-normal">
                       {" "}(vista de la primera sección; cada sección usa sus propias materias)
@@ -503,16 +508,15 @@ export function ResumenFinalTab() {
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {subjectsPreview.abbreviations.map((abbr, i) => (
-                    <Badge key={`${abbr}-${i}`} variant="outline" className="font-mono text-xs">
+                    <Badge key={`reg-${abbr}-${i}`} variant="outline" className="font-mono text-xs">
                       {i + 1}. {abbr}
                     </Badge>
                   ))}
-                  <Badge variant="secondary" className="font-mono text-xs">
-                    {subjectsPreview.count + 1}. GP
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    GRUPO
-                  </Badge>
+                  {subjectsPreview.productiveAbbreviations.map((abbr, i) => (
+                    <Badge key={`prod-${abbr}-${i}`} variant="secondary" className="font-mono text-xs">
+                      {subjectsPreview.count + i + 1}. {abbr}
+                    </Badge>
+                  ))}
                 </div>
               </div>
             ) : (
