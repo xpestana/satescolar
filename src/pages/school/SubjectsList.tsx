@@ -38,6 +38,7 @@ interface SubjectForm {
   show_in_report_card: boolean;
   show_in_planilla: boolean;
   evaluation_type: "numeric" | "literal";
+  display_order: number;
 }
 
 const defaultForm: SubjectForm = {
@@ -47,6 +48,7 @@ const defaultForm: SubjectForm = {
   show_in_report_card: true,
   show_in_planilla: true,
   evaluation_type: "numeric",
+  display_order: 0,
 };
 
 export default function SubjectsList() {
@@ -87,12 +89,12 @@ export default function SubjectsList() {
             show_in_report_card: form.show_in_report_card,
             show_in_planilla: form.show_in_planilla,
             evaluation_type: form.evaluation_type,
+            display_order: form.display_order,
             updated_at: new Date().toISOString(),
           } as any)
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const maxOrder = subjects.length > 0 ? Math.max(...subjects.map((s) => s.display_order)) + 1 : 0;
         const { error } = await supabase
           .from("school_subjects" as any)
           .insert({
@@ -103,7 +105,7 @@ export default function SubjectsList() {
             show_in_report_card: form.show_in_report_card,
             show_in_planilla: form.show_in_planilla,
             evaluation_type: form.evaluation_type,
-            display_order: maxOrder,
+            display_order: form.display_order,
           } as any);
         if (error) {
           if (error.code === "23505") throw new Error("Ya existe un área con ese nombre");
@@ -153,6 +155,7 @@ export default function SubjectsList() {
       show_in_report_card: subject.show_in_report_card,
       show_in_planilla: subject.show_in_planilla,
       evaluation_type: subject.evaluation_type as "numeric" | "literal",
+      display_order: subject.display_order,
     });
     setDialogOpen(true);
   };
@@ -215,6 +218,7 @@ export default function SubjectsList() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-16 text-center">Orden</TableHead>
                       <TableHead>Nombre</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead className="text-center">Boletas</TableHead>
@@ -227,6 +231,7 @@ export default function SubjectsList() {
                   <TableBody>
                     {displayed.map((subject) => (
                       <TableRow key={subject.id} className={subject.is_suspended ? "opacity-60" : ""}>
+                        <TableCell className="text-center text-muted-foreground">{subject.display_order}</TableCell>
                         <TableCell className="font-medium">{subject.name}</TableCell>
                         <TableCell>
                           <Badge variant={subject.subject_type === "gcrp" ? "default" : "secondary"}>
@@ -316,6 +321,18 @@ export default function SubjectsList() {
                 maxLength={20}
               />
               <p className="text-xs text-muted-foreground">Abreviatura que aparecerá en las planillas (sábanas de notas)</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="subject-order">Orden</Label>
+              <Input
+                id="subject-order"
+                type="number"
+                min={0}
+                value={form.display_order}
+                onChange={(e) => setForm({ ...form, display_order: Number(e.target.value) })}
+              />
+              <p className="text-xs text-muted-foreground">Número entero que determina el orden de aparición (0 = primero)</p>
             </div>
 
             <div className="space-y-2">
