@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,6 +49,18 @@ const GRADE_LEVEL_LABELS: Record<string, string> = {
   "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
   "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
 };
+
+const GRADE_ORDER = [
+  "pre_maternal", "maternal", "i_nivel", "ii_nivel", "iii_nivel", "inicial",
+  "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado", "primaria",
+  "1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano", "media_general", "media_tecnica",
+];
+
+const GRADE_GROUPS = [
+  { label: "Preescolar / Maternal", grades: ["pre_maternal", "maternal", "i_nivel", "ii_nivel", "iii_nivel", "inicial"] },
+  { label: "Primaria", grades: ["1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado", "primaria"] },
+  { label: "Bachillerato", grades: ["1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano", "media_general", "media_tecnica"] },
+];
 
 interface StudentWithEnrollment {
   id: string;
@@ -101,6 +113,7 @@ export default function EnrollmentsList() {
   // Filters
   const [statusFilter, setStatusFilter] = useState<"all" | "enrolled" | "pending">("all");
   const [selectedYearId, setSelectedYearId] = useState<string>("active");
+  const [gradeFilter, setGradeFilter] = useState<string>("all");
 
   // Fetch school data for planilla download
   const { data: school } = useQuery({
@@ -404,6 +417,15 @@ export default function EnrollmentsList() {
     enabled: familyIds.length > 0,
   });
 
+  const availableGrades = useMemo(() =>
+    [...new Set(sections.map(s => s.grade_level))].sort((a, b) => {
+      const ai = GRADE_ORDER.indexOf(a);
+      const bi = GRADE_ORDER.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    }),
+    [sections]
+  );
+
   const repMap = useMemo(() => new Map(representatives.map(r => [r.family_id, r.form_data as Record<string, string> | null])), [representatives]);
   const repIdMap = useMemo(() => new Map(representatives.map(r => [r.family_id, r.id])), [representatives]);
   const familyDataMap = useMemo(() => new Map(familiesData.map(f => [f.id, f as Record<string, any>])), [familiesData]);
@@ -441,12 +463,25 @@ export default function EnrollmentsList() {
     return "—";
   };
 
-  // Apply filters: search + status
+  // Apply filters: search + status + grade
   const filtered = useMemo(() => {
     return students.filter(s => {
       // Status filter
       if (statusFilter === "enrolled" && !s.isEnrolled) return false;
       if (statusFilter === "pending" && s.isEnrolled) return false;
+
+      // Grade filter
+      if (gradeFilter !== "all") {
+        if (s.isEnrolled) {
+          if (s.enrollmentGradeLevel !== gradeFilter) return false;
+        } else {
+          const nivelGrado = s.form_data?.nivel_grado;
+          if (nivelGrado) {
+            const labelForGrade = GRADE_LEVEL_LABELS[gradeFilter];
+            if (nivelGrado !== labelForGrade) return false;
+          }
+        }
+      }
 
       // Text search
       const name = getStudentName(s.form_data).toLowerCase();
@@ -455,7 +490,7 @@ export default function EnrollmentsList() {
       const term = searchTerm.toLowerCase();
       return name.includes(term) || doc.includes(term) || family.includes(term);
     });
-  }, [students, statusFilter, searchTerm]);
+  }, [students, statusFilter, gradeFilter, searchTerm]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
@@ -771,6 +806,30 @@ export default function EnrollmentsList() {
                       {y.year_range}{y.is_active ? " ★" : ""}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Grade filter */}
+            {availableGrades.length > 0 && (
+              <Select value={gradeFilter} onValueChange={(v) => { setGradeFilter(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Grado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los grados</SelectItem>
+                  {GRADE_GROUPS.map(group => {
+                    const groupGrades = group.grades.filter(g => availableGrades.includes(g));
+                    if (groupGrades.length === 0) return null;
+                    return (
+                      <SelectGroup key={group.label}>
+                        <SelectLabel>{group.label}</SelectLabel>
+                        {groupGrades.map(g => (
+                          <SelectItem key={g} value={g}>{GRADE_LEVEL_LABELS[g] || g}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             )}
