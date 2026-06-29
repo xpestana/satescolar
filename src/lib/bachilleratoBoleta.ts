@@ -312,7 +312,8 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   // ════════════════════════════════════════════════════════════════════════════
   if (style === "boletin_completo") {
     const cfgPdf = await resolveBoletinSignatures(cfg);
-    const momentosFetch = useStoredDefinitiva ? [0, 1, 2, 3] : [1, 2, 3];
+    const momentosRange = Array.from({ length: momento }, (_, i) => i + 1);
+    const momentosFetch = useStoredDefinitiva ? [0, ...momentosRange] : momentosRange;
     const rankingMomento = useStoredDefinitiva ? 0 : momento;
     const [myGradesRes, allGradesRes] = await Promise.all([
       assignmentIds.length > 0
@@ -550,7 +551,8 @@ export async function downloadAllBachilleratoBoletas(params: {
   // ── BOLETÍN COMPLETO (multi-momento) ─────────────────────────────────────
   if (style === "boletin_completo") {
     const cfgPdf = await resolveBoletinSignatures(cfg);
-    const momentosFetch = useStoredDefinitiva ? [0, 1, 2, 3] : [1, 2, 3];
+    const momentosRange = Array.from({ length: momento }, (_, i) => i + 1);
+    const momentosFetch = useStoredDefinitiva ? [0, ...momentosRange] : momentosRange;
     const rankingMomento = useStoredDefinitiva ? 0 : momento;
     const allGradesRes = assignmentIds.length > 0
       ? await supabase.from("final_grades")
