@@ -232,8 +232,8 @@ export default function GradesConsultation() {
       }
       return rows.map((e: any) => {
         const fd = e.student?.form_data as Record<string, any> | null;
-        const firstName = fd?.nombre || fd?.primer_nombre || "";
-        const lastName = fd?.apellido || fd?.primer_apellido || "";
+        const firstName = [fd?.primer_nombre || fd?.nombre, fd?.segundo_nombre].filter(Boolean).join(" ");
+        const lastName = [fd?.primer_apellido || fd?.apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
         return {
           student_id: e.student_id,
           student_name: `${lastName} ${firstName}`.trim() || "Sin nombre",

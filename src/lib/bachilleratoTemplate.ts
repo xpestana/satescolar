@@ -377,7 +377,7 @@ export function generateBoletaHtml(
 
   // ── Header ────────────────────────────────────────────────────────────────
   const logoHtml = hc.show_logo && data.school_logo
-    ? `<img src="${esc(data.school_logo)}" alt="Logo" style="height:72px;width:auto;object-fit:contain;flex-shrink:0">`
+    ? `<img src="${esc(data.school_logo)}" alt="Logo" crossorigin="anonymous" style="height:72px;width:auto;object-fit:contain;flex-shrink:0">`
     : "";
   const nameHtml = hc.show_name && data.school_name
     ? `<div style="font-size:${cfg.header.name_font_size}pt;font-weight:700;color:${cfg.header.accent_color};text-transform:uppercase;letter-spacing:0.5px">${esc(data.school_name)}</div>`
@@ -604,7 +604,7 @@ export function generateBoletinCompletoHtml(
 
   // ── Header ─────────────────────────────────────────────────────────────────
   const logoHtml = hc.show_logo && data.school_logo
-    ? `<img src="${esc(data.school_logo)}" alt="Logo" style="height:68px;width:auto;max-width:68px;object-fit:contain;display:block">`
+    ? `<img src="${esc(data.school_logo)}" alt="Logo" crossorigin="anonymous" style="height:68px;width:auto;max-width:68px;object-fit:contain;display:block">`
     : "";
 
   const centerLines = [
@@ -642,7 +642,7 @@ export function generateBoletinCompletoHtml(
       <span>Año o Grado: <u><strong>${esc(data.grade_label)}</strong></u></span>
       <span style="margin-left:16px">Sección <u>${esc(data.section_name)}</u></span>
       ${mentionPart}
-      <span style="float:right">Lapso: ${data.lapso}</span>
+      <span style="float:right">Momento: ${data.lapso}</span>
     </div>
     <div>
       <span>Estudiante: <u><strong>${esc(data.student_name)}</strong></u></span>
@@ -838,7 +838,7 @@ export function generatePrimaryDescriptiveHtml(
   const lapsoLabel = lapsoLabels[data.momento] ?? `${data.momento}°`;
 
   const logoHtml = data.school_logo
-    ? `<img src="${esc(data.school_logo)}" alt="Logo" style="height:70px;width:auto;object-fit:contain;flex-shrink:0">`
+    ? `<img src="${esc(data.school_logo)}" alt="Logo" crossorigin="anonymous" style="height:70px;width:auto;object-fit:contain;flex-shrink:0">`
     : `<div style="width:70px;height:70px;background:#e5e7eb;border-radius:50%;flex-shrink:0"></div>`;
 
   const subLines = [

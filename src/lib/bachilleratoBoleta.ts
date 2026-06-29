@@ -96,7 +96,8 @@ export interface BachillerataBoletaParams {
 type GradeMapKey = `${string}:${number}`;
 
 function fmtGradeNum(n: number): string {
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+  if (Number.isInteger(n)) return n < 10 ? `0${n}` : String(n);
+  return n.toFixed(2);
 }
 
 function subjectGradeValue(g: { grade_value?: string; adjustment_points?: number | null }): number | null {
@@ -278,7 +279,8 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   const show = (flag: string, fallback = true): boolean =>
     flag in headerCfgRaw ? headerCfgRaw[flag] : fallback;
 
-  const logoUrl = await resolveImageUrl(school?.logo_url ?? "");
+  const rawLogoUrl = school?.logo_url ?? "";
+  const logoUrl = rawLogoUrl ? ((await resolveImageUrl(rawLogoUrl)) || rawLogoUrl) : "";
 
   // ── 2. Assignments for this section + year ───────────────────────────────
   const { data: assignments } = await supabase
@@ -390,13 +392,13 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   myGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
     if (!isNaN(v)) {
-      myMap[g.assignment_id] = Number.isInteger(v) ? String(v) : v.toFixed(2);
+      myMap[g.assignment_id] = Number.isInteger(v) ? (v < 10 ? `0${v}` : String(v)) : v.toFixed(2);
       mySum += v; myCount++;
     }
   });
 
   const definitiva = myCount > 0
-    ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? String(a) : a.toFixed(2); })()
+    ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? (a < 10 ? `0${a}` : String(a)) : a.toFixed(2); })()
     : "—";
 
   // Position
@@ -511,7 +513,8 @@ export async function downloadAllBachilleratoBoletas(params: {
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
   const style  = cfg.style ?? "simple";
 
-  const logoUrl = await resolveImageUrl(school?.logo_url ?? "");
+  const rawLogoUrl = school?.logo_url ?? "";
+  const logoUrl = rawLogoUrl ? ((await resolveImageUrl(rawLogoUrl)) || rawLogoUrl) : "";
 
   const headerCfgRaw: Record<string, boolean> = (planilla?.header_config as Record<string, boolean>) ?? {};
   const rawSigs = planilla?.signature_lines;
@@ -622,12 +625,12 @@ export async function downloadAllBachilleratoBoletas(params: {
     myGrades.forEach((g: any) => {
       const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
       if (!isNaN(v)) {
-        myMap[g.assignment_id] = Number.isInteger(v) ? String(v) : v.toFixed(2);
+        myMap[g.assignment_id] = Number.isInteger(v) ? (v < 10 ? `0${v}` : String(v)) : v.toFixed(2);
         mySum += v; myCount++;
       }
     });
     const definitiva = myCount > 0
-      ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? String(a) : a.toFixed(2); })()
+      ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? (a < 10 ? `0${a}` : String(a)) : a.toFixed(2); })()
       : "—";
     const positionIdx = ranked.findIndex((r) => r.sid === student.studentId);
     const position = positionIdx >= 0 ? positionIdx + 1 : 0;
@@ -699,7 +702,8 @@ export async function downloadBachilleratoBoletaDefinitiva(
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
   const style  = cfg.style ?? "simple";
 
-  const logoUrl = await resolveImageUrl(school?.logo_url ?? "");
+  const rawLogoUrl = school?.logo_url ?? "";
+  const logoUrl = rawLogoUrl ? ((await resolveImageUrl(rawLogoUrl)) || rawLogoUrl) : "";
 
   const headerCfgRaw: Record<string, boolean> = (planilla?.header_config as Record<string, boolean>) ?? {};
   const rawSigs = planilla?.signature_lines;
@@ -759,12 +763,12 @@ export async function downloadBachilleratoBoletaDefinitiva(
   myGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
     if (!isNaN(v)) {
-      myMap[g.assignment_id] = Number.isInteger(v) ? String(v) : v.toFixed(2);
+      myMap[g.assignment_id] = Number.isInteger(v) ? (v < 10 ? `0${v}` : String(v)) : v.toFixed(2);
       mySum += v; myCount++;
     }
   });
   const definitiva = myCount > 0
-    ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? String(a) : a.toFixed(2); })()
+    ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? (a < 10 ? `0${a}` : String(a)) : a.toFixed(2); })()
     : "—";
 
   // Ranking basado en definitiva guardada (momento=0)
@@ -854,7 +858,8 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
   const style  = cfg.style ?? "simple";
 
-  const logoUrl = await resolveImageUrl(school?.logo_url ?? "");
+  const rawLogoUrl = school?.logo_url ?? "";
+  const logoUrl = rawLogoUrl ? ((await resolveImageUrl(rawLogoUrl)) || rawLogoUrl) : "";
 
   const headerCfgRaw: Record<string, boolean> = (planilla?.header_config as Record<string, boolean>) ?? {};
   const rawSigs = planilla?.signature_lines;
@@ -925,12 +930,12 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
     myGrades.forEach((g: any) => {
       const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
       if (!isNaN(v)) {
-        myMap[g.assignment_id] = Number.isInteger(v) ? String(v) : v.toFixed(2);
+        myMap[g.assignment_id] = Number.isInteger(v) ? (v < 10 ? `0${v}` : String(v)) : v.toFixed(2);
         mySum += v; myCount++;
       }
     });
     const definitiva = myCount > 0
-      ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? String(a) : a.toFixed(2); })()
+      ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? (a < 10 ? `0${a}` : String(a)) : a.toFixed(2); })()
       : "—";
     const positionIdx = ranked.findIndex((r) => r.sid === student.studentId);
     const position = positionIdx >= 0 ? positionIdx + 1 : 0;
