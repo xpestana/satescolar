@@ -1,8 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import {
-  BachilleratoConfig, BoletaRenderData, BoletinCompletoRenderData,
-  BoletinMomentoGrade, BoletinSubjectRow,
-  DEFAULT_BACHILLERATO_CONFIG, generateBoletaHtml, generateBoletinCompletoHtml,
+  BachilleratoConfig,
+  BoletaRenderData,
+  BoletinCompletoRenderData,
+  BoletinMomentoGrade,
+  BoletinSubjectRow,
+  DEFAULT_BACHILLERATO_CONFIG,
+  generateBoletaHtml,
+  generateBoletinCompletoHtml,
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 import { fmtGradeNum, formatBoletaGradeValue } from "@/lib/gradeLiteral";
@@ -13,7 +18,9 @@ function proxyImageUrl(url: string): string {
     if (parsed.hostname.endsWith(".amazonaws.com")) {
       return `/img-proxy/${parsed.hostname}${parsed.pathname}`;
     }
-  } catch { /* not a valid URL */ }
+  } catch {
+    /* not a valid URL */
+  }
   return url;
 }
 
@@ -51,7 +58,9 @@ async function resolveImageUrl(url: string): Promise<string> {
   if (dataUrl) return dataUrl;
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as
+    | string
+    | undefined;
   if (supabaseUrl && supabaseKey) {
     const edgeProxy = `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(url)}`;
     dataUrl = await fetchAsDataUrl(edgeProxy, {
@@ -65,7 +74,9 @@ async function resolveImageUrl(url: string): Promise<string> {
 }
 
 /** Inline signature/stamp images for html2canvas (same CORS fix as school logo). */
-async function resolveBoletinSignatures(cfg: BachilleratoConfig): Promise<BachilleratoConfig> {
+async function resolveBoletinSignatures(
+  cfg: BachilleratoConfig,
+): Promise<BachilleratoConfig> {
   const sigs = cfg.boletin?.signatures ?? [];
   if (sigs.length === 0) return cfg;
   const resolved = await Promise.all(
@@ -79,17 +90,17 @@ async function resolveBoletinSignatures(cfg: BachilleratoConfig): Promise<Bachil
 }
 
 export interface BachillerataBoletaParams {
-  schoolId:    string;
-  studentId:   string;
+  schoolId: string;
+  studentId: string;
   studentName: string;
-  documentId:  string | null;
-  sectionId:   string;
+  documentId: string | null;
+  sectionId: string;
   sectionName: string;
-  gradeLabel:  string;
-  gradeKey:    string;
-  yearId:      string;
-  yearRange:   string;
-  momento:     number;
+  gradeLabel: string;
+  gradeKey: string;
+  yearId: string;
+  yearRange: string;
+  momento: number;
   /** Boletín completo: usar notas guardadas en final_grades con momento=0 en columna Def. */
   useStoredDefinitiva?: boolean;
 }
@@ -101,25 +112,40 @@ type BoletaAssignment = {
   subject?: { name?: string; display_order?: number; evaluation_type?: string };
 };
 
-const ASSIGNMENT_SELECT = "id, subject:subject_id(name, display_order, evaluation_type)";
+const ASSIGNMENT_SELECT =
+  "id, subject:subject_id(name, display_order, evaluation_type)";
 
-function subjectGradeValue(g: { grade_value?: string; adjustment_points?: number | null }): number | null {
+function subjectGradeValue(g: {
+  grade_value?: string;
+  adjustment_points?: number | null;
+}): number | null {
   const nota = parseFloat(g.grade_value ?? "");
   if (isNaN(nota)) return null;
   return nota + (g.adjustment_points ?? 0);
 }
 
-function evalTypeOf(assignments: BoletaAssignment[], assignmentId: string): string | undefined {
-  return assignments.find((a) => a.id === assignmentId)?.subject?.evaluation_type;
+function evalTypeOf(
+  assignments: BoletaAssignment[],
+  assignmentId: string,
+): string | undefined {
+  return assignments.find((a) => a.id === assignmentId)?.subject
+    ?.evaluation_type;
 }
 
-function isLiteralAssignment(assignments: BoletaAssignment[], assignmentId: string): boolean {
+function isLiteralAssignment(
+  assignments: BoletaAssignment[],
+  assignmentId: string,
+): boolean {
   return evalTypeOf(assignments, assignmentId) === "literal";
 }
 
 function buildSimpleBoletaSubjects(
   validAssignments: BoletaAssignment[],
-  myGrades: { assignment_id: string; grade_value?: string; adjustment_points?: number | null }[],
+  myGrades: {
+    assignment_id: string;
+    grade_value?: string;
+    adjustment_points?: number | null;
+  }[],
 ): { subjects: { name: string; grade: string }[]; definitiva: string } {
   const numericByAssignment: Record<string, number> = {};
   let sum = 0;
@@ -139,7 +165,10 @@ function buildSimpleBoletaSubjects(
     const v = numericByAssignment[a.id];
     return {
       name: a.subject?.name ?? "Área",
-      grade: v !== undefined ? formatBoletaGradeValue(v, a.subject?.evaluation_type) : "—",
+      grade:
+        v !== undefined
+          ? formatBoletaGradeValue(v, a.subject?.evaluation_type)
+          : "—",
     };
   });
 
@@ -149,10 +178,25 @@ function buildSimpleBoletaSubjects(
 
 function buildBoletinFromGrades(
   validAssignments: BoletaAssignment[],
-  myGrades: { assignment_id: string; momento: number; grade_value?: string; adjustment_points?: number | null; absence_count?: number | null }[],
+  myGrades: {
+    assignment_id: string;
+    momento: number;
+    grade_value?: string;
+    adjustment_points?: number | null;
+    absence_count?: number | null;
+  }[],
   useStoredDefinitiva: boolean,
-): { subjects: BoletinSubjectRow[]; avg_m1: string; avg_m2: string; avg_m3: string; avg_student: string } {
-  const myMap: Record<GradeMapKey, { nota: string; ajuste: string; def: string; inas: number }> = {};
+): {
+  subjects: BoletinSubjectRow[];
+  avg_m1: string;
+  avg_m2: string;
+  avg_m3: string;
+  avg_student: string;
+} {
+  const myMap: Record<
+    GradeMapKey,
+    { nota: string; ajuste: string; def: string; inas: number }
+  > = {};
   const def0NumericByAssignment: Record<string, number> = {};
 
   myGrades.forEach((g) => {
@@ -175,7 +219,9 @@ function buildBoletinFromGrades(
   });
 
   const momSums: Record<number, { sum: number; count: number }> = {
-    1: { sum: 0, count: 0 }, 2: { sum: 0, count: 0 }, 3: { sum: 0, count: 0 },
+    1: { sum: 0, count: 0 },
+    2: { sum: 0, count: 0 },
+    3: { sum: 0, count: 0 },
   };
   myGrades.forEach((g) => {
     if (g.momento < 1 || g.momento > 3) return;
@@ -212,21 +258,32 @@ function buildBoletinFromGrades(
         overallCount += 1;
       }
     });
-    avg_student = overallCount > 0 ? fmtGradeNum(overallSum / overallCount) : "—";
+    avg_student =
+      overallCount > 0 ? fmtGradeNum(overallSum / overallCount) : "—";
   }
 
   const getNumericDef = (assignmentId: string, m: number): number | null => {
-    const g = myGrades.find((x) => x.assignment_id === assignmentId && x.momento === m);
+    const g = myGrades.find(
+      (x) => x.assignment_id === assignmentId && x.momento === m,
+    );
     if (!g) return null;
     const nota = parseFloat(g.grade_value ?? "0");
     if (isNaN(nota)) return null;
     return nota + (g.adjustment_points ?? 0);
   };
 
-  const getMg = (assignmentId: string, m: number): BoletinMomentoGrade | null => {
+  const getMg = (
+    assignmentId: string,
+    m: number,
+  ): BoletinMomentoGrade | null => {
     const entry = myMap[`${assignmentId}:${m}` as GradeMapKey];
     if (!entry) return null;
-    return { nota: entry.nota, ajuste: entry.ajuste, definitiva: entry.def, inasistencias: entry.inas };
+    return {
+      nota: entry.nota,
+      ajuste: entry.ajuste,
+      definitiva: entry.def,
+      inasistencias: entry.inas,
+    };
   };
 
   const subjects: BoletinSubjectRow[] = validAssignments.map((a, idx) => {
@@ -236,20 +293,28 @@ function buildBoletinFromGrades(
     const evalType = a.subject?.evaluation_type;
     let definitiva_final: string;
     if (useStoredDefinitiva && def0NumericByAssignment[a.id] !== undefined) {
-      definitiva_final = formatBoletaGradeValue(def0NumericByAssignment[a.id], evalType);
+      definitiva_final = formatBoletaGradeValue(
+        def0NumericByAssignment[a.id],
+        evalType,
+      );
     } else {
       const defs = [1, 2, 3]
         .map((m) => getNumericDef(a.id, m))
         .filter((v): v is number => v !== null);
       definitiva_final =
         defs.length > 0
-          ? formatBoletaGradeValue(defs.reduce((s, d) => s + d, 0) / defs.length, evalType)
+          ? formatBoletaGradeValue(
+              defs.reduce((s, d) => s + d, 0) / defs.length,
+              evalType,
+            )
           : "—";
     }
     return {
       number: idx + 1,
       name: a.subject?.name ?? "Área",
-      m1, m2, m3,
+      m1,
+      m2,
+      m3,
       definitiva_final,
     };
   });
@@ -258,7 +323,12 @@ function buildBoletinFromGrades(
 }
 
 function rankSectionByMomento(
-  allGrades: { student_id: string; momento: number; grade_value?: string; adjustment_points?: number | null }[],
+  allGrades: {
+    student_id: string;
+    momento: number;
+    grade_value?: string;
+    adjustment_points?: number | null;
+  }[],
   rankingMomento: number,
 ): { ranked: { sid: string; avg: number }[]; avg_section: string } {
   const perStudent: Record<string, { sum: number; count: number }> = {};
@@ -267,14 +337,17 @@ function rankSectionByMomento(
     .forEach((g) => {
       const v = subjectGradeValue(g);
       if (v === null) return;
-      if (!perStudent[g.student_id]) perStudent[g.student_id] = { sum: 0, count: 0 };
+      if (!perStudent[g.student_id])
+        perStudent[g.student_id] = { sum: 0, count: 0 };
       perStudent[g.student_id].sum += v;
       perStudent[g.student_id].count += 1;
     });
   const ranked = Object.entries(perStudent)
     .map(([sid, { sum, count }]) => ({ sid, avg: sum / count }))
     .sort((a, b) => b.avg - a.avg);
-  const secValues = Object.values(perStudent).map(({ sum, count }) => sum / count);
+  const secValues = Object.values(perStudent).map(
+    ({ sum, count }) => sum / count,
+  );
   const avg_section =
     secValues.length > 0
       ? fmtGradeNum(secValues.reduce((acc, v) => acc + v, 0) / secValues.length)
@@ -282,10 +355,23 @@ function rankSectionByMomento(
   return { ranked, avg_section };
 }
 
-export async function downloadBachilleratoBoleta(params: BachillerataBoletaParams): Promise<string> {
-  const { schoolId, studentId, studentName, documentId,
-          sectionId, sectionName, gradeLabel, gradeKey, yearId, yearRange, momento,
-          useStoredDefinitiva = false } = params;
+export async function downloadBachilleratoBoleta(
+  params: BachillerataBoletaParams,
+): Promise<string> {
+  const {
+    schoolId,
+    studentId,
+    studentName,
+    documentId,
+    sectionId,
+    sectionName,
+    gradeLabel,
+    gradeKey,
+    yearId,
+    yearRange,
+    momento,
+    useStoredDefinitiva = false,
+  } = params;
 
   // ── 1. Fetch template + school + planilla config in parallel ─────────────
   const [templateRes, schoolRes, planillaRes] = await Promise.all([
@@ -308,26 +394,41 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   ]);
 
   const allTemplates = (templateRes.data ?? []) as any[];
-  const tpl = allTemplates.find(
-    (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeKey)
-  ) ?? allTemplates.find(
-    (t) => !t.applicable_grades || t.applicable_grades.length === 0
-  ) ?? null;
+  const tpl =
+    allTemplates.find(
+      (t) =>
+        Array.isArray(t.applicable_grades) &&
+        t.applicable_grades.includes(gradeKey),
+    ) ??
+    allTemplates.find(
+      (t) => !t.applicable_grades || t.applicable_grades.length === 0,
+    ) ??
+    null;
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 
   // Build config: use best-matching template or fall back to defaults
   const cfg: BachilleratoConfig = tpl?.config
-    ? { ...DEFAULT_BACHILLERATO_CONFIG, ...tpl.config,
-        sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(tpl.config?.sections ?? {}) },
-        boletin:  { ...DEFAULT_BACHILLERATO_CONFIG.boletin,  ...(tpl.config?.boletin  ?? {}) } }
+    ? {
+        ...DEFAULT_BACHILLERATO_CONFIG,
+        ...tpl.config,
+        sections: {
+          ...DEFAULT_BACHILLERATO_CONFIG.sections,
+          ...(tpl.config?.sections ?? {}),
+        },
+        boletin: {
+          ...DEFAULT_BACHILLERATO_CONFIG.boletin,
+          ...(tpl.config?.boletin ?? {}),
+        },
+      }
     : DEFAULT_BACHILLERATO_CONFIG;
 
-  const paperW: number = tpl?.paper_width_mm  ?? 215.9;
+  const paperW: number = tpl?.paper_width_mm ?? 215.9;
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
-  const style  = cfg.style ?? "simple";
+  const style = cfg.style ?? "simple";
 
-  const headerCfgRaw: Record<string, boolean> = (planilla?.header_config as Record<string, boolean>) ?? {};
+  const headerCfgRaw: Record<string, boolean> =
+    (planilla?.header_config as Record<string, boolean>) ?? {};
   const rawSigs = planilla?.signature_lines;
   const signatureLines: string[] = Array.isArray(rawSigs)
     ? rawSigs
@@ -337,7 +438,9 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
     flag in headerCfgRaw ? headerCfgRaw[flag] : fallback;
 
   const rawLogoUrl = school?.logo_url ?? "";
-  const logoUrl = rawLogoUrl ? ((await resolveImageUrl(rawLogoUrl)) || rawLogoUrl) : "";
+  const logoUrl = rawLogoUrl
+    ? (await resolveImageUrl(rawLogoUrl)) || rawLogoUrl
+    : "";
 
   // ── 2. Assignments for this section + year ───────────────────────────────
   const { data: assignments } = await supabase
@@ -350,18 +453,21 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
 
   const validAssignments = (assignments || [])
     .filter((a: any) => a.subject?.name)
-    .sort((a: any, b: any) => (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999));
+    .sort(
+      (a: any, b: any) =>
+        (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999),
+    );
   const assignmentIds = validAssignments.map((a: any) => a.id);
 
   // ── Common header data ───────────────────────────────────────────────────
   const headerCfg = {
-    show_logo:             show("show_logo"),
-    show_name:             show("show_name"),
-    show_dea_code:         show("show_dea_code"),
+    show_logo: show("show_logo"),
+    show_name: show("show_name"),
+    show_dea_code: show("show_dea_code"),
     show_statistical_code: show("show_statistical_code"),
-    show_address:          show("show_address"),
-    show_phone:            show("show_phone"),
-    show_rif:              show("show_rif"),
+    show_address: show("show_address"),
+    show_phone: show("show_phone"),
+    show_rif: show("show_rif"),
   };
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -376,46 +482,61 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
     const rankingMomento = useStoredDefinitiva ? 0 : momento;
     const [myGradesRes, allGradesRes] = await Promise.all([
       assignmentIds.length > 0
-        ? supabase.from("final_grades")
-            .select("assignment_id, momento, grade_value, adjustment_points, absence_count")
-            .eq("student_id", studentId).eq("school_id", schoolId)
-            .in("momento", momentosFetch).in("assignment_id", assignmentIds)
+        ? supabase
+            .from("final_grades")
+            .select(
+              "assignment_id, momento, grade_value, adjustment_points, absence_count",
+            )
+            .eq("student_id", studentId)
+            .eq("school_id", schoolId)
+            .in("momento", momentosFetch)
+            .in("assignment_id", assignmentIds)
         : Promise.resolve({ data: [] }),
       assignmentIds.length > 0
-        ? supabase.from("final_grades")
-            .select("student_id, momento, assignment_id, grade_value, adjustment_points")
-            .eq("school_id", schoolId).eq("momento", rankingMomento)
+        ? supabase
+            .from("final_grades")
+            .select(
+              "student_id, momento, assignment_id, grade_value, adjustment_points",
+            )
+            .eq("school_id", schoolId)
+            .eq("momento", rankingMomento)
             .in("assignment_id", assignmentIds)
         : Promise.resolve({ data: [] }),
     ]);
 
     const myGrades = myGradesRes.data || [];
     const allGrades = allGradesRes.data || [];
-    const { subjects, avg_m1, avg_m2, avg_m3, avg_student } = buildBoletinFromGrades(
-      validAssignments, myGrades, useStoredDefinitiva,
+    const { subjects, avg_m1, avg_m2, avg_m3, avg_student } =
+      buildBoletinFromGrades(validAssignments, myGrades, useStoredDefinitiva);
+    const { ranked, avg_section } = rankSectionByMomento(
+      allGrades,
+      rankingMomento,
     );
-    const { ranked, avg_section } = rankSectionByMomento(allGrades, rankingMomento);
     const positionIdx = ranked.findIndex((r) => r.sid === studentId);
     const position = positionIdx >= 0 ? positionIdx + 1 : 0;
 
     const boletinData: BoletinCompletoRenderData = {
-      school_name:      school?.name ?? "",
-      school_logo:      logoUrl,
-      dea_code:         school?.dea_code ?? "",
+      school_name: school?.name ?? "",
+      school_logo: logoUrl,
+      dea_code: school?.dea_code ?? "",
       statistical_code: school?.statistical_code ?? "",
-      address:          school?.address ?? "",
-      phone:            school?.phone ?? "",
-      rif:              school?.rif ?? "",
-      header_cfg:       headerCfg,
-      student_name:     studentName,
-      document_id:      documentId ?? "",
-      grade_label:      gradeLabel,
-      section_name:     sectionName,
-      year_range:       yearRange,
-      lapso:            useStoredDefinitiva ? 0 : momento,
-      mention:          cfg.boletin?.mention ?? "",
+      address: school?.address ?? "",
+      phone: school?.phone ?? "",
+      rif: school?.rif ?? "",
+      header_cfg: headerCfg,
+      student_name: studentName,
+      document_id: documentId ?? "",
+      grade_label: gradeLabel,
+      section_name: sectionName,
+      year_range: yearRange,
+      lapso: useStoredDefinitiva ? 0 : momento,
+      mention: cfg.boletin?.mention ?? "",
       subjects,
-      avg_m1, avg_m2, avg_m3, avg_student, avg_section,
+      avg_m1,
+      avg_m2,
+      avg_m3,
+      avg_student,
+      avg_section,
       position,
       signature_lines: [],
       visibleMomentos,
@@ -432,30 +553,39 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   // ── 3. Final grades: this student + all students (for position) ──────────
   const [myGradesRes, allGradesRes] = await Promise.all([
     assignmentIds.length > 0
-      ? supabase.from("final_grades")
+      ? supabase
+          .from("final_grades")
           .select("assignment_id, grade_value, adjustment_points")
-          .eq("student_id", studentId).eq("school_id", schoolId)
-          .eq("momento", momento).in("assignment_id", assignmentIds)
+          .eq("student_id", studentId)
+          .eq("school_id", schoolId)
+          .eq("momento", momento)
+          .in("assignment_id", assignmentIds)
       : Promise.resolve({ data: [] }),
     assignmentIds.length > 0
-      ? supabase.from("final_grades")
+      ? supabase
+          .from("final_grades")
           .select("student_id, grade_value, adjustment_points")
           .eq("school_id", schoolId)
-          .eq("momento", momento).in("assignment_id", assignmentIds)
+          .eq("momento", momento)
+          .in("assignment_id", assignmentIds)
       : Promise.resolve({ data: [] }),
   ]);
 
   const myGrades = myGradesRes.data || [];
   const allGrades = allGradesRes.data || [];
 
-  const { subjects, definitiva } = buildSimpleBoletaSubjects(validAssignments, myGrades);
+  const { subjects, definitiva } = buildSimpleBoletaSubjects(
+    validAssignments,
+    myGrades,
+  );
 
   // Position (ranking uses all numeric grades)
   const perStudent: Record<string, { sum: number; count: number }> = {};
   allGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
     if (!isNaN(v)) {
-      if (!perStudent[g.student_id]) perStudent[g.student_id] = { sum: 0, count: 0 };
+      if (!perStudent[g.student_id])
+        perStudent[g.student_id] = { sum: 0, count: 0 };
       perStudent[g.student_id].sum += v;
       perStudent[g.student_id].count++;
     }
@@ -467,19 +597,19 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   const position = positionIdx >= 0 ? positionIdx + 1 : 0;
 
   const data: BoletaRenderData = {
-    school_name:      school?.name ?? "",
-    school_logo:      logoUrl,
-    dea_code:         school?.dea_code ?? "",
+    school_name: school?.name ?? "",
+    school_logo: logoUrl,
+    dea_code: school?.dea_code ?? "",
     statistical_code: school?.statistical_code ?? "",
-    address:          school?.address ?? "",
-    phone:            school?.phone ?? "",
-    rif:              school?.rif ?? "",
-    header_cfg:       headerCfg,
+    address: school?.address ?? "",
+    phone: school?.phone ?? "",
+    rif: school?.rif ?? "",
+    header_cfg: headerCfg,
     student_name: studentName,
-    document_id:  documentId ?? "",
-    grade_label:  gradeLabel,
+    document_id: documentId ?? "",
+    grade_label: gradeLabel,
     section_name: sectionName,
-    year_range:   yearRange,
+    year_range: yearRange,
     momento,
     subjects,
     definitiva,
@@ -496,25 +626,35 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface BachillerataBoletaStudentParam {
-  studentId:   string;
+  studentId: string;
   studentName: string;
-  documentId:  string | null;
+  documentId: string | null;
 }
 
 export async function downloadAllBachilleratoBoletas(params: {
-  schoolId:    string;
-  sectionId:   string;
+  schoolId: string;
+  sectionId: string;
   sectionName: string;
-  gradeLabel:  string;
-  gradeKey:    string;
-  yearId:      string;
-  yearRange:   string;
-  momento:     number;
-  students:    BachillerataBoletaStudentParam[];
+  gradeLabel: string;
+  gradeKey: string;
+  yearId: string;
+  yearRange: string;
+  momento: number;
+  students: BachillerataBoletaStudentParam[];
   useStoredDefinitiva?: boolean;
 }): Promise<string> {
-  const { schoolId, sectionId, sectionName, gradeLabel, gradeKey, yearId, yearRange, momento, students,
-          useStoredDefinitiva = false } = params;
+  const {
+    schoolId,
+    sectionId,
+    sectionName,
+    gradeLabel,
+    gradeKey,
+    yearId,
+    yearRange,
+    momento,
+    students,
+    useStoredDefinitiva = false,
+  } = params;
   if (students.length === 0) return "";
 
   // ── 1. Fetch template + school + planilla in parallel ─────────────────────
@@ -538,28 +678,45 @@ export async function downloadAllBachilleratoBoletas(params: {
   ]);
 
   const allTemplatesAll = (templateRes.data ?? []) as any[];
-  const tpl = allTemplatesAll.find(
-    (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeKey)
-  ) ?? allTemplatesAll.find(
-    (t) => !t.applicable_grades || t.applicable_grades.length === 0
-  ) ?? null;
+  const tpl =
+    allTemplatesAll.find(
+      (t) =>
+        Array.isArray(t.applicable_grades) &&
+        t.applicable_grades.includes(gradeKey),
+    ) ??
+    allTemplatesAll.find(
+      (t) => !t.applicable_grades || t.applicable_grades.length === 0,
+    ) ??
+    null;
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 
   const cfg: BachilleratoConfig = tpl?.config
-    ? { ...DEFAULT_BACHILLERATO_CONFIG, ...tpl.config,
-        sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(tpl.config?.sections ?? {}) },
-        boletin:  { ...DEFAULT_BACHILLERATO_CONFIG.boletin,  ...(tpl.config?.boletin  ?? {}) } }
+    ? {
+        ...DEFAULT_BACHILLERATO_CONFIG,
+        ...tpl.config,
+        sections: {
+          ...DEFAULT_BACHILLERATO_CONFIG.sections,
+          ...(tpl.config?.sections ?? {}),
+        },
+        boletin: {
+          ...DEFAULT_BACHILLERATO_CONFIG.boletin,
+          ...(tpl.config?.boletin ?? {}),
+        },
+      }
     : DEFAULT_BACHILLERATO_CONFIG;
 
-  const paperW: number = tpl?.paper_width_mm  ?? 215.9;
+  const paperW: number = tpl?.paper_width_mm ?? 215.9;
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
-  const style  = cfg.style ?? "simple";
+  const style = cfg.style ?? "simple";
 
   const rawLogoUrl = school?.logo_url ?? "";
-  const logoUrl = rawLogoUrl ? ((await resolveImageUrl(rawLogoUrl)) || rawLogoUrl) : "";
+  const logoUrl = rawLogoUrl
+    ? (await resolveImageUrl(rawLogoUrl)) || rawLogoUrl
+    : "";
 
-  const headerCfgRaw: Record<string, boolean> = (planilla?.header_config as Record<string, boolean>) ?? {};
+  const headerCfgRaw: Record<string, boolean> =
+    (planilla?.header_config as Record<string, boolean>) ?? {};
   const rawSigs = planilla?.signature_lines;
   const signatureLines: string[] = Array.isArray(rawSigs)
     ? rawSigs
@@ -567,13 +724,13 @@ export async function downloadAllBachilleratoBoletas(params: {
   const show = (flag: string, fallback = true): boolean =>
     flag in headerCfgRaw ? headerCfgRaw[flag] : fallback;
   const headerCfg = {
-    show_logo:             show("show_logo"),
-    show_name:             show("show_name"),
-    show_dea_code:         show("show_dea_code"),
+    show_logo: show("show_logo"),
+    show_name: show("show_name"),
+    show_dea_code: show("show_dea_code"),
     show_statistical_code: show("show_statistical_code"),
-    show_address:          show("show_address"),
-    show_phone:            show("show_phone"),
-    show_rif:              show("show_rif"),
+    show_address: show("show_address"),
+    show_phone: show("show_phone"),
+    show_rif: show("show_rif"),
   };
 
   // ── 2. Assignments ────────────────────────────────────────────────────────
@@ -587,7 +744,10 @@ export async function downloadAllBachilleratoBoletas(params: {
 
   const validAssignments = (assignments || [])
     .filter((a: any) => a.subject?.name)
-    .sort((a: any, b: any) => (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999));
+    .sort(
+      (a: any, b: any) =>
+        (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999),
+    );
   const assignmentIds = validAssignments.map((a: any) => a.id);
 
   // ── BOLETÍN COMPLETO (multi-momento) ─────────────────────────────────────
@@ -598,59 +758,86 @@ export async function downloadAllBachilleratoBoletas(params: {
     const visibleMomentos = useStoredDefinitiva ? [1, 2, 3] : momentosRange;
     const showDefinitivaColumn = useStoredDefinitiva;
     const rankingMomento = useStoredDefinitiva ? 0 : momento;
-    const allGradesRes = assignmentIds.length > 0
-      ? await supabase.from("final_grades")
-          .select("student_id, assignment_id, momento, grade_value, adjustment_points, absence_count")
-          .eq("school_id", schoolId)
-          .in("momento", momentosFetch)
-          .in("assignment_id", assignmentIds)
-      : { data: [] };
+    const allGradesRes =
+      assignmentIds.length > 0
+        ? await supabase
+            .from("final_grades")
+            .select(
+              "student_id, assignment_id, momento, grade_value, adjustment_points, absence_count",
+            )
+            .eq("school_id", schoolId)
+            .in("momento", momentosFetch)
+            .in("assignment_id", assignmentIds)
+        : { data: [] };
     const allGrades: any[] = allGradesRes.data || [];
-    const { ranked, avg_section } = rankSectionByMomento(allGrades, rankingMomento);
+    const { ranked, avg_section } = rankSectionByMomento(
+      allGrades,
+      rankingMomento,
+    );
 
     const bodies: string[] = [];
     for (const student of students) {
-      const myGrades = allGrades.filter((g: any) => g.student_id === student.studentId);
-      const { subjects, avg_m1, avg_m2, avg_m3, avg_student } = buildBoletinFromGrades(
-        validAssignments, myGrades, useStoredDefinitiva,
+      const myGrades = allGrades.filter(
+        (g: any) => g.student_id === student.studentId,
       );
+      const { subjects, avg_m1, avg_m2, avg_m3, avg_student } =
+        buildBoletinFromGrades(validAssignments, myGrades, useStoredDefinitiva);
       const positionIdx = ranked.findIndex((r) => r.sid === student.studentId);
       const position = positionIdx >= 0 ? positionIdx + 1 : 0;
 
       const boletinData: BoletinCompletoRenderData = {
-        school_name: school?.name ?? "", school_logo: logoUrl,
-        dea_code: school?.dea_code ?? "", statistical_code: school?.statistical_code ?? "",
-        address: school?.address ?? "", phone: school?.phone ?? "", rif: school?.rif ?? "",
+        school_name: school?.name ?? "",
+        school_logo: logoUrl,
+        dea_code: school?.dea_code ?? "",
+        statistical_code: school?.statistical_code ?? "",
+        address: school?.address ?? "",
+        phone: school?.phone ?? "",
+        rif: school?.rif ?? "",
         header_cfg: headerCfg,
-        student_name: student.studentName, document_id: student.documentId ?? "",
-        grade_label: gradeLabel, section_name: sectionName, year_range: yearRange,
+        student_name: student.studentName,
+        document_id: student.documentId ?? "",
+        grade_label: gradeLabel,
+        section_name: sectionName,
+        year_range: yearRange,
         lapso: useStoredDefinitiva ? 0 : momento,
         mention: cfg.boletin?.mention ?? "",
-        subjects, avg_m1, avg_m2, avg_m3, avg_student, avg_section, position,
+        subjects,
+        avg_m1,
+        avg_m2,
+        avg_m3,
+        avg_student,
+        avg_section,
+        position,
         signature_lines: [],
         visibleMomentos,
         showDefinitivaColumn,
       };
-      bodies.push(generateBoletinCompletoHtml(cfgPdf, boletinData, paperW, paperH, { bodyOnly: true }));
+      bodies.push(
+        generateBoletinCompletoHtml(cfgPdf, boletinData, paperW, paperH, {
+          bodyOnly: true,
+        }),
+      );
     }
 
     return wrapAllBoletasHtml(bodies, paperW, paperH, "boletin_completo", {
-      top:    cfg.boletin?.margin_top    ?? 4,
+      top: cfg.boletin?.margin_top ?? 4,
       bottom: cfg.boletin?.margin_bottom ?? 6,
-      sides:  cfg.boletin?.margin_sides  ?? 12,
+      sides: cfg.boletin?.margin_sides ?? 12,
       sig_pin_bottom: cfg.boletin?.sig_pin_bottom ?? false,
     });
     return;
   }
 
   // ── SIMPLE (single momento) ───────────────────────────────────────────────
-  const gradesRes = assignmentIds.length > 0
-    ? await supabase.from("final_grades")
-        .select("student_id, assignment_id, grade_value, adjustment_points")
-        .eq("school_id", schoolId)
-        .eq("momento", momento)
-        .in("assignment_id", assignmentIds)
-    : { data: [] };
+  const gradesRes =
+    assignmentIds.length > 0
+      ? await supabase
+          .from("final_grades")
+          .select("student_id, assignment_id, grade_value, adjustment_points")
+          .eq("school_id", schoolId)
+          .eq("momento", momento)
+          .in("assignment_id", assignmentIds)
+      : { data: [] };
   const allGrades: any[] = gradesRes.data || [];
 
   // Compute section position ranking
@@ -658,8 +845,10 @@ export async function downloadAllBachilleratoBoletas(params: {
   allGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
     if (!isNaN(v)) {
-      if (!perStudent[g.student_id]) perStudent[g.student_id] = { sum: 0, count: 0 };
-      perStudent[g.student_id].sum += v; perStudent[g.student_id].count++;
+      if (!perStudent[g.student_id])
+        perStudent[g.student_id] = { sum: 0, count: 0 };
+      perStudent[g.student_id].sum += v;
+      perStudent[g.student_id].count++;
     }
   });
   const ranked = Object.entries(perStudent)
@@ -668,21 +857,38 @@ export async function downloadAllBachilleratoBoletas(params: {
 
   const bodies: string[] = [];
   for (const student of students) {
-    const myGrades = allGrades.filter((g: any) => g.student_id === student.studentId);
-    const { subjects, definitiva } = buildSimpleBoletaSubjects(validAssignments, myGrades);
+    const myGrades = allGrades.filter(
+      (g: any) => g.student_id === student.studentId,
+    );
+    const { subjects, definitiva } = buildSimpleBoletaSubjects(
+      validAssignments,
+      myGrades,
+    );
     const positionIdx = ranked.findIndex((r) => r.sid === student.studentId);
     const position = positionIdx >= 0 ? positionIdx + 1 : 0;
     const data: BoletaRenderData = {
-      school_name: school?.name ?? "", school_logo: logoUrl,
-      dea_code: school?.dea_code ?? "", statistical_code: school?.statistical_code ?? "",
-      address: school?.address ?? "", phone: school?.phone ?? "", rif: school?.rif ?? "",
+      school_name: school?.name ?? "",
+      school_logo: logoUrl,
+      dea_code: school?.dea_code ?? "",
+      statistical_code: school?.statistical_code ?? "",
+      address: school?.address ?? "",
+      phone: school?.phone ?? "",
+      rif: school?.rif ?? "",
       header_cfg: headerCfg,
-      student_name: student.studentName, document_id: student.documentId ?? "",
-      grade_label: gradeLabel, section_name: sectionName, year_range: yearRange,
-      momento, subjects, definitiva, position,
+      student_name: student.studentName,
+      document_id: student.documentId ?? "",
+      grade_label: gradeLabel,
+      section_name: sectionName,
+      year_range: yearRange,
+      momento,
+      subjects,
+      definitiva,
+      position,
       signature_lines: signatureLines,
     };
-    bodies.push(generateBoletaHtml(cfg, data, paperW, paperH, { bodyOnly: true }));
+    bodies.push(
+      generateBoletaHtml(cfg, data, paperW, paperH, { bodyOnly: true }),
+    );
   }
 
   return wrapAllBoletasHtml(bodies, paperW, paperH, "simple");
@@ -695,8 +901,18 @@ export async function downloadAllBachilleratoBoletas(params: {
 export async function downloadBachilleratoBoletaDefinitiva(
   params: Omit<BachillerataBoletaParams, "momento">,
 ): Promise<string> {
-  const { schoolId, studentId, studentName, documentId,
-          sectionId, sectionName, gradeLabel, gradeKey, yearId, yearRange } = params;
+  const {
+    schoolId,
+    studentId,
+    studentName,
+    documentId,
+    sectionId,
+    sectionName,
+    gradeLabel,
+    gradeKey,
+    yearId,
+    yearRange,
+  } = params;
 
   const [templateRes, schoolRes, planillaRes] = await Promise.all([
     supabase
@@ -718,28 +934,45 @@ export async function downloadBachilleratoBoletaDefinitiva(
   ]);
 
   const allTemplates = (templateRes.data ?? []) as any[];
-  const tpl = allTemplates.find(
-    (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeKey)
-  ) ?? allTemplates.find(
-    (t) => !t.applicable_grades || t.applicable_grades.length === 0
-  ) ?? null;
+  const tpl =
+    allTemplates.find(
+      (t) =>
+        Array.isArray(t.applicable_grades) &&
+        t.applicable_grades.includes(gradeKey),
+    ) ??
+    allTemplates.find(
+      (t) => !t.applicable_grades || t.applicable_grades.length === 0,
+    ) ??
+    null;
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 
   const cfg: BachilleratoConfig = tpl?.config
-    ? { ...DEFAULT_BACHILLERATO_CONFIG, ...tpl.config,
-        sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(tpl.config?.sections ?? {}) },
-        boletin:  { ...DEFAULT_BACHILLERATO_CONFIG.boletin,  ...(tpl.config?.boletin  ?? {}) } }
+    ? {
+        ...DEFAULT_BACHILLERATO_CONFIG,
+        ...tpl.config,
+        sections: {
+          ...DEFAULT_BACHILLERATO_CONFIG.sections,
+          ...(tpl.config?.sections ?? {}),
+        },
+        boletin: {
+          ...DEFAULT_BACHILLERATO_CONFIG.boletin,
+          ...(tpl.config?.boletin ?? {}),
+        },
+      }
     : DEFAULT_BACHILLERATO_CONFIG;
 
-  const paperW: number = tpl?.paper_width_mm  ?? 215.9;
+  const paperW: number = tpl?.paper_width_mm ?? 215.9;
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
-  const style  = cfg.style ?? "simple";
+  const style = cfg.style ?? "simple";
 
   const rawLogoUrl = school?.logo_url ?? "";
-  const logoUrl = rawLogoUrl ? ((await resolveImageUrl(rawLogoUrl)) || rawLogoUrl) : "";
+  const logoUrl = rawLogoUrl
+    ? (await resolveImageUrl(rawLogoUrl)) || rawLogoUrl
+    : "";
 
-  const headerCfgRaw: Record<string, boolean> = (planilla?.header_config as Record<string, boolean>) ?? {};
+  const headerCfgRaw: Record<string, boolean> =
+    (planilla?.header_config as Record<string, boolean>) ?? {};
   const rawSigs = planilla?.signature_lines;
   const signatureLines: string[] = Array.isArray(rawSigs)
     ? rawSigs
@@ -747,13 +980,13 @@ export async function downloadBachilleratoBoletaDefinitiva(
   const show = (flag: string, fallback = true): boolean =>
     flag in headerCfgRaw ? headerCfgRaw[flag] : fallback;
   const headerCfg = {
-    show_logo:             show("show_logo"),
-    show_name:             show("show_name"),
-    show_dea_code:         show("show_dea_code"),
+    show_logo: show("show_logo"),
+    show_name: show("show_name"),
+    show_dea_code: show("show_dea_code"),
     show_statistical_code: show("show_statistical_code"),
-    show_address:          show("show_address"),
-    show_phone:            show("show_phone"),
-    show_rif:              show("show_rif"),
+    show_address: show("show_address"),
+    show_phone: show("show_phone"),
+    show_rif: show("show_rif"),
   };
 
   const { data: assignments } = await supabase
@@ -766,40 +999,56 @@ export async function downloadBachilleratoBoletaDefinitiva(
 
   const validAssignments = (assignments || [])
     .filter((a: any) => a.subject?.name)
-    .sort((a: any, b: any) => (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999));
+    .sort(
+      (a: any, b: any) =>
+        (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999),
+    );
   const assignmentIds = validAssignments.map((a: any) => a.id);
 
   if (style === "boletin_completo") {
-    return downloadBachilleratoBoleta({ ...params, momento: 1, useStoredDefinitiva: true });
+    return downloadBachilleratoBoleta({
+      ...params,
+      momento: 1,
+      useStoredDefinitiva: true,
+    });
   }
 
   // SIMPLE — leer directamente momento=0 (definitiva guardada en BD)
   const [myGradesRes, allGradesRes] = await Promise.all([
     assignmentIds.length > 0
-      ? supabase.from("final_grades")
+      ? supabase
+          .from("final_grades")
           .select("assignment_id, grade_value, adjustment_points")
-          .eq("student_id", studentId).eq("school_id", schoolId)
-          .eq("momento", 0).in("assignment_id", assignmentIds)
+          .eq("student_id", studentId)
+          .eq("school_id", schoolId)
+          .eq("momento", 0)
+          .in("assignment_id", assignmentIds)
       : Promise.resolve({ data: [] }),
     assignmentIds.length > 0
-      ? supabase.from("final_grades")
+      ? supabase
+          .from("final_grades")
           .select("student_id, assignment_id, grade_value, adjustment_points")
           .eq("school_id", schoolId)
-          .eq("momento", 0).in("assignment_id", assignmentIds)
+          .eq("momento", 0)
+          .in("assignment_id", assignmentIds)
       : Promise.resolve({ data: [] }),
   ]);
 
   const myGrades = myGradesRes.data || [];
   const allGrades = allGradesRes.data || [];
 
-  const { subjects, definitiva } = buildSimpleBoletaSubjects(validAssignments, myGrades);
+  const { subjects, definitiva } = buildSimpleBoletaSubjects(
+    validAssignments,
+    myGrades,
+  );
 
   // Ranking basado en definitiva guardada (momento=0)
   const perStudent: Record<string, { sum: number; count: number }> = {};
   allGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
     if (!isNaN(v)) {
-      if (!perStudent[g.student_id]) perStudent[g.student_id] = { sum: 0, count: 0 };
+      if (!perStudent[g.student_id])
+        perStudent[g.student_id] = { sum: 0, count: 0 };
       perStudent[g.student_id].sum += v;
       perStudent[g.student_id].count++;
     }
@@ -811,14 +1060,24 @@ export async function downloadBachilleratoBoletaDefinitiva(
   const position = positionIdx >= 0 ? positionIdx + 1 : 0;
 
   const data: BoletaRenderData = {
-    school_name: school?.name ?? "", school_logo: logoUrl,
-    dea_code: school?.dea_code ?? "", statistical_code: school?.statistical_code ?? "",
-    address: school?.address ?? "", phone: school?.phone ?? "", rif: school?.rif ?? "",
+    school_name: school?.name ?? "",
+    school_logo: logoUrl,
+    dea_code: school?.dea_code ?? "",
+    statistical_code: school?.statistical_code ?? "",
+    address: school?.address ?? "",
+    phone: school?.phone ?? "",
+    rif: school?.rif ?? "",
     header_cfg: headerCfg,
-    student_name: studentName, document_id: documentId ?? "",
-    grade_label: gradeLabel, section_name: sectionName, year_range: yearRange,
-    momento: 1, momentoOverrideLabel: "Definitiva Final",
-    subjects, definitiva, position,
+    student_name: studentName,
+    document_id: documentId ?? "",
+    grade_label: gradeLabel,
+    section_name: sectionName,
+    year_range: yearRange,
+    momento: 1,
+    momentoOverrideLabel: "Definitiva Final",
+    subjects,
+    definitiva,
+    position,
     signature_lines: signatureLines,
   };
 
@@ -826,16 +1085,25 @@ export async function downloadBachilleratoBoletaDefinitiva(
 }
 
 export async function downloadAllBachilleratoBoletasDefinitiva(params: {
-  schoolId:    string;
-  sectionId:   string;
+  schoolId: string;
+  sectionId: string;
   sectionName: string;
-  gradeLabel:  string;
-  gradeKey:    string;
-  yearId:      string;
-  yearRange:   string;
-  students:    BachillerataBoletaStudentParam[];
+  gradeLabel: string;
+  gradeKey: string;
+  yearId: string;
+  yearRange: string;
+  students: BachillerataBoletaStudentParam[];
 }): Promise<string> {
-  const { schoolId, sectionId, sectionName, gradeLabel, gradeKey, yearId, yearRange, students } = params;
+  const {
+    schoolId,
+    sectionId,
+    sectionName,
+    gradeLabel,
+    gradeKey,
+    yearId,
+    yearRange,
+    students,
+  } = params;
   if (students.length === 0) return "";
 
   const [templateRes, schoolRes, planillaRes] = await Promise.all([
@@ -858,28 +1126,45 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
   ]);
 
   const allTemplatesAll = (templateRes.data ?? []) as any[];
-  const tpl = allTemplatesAll.find(
-    (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeKey)
-  ) ?? allTemplatesAll.find(
-    (t) => !t.applicable_grades || t.applicable_grades.length === 0
-  ) ?? null;
+  const tpl =
+    allTemplatesAll.find(
+      (t) =>
+        Array.isArray(t.applicable_grades) &&
+        t.applicable_grades.includes(gradeKey),
+    ) ??
+    allTemplatesAll.find(
+      (t) => !t.applicable_grades || t.applicable_grades.length === 0,
+    ) ??
+    null;
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 
   const cfg: BachilleratoConfig = tpl?.config
-    ? { ...DEFAULT_BACHILLERATO_CONFIG, ...tpl.config,
-        sections: { ...DEFAULT_BACHILLERATO_CONFIG.sections, ...(tpl.config?.sections ?? {}) },
-        boletin:  { ...DEFAULT_BACHILLERATO_CONFIG.boletin,  ...(tpl.config?.boletin  ?? {}) } }
+    ? {
+        ...DEFAULT_BACHILLERATO_CONFIG,
+        ...tpl.config,
+        sections: {
+          ...DEFAULT_BACHILLERATO_CONFIG.sections,
+          ...(tpl.config?.sections ?? {}),
+        },
+        boletin: {
+          ...DEFAULT_BACHILLERATO_CONFIG.boletin,
+          ...(tpl.config?.boletin ?? {}),
+        },
+      }
     : DEFAULT_BACHILLERATO_CONFIG;
 
-  const paperW: number = tpl?.paper_width_mm  ?? 215.9;
+  const paperW: number = tpl?.paper_width_mm ?? 215.9;
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
-  const style  = cfg.style ?? "simple";
+  const style = cfg.style ?? "simple";
 
   const rawLogoUrl = school?.logo_url ?? "";
-  const logoUrl = rawLogoUrl ? ((await resolveImageUrl(rawLogoUrl)) || rawLogoUrl) : "";
+  const logoUrl = rawLogoUrl
+    ? (await resolveImageUrl(rawLogoUrl)) || rawLogoUrl
+    : "";
 
-  const headerCfgRaw: Record<string, boolean> = (planilla?.header_config as Record<string, boolean>) ?? {};
+  const headerCfgRaw: Record<string, boolean> =
+    (planilla?.header_config as Record<string, boolean>) ?? {};
   const rawSigs = planilla?.signature_lines;
   const signatureLines: string[] = Array.isArray(rawSigs)
     ? rawSigs
@@ -887,13 +1172,13 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
   const show = (flag: string, fallback = true): boolean =>
     flag in headerCfgRaw ? headerCfgRaw[flag] : fallback;
   const headerCfg = {
-    show_logo:             show("show_logo"),
-    show_name:             show("show_name"),
-    show_dea_code:         show("show_dea_code"),
+    show_logo: show("show_logo"),
+    show_name: show("show_name"),
+    show_dea_code: show("show_dea_code"),
     show_statistical_code: show("show_statistical_code"),
-    show_address:          show("show_address"),
-    show_phone:            show("show_phone"),
-    show_rif:              show("show_rif"),
+    show_address: show("show_address"),
+    show_phone: show("show_phone"),
+    show_rif: show("show_rif"),
   };
 
   const { data: assignments } = await supabase
@@ -906,24 +1191,37 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
 
   const validAssignments = (assignments || [])
     .filter((a: any) => a.subject?.name)
-    .sort((a: any, b: any) => (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999));
+    .sort(
+      (a: any, b: any) =>
+        (a.subject?.display_order ?? 999) - (b.subject?.display_order ?? 999),
+    );
   const assignmentIds = validAssignments.map((a: any) => a.id);
 
   if (style === "boletin_completo") {
     return downloadAllBachilleratoBoletas({
-      schoolId, sectionId, sectionName, gradeLabel, gradeKey,
-      yearId, yearRange, momento: 1, students, useStoredDefinitiva: true,
+      schoolId,
+      sectionId,
+      sectionName,
+      gradeLabel,
+      gradeKey,
+      yearId,
+      yearRange,
+      momento: 1,
+      students,
+      useStoredDefinitiva: true,
     });
   }
 
   // SIMPLE — leer directamente momento=0 (definitiva guardada en BD)
-  const gradesRes = assignmentIds.length > 0
-    ? await supabase.from("final_grades")
-        .select("student_id, assignment_id, grade_value, adjustment_points")
-        .eq("school_id", schoolId)
-        .eq("momento", 0)
-        .in("assignment_id", assignmentIds)
-    : { data: [] };
+  const gradesRes =
+    assignmentIds.length > 0
+      ? await supabase
+          .from("final_grades")
+          .select("student_id, assignment_id, grade_value, adjustment_points")
+          .eq("school_id", schoolId)
+          .eq("momento", 0)
+          .in("assignment_id", assignmentIds)
+      : { data: [] };
   const allGrades: any[] = gradesRes.data || [];
 
   // Ranking basado en definitiva guardada (momento=0)
@@ -931,7 +1229,8 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
   allGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
     if (!isNaN(v)) {
-      if (!perStudent[g.student_id]) perStudent[g.student_id] = { sum: 0, count: 0 };
+      if (!perStudent[g.student_id])
+        perStudent[g.student_id] = { sum: 0, count: 0 };
       perStudent[g.student_id].sum += v;
       perStudent[g.student_id].count++;
     }
@@ -942,22 +1241,39 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
 
   const bodies: string[] = [];
   for (const student of students) {
-    const myGrades = allGrades.filter((g: any) => g.student_id === student.studentId);
-    const { subjects, definitiva } = buildSimpleBoletaSubjects(validAssignments, myGrades);
+    const myGrades = allGrades.filter(
+      (g: any) => g.student_id === student.studentId,
+    );
+    const { subjects, definitiva } = buildSimpleBoletaSubjects(
+      validAssignments,
+      myGrades,
+    );
     const positionIdx = ranked.findIndex((r) => r.sid === student.studentId);
     const position = positionIdx >= 0 ? positionIdx + 1 : 0;
     const data: BoletaRenderData = {
-      school_name: school?.name ?? "", school_logo: logoUrl,
-      dea_code: school?.dea_code ?? "", statistical_code: school?.statistical_code ?? "",
-      address: school?.address ?? "", phone: school?.phone ?? "", rif: school?.rif ?? "",
+      school_name: school?.name ?? "",
+      school_logo: logoUrl,
+      dea_code: school?.dea_code ?? "",
+      statistical_code: school?.statistical_code ?? "",
+      address: school?.address ?? "",
+      phone: school?.phone ?? "",
+      rif: school?.rif ?? "",
       header_cfg: headerCfg,
-      student_name: student.studentName, document_id: student.documentId ?? "",
-      grade_label: gradeLabel, section_name: sectionName, year_range: yearRange,
-      momento: 1, momentoOverrideLabel: "Definitiva Final",
-      subjects, definitiva, position,
+      student_name: student.studentName,
+      document_id: student.documentId ?? "",
+      grade_label: gradeLabel,
+      section_name: sectionName,
+      year_range: yearRange,
+      momento: 1,
+      momentoOverrideLabel: "Definitiva Final",
+      subjects,
+      definitiva,
+      position,
       signature_lines: signatureLines,
     };
-    bodies.push(generateBoletaHtml(cfg, data, paperW, paperH, { bodyOnly: true }));
+    bodies.push(
+      generateBoletaHtml(cfg, data, paperW, paperH, { bodyOnly: true }),
+    );
   }
 
   return wrapAllBoletasHtml(bodies, paperW, paperH, "simple");

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText, Settings } from "lucide-react";
+import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText, Settings, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "./PrimaryFinalReportModal";
 import PreschoolFinalReportModal from "./PreschoolFinalReportModal";
@@ -91,6 +91,8 @@ export default function FinalGradesTab({
   const [literalNumericos, setLiteralNumericos] = useState<Record<string, string>>({});
   const [dbLiteralNumericos, setDbLiteralNumericos] = useState<Record<string, string>>({});
   const [savingLiteralKeys, setSavingLiteralKeys] = useState<Set<string>>(new Set());
+  /** Claves studentId-0 persistidas en esta sesión tras guardar (momento=0 en final_grades). */
+  const [sessionPersistedMomento0, setSessionPersistedMomento0] = useState<Set<string>>(new Set());
 
   const editedGradesRef = useRef(editedGrades);
   editedGradesRef.current = editedGrades;
@@ -137,6 +139,7 @@ export default function FinalGradesTab({
   const isPrimary = gradeLevel ? PRIMARY_GRADES.has(gradeLevel) : false;
   const isPreschool = gradeLevel ? PRESCHOOL_GRADES.has(gradeLevel) : false;
   const isQualitative = isPrimary || isPreschool;
+  const isBachillerato = isNumeric && !isPrimary && !isPreschool;
 
   // Fetch grades_config for primary report type
   const { data: gradesConfig } = useQuery({
@@ -252,6 +255,28 @@ export default function FinalGradesTab({
     enabled: assignmentIds.length > 0,
   });
 
+  const persistedMomento0Keys = useMemo(() => {
+    const keys = new Set<string>();
+    if (!isBachillerato || assignmentIds.length === 0) return keys;
+    const assignmentId = assignmentIds[0];
+    for (const fg of existingFinalGrades) {
+      if (
+        fg.assignment_id === assignmentId &&
+        fg.momento === 0 &&
+        fg.grade_value != null &&
+        String(fg.grade_value).trim() !== ""
+      ) {
+        keys.add(`${fg.student_id}-0`);
+      }
+    }
+    return keys;
+  }, [existingFinalGrades, assignmentIds, isBachillerato]);
+
+  const isMomento0Persisted = useCallback(
+    (key: string) => persistedMomento0Keys.has(key) || sessionPersistedMomento0.has(key),
+    [persistedMomento0Keys, sessionPersistedMomento0],
+  );
+
   const gradesMap = useMemo(() => {
     const map: Record<string, string> = {};
     allGrades.forEach((g: any) => {
@@ -309,6 +334,7 @@ export default function FinalGradesTab({
     setSavingAdjKeys(new Set());
     setSavingLiteralKeys(new Set());
     setSavedKeys(new Set());
+    setSessionPersistedMomento0(new Set());
     setInitialized(false);
   }, [selectedSubject, selectedSection, selectedGcrpAssignment, effectiveYear]);
 
@@ -654,6 +680,17 @@ export default function FinalGradesTab({
 
   const totalDirty = dirtyCountByMomento[0] + dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
 
+  const unpersistedDefinitivaCount = useMemo(() => {
+    if (!isBachillerato) return 0;
+    let count = 0;
+    for (const s of students) {
+      const key = `${s.student_id}-0`;
+      const val = (editedGrades[key] || "").trim();
+      if (val && !isMomento0Persisted(key)) count++;
+    }
+    return count;
+  }, [students, editedGrades, isBachillerato, isMomento0Persisted]);
+
   const buildUpsertPayload = (studentId: string, momento: number, gradeValue: string, adjVal: number, ef: ExtraFields) => ({
     student_id: studentId,
     assignment_id: assignmentIds[0],
@@ -710,6 +747,16 @@ export default function FinalGradesTab({
         setDbAdjustments(prev => { const n = { ...prev }; delete n[key]; return n; });
         setAdjustments(prev => { const n = { ...prev }; delete n[key]; return n; });
         setDbExtraFields(prev => ({ ...prev, [key]: { ...DEFAULT_EXTRA } }));
+        if (momento === 0) {
+          setSessionPersistedMomento0((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }
+      }
+      if (momento === 0 && (val !== "" || extraChanged)) {
+        setSessionPersistedMomento0((prev) => new Set(prev).add(key));
       }
       setSavedKeys(prev => {
         const next = new Set(prev).add(key);
@@ -828,6 +875,13 @@ export default function FinalGradesTab({
         setDbValues(newDb);
         setDbAdjustments(newDbAdj);
         setDbExtraFields(newDbExtra);
+        setSessionPersistedMomento0((prev) => {
+          const next = new Set(prev);
+          for (const u of upserts) {
+            if (u.momento === 0) next.add(`${u.student_id}-0`);
+          }
+          return next;
+        });
         toast.success(`${upserts.length} registros guardados correctamente`);
       }
     } catch {
@@ -1140,6 +1194,8 @@ export default function FinalGradesTab({
     const gradeNum = Number(value);
     const canAdd = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum < 20;
     const canSubtract = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum > 0;
+    const showUnpersistedWarning =
+      isFinal && isBachillerato && value.trim() !== "" && !isMomento0Persisted(key);
 
     return (
       <TableCell key={m} className={`p-2 align-top ${isFinal ? "bg-muted/10" : ""}`}>
@@ -1202,6 +1258,17 @@ export default function FinalGradesTab({
               </Tooltip>
             )}
           </div>
+
+          {showUnpersistedWarning && (
+            <div className="flex items-start gap-1 rounded border border-red-200 bg-red-50 px-1.5 py-1 dark:border-red-900 dark:bg-red-950/30">
+              <AlertTriangle className="h-3 w-3 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-red-700 dark:text-red-400 leading-tight">
+                Vista previa calculada — no persistida en{" "}
+                <span className="font-mono">final_grades</span> (momento=0). Salga del campo o use{" "}
+                <strong>Guardar Todos</strong> para que la boleta Definitiva Final lea este dato.
+              </p>
+            </div>
+          )}
 
           {/* Observation */}
           <div>
@@ -1360,6 +1427,45 @@ export default function FinalGradesTab({
           </div>
         </div>
 
+        {isBachillerato && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 mb-4">
+            <div className="flex gap-2">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
+                <p className="font-semibold">Bachillerato — Notas finales y boletas</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs text-blue-800 dark:text-blue-200">
+                  <li>
+                    <strong>Momentos 1, 2 y 3:</strong> se calculan desde el plan de evaluación del docente y se
+                    persisten al salir de cada celda en{" "}
+                    <span className="font-mono">final_grades</span> (momento 1, 2 o 3).
+                  </li>
+                  <li>
+                    <strong>Definitiva Final:</strong> muestra el promedio aritmético de los 3 momentos como vista
+                    previa. Solo queda registrada en BD cuando se guarda con{" "}
+                    <span className="font-mono">momento=0</span>.
+                  </li>
+                  <li>
+                    Guardar un momento <strong>no</strong> escribe automáticamente la definitiva final; debe guardarse
+                    esa columna explícitamente (salir del campo o <strong>Guardar Todos</strong>).
+                  </li>
+                  <li>
+                    En <strong>Descarga de Boletas</strong>, el selector de momento genera boletas acumulativas (M1 →
+                    solo I; M2 → I+II; M3 → I+II+III). <strong>Definitiva Final</strong> usa las notas con{" "}
+                    <span className="font-mono">momento=0</span> para la columna Def. y el promedio del estudiante.
+                  </li>
+                </ol>
+                {unpersistedDefinitivaCount > 0 && (
+                  <p className="text-xs font-medium text-red-700 dark:text-red-400 flex items-center gap-1 pt-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {unpersistedDefinitivaCount} estudiante{unpersistedDefinitivaCount !== 1 ? "s" : ""} con
+                    definitiva final calculada pero sin persistir en BD.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
@@ -1392,6 +1498,11 @@ export default function FinalGradesTab({
                   <span className="text-[10px] text-muted-foreground">
                     {isPrimary ? "Literal Final" : "Promedio 3 momentos"}
                   </span>
+                  {isBachillerato && (
+                    <div className="text-[10px] text-red-600 dark:text-red-400 font-medium mt-0.5">
+                      Requiere persistencia en BD (momento=0)
+                    </div>
+                  )}
                   {dirtyCountByMomento[0] > 0 && (
                     <div className="text-[10px] text-orange-500 font-medium">
                       ({dirtyCountByMomento[0]} sin guardar)
