@@ -21,10 +21,24 @@ import type {
   ResumenFinalDocxData,
   StudentDocxRow,
 } from "@/hooks/useResumenFinalDocxData";
+import {
+  buildTotalRows as buildAreaTotalRows,
+  TOTAL_AREA_ROW_COUNT,
+} from "@/lib/resumen-final-totals";
+import {
+  buildProfesoresCursoTable,
+  estimateProfesoresBlockHeight,
+} from "@/lib/resumen-final-profesores-curso";
+import {
+  buildFirmasBlock,
+  FOOT_SIG_ROW_H,
+  FOOT_SIG_SEAL_H,
+} from "@/lib/resumen-final-firmas";
 import { GRADE_LABELS } from "@/lib/buildInvoiceData";
 
 // ─── página (estrategia UEH: hoja virtual alta; ancho dinámico según materias IV) ──
-const PAGE_H = 31660; // ~55.80 cm — igual que UEH referencia
+const PAGE_H_MAX = 31660; // altura máxima ~55.80 cm para escalar contenido
+const PAGE_H_BUFFER = 80; // margen extra al ajustar altura real de página
 const cmToTwips = (cm: number) => Math.round((cm / 2.54) * 1440);
 const MARGIN_LEFT = cmToTwips(0.8); // 0.8 cm
 const MARGIN_RIGHT = cmToTwips(0.8); // 0.8 cm
@@ -90,13 +104,7 @@ const III_HDR_ROW_SPAN = 4; // filas cabecera III (1–4) antes de datos
 const FECHA_SUB_ROW_SPAN = 3; // DIA/MES/AÑO cubren filas 2–4
 // ─── pie de tabla (totales V–IX) — UEH página 40 ─────────────────────
 const FOOT_TOTAL_ROW_H = 412;
-const FOOT_V_HDR_H = 252;
-const FOOT_V_DATA_H = 412;
-const FOOT_V_GP_H = 712;
 const FOOT_OBS_H = 890;
-const FOOT_SIG_ROW_H = 290;
-const FOOT_SIG_SEAL_H = 890;
-const FOOT_V_RATIO = 0.72; // ancho bloque V vs VI
 const ST_III_COLS = [
   ST_III_NRO,
   ST_III_CED,
@@ -149,17 +157,18 @@ type SheetLayout = {
   nIvCols: number;
 };
 
-function rowH(layout: SheetLayout, baseHeight: number, minHeight = 180): number {
+function rowH(
+  layout: SheetLayout,
+  baseHeight: number,
+  minHeight = 180,
+): number {
   return Math.max(minHeight, Math.round(baseHeight * layout.vScale));
 }
 
-function estimateProfesoresBlockHeight(nRegular: number, nProductive: number): number {
-  const profH = FOOT_V_HDR_H * 2 + (nRegular + nProductive) * FOOT_V_DATA_H;
-  const cursoH = FOOT_V_HDR_H + 6 * FOOT_V_DATA_H;
-  return Math.max(profH, cursoH);
-}
-
-function estimateContentHeightTwips(nRegular: number, nProductive: number): number {
+function estimateContentHeightTwips(
+  nRegular: number,
+  nProductive: number,
+): number {
   return (
     HEADER_BLOCK_ESTIMATE +
     INSTITUTION_BLOCK_ESTIMATE +
@@ -170,7 +179,7 @@ function estimateContentHeightTwips(nRegular: number, nProductive: number): numb
     ST_IV_HDR_ROW3 +
     ST_IV_HDR_ROW4 +
     ST_ROWS_PER_PAGE * ST_DATA_ROW_MIN +
-    5 * FOOT_TOTAL_ROW_H +
+    TOTAL_AREA_ROW_COUNT * FOOT_TOTAL_ROW_H +
     estimateProfesoresBlockHeight(nRegular, nProductive) +
     FOOT_OBS_H +
     6 * FOOT_SIG_ROW_H +
@@ -178,9 +187,21 @@ function estimateContentHeightTwips(nRegular: number, nProductive: number): numb
   );
 }
 
+function estimateContentHeightAtScale(
+  nRegular: number,
+  nProductive: number,
+  vScale: number,
+): number {
+  const fixed =
+    HEADER_BLOCK_ESTIMATE + INSTITUTION_BLOCK_ESTIMATE + ST_TABLE_GAP;
+  const total = estimateContentHeightTwips(nRegular, nProductive);
+  return fixed + Math.round((total - fixed) * vScale);
+}
+
 function computeVerticalScale(nRegular: number, nProductive: number): number {
-  const usable = PAGE_H - MARGIN_TOP - MARGIN_BOTTOM;
-  const fixed = HEADER_BLOCK_ESTIMATE + INSTITUTION_BLOCK_ESTIMATE + ST_TABLE_GAP;
+  const usable = PAGE_H_MAX - MARGIN_TOP - MARGIN_BOTTOM;
+  const fixed =
+    HEADER_BLOCK_ESTIMATE + INSTITUTION_BLOCK_ESTIMATE + ST_TABLE_GAP;
   const total = estimateContentHeightTwips(nRegular, nProductive);
   if (total <= usable) return 1;
   const scalable = total - fixed;
@@ -204,7 +225,10 @@ function computeIeRowCols(contentW: number): number[] {
 
 function computeIeDirRowCols(contentW: number): number[] {
   const fixed = 900 + 300 + 900;
-  const [lineDir, lineTel] = distributeLineWidths(contentW - fixed, [0.823, 0.177]);
+  const [lineDir, lineTel] = distributeLineWidths(
+    contentW - fixed,
+    [0.823, 0.177],
+  );
   return [900, lineDir, 300, 900, lineTel];
 }
 
@@ -219,7 +243,10 @@ function computeIeMunRowCols(contentW: number): number[] {
 
 function computeIeDirCedRowCols(contentW: number): number[] {
   const fixed = 950 + 500 + 1600;
-  const [lineDir, lineCed] = distributeLineWidths(contentW - fixed, [0.703, 0.297]);
+  const [lineDir, lineCed] = distributeLineWidths(
+    contentW - fixed,
+    [0.703, 0.297],
+  );
   return [950, lineDir, 500, 1600, lineCed];
 }
 
@@ -237,9 +264,15 @@ function computeSheetLayout(data: ResumenFinalDocxData): SheetLayout {
   const contentW = stColIii + stColIv;
   const pageW = contentW + MARGIN_LEFT + MARGIN_RIGHT;
 
+  const pageH =
+    estimateContentHeightAtScale(nRegular, nProductive, vScale) +
+    MARGIN_TOP +
+    MARGIN_BOTTOM +
+    PAGE_H_BUFFER;
+
   return {
     pageW,
-    pageH: PAGE_H,
+    pageH,
     contentW,
     vScale,
     stColIii,
@@ -264,7 +297,9 @@ function ivColSpanW(layout: SheetLayout, start: number, count: number): number {
 }
 
 function iiiSpanW(layout: SheetLayout, start: number, count: number): number {
-  return layout.stIiiCols.slice(start, start + count).reduce((a, b) => a + b, 0);
+  return layout.stIiiCols
+    .slice(start, start + count)
+    .reduce((a, b) => a + b, 0);
 }
 
 function padTotal(n: number): string {
@@ -343,222 +378,52 @@ function mkFooterSpanCell(
   );
 }
 
-function scaleFooterCols(base: number[], targetW: number): number[] {
-  const sum = base.reduce((a, b) => a + b, 0);
-  const scaled = base.map((w) => Math.round((w * targetW) / sum));
-  const diff = targetW - scaled.reduce((a, b) => a + b, 0);
-  scaled[scaled.length - 1] += diff;
-  return scaled;
-}
-
 function buildTotalRows(
   data: ResumenFinalDocxData,
   layout: SheetLayout,
 ): TableRow[] {
-  const titleW = iiiSpanW(layout, 0, 5);
-  const labelW = iiiSpanW(layout, 5, 5);
-  const items: { label: string; value: number }[] = [
-    { label: "Inscritos", value: data.inscritos },
-    { label: "Inasistentes", value: data.inasistentes },
-    { label: "Aprobados", value: data.aprobados },
-    { label: "No Aprobados", value: data.noAprobados },
-    { label: "No Cursantes", value: data.noCursaron },
-  ];
-
-  return items.map((item, i) =>
-    mkStHdrRow(
-      [
-        ...(i === 0
-          ? [
-              mkStHdrCell(titleW, "Total de Áreas de Formación", {
-                rowSpan: 5,
-                columnSpan: 5,
-              }),
-            ]
-          : []),
-        mkStHdrCell(labelW, item.label, { columnSpan: 5 }),
-        mkStHdrCell(layout.stColIv, padTotal(item.value), {
-          columnSpan: layout.nIvCols,
-        }),
-      ],
-      rowH(layout, FOOT_TOTAL_ROW_H),
-    ),
+  return buildAreaTotalRows(
+    data,
+    {
+      stIiiCols: layout.stIiiCols,
+      stIvCols: layout.stIvCols,
+      nRegular: layout.nRegular,
+    },
+    {
+      iiiSpanW: (l, start, count) => iiiSpanW(layout, start, count),
+      padTotal,
+      mkStHdrRow,
+      mkStHdrCell,
+      rowH: (base) => rowH(layout, base),
+      footTotalRowH: FOOT_TOTAL_ROW_H,
+    },
   );
-}
-
-function buildProfesoresTable(
-  data: ResumenFinalDocxData,
-  tableW: number,
-  layout: SheetLayout,
-): Table {
-  const vCols = scaleFooterCols([280, 380, 1500, 2800, 1200, 900], tableW);
-  const subjects = data.regularSubjects;
-
-  const mkProfRow = (
-    nro: string,
-    code: string,
-    area: string,
-    teacher: string,
-    cedula: string,
-    minH: number,
-    areaMultiline = false,
-  ) =>
-    mkStHdrRow(
-      [
-        mkFooterDataCell(vCols[0], nro, { align: AlignmentType.CENTER }),
-        mkFooterDataCell(vCols[1], code, { align: AlignmentType.CENTER }),
-        areaMultiline
-          ? new TableCell({
-              width: { size: vCols[2], type: WidthType.DXA },
-              children: tblPMulti(area, false),
-              verticalAlign: VerticalAlign.CENTER,
-              margins: { top: 4, bottom: 4, left: 4, right: 4 },
-            })
-          : mkFooterDataCell(vCols[2], area),
-        mkFooterDataCell(vCols[3], teacher),
-        mkFooterDataCell(vCols[4], cedula, { align: AlignmentType.CENTER }),
-        mkFooterDataCell(vCols[5], ""),
-      ],
-      minH,
-    );
-
-  return new Table({
-    width: { size: tableW, type: WidthType.DXA },
-    columnWidths: vCols,
-    layout: TableLayoutType.FIXED,
-    borders: BORDERS_GRID,
-    rows: [
-      mkStHdrRow(
-        [
-          new TableCell({
-            columnSpan: 6,
-            width: { size: tableW, type: WidthType.DXA },
-            children: [tblFooterP("V. Profesores por Áreas:", { bold: true })],
-            margins: { top: 4, bottom: 4, left: 6, right: 4 },
-          }),
-        ],
-        rowH(layout, FOOT_V_HDR_H),
-      ),
-      mkStHdrRow(
-        [
-          mkFooterDataCell(vCols[0], "N°", { bold: true, align: AlignmentType.CENTER }),
-          mkFooterDataCell(vCols[1], "", { bold: true }),
-          mkFooterDataCell(vCols[2], "Áreas de Formación", { bold: true }),
-          mkFooterDataCell(vCols[3], "Apellidos y Nombres del Profesor", {
-            bold: true,
-          }),
-          mkFooterDataCell(vCols[4], "Cedula de Identidad", {
-            bold: true,
-            align: AlignmentType.CENTER,
-          }),
-          mkFooterDataCell(vCols[5], "Firma", {
-            bold: true,
-            align: AlignmentType.CENTER,
-          }),
-        ],
-        rowH(layout, FOOT_V_HDR_H),
-      ),
-      ...subjects.map((s, i) =>
-        mkProfRow(
-          String(i + 1),
-          s.abbreviation.toUpperCase(),
-          s.name.toUpperCase(),
-          s.teacherName,
-          s.teacherCedula,
-          rowH(layout, FOOT_V_DATA_H),
-        ),
-      ),
-      ...data.productiveSubjects.map((s, i) =>
-        mkProfRow(
-          String(subjects.length + i + 1),
-          s.abbreviation.toUpperCase(),
-          s.name.toUpperCase(),
-          s.teacherName,
-          s.teacherCedula,
-          rowH(layout, FOOT_V_DATA_H),
-        ),
-      ),
-    ],
-  });
-}
-
-function buildCursoTable(
-  data: ResumenFinalDocxData,
-  tableW: number,
-  layout: SheetLayout,
-): Table {
-  const viCols = [Math.round(tableW * 0.42), tableW - Math.round(tableW * 0.42)];
-  const rows: [string, string][] = [
-    ["PLAN DE ESTUDIO", "EDUCACIÓN MEDIA GENERAL"],
-    ["CÓDIGO", ""],
-    ["AÑO CURSADO", gradeLabelUpper(data.sectionGradeLevel)],
-    ["SECCIÓN", data.sectionName.toUpperCase()],
-    ["N° DE ESTUDIANTES POR SECCIÓN", String(data.totalStudentsInSection)],
-    ["N° DE ESTUDIANTES EN LA PÁGINA", String(data.studentsInPage)],
-  ];
-
-  return new Table({
-    width: { size: tableW, type: WidthType.DXA },
-    columnWidths: viCols,
-    layout: TableLayoutType.FIXED,
-    borders: BORDERS_GRID,
-    rows: [
-      mkStHdrRow(
-        [
-          new TableCell({
-            columnSpan: 2,
-            width: { size: tableW, type: WidthType.DXA },
-            children: [
-              tblFooterP("VI. Identificación del Curso:", { bold: true }),
-            ],
-            margins: { top: 4, bottom: 4, left: 6, right: 4 },
-          }),
-        ],
-        rowH(layout, FOOT_V_HDR_H),
-      ),
-      ...rows.map(([lbl, val]) =>
-        mkStHdrRow(
-          [
-            mkFooterDataCell(viCols[0], lbl, { bold: true }),
-            mkFooterDataCell(viCols[1], val),
-          ],
-          rowH(layout, FOOT_V_DATA_H),
-        ),
-      ),
-    ],
-  });
 }
 
 function buildProfesoresCursoRow(
   data: ResumenFinalDocxData,
   layout: SheetLayout,
 ): TableRow {
-  const vW = Math.round(layout.stTableW * FOOT_V_RATIO);
-  const viW = layout.stTableW - vW;
-
   return mkFooterSpanCell(layout, [
-    new Table({
-      width: { size: layout.stTableW, type: WidthType.DXA },
-      columnWidths: [vW, viW],
-      layout: TableLayoutType.FIXED,
-      borders: BORDERS_NONE,
-      rows: [
-        mkRow([
-          new TableCell({
-            width: { size: vW, type: WidthType.DXA },
-            children: [buildProfesoresTable(data, vW, layout)],
-            borders: BORDERS_NONE,
-            margins: { top: 0, bottom: 0, left: 0, right: 4 },
-          }),
-          new TableCell({
-            width: { size: viW, type: WidthType.DXA },
-            children: [buildCursoTable(data, viW, layout)],
-            borders: BORDERS_NONE,
-            margins: { top: 0, bottom: 0, left: 4, right: 0 },
-          }),
-        ]),
-      ],
-    }),
+    buildProfesoresCursoTable(
+      data,
+      {
+        stTableW: layout.stTableW,
+        stColIii: layout.stColIii,
+        stColIv: layout.stColIv,
+        ivMateriaW: IV_MATERIA_W,
+        stIvCols: layout.stIvCols,
+      },
+      {
+        rowH: (base) => rowH(layout, base),
+        mkStHdrRow,
+        mkFooterDataCell,
+        tblFooterP,
+        gradeLabelUpper,
+        bordersGrid: BORDERS_GRID,
+        bordersNestedGrid: BORDERS_GRID_NESTED,
+      },
+    ),
   ]);
 }
 
@@ -595,93 +460,44 @@ function mkSigCell(
   opts?: {
     bold?: boolean;
     rowSpan?: number;
-    multiline?: string;
   },
 ): TableCell {
   return new TableCell({
     ...(opts?.rowSpan ? { rowSpan: opts.rowSpan } : {}),
     width: { size: w, type: WidthType.DXA },
-    children: opts?.multiline
-      ? tblPMulti(opts.multiline, opts.bold ?? false)
-      : [tblFooterP(text, { bold: opts?.bold })],
+    children: [tblFooterP(text, { bold: opts?.bold })],
     verticalAlign: VerticalAlign.TOP,
     margins: { top: 6, bottom: 4, left: 6, right: 4 },
   });
 }
 
-function buildFirmasBlock(
+function mkSigSealCell(w: number, text: string, rowSpan: number): TableCell {
+  return new TableCell({
+    rowSpan,
+    width: { size: w, type: WidthType.DXA },
+    children: [
+      tblP(text, {
+        size: ST_HDR_FONT_SIZE,
+        align: AlignmentType.CENTER,
+      }),
+    ],
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 6, bottom: 4, left: 6, right: 4 },
+  });
+}
+
+function buildFirmasBlockLocal(
   data: ResumenFinalDocxData,
   tableW: number,
   layout: SheetLayout,
 ): Table {
-  const h = data.schoolHeader;
-  const remision = remisionDateFromYearRange(data.yearRange);
-  const director = (h.director ?? "").toUpperCase();
-  const cedulaDir = h.cedula_director ?? "";
-  const c1 = Math.round(tableW * 0.22);
-  const c2 = Math.round(tableW * 0.2);
-  const c3 = Math.round(tableW * 0.35);
-  const c4 = tableW - c1 - c2 - c3;
-  const cols = [c1, c2, c3, c4];
-
-  return new Table({
-    width: { size: tableW, type: WidthType.DXA },
-    columnWidths: cols,
-    layout: TableLayoutType.FIXED,
-    borders: BORDERS_GRID,
-    rows: [
-      mkStHdrRow(
-        [
-          mkSigCell(cols[0], `VIII. Fecha de Remisión: ${remision}`, {
-            bold: true,
-          }),
-          mkSigCell(cols[1], "", {
-            rowSpan: 7,
-            multiline: "SELLO DE LA\nINSTITUCIÓN\nEDUCATIVA",
-          }),
-          mkSigCell(cols[2], "IX. Fecha de Recepción:", { bold: true }),
-          mkSigCell(cols[3], "", {
-            rowSpan: 7,
-            multiline:
-              "SELLO DEL CENTRO DE DESARROLLO DE LA CALIDAD EDUCATIVA ESTATAL",
-          }),
-        ],
-        rowH(layout, FOOT_SIG_ROW_H),
-      ),
-      mkStHdrRow(
-        [
-          mkSigCell(cols[0], "Director(a)"),
-          mkSigCell(cols[2], "Funcionario Receptor"),
-        ],
-        rowH(layout, FOOT_SIG_ROW_H),
-      ),
-      mkStHdrRow(
-        [
-          mkSigCell(cols[0], "Apellidos y Nombres:"),
-          mkSigCell(cols[2], "Apellidos y Nombres:"),
-        ],
-        rowH(layout, FOOT_SIG_ROW_H),
-      ),
-      mkStHdrRow(
-        [mkSigCell(cols[0], director), mkSigCell(cols[2], "")],
-        rowH(layout, FOOT_SIG_ROW_H),
-      ),
-      mkStHdrRow(
-        [
-          mkSigCell(cols[0], "Cédula de Identidad"),
-          mkSigCell(cols[2], "Cédula de Identidad"),
-        ],
-        rowH(layout, FOOT_SIG_ROW_H),
-      ),
-      mkStHdrRow(
-        [mkSigCell(cols[0], cedulaDir), mkSigCell(cols[2], "")],
-        rowH(layout, FOOT_SIG_ROW_H),
-      ),
-      mkStHdrRow(
-        [mkSigCell(cols[0], "Firma:"), mkSigCell(cols[2], "Firma:")],
-        rowH(layout, FOOT_SIG_SEAL_H, 400),
-      ),
-    ],
+  return buildFirmasBlock(data, tableW, {
+    rowH: (base, min) => rowH(layout, base, min),
+    mkStHdrRow,
+    mkSigCell,
+    mkSigSealCell,
+    remisionDateFromYearRange,
+    bordersGrid: BORDERS_GRID,
   });
 }
 
@@ -693,7 +509,9 @@ function buildFooterRows(
     ...buildTotalRows(data, layout),
     buildProfesoresCursoRow(data, layout),
     buildObservacionesRow(data, layout),
-    mkFooterSpanCell(layout, [buildFirmasBlock(data, layout.stTableW, layout)]),
+    mkFooterSpanCell(layout, [
+      buildFirmasBlockLocal(data, layout.stTableW, layout),
+    ]),
   ];
 }
 
@@ -714,6 +532,10 @@ const BORDERS_GRID = {
   right: BS,
   insideHorizontal: BS,
   insideVertical: BS,
+};
+const BORDERS_GRID_NESTED = {
+  ...BORDERS_GRID,
+  left: BN,
 };
 
 type TxtOpts = {
@@ -1097,7 +919,7 @@ function mkStDataCell(
       top: ST_DATA_CELL_PAD,
       bottom: ST_DATA_CELL_PAD,
       left: align === AlignmentType.CENTER ? 0 : ST_DATA_CELL_PAD_LEFT,
-      right: 0,
+      right: align === AlignmentType.CENTER ? 0 : 0,
     },
   });
 }
@@ -1135,8 +957,13 @@ function mkStDataRow(
       mkStDataCell(
         ST_III_EF,
         formatStField(row.entidadFederal, ST_EMPTY_SHORT),
+        AlignmentType.CENTER,
       ),
-      mkStDataCell(ST_III_SEX, formatStField(row.sexo, ST_EMPTY_SHORT)),
+      mkStDataCell(
+        ST_III_SEX,
+        formatStField(row.sexo, ST_EMPTY_SHORT),
+        AlignmentType.CENTER,
+      ),
       mkStDataCell(
         ST_III_DIA,
         formatStField(row.diaNac, ST_EMPTY_SHORT),
@@ -1168,7 +995,13 @@ function buildEstudiantesBlock(
   const productiveSubjects = data.productiveSubjects;
   const padded = padStudentsPage(data.students);
   const dataRows = padded.map((row, idx) =>
-    mkStDataRow(row, layout, regularSubjects, productiveSubjects, idx >= data.students.length),
+    mkStDataRow(
+      row,
+      layout,
+      regularSubjects,
+      productiveSubjects,
+      idx >= data.students.length,
+    ),
   );
 
   return new Table({
@@ -1248,9 +1081,15 @@ function buildEstudiantesBlock(
             columnSpan: nRegular,
           }),
           ...(nProductive > 0
-            ? [mkStHdrCell(ivColSpanW(layout, nRegular, nProductive), "COMPONENTE PRODUCTIVO", {
-                columnSpan: nProductive,
-              })]
+            ? [
+                mkStHdrCell(
+                  ivColSpanW(layout, nRegular, nProductive),
+                  "COMPONENTE PRODUCTIVO",
+                  {
+                    columnSpan: nProductive,
+                  },
+                ),
+              ]
             : []),
         ],
         rowH(layout, ST_IV_HDR_ROW2, 280),
@@ -1261,7 +1100,10 @@ function buildEstudiantesBlock(
             mkStHdrCell(layout.stIvCols[i], String(i + 1)),
           ),
           ...productiveSubjects.map((_, i) =>
-            mkStHdrCell(layout.stIvCols[nRegular + i], String(nRegular + i + 1)),
+            mkStHdrCell(
+              layout.stIvCols[nRegular + i],
+              String(nRegular + i + 1),
+            ),
           ),
         ],
         rowH(layout, ST_IV_HDR_ROW3, 260),
@@ -1272,7 +1114,10 @@ function buildEstudiantesBlock(
             mkStHdrCell(layout.stIvCols[i], s.abbreviation.toUpperCase()),
           ),
           ...productiveSubjects.map((s, i) =>
-            mkStHdrCell(layout.stIvCols[nRegular + i], s.abbreviation.toUpperCase()),
+            mkStHdrCell(
+              layout.stIvCols[nRegular + i],
+              s.abbreviation.toUpperCase(),
+            ),
           ),
         ],
         rowH(layout, ST_IV_HDR_ROW4, 280),
@@ -1293,7 +1138,9 @@ async function buildHeaderBlock(
   const rightInnerW = rightW - HDR_TITLE_INDENT;
 
   const logoMaxH = Math.max(48, Math.round(LOGO_MAX_HEIGHT_PX * layout.vScale));
-  const logoSize = logoBuffer ? logoImageSize(leftW, logoBuffer, logoMaxH) : null;
+  const logoSize = logoBuffer
+    ? logoImageSize(leftW, logoBuffer, logoMaxH)
+    : null;
   const logoCell = new TableCell({
     width: { size: leftW, type: WidthType.DXA },
     children:
@@ -1559,7 +1406,9 @@ async function buildDocumentContent(
     await buildHeaderBlock(data, logoBuffer, layout),
     ...(HDR_BLOCK_GAP > 0 ? [mkCompactGap(HDR_BLOCK_GAP)] : []),
     buildInstitucionBlock(data, layout),
-    ...(ST_TABLE_GAP > 0 ? [mkCompactGap(Math.round(ST_TABLE_GAP * layout.vScale))] : []),
+    ...(ST_TABLE_GAP > 0
+      ? [mkCompactGap(Math.round(ST_TABLE_GAP * layout.vScale))]
+      : []),
     buildEstudiantesBlock(data, layout),
   ];
 }

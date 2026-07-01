@@ -44,23 +44,33 @@ export interface ResumenFinalDocxData {
   students: StudentDocxRow[];
   // config
   tipoPlanilla: "31059" | "31060";
+  planEstudio: string;
   observaciones: string;
   nombreProfesor: string;
   cedulaProfesor: string;
-  // totals
-  inscritos: number;
-  inasistentes: number;
-  aprobados: number;
-  noAprobados: number;
-  noCursaron: number;
+  /** Totales por materia (key = assignmentId) para el pie "Total de Áreas de Formación". */
+  subjectTotals: Record<string, SubjectAreaTotals>;
 }
 
-function gradeDisplay(gradeValue: string | null, adjPoints: number, evalType: string, finalStatus: string | null): string {
-  if (evalType === "literal") return finalStatus ?? "";
-  if (gradeValue == null || gradeValue === "") return "";
-  const num = parseFloat(gradeValue) + (adjPoints ?? 0);
-  if (isNaN(num)) return gradeValue;
-  return Number.isInteger(num) ? String(num) : num.toFixed(1);
+export interface SubjectAreaTotals {
+  inscritos: number;
+  inasistentes: number;
+  asistentes: number;
+  aprobados: number;
+  noAprobados: number;
+  noCursantes: number;
+}
+
+import { computeSubjectAreaTotals } from "@/lib/resumen-final-subject-totals";
+import { formatResumenFinalGrade } from "@/lib/gradeLiteral";
+
+function gradeDisplay(
+  gradeValue: string | null,
+  adjPoints: number,
+  evalType: string,
+  _finalStatus: string | null,
+): string {
+  return formatResumenFinalGrade(gradeValue, adjPoints, evalType);
 }
 
 type GradeRecord = {
@@ -69,6 +79,8 @@ type GradeRecord = {
   grade_value: string | null;
   adjustment_points: number;
   final_status: string | null;
+  absence_count: number | null;
+  attendance_count: number | null;
 };
 
 function teacherName(fd: Record<string, any> | null): string {
@@ -296,8 +308,16 @@ export async function fetchResumenFinalDocxData(
   // 2. school config
   const { data: planillaConfig } = await supabase
     .from("planilla_general_config")
-    .select("school_header").eq("school_id", schoolId).maybeSingle();
+    .select("school_header, education_codes")
+    .eq("school_id", schoolId)
+    .maybeSingle();
   const schoolHeader = (planillaConfig?.school_header as Record<string, string>) ?? {};
+  const educationCodes = (planillaConfig?.education_codes ?? {}) as {
+    menciones_seccion?: Record<
+      string,
+      Record<string, { tipo?: string; mencion_texto?: string }>
+    >;
+  };
 
   // 3. section info
   const { data: section } = await supabase
@@ -378,7 +398,7 @@ export async function fetchResumenFinalDocxData(
   if (allAssignmentIds.length > 0 && pageStudentIds.length > 0) {
     const { data, error: gradesError } = await supabase
       .from("final_grades")
-      .select("student_id, assignment_id, grade_value, adjustment_points, final_status")
+      .select("student_id, assignment_id, grade_value, adjustment_points, final_status, absence_count, attendance_count")
       .eq("school_id", schoolId)
       .eq("momento", 0)
       .in("assignment_id", allAssignmentIds)
@@ -502,17 +522,20 @@ export async function fetchResumenFinalDocxData(
     };
   });
 
-  const PASS_THRESHOLD = 10;
-  let aprobados = 0, noAprobados = 0, inasistentes = 0;
-  studentRows.forEach(row => {
-    const regGrades = regularSubjects.map(s => row.grades[s.assignmentId]).filter(g => g !== "");
-    if (regGrades.length === 0) { inasistentes++; return; }
-    const numericGrades = regGrades.map(g => parseFloat(g)).filter(n => !isNaN(n));
-    if (numericGrades.length === 0) { aprobados++; return; }
-    const hasFailure = numericGrades.some(n => n < PASS_THRESHOLD);
-    if (hasFailure) noAprobados++; else aprobados++;
-  });
-  const inscritos = studentRows.length;
+  const allSubjects = [...regularSubjects, ...productiveSubjects];
+  const subjectTotals = computeSubjectAreaTotals(
+    pageStudentIds,
+    studentRows,
+    allSubjects,
+    gradeMap,
+  );
+
+  const mencionConfig =
+    educationCodes.menciones_seccion?.[schoolYearId]?.[sectionId];
+  const planEstudio =
+    mencionConfig?.tipo === "con_mencion" && mencionConfig.mencion_texto?.trim()
+      ? mencionConfig.mencion_texto.trim()
+      : "EDUCACIÓN MEDIA GENERAL";
 
   return {
     schoolHeader,
@@ -521,19 +544,16 @@ export async function fetchResumenFinalDocxData(
     sectionName: section?.name || "",
     parte,
     totalStudentsInSection,
-    studentsInPage: inscritos,
+    studentsInPage: studentRows.length,
     regularSubjects,
     productiveSubjects,
     students: studentRows,
     tipoPlanilla,
+    planEstudio,
     observaciones: rfConfig?.observaciones || "",
     nombreProfesor: rfConfig?.nombre_profesor || "",
     cedulaProfesor: rfConfig?.cedula_profesor || "",
-    inscritos,
-    inasistentes,
-    aprobados,
-    noAprobados,
-    noCursaron: 35 - inscritos,
+    subjectTotals,
   };
 }
 

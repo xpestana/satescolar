@@ -20,3 +20,16 @@ export function formatBoletaGradeValue(
   if (evaluationType === "literal") return numericToLiteralGrade(n);
   return fmtGradeNum(n);
 }
+
+/** Nota para planilla Resumen Final (31059/31060): literal como en boleta (A–D); sin nota → vacío. */
+export function formatResumenFinalGrade(
+  gradeValue: string | null,
+  adjPoints: number,
+  evalType: string,
+): string {
+  if (gradeValue == null || String(gradeValue).trim() === "") return "";
+  const num = parseFloat(gradeValue) + (adjPoints ?? 0);
+  if (isNaN(num)) return "";
+  if (evalType === "literal") return formatBoletaGradeValue(num, evalType);
+  return Number.isInteger(num) ? String(num) : num.toFixed(1);
+}
