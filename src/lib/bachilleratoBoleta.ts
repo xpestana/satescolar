@@ -5,6 +5,7 @@ import {
   DEFAULT_BACHILLERATO_CONFIG, generateBoletaHtml, generateBoletinCompletoHtml,
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
+import { fmtGradeNum, formatBoletaGradeValue } from "@/lib/gradeLiteral";
 
 function proxyImageUrl(url: string): string {
   try {
@@ -95,10 +96,12 @@ export interface BachillerataBoletaParams {
 
 type GradeMapKey = `${string}:${number}`;
 
-function fmtGradeNum(n: number): string {
-  if (Number.isInteger(n)) return n < 10 ? `0${n}` : String(n);
-  return n.toFixed(2);
-}
+type BoletaAssignment = {
+  id: string;
+  subject?: { name?: string; display_order?: number; evaluation_type?: string };
+};
+
+const ASSIGNMENT_SELECT = "id, subject:subject_id(name, display_order, evaluation_type)";
 
 function subjectGradeValue(g: { grade_value?: string; adjustment_points?: number | null }): number | null {
   const nota = parseFloat(g.grade_value ?? "");
@@ -106,28 +109,67 @@ function subjectGradeValue(g: { grade_value?: string; adjustment_points?: number
   return nota + (g.adjustment_points ?? 0);
 }
 
+function evalTypeOf(assignments: BoletaAssignment[], assignmentId: string): string | undefined {
+  return assignments.find((a) => a.id === assignmentId)?.subject?.evaluation_type;
+}
+
+function isLiteralAssignment(assignments: BoletaAssignment[], assignmentId: string): boolean {
+  return evalTypeOf(assignments, assignmentId) === "literal";
+}
+
+function buildSimpleBoletaSubjects(
+  validAssignments: BoletaAssignment[],
+  myGrades: { assignment_id: string; grade_value?: string; adjustment_points?: number | null }[],
+): { subjects: { name: string; grade: string }[]; definitiva: string } {
+  const numericByAssignment: Record<string, number> = {};
+  let sum = 0;
+  let count = 0;
+
+  myGrades.forEach((g) => {
+    const v = subjectGradeValue(g);
+    if (v === null) return;
+    numericByAssignment[g.assignment_id] = v;
+    if (!isLiteralAssignment(validAssignments, g.assignment_id)) {
+      sum += v;
+      count++;
+    }
+  });
+
+  const subjects = validAssignments.map((a) => {
+    const v = numericByAssignment[a.id];
+    return {
+      name: a.subject?.name ?? "Área",
+      grade: v !== undefined ? formatBoletaGradeValue(v, a.subject?.evaluation_type) : "—",
+    };
+  });
+
+  const definitiva = count > 0 ? fmtGradeNum(sum / count) : "—";
+  return { subjects, definitiva };
+}
+
 function buildBoletinFromGrades(
-  validAssignments: { id: string; subject?: { name?: string } }[],
+  validAssignments: BoletaAssignment[],
   myGrades: { assignment_id: string; momento: number; grade_value?: string; adjustment_points?: number | null; absence_count?: number | null }[],
   useStoredDefinitiva: boolean,
 ): { subjects: BoletinSubjectRow[]; avg_m1: string; avg_m2: string; avg_m3: string; avg_student: string } {
   const myMap: Record<GradeMapKey, { nota: string; ajuste: string; def: string; inas: number }> = {};
-  const def0ByAssignment: Record<string, string> = {};
+  const def0NumericByAssignment: Record<string, number> = {};
 
   myGrades.forEach((g) => {
     if (g.momento === 0) {
       const val = subjectGradeValue(g);
-      if (val !== null) def0ByAssignment[g.assignment_id] = fmtGradeNum(val);
+      if (val !== null) def0NumericByAssignment[g.assignment_id] = val;
       return;
     }
     const nota = parseFloat(g.grade_value ?? "0");
     const ajuste = g.adjustment_points ?? 0;
     if (isNaN(nota)) return;
     const def = nota + ajuste;
+    const evalType = evalTypeOf(validAssignments, g.assignment_id);
     myMap[`${g.assignment_id}:${g.momento}` as GradeMapKey] = {
-      nota: fmtGradeNum(nota),
+      nota: formatBoletaGradeValue(nota, evalType),
       ajuste: ajuste !== 0 ? fmtGradeNum(ajuste) : "0",
-      def: fmtGradeNum(def),
+      def: formatBoletaGradeValue(def, evalType),
       inas: g.absence_count ?? 0,
     };
   });
@@ -137,6 +179,7 @@ function buildBoletinFromGrades(
   };
   myGrades.forEach((g) => {
     if (g.momento < 1 || g.momento > 3) return;
+    if (isLiteralAssignment(validAssignments, g.assignment_id)) return;
     const val = subjectGradeValue(g);
     if (val === null) return;
     momSums[g.momento].sum += val;
@@ -152,7 +195,10 @@ function buildBoletinFromGrades(
 
   let avg_student: string;
   if (useStoredDefinitiva) {
-    const def0Vals = Object.values(def0ByAssignment).map((v) => parseFloat(v));
+    const def0Vals = validAssignments
+      .filter((a) => !isLiteralAssignment(validAssignments, a.id))
+      .map((a) => def0NumericByAssignment[a.id])
+      .filter((v): v is number => v !== undefined);
     avg_student =
       def0Vals.length > 0
         ? fmtGradeNum(def0Vals.reduce((a, b) => a + b, 0) / def0Vals.length)
@@ -169,6 +215,14 @@ function buildBoletinFromGrades(
     avg_student = overallCount > 0 ? fmtGradeNum(overallSum / overallCount) : "—";
   }
 
+  const getNumericDef = (assignmentId: string, m: number): number | null => {
+    const g = myGrades.find((x) => x.assignment_id === assignmentId && x.momento === m);
+    if (!g) return null;
+    const nota = parseFloat(g.grade_value ?? "0");
+    if (isNaN(nota)) return null;
+    return nota + (g.adjustment_points ?? 0);
+  };
+
   const getMg = (assignmentId: string, m: number): BoletinMomentoGrade | null => {
     const entry = myMap[`${assignmentId}:${m}` as GradeMapKey];
     if (!entry) return null;
@@ -179,14 +233,17 @@ function buildBoletinFromGrades(
     const m1 = getMg(a.id, 1);
     const m2 = getMg(a.id, 2);
     const m3 = getMg(a.id, 3);
+    const evalType = a.subject?.evaluation_type;
     let definitiva_final: string;
-    if (useStoredDefinitiva && def0ByAssignment[a.id]) {
-      definitiva_final = def0ByAssignment[a.id];
+    if (useStoredDefinitiva && def0NumericByAssignment[a.id] !== undefined) {
+      definitiva_final = formatBoletaGradeValue(def0NumericByAssignment[a.id], evalType);
     } else {
-      const defs = [m1, m2, m3].filter(Boolean).map((mg) => parseFloat(mg!.definitiva));
+      const defs = [1, 2, 3]
+        .map((m) => getNumericDef(a.id, m))
+        .filter((v): v is number => v !== null);
       definitiva_final =
         defs.length > 0
-          ? fmtGradeNum(defs.reduce((s, d) => s + d, 0) / defs.length)
+          ? formatBoletaGradeValue(defs.reduce((s, d) => s + d, 0) / defs.length, evalType)
           : "—";
     }
     return {
@@ -285,7 +342,7 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   // ── 2. Assignments for this section + year ───────────────────────────────
   const { data: assignments } = await supabase
     .from("subject_teacher_assignments")
-    .select("id, subject:subject_id(name, display_order)")
+    .select(ASSIGNMENT_SELECT)
     .eq("school_id", schoolId)
     .eq("section_id", sectionId)
     .eq("school_year_id", yearId)
@@ -313,7 +370,9 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   if (style === "boletin_completo") {
     const cfgPdf = await resolveBoletinSignatures(cfg);
     const momentosRange = Array.from({ length: momento }, (_, i) => i + 1);
-    const momentosFetch = useStoredDefinitiva ? [0, ...momentosRange] : momentosRange;
+    const momentosFetch = useStoredDefinitiva ? [0, 1, 2, 3] : momentosRange;
+    const visibleMomentos = useStoredDefinitiva ? [1, 2, 3] : momentosRange;
+    const showDefinitivaColumn = useStoredDefinitiva;
     const rankingMomento = useStoredDefinitiva ? 0 : momento;
     const [myGradesRes, allGradesRes] = await Promise.all([
       assignmentIds.length > 0
@@ -353,12 +412,14 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
       grade_label:      gradeLabel,
       section_name:     sectionName,
       year_range:       yearRange,
-      lapso:            momento,
+      lapso:            useStoredDefinitiva ? 0 : momento,
       mention:          cfg.boletin?.mention ?? "",
       subjects,
       avg_m1, avg_m2, avg_m3, avg_student, avg_section,
       position,
       signature_lines: [],
+      visibleMomentos,
+      showDefinitivaColumn,
     };
 
     return generateBoletinCompletoHtml(cfgPdf, boletinData, paperW, paperH);
@@ -387,22 +448,9 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
   const myGrades = myGradesRes.data || [];
   const allGrades = allGradesRes.data || [];
 
-  // Grade map for this student
-  const myMap: Record<string, string> = {};
-  let mySum = 0, myCount = 0;
-  myGrades.forEach((g: any) => {
-    const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
-    if (!isNaN(v)) {
-      myMap[g.assignment_id] = Number.isInteger(v) ? (v < 10 ? `0${v}` : String(v)) : v.toFixed(2);
-      mySum += v; myCount++;
-    }
-  });
+  const { subjects, definitiva } = buildSimpleBoletaSubjects(validAssignments, myGrades);
 
-  const definitiva = myCount > 0
-    ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? (a < 10 ? `0${a}` : String(a)) : a.toFixed(2); })()
-    : "—";
-
-  // Position
+  // Position (ranking uses all numeric grades)
   const perStudent: Record<string, { sum: number; count: number }> = {};
   allGrades.forEach((g: any) => {
     const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
@@ -417,12 +465,6 @@ export async function downloadBachilleratoBoleta(params: BachillerataBoletaParam
     .sort((a, b) => b.avg - a.avg);
   const positionIdx = ranked.findIndex((r) => r.sid === studentId);
   const position = positionIdx >= 0 ? positionIdx + 1 : 0;
-
-  // ── 4. Build render data ─────────────────────────────────────────────────
-  const subjects = validAssignments.map((a: any) => ({
-    name:  a.subject?.name ?? "Área",
-    grade: myMap[a.id] ?? "—",
-  }));
 
   const data: BoletaRenderData = {
     school_name:      school?.name ?? "",
@@ -537,7 +579,7 @@ export async function downloadAllBachilleratoBoletas(params: {
   // ── 2. Assignments ────────────────────────────────────────────────────────
   const { data: assignments } = await supabase
     .from("subject_teacher_assignments")
-    .select("id, subject:subject_id(name, display_order)")
+    .select(ASSIGNMENT_SELECT)
     .eq("school_id", schoolId)
     .eq("section_id", sectionId)
     .eq("school_year_id", yearId)
@@ -552,7 +594,9 @@ export async function downloadAllBachilleratoBoletas(params: {
   if (style === "boletin_completo") {
     const cfgPdf = await resolveBoletinSignatures(cfg);
     const momentosRange = Array.from({ length: momento }, (_, i) => i + 1);
-    const momentosFetch = useStoredDefinitiva ? [0, ...momentosRange] : momentosRange;
+    const momentosFetch = useStoredDefinitiva ? [0, 1, 2, 3] : momentosRange;
+    const visibleMomentos = useStoredDefinitiva ? [1, 2, 3] : momentosRange;
+    const showDefinitivaColumn = useStoredDefinitiva;
     const rankingMomento = useStoredDefinitiva ? 0 : momento;
     const allGradesRes = assignmentIds.length > 0
       ? await supabase.from("final_grades")
@@ -580,9 +624,12 @@ export async function downloadAllBachilleratoBoletas(params: {
         header_cfg: headerCfg,
         student_name: student.studentName, document_id: student.documentId ?? "",
         grade_label: gradeLabel, section_name: sectionName, year_range: yearRange,
-        lapso: momento, mention: cfg.boletin?.mention ?? "",
+        lapso: useStoredDefinitiva ? 0 : momento,
+        mention: cfg.boletin?.mention ?? "",
         subjects, avg_m1, avg_m2, avg_m3, avg_student, avg_section, position,
         signature_lines: [],
+        visibleMomentos,
+        showDefinitivaColumn,
       };
       bodies.push(generateBoletinCompletoHtml(cfgPdf, boletinData, paperW, paperH, { bodyOnly: true }));
     }
@@ -622,24 +669,9 @@ export async function downloadAllBachilleratoBoletas(params: {
   const bodies: string[] = [];
   for (const student of students) {
     const myGrades = allGrades.filter((g: any) => g.student_id === student.studentId);
-    const myMap: Record<string, string> = {};
-    let mySum = 0, myCount = 0;
-    myGrades.forEach((g: any) => {
-      const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
-      if (!isNaN(v)) {
-        myMap[g.assignment_id] = Number.isInteger(v) ? (v < 10 ? `0${v}` : String(v)) : v.toFixed(2);
-        mySum += v; myCount++;
-      }
-    });
-    const definitiva = myCount > 0
-      ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? (a < 10 ? `0${a}` : String(a)) : a.toFixed(2); })()
-      : "—";
+    const { subjects, definitiva } = buildSimpleBoletaSubjects(validAssignments, myGrades);
     const positionIdx = ranked.findIndex((r) => r.sid === student.studentId);
     const position = positionIdx >= 0 ? positionIdx + 1 : 0;
-    const subjects = validAssignments.map((a: any) => ({
-      name:  a.subject?.name ?? "Área",
-      grade: myMap[a.id] ?? "—",
-    }));
     const data: BoletaRenderData = {
       school_name: school?.name ?? "", school_logo: logoUrl,
       dea_code: school?.dea_code ?? "", statistical_code: school?.statistical_code ?? "",
@@ -726,7 +758,7 @@ export async function downloadBachilleratoBoletaDefinitiva(
 
   const { data: assignments } = await supabase
     .from("subject_teacher_assignments")
-    .select("id, subject:subject_id(name, display_order)")
+    .select(ASSIGNMENT_SELECT)
     .eq("school_id", schoolId)
     .eq("section_id", sectionId)
     .eq("school_year_id", yearId)
@@ -760,18 +792,7 @@ export async function downloadBachilleratoBoletaDefinitiva(
   const myGrades = myGradesRes.data || [];
   const allGrades = allGradesRes.data || [];
 
-  const myMap: Record<string, string> = {};
-  let mySum = 0, myCount = 0;
-  myGrades.forEach((g: any) => {
-    const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
-    if (!isNaN(v)) {
-      myMap[g.assignment_id] = Number.isInteger(v) ? (v < 10 ? `0${v}` : String(v)) : v.toFixed(2);
-      mySum += v; myCount++;
-    }
-  });
-  const definitiva = myCount > 0
-    ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? (a < 10 ? `0${a}` : String(a)) : a.toFixed(2); })()
-    : "—";
+  const { subjects, definitiva } = buildSimpleBoletaSubjects(validAssignments, myGrades);
 
   // Ranking basado en definitiva guardada (momento=0)
   const perStudent: Record<string, { sum: number; count: number }> = {};
@@ -788,11 +809,6 @@ export async function downloadBachilleratoBoletaDefinitiva(
     .sort((a, b) => b.avg - a.avg);
   const positionIdx = ranked.findIndex((r) => r.sid === studentId);
   const position = positionIdx >= 0 ? positionIdx + 1 : 0;
-
-  const subjects = validAssignments.map((a: any) => ({
-    name:  a.subject?.name ?? "Área",
-    grade: myMap[a.id] ?? "—",
-  }));
 
   const data: BoletaRenderData = {
     school_name: school?.name ?? "", school_logo: logoUrl,
@@ -882,7 +898,7 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
 
   const { data: assignments } = await supabase
     .from("subject_teacher_assignments")
-    .select("id, subject:subject_id(name, display_order)")
+    .select(ASSIGNMENT_SELECT)
     .eq("school_id", schoolId)
     .eq("section_id", sectionId)
     .eq("school_year_id", yearId)
@@ -927,24 +943,9 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
   const bodies: string[] = [];
   for (const student of students) {
     const myGrades = allGrades.filter((g: any) => g.student_id === student.studentId);
-    const myMap: Record<string, string> = {};
-    let mySum = 0, myCount = 0;
-    myGrades.forEach((g: any) => {
-      const v = parseFloat(g.grade_value ?? "0") + (g.adjustment_points ?? 0);
-      if (!isNaN(v)) {
-        myMap[g.assignment_id] = Number.isInteger(v) ? (v < 10 ? `0${v}` : String(v)) : v.toFixed(2);
-        mySum += v; myCount++;
-      }
-    });
-    const definitiva = myCount > 0
-      ? (() => { const a = mySum / myCount; return Number.isInteger(a) ? (a < 10 ? `0${a}` : String(a)) : a.toFixed(2); })()
-      : "—";
+    const { subjects, definitiva } = buildSimpleBoletaSubjects(validAssignments, myGrades);
     const positionIdx = ranked.findIndex((r) => r.sid === student.studentId);
     const position = positionIdx >= 0 ? positionIdx + 1 : 0;
-    const subjects = validAssignments.map((a: any) => ({
-      name:  a.subject?.name ?? "Área",
-      grade: myMap[a.id] ?? "—",
-    }));
     const data: BoletaRenderData = {
       school_name: school?.name ?? "", school_logo: logoUrl,
       dea_code: school?.dea_code ?? "", statistical_code: school?.statistical_code ?? "",
