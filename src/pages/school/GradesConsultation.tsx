@@ -772,17 +772,17 @@ export default function GradesConsultation() {
                         <div className="flex gap-2">
                           <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                           <div className="space-y-1.5 text-sm text-blue-900 dark:text-blue-100">
-                            <p className="font-semibold">Bachillerato — Descarga de boletas</p>
+                            <p className="font-semibold">Cómo descargar las boletas (Bachillerato)</p>
                             <ul className="list-disc list-inside space-y-1 text-xs text-blue-800 dark:text-blue-200">
                               <li>
-                                <strong>Descargar Boleta</strong> (momento del selector): columnas acumulativas — M1
-                                solo I Momento; M2 I+II; M3 I+II+III. Lee{" "}
-                                <span className="font-mono">final_grades</span> momentos 1–3.
+                                <strong>Descargar Boleta:</strong> usa el momento seleccionado arriba. Momento 1 muestra
+                                solo el I periodo; Momento 2 el I y II; Momento 3 los tres periodos.
                               </li>
                               <li>
-                                <strong>Descargar Definitiva Final</strong>: boletín completo con columna Def. y
-                                promedios anuales. El promedio del estudiante requiere definitivas guardadas con{" "}
-                                <span className="font-mono">momento=0</span> en Notas Finales.
+                                <strong>Descargar Definitiva Final:</strong> boletín anual completo con la nota
+                                definitiva de cada materia y los promedios del año. Para que aparezca el promedio
+                                general, las definitivas finales deben estar guardadas en la pestaña{" "}
+                                <strong>Notas Finales</strong>.
                               </li>
                             </ul>
                           </div>

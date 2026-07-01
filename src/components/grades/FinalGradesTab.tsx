@@ -1263,9 +1263,8 @@ export default function FinalGradesTab({
             <div className="flex items-start gap-1 rounded border border-red-200 bg-red-50 px-1.5 py-1 dark:border-red-900 dark:bg-red-950/30">
               <AlertTriangle className="h-3 w-3 text-red-600 shrink-0 mt-0.5" />
               <p className="text-[10px] text-red-700 dark:text-red-400 leading-tight">
-                Vista previa calculada — no persistida en{" "}
-                <span className="font-mono">final_grades</span> (momento=0). Salga del campo o use{" "}
-                <strong>Guardar Todos</strong> para que la boleta Definitiva Final lea este dato.
+                Esta nota definitiva aún <strong>no está guardada</strong>. Salga del campo o use{" "}
+                <strong>Guardar Todos</strong> para que aparezca en la boleta definitiva del año escolar.
               </p>
             </div>
           )}
@@ -1432,33 +1431,31 @@ export default function FinalGradesTab({
             <div className="flex gap-2">
               <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
               <div className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
-                <p className="font-semibold">Bachillerato — Notas finales y boletas</p>
+                <p className="font-semibold">Cómo usar las notas finales (Bachillerato)</p>
                 <ol className="list-decimal list-inside space-y-1 text-xs text-blue-800 dark:text-blue-200">
                   <li>
-                    <strong>Momentos 1, 2 y 3:</strong> se calculan desde el plan de evaluación del docente y se
-                    persisten al salir de cada celda en{" "}
-                    <span className="font-mono">final_grades</span> (momento 1, 2 o 3).
+                    <strong>Momentos 1, 2 y 3:</strong> las notas se calculan a partir del plan de evaluación del
+                    docente. Al salir de cada casilla, la nota de ese momento queda guardada.
                   </li>
                   <li>
-                    <strong>Definitiva Final:</strong> muestra el promedio aritmético de los 3 momentos como vista
-                    previa. Solo queda registrada en BD cuando se guarda con{" "}
-                    <span className="font-mono">momento=0</span>.
+                    <strong>Definitiva Final:</strong> el sistema muestra el promedio de los tres momentos. Es una
+                    referencia hasta que usted la guarde de forma definitiva.
                   </li>
                   <li>
-                    Guardar un momento <strong>no</strong> escribe automáticamente la definitiva final; debe guardarse
-                    esa columna explícitamente (salir del campo o <strong>Guardar Todos</strong>).
+                    Guardar las notas de un momento <strong>no guarda automáticamente</strong> la definitiva final.
+                    Debe guardar también esa columna (salir del campo o pulsar <strong>Guardar Todos</strong>).
                   </li>
                   <li>
-                    En <strong>Descarga de Boletas</strong>, el selector de momento genera boletas acumulativas (M1 →
-                    solo I; M2 → I+II; M3 → I+II+III). <strong>Definitiva Final</strong> usa las notas con{" "}
-                    <span className="font-mono">momento=0</span> para la columna Def. y el promedio del estudiante.
+                    En la pestaña <strong>Descarga de Boletas</strong>, el momento seleccionado arriba define qué
+                    periodos incluye la boleta (Momento 1 = solo el primero; Momento 2 = primero y segundo; Momento 3 =
+                    los tres). La opción <strong>Definitiva Final</strong> es el boletín completo del año escolar.
                   </li>
                 </ol>
                 {unpersistedDefinitivaCount > 0 && (
                   <p className="text-xs font-medium text-red-700 dark:text-red-400 flex items-center gap-1 pt-1">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    {unpersistedDefinitivaCount} estudiante{unpersistedDefinitivaCount !== 1 ? "s" : ""} con
-                    definitiva final calculada pero sin persistir en BD.
+                    {unpersistedDefinitivaCount} estudiante{unpersistedDefinitivaCount !== 1 ? "s" : ""} con la nota
+                    definitiva calculada pero <strong>aún sin guardar</strong>.
                   </p>
                 )}
               </div>
@@ -1500,7 +1497,7 @@ export default function FinalGradesTab({
                   </span>
                   {isBachillerato && (
                     <div className="text-[10px] text-red-600 dark:text-red-400 font-medium mt-0.5">
-                      Requiere persistencia en BD (momento=0)
+                      Debe guardarse para la boleta anual
                     </div>
                   )}
                   {dirtyCountByMomento[0] > 0 && (
