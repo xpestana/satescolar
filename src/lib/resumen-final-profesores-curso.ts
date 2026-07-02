@@ -13,6 +13,7 @@ import type { ResumenFinalDocxData } from "@/hooks/useResumenFinalDocxData";
 
 export const FOOT_V_HDR_H = 252;
 export const FOOT_V_DATA_H = 412;
+export const FOOT_V_GP_H = 712;
 
 const BS = { style: BorderStyle.SINGLE, size: 4, color: "000000" } as const;
 const BN = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" } as const;
@@ -28,6 +29,8 @@ const BORDERS_STUDENTS_PAIR: ITableBordersOptions = {
 
 /** VI comienza tras las primeras N columnas de materias (5ª casilla = índice 4). */
 export const VI_START_AFTER_IV_COLS = 4;
+/** 31059: VI alineado con la 9ª casilla de No Cursantes (4 columnas más a la derecha). */
+export const VI_START_AFTER_IV_COLS_31059 = 8;
 
 export type ProfesoresCursoLayout = {
   stTableW: number;
@@ -63,8 +66,10 @@ export type BuildProfesoresCursoDeps = {
 export function estimateProfesoresBlockHeight(
   nRegular: number,
   nProductive: number,
+  includeGpParticipacionRow = false,
 ): number {
-  return FOOT_V_HDR_H * 2 + (nRegular + nProductive) * FOOT_V_DATA_H;
+  const gpH = includeGpParticipacionRow ? FOOT_V_GP_H : 0;
+  return FOOT_V_HDR_H * 2 + (nRegular + nProductive) * FOOT_V_DATA_H + gpH;
 }
 
 type ViSlot = { type: "label" | "value"; text: string };
@@ -150,24 +155,53 @@ export function computeViStartOffset(
   return stIvCols.slice(0, afterCols).reduce((a, b) => a + b, 0);
 }
 
-/** V ocupa III + primeras N materias; VI ocupa el resto de IV (desde 5ª materia). */
+/** V ocupa III + primeras N materias; VI ocupa el resto de IV (desde N+1ª materia). */
 export function computeColumnWidths(
   stColIii: number,
   stColIv: number,
   ivMateriaW: number,
   stIvCols: number[],
+  viStartAfterIvCols = VI_START_AFTER_IV_COLS,
 ): { vCols: number[]; viW: number; vW: number; allCols: number[] } {
-  const offset = Math.min(computeViStartOffset(stIvCols), stColIv);
+  const offset = Math.min(
+    computeViStartOffset(stIvCols, viStartAfterIvCols),
+    stColIv,
+  );
+  const defaultOffset = Math.min(
+    computeViStartOffset(stIvCols, VI_START_AFTER_IV_COLS),
+    stColIv,
+  );
+  const extraOffset = Math.max(0, offset - defaultOffset);
   const vW = stColIii + offset;
   const viW = stColIv - offset;
   const colNro = 340;
   const colSigla = 700;
-  const colCedula = 1500;
+  const colCedulaBase = 1500;
   const colFirma = 2 * ivMateriaW;
   const colProfesorBase = 3600;
-  const colProfesor = colProfesorBase + Math.round((vW - stColIii) * 0.55);
-  // Remanente para que la suma de V coincida con vW (evita deformar Word)
-  const colArea = vW - colNro - colSigla - colProfesor - colCedula - colFirma;
+  const baseProfesor = colProfesorBase + Math.round(defaultOffset * 0.55);
+  const baseCedula = colCedulaBase;
+  const baseArea =
+    stColIii +
+    defaultOffset -
+    colNro -
+    colSigla -
+    baseProfesor -
+    baseCedula -
+    colFirma;
+
+  let colProfesor = baseProfesor;
+  let colCedula = baseCedula;
+  let colArea = baseArea;
+
+  if (extraOffset > 0) {
+    const share = Math.floor(extraOffset / 3);
+    const rem = extraOffset - share * 3;
+    colProfesor += share + (rem > 0 ? 1 : 0);
+    colCedula += share + (rem > 1 ? 1 : 0);
+    colArea += share + (rem > 2 ? 1 : 0);
+  }
+
   const vCols = [colNro, colSigla, colArea, colProfesor, colCedula, colFirma];
   return { vCols, viW, vW, allCols: [...vCols, viW] };
 }
@@ -333,12 +367,18 @@ export function buildProfesoresCursoTable(
   data: ResumenFinalDocxData,
   layout: ProfesoresCursoLayout,
   deps: BuildProfesoresCursoDeps,
+  options?: { includeGpParticipacionRow?: boolean },
 ): Table {
+  const includeGpParticipacionRow = options?.includeGpParticipacionRow ?? false;
+  const viStartAfterIvCols = includeGpParticipacionRow
+    ? VI_START_AFTER_IV_COLS_31059
+    : VI_START_AFTER_IV_COLS;
   const { vCols, viW, vW, allCols } = computeColumnWidths(
     layout.stColIii,
     layout.stColIv,
     layout.ivMateriaW,
     layout.stIvCols,
+    viStartAfterIvCols,
   );
   const allSubjects = [...data.regularSubjects, ...data.productiveSubjects];
   const slots = buildCursoFieldSlots(data, deps.gradeLabelUpper);
@@ -376,7 +416,7 @@ export function buildProfesoresCursoTable(
       deps.mkFooterDataCell(vCols[3], "Apellidos y Nombres del Profesor", {
         bold: true,
       }),
-      deps.mkFooterDataCell(vCols[4], "Cedula de Identidad", {
+      deps.mkFooterDataCell(vCols[4], "Cédula de Identidad", {
         bold: true,
         align: AlignmentType.CENTER,
       }),
@@ -418,11 +458,41 @@ export function buildProfesoresCursoTable(
     return deps.mkStHdrRow(cells, deps.rowH(FOOT_V_DATA_H));
   });
 
+  const gpRow = includeGpParticipacionRow
+    ? deps.mkStHdrRow(
+        [
+          deps.mkFooterDataCell(vCols[0], String(allSubjects.length + 1), {
+            align: AlignmentType.CENTER,
+          }),
+          deps.mkFooterDataCell(vCols[1], "GP", {
+            align: AlignmentType.CENTER,
+          }),
+          new TableCell({
+            width: { size: vCols[2], type: WidthType.DXA },
+            children: [
+              deps.tblFooterP(
+                "PARTICIPACIÓN EN GRUPOS DE CREACIÓN, RECREACIÓN Y PRODUCCIÓN",
+              ),
+            ],
+            verticalAlign: VerticalAlign.CENTER,
+            margins: { top: 4, bottom: 4, left: 4, right: 4 },
+          }),
+          deps.mkFooterDataCell(vCols[3], "**********"),
+          deps.mkFooterDataCell(vCols[4], "**********", {
+            align: AlignmentType.CENTER,
+          }),
+          deps.mkFooterDataCell(vCols[5], ""),
+          mkViFieldCell(viW, "", "", deps),
+        ],
+        deps.rowH(FOOT_V_GP_H),
+      )
+    : null;
+
   return new Table({
     width: { size: layout.stTableW, type: WidthType.DXA },
     columnWidths: allCols,
     layout: TableLayoutType.FIXED,
     borders: deps.bordersNestedGrid,
-    rows: [titleRow, headerRow, ...dataRows],
+    rows: [titleRow, headerRow, ...dataRows, ...(gpRow ? [gpRow] : [])],
   });
 }

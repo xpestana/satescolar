@@ -25,6 +25,8 @@ export interface StudentDocxRow {
   mesNac: string;
   anioNac: string;
   grades: Record<string, string>; // assignmentId → display value (regular + productive)
+  gpGrade: string;
+  grupoName: string;
 }
 
 export interface ResumenFinalDocxData {
@@ -62,6 +64,8 @@ export interface SubjectAreaTotals {
 }
 
 import { computeSubjectAreaTotals } from "@/lib/resumen-final-subject-totals";
+import { computeGpGradeAndGrupo } from "@/lib/resumen-final-gcrp";
+import { resolvePlanEstudio } from "@/lib/resumen-final-plan-estudio";
 import { formatResumenFinalGrade } from "@/lib/gradeLiteral";
 
 function gradeDisplay(
@@ -118,6 +122,26 @@ function isProductivePlanillaAssignment(a: AssignmentWithSubject): boolean {
   if (!s) return false;
   if (s.is_suspended) return false;
   if (s.subject_type === "regular") return false;
+  if (s.subject_type === "gcrp") return false;
+  if (s.show_in_planilla === false) return false;
+  return true;
+}
+
+/** Productivas de planilla 31060: incluye GCRP como columna productiva (sin GP/GRUPO). */
+function isMergedProductivePlanillaAssignment(a: AssignmentWithSubject): boolean {
+  const s = a.school_subjects;
+  if (!s) return false;
+  if (s.is_suspended) return false;
+  if (s.subject_type === "regular") return false;
+  if (s.show_in_planilla === false) return false;
+  return true;
+}
+
+function isGcrpPlanillaAssignment(a: AssignmentWithSubject): boolean {
+  const s = a.school_subjects;
+  if (!s) return false;
+  if (s.is_suspended) return false;
+  if (s.subject_type !== "gcrp") return false;
   if (s.show_in_planilla === false) return false;
   return true;
 }
@@ -323,6 +347,18 @@ export async function fetchResumenFinalDocxData(
   const { data: section } = await supabase
     .from("sections").select("grade_level, name").eq("id", sectionId).single();
 
+  // 3b. tipo de planilla (define layout GP/GRUPO vs productivas mezcladas)
+  const { data: rfConfig } = await supabase
+    .from("resumen_final_config")
+    .select("tipo_planilla, observaciones, nombre_profesor, cedula_profesor")
+    .eq("school_id", schoolId)
+    .eq("school_year_id", schoolYearId)
+    .eq("section_id", sectionId)
+    .eq("parte", parte)
+    .maybeSingle();
+  const tipoPlanilla = (rfConfig?.tipo_planilla as "31059" | "31060") ?? "31059";
+  const useGpGrupoColumns = tipoPlanilla === "31059";
+
   // 4. enrollments → student IDs, ordered
   const { data: enrollments } = await supabase
     .from("enrollments")
@@ -378,19 +414,44 @@ export async function fetchResumenFinalDocxData(
       .eq("school_year_id", schoolYearId)
       .eq("is_suspended", false);
     if (gcrpAssignError) throw new Error(`Error al cargar materias GCRP: ${gcrpAssignError.message}`);
+    const gcrpFilter = useGpGrupoColumns
+      ? isGcrpPlanillaAssignment
+      : isMergedProductivePlanillaAssignment;
     gcrpAssignmentsData = dedupeAssignmentsBySubject(
-      ((data ?? []) as AssignmentWithSubject[]).filter(isProductivePlanillaAssignment),
+      ((data ?? []) as AssignmentWithSubject[]).filter(gcrpFilter),
     );
   }
 
-  // Merge section-level productive + GCRP per-student, deduplicate by subject_id
-  const allProductiveRaw = [...sectionProductiveAssignments, ...gcrpAssignmentsData];
-  const productiveAssignments = dedupeAssignmentsBySubject(allProductiveRaw);
+  const gcrpOrder = new Map(
+    gcrpAssignmentsData.map((a, i) => [a.id, a.school_subjects?.display_order ?? i]),
+  );
+  const studentGcrpAssignments = new Map<string, string[]>();
+  if (useGpGrupoColumns) {
+    const sortedGcrpLinks = [...(gcrpLinks ?? [])].sort((a, b) => {
+      const oa = gcrpOrder.get(a.assignment_id) ?? 999;
+      const ob = gcrpOrder.get(b.assignment_id) ?? 999;
+      return oa - ob;
+    });
+    sortedGcrpLinks.forEach((l) => {
+      if (!gcrpAssignmentIds.includes(l.assignment_id)) return;
+      const list = studentGcrpAssignments.get(l.student_id) ?? [];
+      if (!list.includes(l.assignment_id)) list.push(l.assignment_id);
+      studentGcrpAssignments.set(l.student_id, list);
+    });
+  }
+
+  const productiveAssignments = useGpGrupoColumns
+    ? sectionProductiveAssignments
+    : dedupeAssignmentsBySubject([
+        ...sectionProductiveAssignments,
+        ...gcrpAssignmentsData,
+      ]);
 
   // 8. all assignment IDs for grade query
   const allAssignmentIds = [
     ...regularAssignments.map(a => a.id),
     ...productiveAssignments.map(a => a.id),
+    ...(useGpGrupoColumns ? gcrpAssignmentsData.map(a => a.id) : []),
   ];
 
   // 9. notas definitivas guardadas (momento = 0, periodo cero)
@@ -407,19 +468,7 @@ export async function fetchResumenFinalDocxData(
     gradesData = (data ?? []) as GradeRecord[];
   }
 
-  // 10. resumen_final_config
-  const { data: rfConfig } = await supabase
-    .from("resumen_final_config")
-    .select("tipo_planilla, observaciones, nombre_profesor, cedula_profesor")
-    .eq("school_id", schoolId)
-    .eq("school_year_id", schoolYearId)
-    .eq("section_id", sectionId)
-    .eq("parte", parte)
-    .maybeSingle();
-
-  const tipoPlanilla = (rfConfig?.tipo_planilla as "31059" | "31060") ?? "31059";
-
-  // 11. subject name/abbreviation overrides for this planilla type
+  // 10. subject name/abbreviation overrides for this planilla type
   const { data: overridesData } = await supabase
     .from("resumen_final_subject_overrides")
     .select("subject_id, custom_name, custom_abbreviation")
@@ -456,7 +505,7 @@ export async function fetchResumenFinalDocxData(
       name: ov?.custom_name || s.name,
       abbreviation: ov?.custom_abbreviation || s.abbreviation || s.name.substring(0, 2).toUpperCase(),
       evaluationType: s.evaluation_type || "numeric",
-      isGcrp: s.subject_type === "gcrp",
+      isGcrp: useGpGrupoColumns ? false : s.subject_type === "gcrp",
       assignmentId: a.id,
       teacherName: teacherName(t?.form_data),
       teacherCedula: t?.document_id || "",
@@ -496,6 +545,21 @@ export async function fetchResumenFinalDocxData(
       }
     });
 
+    let gpGrade = "";
+    let grupoName = "";
+    if (useGpGrupoColumns) {
+      const gcrpIds = studentGcrpAssignments.get(sid) ?? [];
+      const gp = computeGpGradeAndGrupo(
+        sid,
+        gcrpIds,
+        gcrpAssignmentsData,
+        gradeMap,
+        gradeKey,
+      );
+      gpGrade = gp.gpGrade;
+      grupoName = gp.grupoName.toUpperCase();
+    }
+
     let diaNac = "", mesNac = "", anioNac = "";
     const fechaNac = fd.fecha_nacimiento as string | undefined;
     if (fechaNac) {
@@ -519,6 +583,8 @@ export async function fetchResumenFinalDocxData(
       mesNac,
       anioNac,
       grades,
+      gpGrade,
+      grupoName,
     };
   });
 
@@ -532,10 +598,10 @@ export async function fetchResumenFinalDocxData(
 
   const mencionConfig =
     educationCodes.menciones_seccion?.[schoolYearId]?.[sectionId];
-  const planEstudio =
-    mencionConfig?.tipo === "con_mencion" && mencionConfig.mencion_texto?.trim()
-      ? mencionConfig.mencion_texto.trim()
-      : "EDUCACIÓN MEDIA GENERAL";
+  const planEstudio = resolvePlanEstudio(
+    tipoPlanilla,
+    mencionConfig?.mencion_texto,
+  );
 
   return {
     schoolHeader,

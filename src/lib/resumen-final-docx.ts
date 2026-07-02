@@ -2,7 +2,7 @@ import { generateResumenFinal31059Docx } from "./resumen-final-31059-docx";
 import { generateResumenFinal31060Docx } from "./resumen-final-31060-docx";
 import type { ResumenFinalDocxData } from "@/hooks/useResumenFinalDocxData";
 
-export { downloadBlob } from "./resumen-final-31059-docx";
+export { downloadBlob } from "./resumen-final-docx-base";
 
 export type DocxResult = {
   blob: Blob;

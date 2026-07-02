@@ -3,6 +3,8 @@ import {
   assignViToRows,
   computeColumnWidths,
   computeViStartOffset,
+  VI_START_AFTER_IV_COLS,
+  VI_START_AFTER_IV_COLS_31059,
 } from "./resumen-final-profesores-curso";
 
 describe("assignViToRows", () => {
@@ -109,6 +111,34 @@ describe("computeColumnWidths", () => {
     expect(profesor).toBe(3600 + Math.round(viOffset * 0.55));
     expect(area).toBeGreaterThan(4000);
     expect(vCols.reduce((a, b) => a + b, 0)).toBe(ST_COL_III + viOffset);
+  });
+
+  it("31059: VI desde la 9ª materia y reparte espacio extra en área, cédula y profesor", () => {
+    const viOffset31059 = computeViStartOffset(stIvCols, VI_START_AFTER_IV_COLS_31059);
+    const extraOffset = viOffset31059 - viOffset;
+    const { vCols, viW, vW } = computeColumnWidths(
+      ST_COL_III,
+      stColIv,
+      IV_MATERIA_W,
+      stIvCols,
+      VI_START_AFTER_IV_COLS_31059,
+    );
+    const base = computeColumnWidths(
+      ST_COL_III,
+      stColIv,
+      IV_MATERIA_W,
+      stIvCols,
+      VI_START_AFTER_IV_COLS,
+    );
+    const share = Math.floor(extraOffset / 3);
+    const rem = extraOffset - share * 3;
+
+    expect(vW).toBe(ST_COL_III + viOffset31059);
+    expect(viW).toBe(stColIv - viOffset31059);
+    expect(vCols[2]).toBe(base.vCols[2] + share + (rem > 2 ? 1 : 0));
+    expect(vCols[3]).toBe(base.vCols[3] + share + (rem > 0 ? 1 : 0));
+    expect(vCols[4]).toBe(base.vCols[4] + share + (rem > 1 ? 1 : 0));
+    expect(vCols.reduce((a, b) => a + b, 0)).toBe(vW);
   });
 
   it("genera 7 columnas totales (6 V + 1 VI)", () => {

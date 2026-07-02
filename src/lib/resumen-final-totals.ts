@@ -22,6 +22,9 @@ export type TotalsSheetLayout = {
   stIiiCols: number[];
   stIvCols: number[];
   nRegular: number;
+  nProductive: number;
+  ivGpIndex?: number;
+  ivGrupoIndex?: number;
 };
 
 export type BuildTotalRowsDeps = {
@@ -70,6 +73,12 @@ export function buildTotalRows(
             deps.padTotal(data.subjectTotals[s.assignmentId]?.[item.key] ?? 0),
           ),
         ),
+        ...(layout.ivGpIndex !== undefined && layout.ivGrupoIndex !== undefined
+          ? [
+              deps.mkStHdrCell(layout.stIvCols[layout.ivGpIndex], ""),
+              deps.mkStHdrCell(layout.stIvCols[layout.ivGrupoIndex], ""),
+            ]
+          : []),
       ],
       deps.rowH(deps.footTotalRowH),
     ),
