@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import {
+  GEO_UUID_PATTERN,
+  buildGeoCacheFromFormData,
+  resolveGeoName,
+} from "@/lib/geo-resolve";
 
 export interface SubjectCol {
   id: string;
@@ -233,60 +238,6 @@ export async function fetchResumenFinalSubjectsForEditor(
 
 const CALC_PARTS = (count: number) => Math.max(1, Math.ceil(count / 35));
 
-const GEO_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
-const GEO_FIELD_NAMES = [
-  "estado_nacimiento",
-  "municipio_nacimiento",
-  "ciudad_nacimiento",
-  "parroquia_nacimiento",
-  "estado",
-  "municipio",
-  "ciudad",
-  "parroquia",
-  "lugar_nacimiento",
-];
-
-function resolveGeoName(
-  value: string | undefined | null,
-  geoCache: Record<string, string>,
-): string {
-  if (!value) return "";
-  const v = String(value).trim();
-  if (GEO_UUID_PATTERN.test(v)) return geoCache[v] || "";
-  return v;
-}
-
-async function buildGeoCache(
-  formDataList: Record<string, unknown>[],
-): Promise<Record<string, string>> {
-  const uuids = new Set<string>();
-  for (const fd of formDataList) {
-    for (const key of GEO_FIELD_NAMES) {
-      const val = fd[key];
-      if (typeof val === "string" && GEO_UUID_PATTERN.test(val)) uuids.add(val);
-    }
-    for (const val of Object.values(fd)) {
-      if (typeof val === "string" && GEO_UUID_PATTERN.test(val)) uuids.add(val);
-    }
-  }
-  if (uuids.size === 0) return {};
-
-  const ids = Array.from(uuids);
-  const [statesR, munisR, citiesR, parishesR] = await Promise.all([
-    supabase.from("states").select("id, name").in("id", ids),
-    supabase.from("municipalities").select("id, name").in("id", ids),
-    supabase.from("cities").select("id, name").in("id", ids),
-    supabase.from("parishes").select("id, name").in("id", ids),
-  ]);
-
-  const cache: Record<string, string> = {};
-  for (const row of statesR.data || []) cache[row.id] = row.name;
-  for (const row of munisR.data || []) cache[row.id] = row.name;
-  for (const row of citiesR.data || []) cache[row.id] = row.name;
-  for (const row of parishesR.data || []) cache[row.id] = row.name;
-  return cache;
-}
-
 function lugarNacimientoFromForm(
   fd: Record<string, unknown>,
   geoCache: Record<string, string>,
@@ -516,7 +467,7 @@ export async function fetchResumenFinalDocxData(
   const gradeMap = new Map<string, GradeRecord>();
   gradesData.forEach((g) => gradeMap.set(gradeKey(g.student_id, g.assignment_id), g));
 
-  const geoCache = await buildGeoCache(
+  const geoCache = await buildGeoCacheFromFormData(
     pageStudentIds
       .map((sid) => (studentsMap.get(sid)?.form_data || {}) as Record<string, unknown>)
       .filter((fd) => Object.keys(fd).length > 0),
