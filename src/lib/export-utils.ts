@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import QRCode from "qrcode";
 import { buildAttendanceScanUrl } from "@/lib/attendance-url";
+import { resolveImageToPngDataUrl } from "@/lib/image-resolve";
 
 interface ExportColumn {
   key: string;
@@ -97,94 +98,8 @@ export function downloadExcel(
 }
 
 // ── PDF ──────────────────────────────────────────────
-// Loads any image URL as a PNG data URL via fetch → blob URL → canvas.
-// Using a blob URL keeps the canvas same-origin so toDataURL() never throws.
-// Falls back to the image-proxy edge function when direct fetch fails (CORS).
-const FETCH_TIMEOUT_MS = 8_000;
-const IMAGE_LOAD_TIMEOUT_MS = 10_000;
-
-async function fetchWithTimeout(
-  url: string,
-  options?: RequestInit,
-  timeoutMs = FETCH_TIMEOUT_MS
-): Promise<Response | null> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    return response;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function loadImageAsBase64(url: string): Promise<string | null> {
-  const fetchToPng = async (fetchUrl: string, headers?: Record<string, string>): Promise<string | null> => {
-    try {
-      const response = await fetchWithTimeout(
-        fetchUrl,
-        headers ? { headers } : undefined
-      );
-      if (!response?.ok) return null;
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      return new Promise((resolve) => {
-        const img = new Image();
-        const fail = () => {
-          clearTimeout(timer);
-          URL.revokeObjectURL(blobUrl);
-          resolve(null);
-        };
-        const timer = setTimeout(fail, IMAGE_LOAD_TIMEOUT_MS);
-        img.onload = () => {
-          clearTimeout(timer);
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.naturalWidth || 200;
-            canvas.height = img.naturalHeight || 200;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) { URL.revokeObjectURL(blobUrl); resolve(null); return; }
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(blobUrl);
-            resolve(canvas.toDataURL("image/png"));
-          } catch {
-            URL.revokeObjectURL(blobUrl);
-            resolve(null);
-          }
-        };
-        img.onerror = fail;
-        img.src = blobUrl;
-      });
-    } catch {
-      return null;
-    }
-  };
-
-  // S3 logos: use proxy first to avoid CORS errors and long direct-fetch timeouts.
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-  const isS3 = url.includes("amazonaws.com");
-
-  if (isS3 && supabaseUrl && supabaseKey) {
-    const proxyUrl = `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(url)}`;
-    const proxied = await fetchToPng(proxyUrl, {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-    });
-    if (proxied) return proxied;
-  }
-
-  const direct = await fetchToPng(url);
-  if (direct) return direct;
-
-  if (!isS3 && supabaseUrl && supabaseKey) {
-    const proxyUrl = `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(url)}`;
-    return fetchToPng(proxyUrl, { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` });
-  }
-
-  return null;
+  return resolveImageToPngDataUrl(url);
 }
 
 export async function downloadPDF(

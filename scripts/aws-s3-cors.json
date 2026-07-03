@@ -1,7 +1,11 @@
 {
   "CORSRules": [
     {
-      "AllowedOrigins": ["*"],
+      "AllowedOrigins": [
+        "*",
+        "https://app.satescolar.com",
+        "http://localhost:8080"
+      ],
       "AllowedMethods": ["GET", "HEAD", "PUT"],
       "AllowedHeaders": ["*"],
       "ExposeHeaders": ["ETag", "x-amz-request-id", "x-amz-id-2"],

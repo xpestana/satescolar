@@ -11,67 +11,7 @@ import {
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 import { fmtGradeNum, formatBoletaGradeValue } from "@/lib/gradeLiteral";
-
-function proxyImageUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname.endsWith(".amazonaws.com")) {
-      return `/img-proxy/${parsed.hostname}${parsed.pathname}`;
-    }
-  } catch {
-    /* not a valid URL */
-  }
-  return url;
-}
-
-/**
- * Loads an image as base64 for html2canvas. Uses Vite img-proxy in dev and
- * Supabase image-proxy when direct S3 fetch is blocked by CORS.
- */
-async function resolveImageUrl(url: string): Promise<string> {
-  if (!url) return "";
-  if (url.startsWith("data:")) return url;
-
-  const fetchAsDataUrl = async (
-    fetchUrl: string,
-    headers?: Record<string, string>,
-  ): Promise<string> => {
-    try {
-      const res = await fetch(fetchUrl, headers ? { headers } : undefined);
-      if (!res.ok) return "";
-      const blob = await res.blob();
-      return await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string) ?? "");
-        reader.onerror = () => resolve("");
-        reader.readAsDataURL(blob);
-      });
-    } catch {
-      return "";
-    }
-  };
-
-  let dataUrl = await fetchAsDataUrl(proxyImageUrl(url));
-  if (dataUrl) return dataUrl;
-
-  dataUrl = await fetchAsDataUrl(url);
-  if (dataUrl) return dataUrl;
-
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as
-    | string
-    | undefined;
-  if (supabaseUrl && supabaseKey) {
-    const edgeProxy = `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(url)}`;
-    dataUrl = await fetchAsDataUrl(edgeProxy, {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-    });
-    if (dataUrl) return dataUrl;
-  }
-
-  return "";
-}
+import { resolveImageToDataUrl } from "@/lib/image-resolve";
 
 /** Inline signature/stamp images for html2canvas (same CORS fix as school logo). */
 async function resolveBoletinSignatures(
@@ -82,8 +22,8 @@ async function resolveBoletinSignatures(
   const resolved = await Promise.all(
     sigs.map(async (sig) => ({
       ...sig,
-      firma_url: sig.firma_url ? await resolveImageUrl(sig.firma_url) : "",
-      sello_url: sig.sello_url ? await resolveImageUrl(sig.sello_url) : "",
+      firma_url: sig.firma_url ? await resolveImageToDataUrl(sig.firma_url) : "",
+      sello_url: sig.sello_url ? await resolveImageToDataUrl(sig.sello_url) : "",
     })),
   );
   return { ...cfg, boletin: { ...cfg.boletin!, signatures: resolved } };
@@ -437,9 +377,8 @@ export async function downloadBachilleratoBoleta(
   const show = (flag: string, fallback = true): boolean =>
     flag in headerCfgRaw ? headerCfgRaw[flag] : fallback;
 
-  const rawLogoUrl = school?.logo_url ?? "";
-  const logoUrl = rawLogoUrl
-    ? (await resolveImageUrl(rawLogoUrl)) || rawLogoUrl
+  const logoUrl = school?.logo_url
+    ? await resolveImageToDataUrl(school.logo_url)
     : "";
 
   // ── 2. Assignments for this section + year ───────────────────────────────
@@ -710,9 +649,8 @@ export async function downloadAllBachilleratoBoletas(params: {
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
   const style = cfg.style ?? "simple";
 
-  const rawLogoUrl = school?.logo_url ?? "";
-  const logoUrl = rawLogoUrl
-    ? (await resolveImageUrl(rawLogoUrl)) || rawLogoUrl
+  const logoUrl = school?.logo_url
+    ? await resolveImageToDataUrl(school.logo_url)
     : "";
 
   const headerCfgRaw: Record<string, boolean> =
@@ -966,9 +904,8 @@ export async function downloadBachilleratoBoletaDefinitiva(
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
   const style = cfg.style ?? "simple";
 
-  const rawLogoUrl = school?.logo_url ?? "";
-  const logoUrl = rawLogoUrl
-    ? (await resolveImageUrl(rawLogoUrl)) || rawLogoUrl
+  const logoUrl = school?.logo_url
+    ? await resolveImageToDataUrl(school.logo_url)
     : "";
 
   const headerCfgRaw: Record<string, boolean> =
@@ -1158,9 +1095,8 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
   const paperH: number = tpl?.paper_height_mm ?? 279.4;
   const style = cfg.style ?? "simple";
 
-  const rawLogoUrl = school?.logo_url ?? "";
-  const logoUrl = rawLogoUrl
-    ? (await resolveImageUrl(rawLogoUrl)) || rawLogoUrl
+  const logoUrl = school?.logo_url
+    ? await resolveImageToDataUrl(school.logo_url)
     : "";
 
   const headerCfgRaw: Record<string, boolean> =
