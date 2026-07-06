@@ -533,6 +533,18 @@ export default function FinalGradesTab({
     setEditedGrades(prev => ({ ...prev, [`${studentId}-${momento}`]: value }));
   };
 
+  const calculateAnnualAverageFromMoments = useCallback((studentId: string): string | null => {
+    const vals: number[] = [];
+    for (const m of [1, 2, 3]) {
+      const v = (editedGrades[`${studentId}-${m}`] || "").trim();
+      if (!v) return null;
+      const num = Number(v);
+      if (isNaN(num)) return null;
+      vals.push(num);
+    }
+    return (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
+  }, [editedGrades]);
+
   const handleExtraChange = (key: string, field: keyof ExtraFields, value: string | number) => {
     setExtraFields(prev => ({ ...prev, [key]: { ...(prev[key] || DEFAULT_EXTRA), [field]: value } }));
   };
@@ -812,6 +824,15 @@ export default function FinalGradesTab({
       setSavingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
   }, [assignmentIds, schoolId, isNumeric, isBachillerato, persistedMomento0Keys, sessionPersistedMomento0]);
+
+  const applyRecalculatedFinal = useCallback(async (studentId: string, newAverage: string) => {
+    const key = `${studentId}-0`;
+    editedGradesRef.current = { ...editedGradesRef.current, [key]: newAverage };
+    adjustmentsRef.current = { ...adjustmentsRef.current, [key]: 0 };
+    setEditedGrades(editedGradesRef.current);
+    setAdjustments((prev) => ({ ...prev, [key]: 0 }));
+    await saveGrade(studentId, 0);
+  }, [saveGrade]);
 
   const adjustPoint = useCallback(async (studentId: string, momento: number, delta: number) => {
     if (assignmentIds.length === 0) return;
@@ -1237,8 +1258,18 @@ export default function FinalGradesTab({
     const gradeNum = Number(value);
     const canAdd = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum < 20;
     const canSubtract = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum > 0;
+    const currentFinalTrimmed = value.trim();
+    const recalculatedAverage = isFinal && isBachillerato
+      ? calculateAnnualAverageFromMoments(s.student_id)
+      : null;
+    const showStaleAveragePrompt =
+      isFinal &&
+      isBachillerato &&
+      currentFinalTrimmed !== "" &&
+      recalculatedAverage !== null &&
+      Number(currentFinalTrimmed).toFixed(2) !== Number(recalculatedAverage).toFixed(2);
     const showUnpersistedWarning =
-      isFinal && isBachillerato && value.trim() !== "" && !isMomento0Persisted(key);
+      isFinal && isBachillerato && currentFinalTrimmed !== "" && !isMomento0Persisted(key) && !showStaleAveragePrompt;
 
     return (
       <TableCell key={m} className={`p-2 align-top ${isFinal ? "bg-muted/10" : ""}`}>
@@ -1301,6 +1332,25 @@ export default function FinalGradesTab({
               </Tooltip>
             )}
           </div>
+
+          {showStaleAveragePrompt && recalculatedAverage && (
+            <div className="flex items-start gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-1 dark:border-amber-900 dark:bg-amber-950/30">
+              <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-800 dark:text-amber-300 leading-tight">
+                Cambió las notas de los momentos y el promedio ya no coincide. Según los tres momentos actuales,
+                la definitiva debería ser <strong>{recalculatedAverage}</strong> (ahora tiene{" "}
+                <strong>{currentFinalTrimmed}</strong>).{" "}
+                <button
+                  type="button"
+                  onClick={() => applyRecalculatedFinal(s.student_id, recalculatedAverage)}
+                  className="underline font-semibold text-amber-900 dark:text-amber-200 hover:text-amber-950 dark:hover:text-amber-100"
+                >
+                  Haga clic aquí para colocar el nuevo promedio
+                </button>
+                .
+              </p>
+            </div>
+          )}
 
           {showUnpersistedWarning && (
             <div className="flex items-start gap-1 rounded border border-red-200 bg-red-50 px-1.5 py-1 dark:border-red-900 dark:bg-red-950/30">
