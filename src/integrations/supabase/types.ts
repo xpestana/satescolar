@@ -3648,18 +3648,21 @@ export type Database = {
       }
       states: {
         Row: {
+          acronym: string | null
           created_at: string
           id: string
           legacy_id: number | null
           name: string
         }
         Insert: {
+          acronym?: string | null
           created_at?: string
           id?: string
           legacy_id?: number | null
           name: string
         }
         Update: {
+          acronym?: string | null
           created_at?: string
           id?: string
           legacy_id?: number | null

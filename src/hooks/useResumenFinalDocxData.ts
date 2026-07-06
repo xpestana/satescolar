@@ -4,6 +4,7 @@ import { useSchoolId } from "@/hooks/useSchoolId";
 import {
   GEO_UUID_PATTERN,
   buildGeoCacheFromFormData,
+  buildStateAcronymCacheFromFormData,
   resolveGeoName,
 } from "@/lib/geo-resolve";
 import { formatPlanillaStudentNameParts, formatPlanillaStudentText } from "@/lib/resumen-final-text";
@@ -259,12 +260,18 @@ function lugarNacimientoFromForm(
 function entidadFederalFromForm(
   fd: Record<string, unknown>,
   geoCache: Record<string, string>,
+  stateAcronymCache: Record<string, string>,
 ): string {
   const ef = fd.entidad_federal;
   if (typeof ef === "string" && ef.trim() && !GEO_UUID_PATTERN.test(ef.trim())) {
-    return ef.trim().toUpperCase().substring(0, 2);
+    return ef.trim().toUpperCase();
   }
-  const state = resolveGeoName(fd.estado_nacimiento as string, geoCache);
+  const stateRef = fd.estado_nacimiento as string | undefined;
+  if (stateRef && GEO_UUID_PATTERN.test(stateRef.trim())) {
+    const acronym = stateAcronymCache[stateRef.trim()];
+    if (acronym) return acronym.toUpperCase();
+  }
+  const state = resolveGeoName(stateRef, geoCache);
   if (state) return state.toUpperCase().substring(0, 2);
   return "";
 }
@@ -275,16 +282,6 @@ function municipioCompletoFromForm(
   geoCache: Record<string, string>,
 ): string {
   return resolveGeoName(fd.municipio_nacimiento as string, geoCache);
-}
-
-/** Planilla 31060: sigla del municipio (primeras 2 letras del nombre). */
-function municipioSiglaFromForm(
-  fd: Record<string, unknown>,
-  geoCache: Record<string, string>,
-): string {
-  const name = municipioCompletoFromForm(fd, geoCache);
-  if (!name) return "";
-  return formatPlanillaStudentText(name, true).substring(0, 2);
 }
 
 function studentNamePart(
@@ -496,11 +493,11 @@ export async function fetchResumenFinalDocxData(
   const gradeMap = new Map<string, GradeRecord>();
   gradesData.forEach((g) => gradeMap.set(gradeKey(g.student_id, g.assignment_id), g));
 
-  const geoCache = await buildGeoCacheFromFormData(
-    pageStudentIds
-      .map((sid) => (studentsMap.get(sid)?.form_data || {}) as Record<string, unknown>)
-      .filter((fd) => Object.keys(fd).length > 0),
-  );
+  const formDataList = pageStudentIds
+    .map((sid) => (studentsMap.get(sid)?.form_data || {}) as Record<string, unknown>)
+    .filter((fd) => Object.keys(fd).length > 0);
+  const geoCache = await buildGeoCacheFromFormData(formDataList);
+  const stateAcronymCache = await buildStateAcronymCacheFromFormData(formDataList);
 
   const studentRows: StudentDocxRow[] = pageStudentIds.map((sid, idx) => {
     const student = studentsMap.get(sid);
@@ -564,10 +561,7 @@ export async function fetchResumenFinalDocxData(
             true,
           )
         : lugarNacimientoFromForm(fd, geoCache).toUpperCase();
-    const entidadFederal =
-      tipoPlanilla === "31060"
-        ? municipioSiglaFromForm(fd, geoCache)
-        : entidadFederalFromForm(fd, geoCache);
+    const entidadFederal = entidadFederalFromForm(fd, geoCache, stateAcronymCache);
 
     return {
       nro: idx + 1,

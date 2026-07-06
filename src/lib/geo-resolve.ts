@@ -77,6 +77,39 @@ async function fetchGeoRowsByIds(
   return rows;
 }
 
+async function fetchStateAcronymsByIds(
+  ids: string[],
+): Promise<Record<string, string>> {
+  const chunks = chunkArray(ids, IN_CHUNK_SIZE);
+  const cache: Record<string, string> = {};
+  for (const chunk of chunks) {
+    const { data } = await supabase
+      .from("states")
+      .select("id, acronym")
+      .in("id", chunk);
+    if (data) {
+      for (const row of data) {
+        if (row.acronym?.trim()) cache[row.id] = row.acronym.trim();
+      }
+    }
+  }
+  return cache;
+}
+
+export async function buildStateAcronymCacheFromFormData(
+  formDataList: Record<string, unknown>[],
+): Promise<Record<string, string>> {
+  const stateIds = new Set<string>();
+  for (const fd of formDataList) {
+    const val = fd.estado_nacimiento;
+    if (typeof val === "string" && GEO_UUID_PATTERN.test(val)) {
+      stateIds.add(val);
+    }
+  }
+  if (stateIds.size === 0) return {};
+  return fetchStateAcronymsByIds(Array.from(stateIds));
+}
+
 export async function buildGeoCacheFromFormData(
   formDataList: Record<string, unknown>[],
 ): Promise<Record<string, string>> {
