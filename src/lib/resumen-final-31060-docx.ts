@@ -10,5 +10,10 @@ export function generateResumenFinal31060Docx(
     logoUrl: logoMppeNuevo,
     logoMarginLeft: -40,
     useSpanishNames: true,
+    pageLayoutExtra: {
+      headerBlockExtra: 500,
+      pageBufferExtra: 450,
+      profesoresWrapEstimate: true,
+    },
   });
 }

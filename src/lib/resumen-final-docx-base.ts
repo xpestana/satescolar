@@ -27,7 +27,10 @@ import {
 } from "@/lib/resumen-final-totals";
 import {
   buildProfesoresCursoTable,
+  computeColumnWidths,
   estimateProfesoresBlockHeight,
+  estimateProfesoresWrapExtra,
+  VI_START_AFTER_IV_COLS,
 } from "@/lib/resumen-final-profesores-curso";
 import {
   buildFirmasBlock,
@@ -47,6 +50,20 @@ export type ResumenFinalDocxVariant = {
   logoMarginLeft?: number;
   /** Preserva Ñ y acentos al mayusculizar nombres/apellidos (planilla 31060). */
   useSpanishNames?: boolean;
+  /** Ajustes de altura de página (solo planilla 31060). */
+  pageLayoutExtra?: {
+    /** Extra en estimación de cabecera (logo más alto, interlineado). */
+    headerBlockExtra?: number;
+    /** Margen extra al calcular altura final de hoja. */
+    pageBufferExtra?: number;
+    /** Estimar filas de profesores con texto multilínea. */
+    profesoresWrapEstimate?: boolean;
+  };
+};
+
+type LayoutEstimateOpts = {
+  headerExtra?: number;
+  profesoresWrapExtra?: number;
 };
 
 // ??? p?gina (estrategia UEH: hoja virtual alta; ancho din?mico seg?n materias IV) ??
@@ -72,7 +89,7 @@ const HDR_TITLE_INDENT = 200;
 const HDR_FONT = "Arial";
 const HDR_TITLE_SIZE = 9;
 const HDR_BODY_SIZE = 9;
-const HDR_LINE_SPACING = 180;
+const HDR_LINE_SPACING = 220; // interlineado cabecera (+2 pt sobre 180)
 const BODY_LABEL_SIZE = 9; // t?tulos / etiquetas
 const BODY_DATA_SIZE = 10; // datos desde BD
 const IE_LINE_SPACING = 185; // interlineado secci?n II
@@ -172,6 +189,7 @@ type SheetLayout = {
   nIvCols: number;
   includeGpGrupo: boolean;
   useSpanishNames: boolean;
+  tipoPlanilla: "31059" | "31060";
   logoMarginLeft: number;
   ivGpIndex?: number;
   ivGrupoIndex?: number;
@@ -189,9 +207,13 @@ function estimateContentHeightTwips(
   nRegular: number,
   nProductive: number,
   includeGpGrupo: boolean,
+  opts: LayoutEstimateOpts = {},
 ): number {
+  const headerExtra = opts.headerExtra ?? 0;
+  const profesoresWrapExtra = opts.profesoresWrapExtra ?? 0;
   return (
     HEADER_BLOCK_ESTIMATE +
+    headerExtra +
     INSTITUTION_BLOCK_ESTIMATE +
     ST_TABLE_GAP +
     ST_TITLE_ROW_MIN +
@@ -202,9 +224,19 @@ function estimateContentHeightTwips(
     ST_ROWS_PER_PAGE * ST_DATA_ROW_MIN +
     TOTAL_AREA_ROW_COUNT * FOOT_TOTAL_ROW_H +
     estimateProfesoresBlockHeight(nRegular, nProductive, includeGpGrupo) +
+    profesoresWrapExtra +
     FOOT_OBS_H +
     6 * FOOT_SIG_ROW_H +
     FOOT_SIG_SEAL_H
+  );
+}
+
+function fixedLayoutHeightTwips(opts: LayoutEstimateOpts = {}): number {
+  return (
+    HEADER_BLOCK_ESTIMATE +
+    (opts.headerExtra ?? 0) +
+    INSTITUTION_BLOCK_ESTIMATE +
+    ST_TABLE_GAP
   );
 }
 
@@ -213,10 +245,15 @@ function estimateContentHeightAtScale(
   nProductive: number,
   vScale: number,
   includeGpGrupo: boolean,
+  opts: LayoutEstimateOpts = {},
 ): number {
-  const fixed =
-    HEADER_BLOCK_ESTIMATE + INSTITUTION_BLOCK_ESTIMATE + ST_TABLE_GAP;
-  const total = estimateContentHeightTwips(nRegular, nProductive, includeGpGrupo);
+  const fixed = fixedLayoutHeightTwips(opts);
+  const total = estimateContentHeightTwips(
+    nRegular,
+    nProductive,
+    includeGpGrupo,
+    opts,
+  );
   return fixed + Math.round((total - fixed) * vScale);
 }
 
@@ -224,11 +261,16 @@ function computeVerticalScale(
   nRegular: number,
   nProductive: number,
   includeGpGrupo: boolean,
+  opts: LayoutEstimateOpts = {},
 ): number {
   const usable = PAGE_H_MAX - MARGIN_TOP - MARGIN_BOTTOM;
-  const fixed =
-    HEADER_BLOCK_ESTIMATE + INSTITUTION_BLOCK_ESTIMATE + ST_TABLE_GAP;
-  const total = estimateContentHeightTwips(nRegular, nProductive, includeGpGrupo);
+  const fixed = fixedLayoutHeightTwips(opts);
+  const total = estimateContentHeightTwips(
+    nRegular,
+    nProductive,
+    includeGpGrupo,
+    opts,
+  );
   if (total <= usable) return 1;
   const scalable = total - fixed;
   if (scalable <= 0) return V_SCALE_MIN;
@@ -283,7 +325,6 @@ function computeSheetLayout(
   const nRegular = data.regularSubjects.length;
   const nProductive = data.productiveSubjects.length;
   const includeGpGrupo = variant.includeGpGrupo;
-  const vScale = computeVerticalScale(nRegular, nProductive, includeGpGrupo);
   const stIiiCols = [...ST_III_COLS];
   const stColIii = ST_COL_III_FIXED;
   const stIvCols = [
@@ -292,13 +333,48 @@ function computeSheetLayout(
     ...(includeGpGrupo ? [IV_GP_W, IV_GRUPO_W] : []),
   ];
   const stColIv = stIvCols.reduce((a, b) => a + b, 0);
+
+  const pageLayoutExtra = variant.pageLayoutExtra;
+  let profesoresWrapExtra = 0;
+  if (pageLayoutExtra?.profesoresWrapEstimate) {
+    const { vCols } = computeColumnWidths(
+      stColIii,
+      stColIv,
+      IV_MATERIA_W,
+      stIvCols,
+      VI_START_AFTER_IV_COLS,
+    );
+    profesoresWrapExtra = estimateProfesoresWrapExtra(
+      [...data.regularSubjects, ...data.productiveSubjects],
+      vCols[2],
+      vCols[3],
+    );
+  }
+  const estimateOpts: LayoutEstimateOpts = {
+    headerExtra: pageLayoutExtra?.headerBlockExtra ?? 0,
+    profesoresWrapExtra,
+  };
+
+  const vScale = computeVerticalScale(
+    nRegular,
+    nProductive,
+    includeGpGrupo,
+    estimateOpts,
+  );
   const contentW = stColIii + stColIv;
   const pageW = contentW + MARGIN_LEFT + MARGIN_RIGHT;
   const pageH =
-    estimateContentHeightAtScale(nRegular, nProductive, vScale, includeGpGrupo) +
+    estimateContentHeightAtScale(
+      nRegular,
+      nProductive,
+      vScale,
+      includeGpGrupo,
+      estimateOpts,
+    ) +
     MARGIN_TOP +
     MARGIN_BOTTOM +
-    PAGE_H_BUFFER;
+    PAGE_H_BUFFER +
+    (pageLayoutExtra?.pageBufferExtra ?? 0);
 
   return {
     pageW,
@@ -320,7 +396,9 @@ function computeSheetLayout(
     nProductive,
     nIvCols: stIvCols.length,
     includeGpGrupo,
-    useSpanishNames: variant.useSpanishNames ?? false,
+    tipoPlanilla: data.tipoPlanilla,
+    useSpanishNames:
+      (variant.useSpanishNames ?? false) || data.tipoPlanilla === "31060",
     logoMarginLeft: variant.logoMarginLeft ?? 0,
     ...(includeGpGrupo
       ? {
@@ -1064,11 +1142,15 @@ function mkStDataRow(
       mkStDataCell(ST_III_CED, formatStField(row.cedula)),
       mkStDataCell(
         ST_III_APE,
-        formatStField(row.apellidos, ST_EMPTY, layout.useSpanishNames),
+        layout.useSpanishNames
+          ? formatPlanillaStudentText(row.apellidos, true)
+          : formatStField(row.apellidos),
       ),
       mkStDataCell(
         ST_III_NOM,
-        formatStField(row.nombres, ST_EMPTY, layout.useSpanishNames),
+        layout.useSpanishNames
+          ? formatPlanillaStudentText(row.nombres, true)
+          : formatStField(row.nombres),
       ),
       mkStDataCell(ST_III_LUG, formatStField(row.lugarNacimiento)),
       mkStDataCell(

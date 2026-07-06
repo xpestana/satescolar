@@ -152,7 +152,13 @@ export function ResumenFinalTab() {
       if (downloadKey === "all") {
         const allData = await Promise.all(
           sectionParts.map(sp =>
-            fetchResumenFinalDocxData(schoolId, selectedYearId, sp.section.id, sp.parte)
+            fetchResumenFinalDocxData(
+              schoolId,
+              selectedYearId,
+              sp.section.id,
+              sp.parte,
+              sp.config?.tipo_planilla ?? form.tipo_planilla,
+            )
           )
         );
         const results = await generateResumenFinalDocx(allData);
@@ -164,7 +170,13 @@ export function ResumenFinalTab() {
         const [sectionId, parteStr] = downloadKey.split("__");
         const parte = parseInt(parteStr, 10);
         const sp = sectionParts.find(s => s.section.id === sectionId && s.parte === parte);
-        const data = await fetchResumenFinalDocxData(schoolId, selectedYearId, sectionId, parte);
+        const data = await fetchResumenFinalDocxData(
+          schoolId,
+          selectedYearId,
+          sectionId,
+          parte,
+          form.tipo_planilla,
+        );
         const gradeLabel = ALL_GRADE_LABELS[sp?.section.grade_level ?? ""] ?? sp?.section.grade_level ?? "";
         const filename = `Resumen_Final_${gradeLabel}_${sp?.section.name ?? "Sec"}_P${parte}.docx`.replace(/\s+/g, "_");
         const results = await generateResumenFinalDocx([data]);

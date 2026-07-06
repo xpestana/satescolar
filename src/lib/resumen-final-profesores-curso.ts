@@ -72,6 +72,31 @@ export function estimateProfesoresBlockHeight(
   return FOOT_V_HDR_H * 2 + (nRegular + nProductive) * FOOT_V_DATA_H + gpH;
 }
 
+/** Altura extra cuando nombres de materia/profesor ocupan más de una línea. */
+export function estimateProfesoresWrapExtra(
+  subjects: Array<{ name: string; teacherName?: string }>,
+  areaColWidthTwips: number,
+  profesorColWidthTwips: number,
+): number {
+  if (subjects.length === 0) return 0;
+  const charsPerLine = (width: number) => Math.max(14, Math.floor(width / 95));
+  const areaCpl = charsPerLine(areaColWidthTwips);
+  const profCpl = charsPerLine(profesorColWidthTwips);
+  let extra = 0;
+  for (const s of subjects) {
+    const nameLen = (s.name ?? "").trim().length;
+    const teacherLen = (s.teacherName ?? "").trim().length;
+    const lines = Math.max(
+      Math.ceil(nameLen / areaCpl),
+      Math.ceil(teacherLen / profCpl),
+    );
+    if (lines > 1) {
+      extra += (lines - 1) * Math.round(FOOT_V_DATA_H * 0.9);
+    }
+  }
+  return extra;
+}
+
 type ViSlot = { type: "label" | "value"; text: string };
 
 export type ViRowContent =

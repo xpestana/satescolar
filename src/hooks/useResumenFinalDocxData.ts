@@ -6,7 +6,7 @@ import {
   buildGeoCacheFromFormData,
   resolveGeoName,
 } from "@/lib/geo-resolve";
-import { formatPlanillaStudentText } from "@/lib/resumen-final-text";
+import { formatPlanillaStudentNameParts, formatPlanillaStudentText } from "@/lib/resumen-final-text";
 
 export interface SubjectCol {
   id: string;
@@ -291,16 +291,15 @@ function studentNamePart(
   parts: unknown[],
   tipoPlanilla: "31059" | "31060",
 ): string {
-  const joined = parts.filter(Boolean).join(" ");
-  const useSpanish = tipoPlanilla === "31060";
-  return formatPlanillaStudentText(joined, useSpanish);
+  return formatPlanillaStudentNameParts(parts, tipoPlanilla === "31060");
 }
 
 export async function fetchResumenFinalDocxData(
   schoolId: string,
   schoolYearId: string,
   sectionId: string,
-  parte: number
+  parte: number,
+  tipoPlanillaOverride?: "31059" | "31060",
 ): Promise<ResumenFinalDocxData> {
   if (!schoolId || !schoolYearId || !sectionId) throw new Error("Missing params");
 
@@ -335,7 +334,9 @@ export async function fetchResumenFinalDocxData(
     .eq("section_id", sectionId)
     .eq("parte", parte)
     .maybeSingle();
-  const tipoPlanilla = (rfConfig?.tipo_planilla as "31059" | "31060") ?? "31059";
+  const tipoPlanilla = String(
+    tipoPlanillaOverride ?? rfConfig?.tipo_planilla ?? "31059",
+  ).trim() as "31059" | "31060";
   const useGpGrupoColumns = tipoPlanilla === "31059";
 
   // 4. enrollments → student IDs, ordered

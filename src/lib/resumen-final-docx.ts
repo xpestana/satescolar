@@ -14,8 +14,8 @@ export async function generateResumenFinalDocx(
 ): Promise<DocxResult[]> {
   const arr = Array.isArray(sections) ? sections : [sections];
 
-  const groups59 = arr.filter((s) => s.tipoPlanilla !== "31060");
-  const groups60 = arr.filter((s) => s.tipoPlanilla === "31060");
+  const groups59 = arr.filter((s) => String(s.tipoPlanilla).trim() !== "31060");
+  const groups60 = arr.filter((s) => String(s.tipoPlanilla).trim() === "31060");
 
   const results: DocxResult[] = [];
 

@@ -3,6 +3,8 @@ import {
   assignViToRows,
   computeColumnWidths,
   computeViStartOffset,
+  estimateProfesoresWrapExtra,
+  FOOT_V_DATA_H,
   VI_START_AFTER_IV_COLS,
   VI_START_AFTER_IV_COLS_31059,
 } from "./resumen-final-profesores-curso";
@@ -162,5 +164,31 @@ describe("computeColumnWidths", () => {
     );
     expect(vW).toBe(ST_COL_III + narrowColIv);
     expect(viW).toBe(0);
+  });
+});
+
+describe("estimateProfesoresWrapExtra", () => {
+  it("suma altura cuando el nombre de materia ocupa varias líneas", () => {
+    const extra = estimateProfesoresWrapExtra(
+      [
+        {
+          name: "GEOGRAFIA, HISTORIA Y SOBERANIA NACIONAL",
+          teacherName: "DOCENTE",
+        },
+      ],
+      2200,
+      3000,
+    );
+    expect(extra).toBeGreaterThan(0);
+    expect(extra).toBeLessThanOrEqual(FOOT_V_DATA_H * 2);
+  });
+
+  it("no suma extra para nombres cortos", () => {
+    const extra = estimateProfesoresWrapExtra(
+      [{ name: "QUIMICA", teacherName: "DOCENTE" }],
+      2200,
+      3000,
+    );
+    expect(extra).toBe(0);
   });
 });
