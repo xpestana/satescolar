@@ -36,10 +36,17 @@ import {
 } from "@/lib/resumen-final-firmas";
 import { GRADE_LABELS } from "@/lib/buildInvoiceData";
 import { RF } from "@/lib/resumen-final-docx-labels";
+import { formatPlanillaStudentText } from "@/lib/resumen-final-text";
 
 export type ResumenFinalDocxVariant = {
   /** Solo planilla 31059 (sin menci?n): columnas GP + GRUPO para GCRP. */
   includeGpGrupo: boolean;
+  /** URL del logo de cabecera (default: LOGO_URL de S3). */
+  logoUrl?: string;
+  /** Margen izquierdo del logo en twips (negativo desplaza a la izquierda). */
+  logoMarginLeft?: number;
+  /** Preserva Ñ y acentos al mayusculizar nombres/apellidos (planilla 31060). */
+  useSpanishNames?: boolean;
 };
 
 // ??? p?gina (estrategia UEH: hoja virtual alta; ancho din?mico seg?n materias IV) ??
@@ -164,6 +171,8 @@ type SheetLayout = {
   nProductive: number;
   nIvCols: number;
   includeGpGrupo: boolean;
+  useSpanishNames: boolean;
+  logoMarginLeft: number;
   ivGpIndex?: number;
   ivGrupoIndex?: number;
 };
@@ -311,6 +320,8 @@ function computeSheetLayout(
     nProductive,
     nIvCols: stIvCols.length,
     includeGpGrupo,
+    useSpanishNames: variant.useSpanishNames ?? false,
+    logoMarginLeft: variant.logoMarginLeft ?? 0,
     ...(includeGpGrupo
       ? {
           ivGpIndex: nRegular + nProductive,
@@ -691,15 +702,56 @@ function getPngDimensions(
   return { width: v.getUint32(16), height: v.getUint32(20) };
 }
 
+type DocxImageType = "png" | "jpg" | "gif" | "bmp";
+
+function detectImageType(buffer: ArrayBuffer): DocxImageType {
+  const v = new Uint8Array(buffer);
+  if (v[0] === 0x89 && v[1] === 0x50) return "png";
+  if (v[0] === 0xff && v[1] === 0xd8) return "jpg";
+  if (v[0] === 0x47 && v[1] === 0x49) return "gif";
+  if (v[0] === 0x42 && v[1] === 0x4d) return "bmp";
+  return "png";
+}
+
+function getJpegDimensions(
+  buffer: ArrayBuffer,
+): { width: number; height: number } | null {
+  const v = new Uint8Array(buffer);
+  if (v.length < 4 || v[0] !== 0xff || v[1] !== 0xd8) return null;
+  let offset = 2;
+  while (offset < v.length - 8) {
+    if (v[offset] !== 0xff) break;
+    const marker = v[offset + 1];
+    const len = (v[offset + 2] << 8) | v[offset + 3];
+    if (marker === 0xc0 || marker === 0xc2) {
+      const height = (v[offset + 5] << 8) | v[offset + 6];
+      const width = (v[offset + 7] << 8) | v[offset + 8];
+      if (width > 0 && height > 0) return { width, height };
+      return null;
+    }
+    offset += 2 + len;
+  }
+  return null;
+}
+
+function getImageDimensions(
+  buffer: ArrayBuffer,
+): { width: number; height: number } | null {
+  const kind = detectImageType(buffer);
+  if (kind === "png") return getPngDimensions(buffer);
+  if (kind === "jpg") return getJpegDimensions(buffer);
+  return null;
+}
+
 function logoImageSize(
   cellWidthTwips: number,
   logoBuffer: ArrayBuffer,
   maxHeightPx = LOGO_MAX_HEIGHT_PX,
 ): { width: number; height: number } {
   const widthPx = twipsToImagePx(cellWidthTwips);
-  const dims = getPngDimensions(logoBuffer);
+  const dims = getImageDimensions(logoBuffer);
   if (!dims?.width || !dims?.height)
-    return { width: widthPx, height: Math.round(widthPx * 0.15) };
+    return { width: widthPx, height: Math.round(widthPx * 0.2) };
 
   let width = widthPx;
   let height = Math.round(widthPx * (dims.height / dims.width));
@@ -900,9 +952,14 @@ function mkIvMergeContinue(
   });
 }
 
-function formatStField(value: string, empty = ST_EMPTY): string {
+function formatStField(
+  value: string,
+  empty = ST_EMPTY,
+  useSpanishNames = false,
+): string {
   const v = (value ?? "").trim();
-  return v ? v.toUpperCase() : empty;
+  if (!v) return empty;
+  return formatPlanillaStudentText(v, useSpanishNames);
 }
 
 function formatStNro(n: number): string {
@@ -1005,8 +1062,14 @@ function mkStDataRow(
     [
       mkStDataCell(ST_III_NRO, formatStNro(row.nro)),
       mkStDataCell(ST_III_CED, formatStField(row.cedula)),
-      mkStDataCell(ST_III_APE, formatStField(row.apellidos)),
-      mkStDataCell(ST_III_NOM, formatStField(row.nombres)),
+      mkStDataCell(
+        ST_III_APE,
+        formatStField(row.apellidos, ST_EMPTY, layout.useSpanishNames),
+      ),
+      mkStDataCell(
+        ST_III_NOM,
+        formatStField(row.nombres, ST_EMPTY, layout.useSpanishNames),
+      ),
       mkStDataCell(ST_III_LUG, formatStField(row.lugarNacimiento)),
       mkStDataCell(
         ST_III_EF,
@@ -1256,7 +1319,7 @@ async function buildHeaderBlock(
             new Paragraph({
               children: [
                 new ImageRun({
-                  type: "png",
+                  type: detectImageType(logoBuffer),
                   data: logoBuffer,
                   transformation: logoSize,
                 }),
@@ -1272,7 +1335,12 @@ async function buildHeaderBlock(
           ],
     borders: BORDERS_NONE,
     verticalAlign: VerticalAlign.TOP,
-    margins: { top: 0, bottom: 0, left: 0, right: 20 },
+    margins: {
+      top: 0,
+      bottom: 0,
+      left: layout.logoMarginLeft,
+      right: 20,
+    },
   });
 
   const wLineMes = rightInnerW - W_LBL_COL0 - W_LINE_TIPO - W_LBL_MES;
@@ -1526,9 +1594,10 @@ export async function generateResumenFinalDocxBase(
 ): Promise<Blob> {
   const dataArray = Array.isArray(sections) ? sections : [sections];
 
+  const logoUrl = variant.logoUrl ?? LOGO_URL;
   let logoBuffer: ArrayBuffer | null = null;
   try {
-    const res = await fetch(LOGO_URL);
+    const res = await fetch(logoUrl);
     if (res.ok) logoBuffer = await res.arrayBuffer();
   } catch {
     // sin logo

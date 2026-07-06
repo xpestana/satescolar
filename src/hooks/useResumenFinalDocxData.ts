@@ -6,6 +6,7 @@ import {
   buildGeoCacheFromFormData,
   resolveGeoName,
 } from "@/lib/geo-resolve";
+import { formatPlanillaStudentText } from "@/lib/resumen-final-text";
 
 export interface SubjectCol {
   id: string;
@@ -268,6 +269,33 @@ function entidadFederalFromForm(
   return "";
 }
 
+/** Planilla 31060: nombre completo del municipio de nacimiento. */
+function municipioCompletoFromForm(
+  fd: Record<string, unknown>,
+  geoCache: Record<string, string>,
+): string {
+  return resolveGeoName(fd.municipio_nacimiento as string, geoCache);
+}
+
+/** Planilla 31060: sigla del municipio (primeras 2 letras del nombre). */
+function municipioSiglaFromForm(
+  fd: Record<string, unknown>,
+  geoCache: Record<string, string>,
+): string {
+  const name = municipioCompletoFromForm(fd, geoCache);
+  if (!name) return "";
+  return formatPlanillaStudentText(name, true).substring(0, 2);
+}
+
+function studentNamePart(
+  parts: unknown[],
+  tipoPlanilla: "31059" | "31060",
+): string {
+  const joined = parts.filter(Boolean).join(" ");
+  const useSpanish = tipoPlanilla === "31060";
+  return formatPlanillaStudentText(joined, useSpanish);
+}
+
 export async function fetchResumenFinalDocxData(
   schoolId: string,
   schoolYearId: string,
@@ -477,8 +505,14 @@ export async function fetchResumenFinalDocxData(
     const student = studentsMap.get(sid);
     const fd = (student?.form_data || {}) as Record<string, unknown>;
 
-    const apellidos = [fd.primer_apellido, fd.segundo_apellido].filter(Boolean).join(" ").toUpperCase();
-    const nombres = [fd.primer_nombre, fd.segundo_nombre].filter(Boolean).join(" ").toUpperCase();
+    const apellidos = studentNamePart(
+      [fd.primer_apellido, fd.segundo_apellido],
+      tipoPlanilla,
+    );
+    const nombres = studentNamePart(
+      [fd.primer_nombre, fd.segundo_nombre],
+      tipoPlanilla,
+    );
 
     const grades: Record<string, string> = {};
     [...regularAssignments, ...productiveAssignments].forEach((a) => {
@@ -522,13 +556,25 @@ export async function fetchResumenFinalDocxData(
       anioNac = String(fd.anio_nacimiento || "");
     }
 
+    const lugarNacimiento =
+      tipoPlanilla === "31060"
+        ? formatPlanillaStudentText(
+            municipioCompletoFromForm(fd, geoCache),
+            true,
+          )
+        : lugarNacimientoFromForm(fd, geoCache).toUpperCase();
+    const entidadFederal =
+      tipoPlanilla === "31060"
+        ? municipioSiglaFromForm(fd, geoCache)
+        : entidadFederalFromForm(fd, geoCache);
+
     return {
       nro: idx + 1,
       cedula: student?.document_id || "",
       apellidos,
       nombres,
-      lugarNacimiento: lugarNacimientoFromForm(fd, geoCache).toUpperCase(),
-      entidadFederal: entidadFederalFromForm(fd, geoCache),
+      lugarNacimiento,
+      entidadFederal,
       sexo: (fd.sexo || fd.genero || "").toUpperCase().substring(0, 1),
       diaNac,
       mesNac,
