@@ -175,7 +175,7 @@ export function ResumenFinalTab() {
           selectedYearId,
           sectionId,
           parte,
-          form.tipo_planilla,
+          sp?.config?.tipo_planilla ?? form.tipo_planilla,
         );
         const gradeLabel = ALL_GRADE_LABELS[sp?.section.grade_level ?? ""] ?? sp?.section.grade_level ?? "";
         const filename = `Resumen_Final_${gradeLabel}_${sp?.section.name ?? "Sec"}_P${parte}.docx`.replace(/\s+/g, "_");

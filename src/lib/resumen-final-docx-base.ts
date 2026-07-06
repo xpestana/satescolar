@@ -985,14 +985,35 @@ type StHdrCellOpts = {
   vertical?: boolean;
   vertCompact?: boolean; // EF, SEXO, DIA, MES, A?O
   verticalMerge?: (typeof VerticalMergeType)[keyof typeof VerticalMergeType];
+  fit?: boolean; // reduce el tamaño para que la sigla quepa en UNA sola línea
 };
 
+/**
+ * Calcula el tamaño de fuente para que `text` (Arial bold, mayúsculas) quepa en
+ * una sola línea dentro de una celda de ancho `w` (twips). Solo encoge: nunca
+ * supera ST_HDR_FONT_SIZE. Sirve para siglas largas como "GHSN" en columnas
+ * angostas (IV_MATERIA_W = 450). Ajustar TWIPS_PER_CHAR_PT si algo aún se parte.
+ */
+const TWIPS_PER_CHAR_PT = 14; // ancho aprox. de un carácter, en twips por punto
+function fitHdrSize(text: string, w: number, sideMargin: number): number {
+  const avail = w - sideMargin * 2;
+  const len = Math.max(1, text.length);
+  const fit = Math.floor(avail / (TWIPS_PER_CHAR_PT * len));
+  return Math.min(ST_HDR_FONT_SIZE, Math.max(6, fit));
+}
+
 function mkStHdrCell(w: number, text: string, opts?: StHdrCellOpts): TableCell {
+  const sideMargin = opts?.vertCompact ? 2 : 8;
   const children = opts?.multiline
     ? tblPMulti(opts.multiline)
     : opts?.vertical
       ? tblPVertical(text, ST_HDR_VERT_LINE)
-      : [tblP(text, { bold: true, size: ST_HDR_FONT_SIZE })];
+      : [
+          tblP(text, {
+            bold: true,
+            size: opts?.fit ? fitHdrSize(text, w, sideMargin) : ST_HDR_FONT_SIZE,
+          }),
+        ];
 
   const padTop = opts?.vertCompact ? ST_HDR_VERT_PAD_TOP : ST_HDR_CELL_PAD_TOP;
   const padBottom = opts?.vertCompact
@@ -1081,7 +1102,10 @@ function mkStDataCell(
       new Paragraph({
         children: [t(text, { size: ST_DATA_FONT_SIZE, bold: false })],
         alignment: align,
-        spacing: { before: 0, after: 0, line: 200, lineRule: "exact" as const },
+        // line 240 (12pt) da altura suficiente para no recortar diacríticos
+        // (virgulilla de Ñ, tildes) con texto Arial 10pt. La fila es ATLEAST
+        // ST_DATA_ROW_MIN (412), así que esto no altera el alto ni el layout.
+        spacing: { before: 0, after: 0, line: 240, lineRule: "exact" as const },
       }),
     ],
     verticalAlign: VerticalAlign.CENTER,
@@ -1256,12 +1280,15 @@ function buildEstudiantesBlock(
   const ivHdrRow4Cells = includeGpGrupo
     ? [
         ...regularSubjects.map((s, i) =>
-          mkStHdrCell(layout.stIvCols[i], s.abbreviation.toUpperCase()),
+          mkStHdrCell(layout.stIvCols[i], s.abbreviation.toUpperCase(), {
+            fit: true,
+          }),
         ),
         ...productiveSubjects.map((s, i) =>
           mkStHdrCell(
             layout.stIvCols[nRegular + i],
             s.abbreviation.toUpperCase(),
+            { fit: true },
           ),
         ),
         mkStHdrCell(layout.stIvCols[ivGpIndex], RF.GP),
@@ -1269,12 +1296,15 @@ function buildEstudiantesBlock(
       ]
     : [
         ...regularSubjects.map((s, i) =>
-          mkStHdrCell(layout.stIvCols[i], s.abbreviation.toUpperCase()),
+          mkStHdrCell(layout.stIvCols[i], s.abbreviation.toUpperCase(), {
+            fit: true,
+          }),
         ),
         ...productiveSubjects.map((s, i) =>
           mkStHdrCell(
             layout.stIvCols[nRegular + i],
             s.abbreviation.toUpperCase(),
+            { fit: true },
           ),
         ),
       ];

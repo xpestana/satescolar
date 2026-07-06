@@ -262,14 +262,17 @@ function entidadFederalFromForm(
   geoCache: Record<string, string>,
   stateAcronymCache: Record<string, string>,
 ): string {
-  const ef = fd.entidad_federal;
-  if (typeof ef === "string" && ef.trim() && !GEO_UUID_PATTERN.test(ef.trim())) {
-    return ef.trim().toUpperCase();
-  }
+  // Prioridad: derivar la entidad federal del estado de nacimiento (dato geo
+  // autoritativo) → acrónimo. El campo libre `entidad_federal` suele traer datos
+  // viejos/errados (p.ej. "BA") y solo se usa como respaldo si no hay estado geo.
   const stateRef = fd.estado_nacimiento as string | undefined;
   if (stateRef && GEO_UUID_PATTERN.test(stateRef.trim())) {
     const acronym = stateAcronymCache[stateRef.trim()];
     if (acronym) return acronym.toUpperCase();
+  }
+  const ef = fd.entidad_federal;
+  if (typeof ef === "string" && ef.trim() && !GEO_UUID_PATTERN.test(ef.trim())) {
+    return ef.trim().toUpperCase();
   }
   const state = resolveGeoName(stateRef, geoCache);
   if (state) return state.toUpperCase().substring(0, 2);

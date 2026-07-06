@@ -31,5 +31,6 @@ export function formatResumenFinalGrade(
   const num = parseFloat(gradeValue) + (adjPoints ?? 0);
   if (isNaN(num)) return "";
   if (evalType === "literal") return formatBoletaGradeValue(num, evalType);
-  return Number.isInteger(num) ? String(num) : num.toFixed(1);
+  // Redondeo básico a entero: 19.5 → 20, 18.2 → 18 (Math.round = mitad hacia arriba).
+  return String(Math.round(num));
 }
