@@ -503,7 +503,6 @@ export default function FinalGradesTab({
           });
           const calcVal = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
           edited[key] = calcVal;
-          db[key] = calcVal;
           let totalAtt = 0, totalAbs = 0;
           for (const mo of [1, 2, 3]) {
             const moKey = `${s.student_id}-${mo}`;
@@ -678,7 +677,45 @@ export default function FinalGradesTab({
     return counts;
   }, [students, isAnyDirty]);
 
-  const totalDirty = dirtyCountByMomento[0] + dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
+  /** Algún estudiante sin nota cargada en momento 1, 2 o 3 — bloquea Guardar Todos. */
+  const hasMissingMomentGrades = useMemo(() => {
+    for (const s of students) {
+      for (const m of [1, 2, 3]) {
+        const key = `${s.student_id}-${m}`;
+        const val = isPrimary || isPreschool
+          ? (literals[key] || "").trim()
+          : (editedGrades[key] || "").trim();
+        if (!val) return true;
+      }
+    }
+    return false;
+  }, [students, editedGrades, literals, isPrimary, isPreschool]);
+
+  const isUnpersistedDefinitiva = useCallback(
+    (key: string) => {
+      const val = (editedGrades[key] || "").trim();
+      return isBachillerato && val !== "" && !isMomento0Persisted(key);
+    },
+    [editedGrades, isBachillerato, isMomento0Persisted],
+  );
+
+  const needsSave = useCallback(
+    (key: string, momento: number) => {
+      if (isAnyDirty(key)) return true;
+      return momento === 0 && isUnpersistedDefinitiva(key);
+    },
+    [isAnyDirty, isUnpersistedDefinitiva],
+  );
+
+  const totalToSave = useMemo(() => {
+    let count = 0;
+    for (const s of students) {
+      for (const m of [0, 1, 2, 3]) {
+        if (needsSave(`${s.student_id}-${m}`, m)) count++;
+      }
+    }
+    return count;
+  }, [students, needsSave]);
 
   const unpersistedDefinitivaCount = useMemo(() => {
     if (!isBachillerato) return 0;
@@ -723,7 +760,13 @@ export default function FinalGradesTab({
     const dbEf = dbExtraFieldsRef.current[key] || DEFAULT_EXTRA;
     const gradeChanged = val !== savedVal;
     const extraChanged = ef.observation !== dbEf.observation || ef.attendance_count !== dbEf.attendance_count || ef.absence_count !== dbEf.absence_count || ef.final_status !== dbEf.final_status;
-    if (!gradeChanged && !extraChanged) return;
+    const unpersistedDefinitiva =
+      momento === 0 &&
+      isBachillerato &&
+      val !== "" &&
+      !persistedMomento0Keys.has(key) &&
+      !sessionPersistedMomento0.has(key);
+    if (!gradeChanged && !extraChanged && !unpersistedDefinitiva) return;
 
     setSavingKeys(prev => new Set(prev).add(key));
     try {
@@ -768,7 +811,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
-  }, [assignmentIds, schoolId, isNumeric]);
+  }, [assignmentIds, schoolId, isNumeric, isBachillerato, persistedMomento0Keys, sessionPersistedMomento0]);
 
   const adjustPoint = useCallback(async (studentId: string, momento: number, delta: number) => {
     if (assignmentIds.length === 0) return;
@@ -805,7 +848,7 @@ export default function FinalGradesTab({
   }, [assignmentIds, editedGrades, dbValues, adjustments, extraFields, schoolId]);
 
   const saveAll = useCallback(async () => {
-    if (assignmentIds.length === 0 || totalDirty === 0) return;
+    if (assignmentIds.length === 0 || hasMissingMomentGrades || totalToSave === 0) return;
     setSavingAll(true);
     try {
       if (isPrimary || isPreschool) {
@@ -815,7 +858,7 @@ export default function FinalGradesTab({
         for (const s of students) {
           for (const m of [1, 2, 3, 0]) {
             const key = `${s.student_id}-${m}`;
-            if (!isAnyDirty(key)) continue;
+            if (!needsSave(key, m)) continue;
             const ef = extraFields[key] || DEFAULT_EXTRA;
             upserts.push({
               student_id: s.student_id,
@@ -850,7 +893,7 @@ export default function FinalGradesTab({
         for (const s of students) {
           for (const m of [1, 2, 3, 0]) {
             const key = `${s.student_id}-${m}`;
-            if (!isAnyDirty(key)) continue;
+            if (!needsSave(key, m)) continue;
             const val = (editedGrades[key] || "").trim();
             const ef = extraFields[key] || DEFAULT_EXTRA;
             if (val !== "" || dbValues[key]) {
@@ -889,7 +932,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingAll(false);
     }
-  }, [isPrimary, isPreschool, assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, isAnyDirty, totalDirty, literals, dbLiterals]);
+  }, [isPrimary, isPreschool, assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, needsSave, hasMissingMomentGrades, totalToSave, literals, dbLiterals]);
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return students;
@@ -1384,15 +1427,26 @@ export default function FinalGradesTab({
                 <Loader2 className="h-4 w-4 animate-spin" /> Guardando...
               </div>
             )}
-            <Button
-              size="sm"
-              onClick={saveAll}
-              disabled={totalDirty === 0 || savingAll}
-              className="gap-1.5"
-            >
-              {savingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Guardar Todos {totalDirty > 0 && `(${totalDirty})`}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <Button
+                    size="sm"
+                    onClick={saveAll}
+                    disabled={hasMissingMomentGrades || savingAll}
+                    className="gap-1.5"
+                  >
+                    {savingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Guardar Todos {totalToSave > 0 && `(${totalToSave})`}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {hasMissingMomentGrades && (
+                <TooltipContent className="max-w-xs text-xs">
+                  <p>Complete y guarde las notas de los momentos 1, 2 y 3 de todos los estudiantes antes de usar Guardar Todos.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
             {isNumeric && !isPrimary && (
               <Tooltip>
                 <TooltipTrigger asChild>

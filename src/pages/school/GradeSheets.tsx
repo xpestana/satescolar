@@ -11,12 +11,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, Users, Info, Hammer, Settings2, Building2, Hash, ClipboardList } from "lucide-react";
+import { Loader2, Download, FileText, Users, Info, Hammer, Settings2, Building2, ClipboardList } from "lucide-react";
 import { DocumentBuilder } from "@/components/utilities/DocumentBuilder";
 import { usePlanillasConfig } from "@/hooks/usePlanillasConfig";
 import { DatosComunes } from "@/components/planillas/config/DatosComunes";
-import { CodigosEducacion } from "@/components/planillas/config/CodigosEducacion";
-import { ConfiguracionRFRE } from "@/components/planillas/config/ConfiguracionRFRE";
 import { useSabanaConfig } from "@/hooks/useSabanaConfig";
 import { SabanaConfigPanel } from "@/components/planillas/sabana/SabanaConfigPanel";
 import { ResumenFinalTab } from "@/components/planillas/resumen-final/ResumenFinalTab";
@@ -496,8 +494,6 @@ export default function GradeSheets() {
                   </p>
                   {([
                     { value: "datos-comunes", icon: Building2, label: "Datos comunes" },
-                    { value: "codigos",       icon: Hash,      label: "Códigos" },
-                    { value: "rfre",          icon: Settings2, label: "Configuraciones RFRE" },
                   ] as const).map(({ value, icon: Icon, label }) => (
                     <TabsTrigger
                       key={value}
@@ -517,20 +513,6 @@ export default function GradeSheets() {
                     <DatosComunes
                       schoolHeader={planillasConfig.schoolHeader}
                       saveSchoolHeader={planillasConfig.saveSchoolHeader}
-                      isLoading={planillasConfig.isLoading}
-                    />
-                  </TabsContent>
-                  <TabsContent value="codigos" className="mt-0">
-                    <CodigosEducacion
-                      educationCodes={planillasConfig.educationCodes}
-                      saveEducationCodes={planillasConfig.saveEducationCodes}
-                      isLoading={planillasConfig.isLoading}
-                    />
-                  </TabsContent>
-                  <TabsContent value="rfre" className="mt-0">
-                    <ConfiguracionRFRE
-                      rfreConfig={planillasConfig.rfreConfig}
-                      saveRfreConfig={planillasConfig.saveRfreConfig}
                       isLoading={planillasConfig.isLoading}
                     />
                   </TabsContent>
