@@ -339,26 +339,36 @@ export async function fetchResumenFinalDocxData(
   ).trim() as "31059" | "31060";
   const useGpGrupoColumns = tipoPlanilla === "31059";
 
-  // 4. enrollments → student IDs, ordered
+  // 4. enrollments → student IDs ordenados por cédula (menor a mayor)
   const { data: enrollments } = await supabase
     .from("enrollments")
     .select("student_id")
     .eq("school_id", schoolId)
     .eq("school_year_id", schoolYearId)
     .eq("section_id", sectionId);
-  const allStudentIds = (enrollments ?? []).map(e => e.student_id);
+  const enrolledStudentIds = (enrollments ?? []).map((e) => e.student_id);
+  if (enrolledStudentIds.length === 0) throw new Error("No students for this section");
+
+  const { data: enrolledStudents } = await supabase
+    .from("students")
+    .select("id, document_id, form_data")
+    .in("id", enrolledStudentIds);
+
+  const studentsMap = new Map((enrolledStudents ?? []).map((s) => [s.id, s]));
+  const allStudentIds = [...(enrolledStudents ?? [])]
+    .sort((a, b) =>
+      (a.document_id ?? "").localeCompare(b.document_id ?? "", undefined, {
+        numeric: true,
+      }),
+    )
+    .map((s) => s.id);
   const totalStudentsInSection = allStudentIds.length;
   const start = (parte - 1) * 35;
   const pageStudentIds = allStudentIds.slice(start, start + 35);
 
   if (pageStudentIds.length === 0) throw new Error("No students for this parte");
 
-  // 5. students data
-  const { data: students } = await supabase
-    .from("students")
-    .select("id, document_id, form_data")
-    .in("id", pageStudentIds);
-  const studentsMap = new Map((students ?? []).map(s => [s.id, s]));
+  // 5. students data (ya cargados en studentsMap)
 
   // 6. regular subject assignments for this section
   const regularAssignments = await fetchRegularAssignmentsForSection(schoolId, schoolYearId, sectionId);
