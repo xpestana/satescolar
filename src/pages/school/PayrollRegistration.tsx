@@ -7,12 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
-import { Search, CreditCard, CheckCircle2, DollarSign, Ban, Loader2 } from "lucide-react";
+import { Search, CreditCard, CheckCircle2, DollarSign, Ban, Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +38,7 @@ export default function PayrollRegistration() {
   const { beneficiaries } = usePayrollBeneficiaries(schoolId);
 
   const [periodId, setPeriodId] = useState<string>("");
+  const [periodOpen, setPeriodOpen] = useState(false);
   const activePeriodId = periodId || periods[0]?.id || "";
 
   const { payments, approvePayment, markPaid, voidPayment } = usePayrollPayments(schoolId, { periodId: activePeriodId });
@@ -118,14 +122,36 @@ export default function PayrollRegistration() {
       ) : (
         <>
           <div className="flex flex-wrap gap-3 mb-4">
-            <Select value={activePeriodId} onValueChange={setPeriodId}>
-              <SelectTrigger className="w-[240px]"><SelectValue placeholder="Período" /></SelectTrigger>
-              <SelectContent>
-                {periods.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name} {p.status === "closed" ? "(cerrado)" : ""}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={periodOpen} onOpenChange={setPeriodOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={periodOpen} className="w-[240px] justify-between font-normal">
+                  <span className="truncate">
+                    {activePeriod ? `${activePeriod.name}${activePeriod.status === "closed" ? " (cerrado)" : ""}` : "Período"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Buscar período..." />
+                  <CommandList>
+                    <CommandEmpty>No se encontró ningún período.</CommandEmpty>
+                    <CommandGroup>
+                      {periods.map((p) => (
+                        <CommandItem
+                          key={p.id}
+                          value={p.name}
+                          onSelect={() => { setPeriodId(p.id); setPeriodOpen(false); }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", activePeriodId === p.id ? "opacity-100" : "opacity-0")} />
+                          {p.name} {p.status === "closed" ? "(cerrado)" : ""}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input className="pl-9" placeholder="Buscar por nombre o cédula..." value={search} onChange={(e) => setSearch(e.target.value)} />
