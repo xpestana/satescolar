@@ -80,21 +80,21 @@ export function PayrollMethodsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
-          <DialogTitle>Métodos de pago — {beneficiaryName}</DialogTitle>
+          <DialogTitle className="truncate">Métodos de pago — {beneficiaryName}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-1">
+        <div className="space-y-4 py-1 min-w-0">
           {/* Existing methods */}
           <div className="space-y-2">
             {methods.length === 0 && (
               <p className="text-sm text-muted-foreground">No hay métodos guardados aún.</p>
             )}
             {methods.map((m) => (
-              <div key={m.id} className="flex items-center justify-between rounded-md border p-2.5">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+              <div key={m.id} className="flex items-center justify-between gap-2 rounded-md border p-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{m.label || METHOD_LABELS[m.method_type]}</span>
                     <Badge variant="outline" className="text-xs">{METHOD_LABELS[m.method_type]}</Badge>
                     {m.is_default && (
@@ -106,6 +106,7 @@ export function PayrollMethodsModal({
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="shrink-0"
                   onClick={() =>
                     deleteMethod.mutate(m.id, {
                       onSuccess: () => toast({ title: "Método eliminado" }),
@@ -122,7 +123,7 @@ export function PayrollMethodsModal({
           <div className="rounded-md border bg-muted/30 p-3 space-y-3">
             <p className="text-sm font-medium">Agregar método</p>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs">Tipo</Label>
                 <Select value={methodType} onValueChange={(v) => { setMethodType(v as PayrollMethodType); setConfig({}); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -131,7 +132,7 @@ export function PayrollMethodsModal({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs">Etiqueta (opcional)</Label>
                 <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ej: Banesco principal" />
               </div>

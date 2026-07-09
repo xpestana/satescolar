@@ -136,12 +136,12 @@ export function PayrollPaymentFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
-          <DialogTitle>Registrar Pago — {beneficiary.full_name}</DialogTitle>
+          <DialogTitle className="truncate">Registrar Pago — {beneficiary.full_name}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-1">
+        <div className="space-y-4 py-1 min-w-0">
           {/* Currency + rate + method */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
