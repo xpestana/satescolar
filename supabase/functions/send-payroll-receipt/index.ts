@@ -1,5 +1,6 @@
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
 import {
+  asciiSubject,
   buildReceiptHtml,
   type Currency,
   type ReceiptEmailData,
@@ -140,7 +141,7 @@ export default async function handler(req: Request): Promise<Response> {
     await sendViaSmtp({
       from: `${fromName} <${fromEmail}>`,
       to: [to],
-      subject: `Recibo de pago — ${data.periodName}`,
+      subject: asciiSubject(`Recibo de pago - ${data.periodName}`),
       html: buildReceiptHtml(data),
     } as any);
 

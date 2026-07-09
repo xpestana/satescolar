@@ -1,5 +1,6 @@
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
 import {
+  asciiSubject,
   buildMonthlyReportHtml,
   money,
   type MonthlyReportData,
@@ -139,7 +140,7 @@ async function reportForSchool(
   await sendViaSmtp({
     from: `${fromName} <${fromEmail}>`,
     to: [to],
-    subject: `Reporte de nómina — ${monthLabel} (${money(totalVes, "VES")})`,
+    subject: asciiSubject(`Reporte de nomina - ${monthLabel} (${money(totalVes, "VES")})`),
     html: buildMonthlyReportHtml(data),
   } as any);
 

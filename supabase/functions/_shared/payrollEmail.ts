@@ -41,6 +41,21 @@ export interface MonthlyReportData {
   byMethod: ReportBucket[];
 }
 
+/**
+ * Force a subject to pure ASCII. The shared SMTP client pre-encodes non-ASCII
+ * subjects as RFC 2047 words, which denomailer then re-encodes (QP), corrupting
+ * the base64 padding so clients show the raw "=?utf-8?b?...?=" string. Keeping
+ * the subject ASCII (dropping accents, normalizing dashes) avoids that path.
+ */
+export function asciiSubject(value: string): string {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[—–]/g, "-")
+    .replace(/[^\x20-\x7E]/g, "")
+    .trim();
+}
+
 export function money(amount: number, currency: Currency = "VES"): string {
   const value = Number.isFinite(amount) ? amount : 0;
   return `${currency} ${value.toLocaleString("es-VE", {
