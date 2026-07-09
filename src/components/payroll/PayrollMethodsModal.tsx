@@ -10,6 +10,7 @@ import { Loader2, Plus, Trash2, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePayrollMethods } from "@/hooks/payroll/usePayrollMethods";
 import { METHOD_LABELS, type PayrollMethodType } from "@/lib/payroll/types";
+import { VENEZUELAN_BANKS } from "@/lib/venezuelan-banks";
 
 interface PayrollMethodsModalProps {
   open: boolean;
@@ -138,12 +139,26 @@ export function PayrollMethodsModal({
               </div>
             </div>
             {FIELDS[methodType].map((f) => (
-              <div key={f.key} className="space-y-1.5">
+              <div key={f.key} className="space-y-1.5 min-w-0">
                 <Label className="text-xs">{f.label}</Label>
-                <Input
-                  value={config[f.key] ?? ""}
-                  onChange={(e) => setConfig((prev) => ({ ...prev, [f.key]: e.target.value }))}
-                />
+                {f.key === "bank_name" ? (
+                  <Select
+                    value={config[f.key] ?? ""}
+                    onValueChange={(v) => setConfig((prev) => ({ ...prev, [f.key]: v }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Seleccione el banco" /></SelectTrigger>
+                    <SelectContent>
+                      {VENEZUELAN_BANKS.map((b) => (
+                        <SelectItem key={b.codigo} value={b.nombre}>{b.codigo} - {b.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={config[f.key] ?? ""}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, [f.key]: e.target.value }))}
+                  />
+                )}
               </div>
             ))}
             <div className="flex items-center gap-2">
