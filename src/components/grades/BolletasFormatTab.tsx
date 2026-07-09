@@ -356,7 +356,7 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
                 <ToggleRow label="Anclar firmas al pie de la hoja" value={cfg.boletin?.sig_pin_bottom ?? false}
                   onChange={(v) => updBoletin({ sig_pin_bottom: v })} />
                 <p className="text-xs text-muted-foreground">
-                  Para media hoja (140 mm) deja desactivado el anclaje y reduce espacio/altura si las firmas no caben.
+                  Esta boleta se imprime en media hoja. Deja desactivado el anclaje y reduce espacio/altura si las firmas no caben.
                 </p>
               </div>
               <div className="space-y-2">
@@ -575,6 +575,10 @@ function BoletaPreview({ cfg, paperW, paperH }: {
   cfg: BachilleratoConfig; paperW: number; paperH: number;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  // "Media hoja": cada boleta usa la mitad del alto de la hoja elegida (misma regla
+  // que la descarga en bachilleratoBoleta.ts) para que la vista previa sea fiel.
+  const effectivePaperH =
+    cfg.style === "boletin_completo" && paperH > 200 ? paperH / 2 : paperH;
   const html = useMemo(() => {
     const previewCfg = cfg.style === "boletin_completo" ? cfgForBoletinPreview(cfg) : cfg;
     if (cfg.style === "boletin_completo")
@@ -582,16 +586,16 @@ function BoletaPreview({ cfg, paperW, paperH }: {
         previewCfg,
         { ...SAMPLE_BOLETIN_COMPLETO_DATA, mention: previewCfg.boletin?.mention ?? SAMPLE_BOLETIN_COMPLETO_DATA.mention },
         paperW,
-        paperH,
+        effectivePaperH,
       );
     if (cfg.style === "primaria_descriptivo")
-      return generatePrimaryDescriptiveHtml(cfg, SAMPLE_PRIMARY_DESCRIPTIVE_DATA, paperW, paperH);
-    return generateBoletaHtml(cfg, SAMPLE_RENDER_DATA, paperW, paperH);
-  }, [cfg, paperW, paperH]);
+      return generatePrimaryDescriptiveHtml(cfg, SAMPLE_PRIMARY_DESCRIPTIVE_DATA, paperW, effectivePaperH);
+    return generateBoletaHtml(cfg, SAMPLE_RENDER_DATA, paperW, effectivePaperH);
+  }, [cfg, paperW, effectivePaperH]);
 
   const MM_TO_PX = 96 / 25.4;
   const naturalW = paperW * MM_TO_PX;
-  const naturalH = paperH * MM_TO_PX;
+  const naturalH = effectivePaperH * MM_TO_PX;
   const previewW = 700;
   const scale = previewW / naturalW;
   const previewH = naturalH * scale;
@@ -961,6 +965,7 @@ export function BolletasFormatTab() {
                   <div className="flex gap-1.5">
                     {[
                       { l: "Carta", w: 215.9, h: 279.4 },
+                      { l: "Media carta", w: 215.9, h: 139.7 },
                       { l: "A4", w: 210, h: 297 },
                       { l: "Oficio", w: 216, h: 356 },
                     ].map(({ l, w, h }) => (
@@ -988,6 +993,12 @@ export function BolletasFormatTab() {
                   </div>
                 </div>
               </div>
+              {cfg.style === "boletin_completo" && (
+                <p className="text-xs text-muted-foreground">
+                  El estilo media hoja imprime cada boleta a la mitad del tamaño elegido (ej: elige Carta y saldrá en media carta).
+                  En la impresora selecciona "2 páginas por hoja" para obtener dos boletas por hoja.
+                </p>
+              )}
             </div>
 
             {/* Body: config panel + preview — scroll together with the modal */}

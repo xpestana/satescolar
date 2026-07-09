@@ -29,6 +29,15 @@ async function resolveBoletinSignatures(
   return { ...cfg, boletin: { ...cfg.boletin!, signatures: resolved } };
 }
 
+/**
+ * Estilo "media hoja": cada boleta ocupa la mitad de la hoja elegida para poder
+ * imprimir dos por hoja ("2 páginas por hoja" en la impresora). Si el alto guardado
+ * es de hoja completa (>200mm) lo reducimos a la mitad; si ya es media hoja lo dejamos.
+ */
+function mediaHojaHeight(style: string, paperH: number): number {
+  return style === "boletin_completo" && paperH > 200 ? paperH / 2 : paperH;
+}
+
 export interface BachillerataBoletaParams {
   schoolId: string;
   studentId: string;
@@ -482,7 +491,12 @@ export async function downloadBachilleratoBoleta(
       showDefinitivaColumn,
     };
 
-    return generateBoletinCompletoHtml(cfgPdf, boletinData, paperW, paperH);
+    return generateBoletinCompletoHtml(
+      cfgPdf,
+      boletinData,
+      paperW,
+      mediaHojaHeight(style, paperH),
+    );
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -751,13 +765,17 @@ export async function downloadAllBachilleratoBoletas(params: {
         showDefinitivaColumn,
       };
       bodies.push(
-        generateBoletinCompletoHtml(cfgPdf, boletinData, paperW, paperH, {
-          bodyOnly: true,
-        }),
+        generateBoletinCompletoHtml(
+          cfgPdf,
+          boletinData,
+          paperW,
+          mediaHojaHeight(style, paperH),
+          { bodyOnly: true },
+        ),
       );
     }
 
-    return wrapAllBoletasHtml(bodies, paperW, paperH, "boletin_completo", {
+    return wrapAllBoletasHtml(bodies, paperW, mediaHojaHeight(style, paperH), "boletin_completo", {
       top: cfg.boletin?.margin_top ?? 4,
       bottom: cfg.boletin?.margin_bottom ?? 6,
       sides: cfg.boletin?.margin_sides ?? 12,
