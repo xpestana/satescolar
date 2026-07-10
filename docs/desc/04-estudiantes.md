@@ -8,16 +8,21 @@ Gestión de los estudiantes: alta, datos y relación con la familia. El represen
 sus estudiantes; el colegio los gestiona a través de familias, inscripciones y notas.
 
 ## Roles involucrados
-- **representative** — ve sus estudiantes.
+- **representative** — ve sus estudiantes, edita datos y descarga carnet/planilla.
 - **school** — gestiona estudiantes (vía familias / inscripciones).
 
 ## Casos de uso
-> ⏳ Por documentar.
+- El representante consulta la lista de estudiantes de su familia.
+- Desde **Mis Estudiantes**, el representante puede descargar el **carnet** y la
+  **planilla de inscripción** (menú Descargas en cada tarjeta de estudiante).
+- El colegio gestiona estudiantes e inscripciones desde familias e inscripciones.
 
 ## Operaciones / Funciones
 | Operación | Rol | Ruta | Permiso | Descripción |
 |---|---|---|---|---|
 | Mis estudiantes | representative | `/representative/estudiantes` | — | Estudiantes de la familia. |
+| Descargar carnet | representative | `/representative/estudiantes` | — | Carnet PDF desde menú Descargas. |
+| Descargar planilla de inscripción | representative | `/representative/estudiantes` | — | Planilla PDF (misma lógica que school). |
 
 ## Rutas (frontend)
 - `/representative/estudiantes`
@@ -34,7 +39,9 @@ sus estudiantes; el colegio los gestiona a través de familias, inscripciones y 
   (ver [12-pagos](12-pagos.md)).
 
 ## Reglas de negocio
-> ⏳ Por documentar.
+- La descarga de planilla desde representante usa la configuración del colegio
+  (`enrollment_planilla_sections`, `planilla_general_config`) y no bloquea por campos
+  opcionales vacíos (ver [07-inscripciones](07-inscripciones.md)).
 
 ## Archivos clave (código)
 - `src/pages/representative/StudentsList.tsx`
@@ -42,6 +49,8 @@ sus estudiantes; el colegio los gestiona a través de familias, inscripciones y 
 ## Configuración relacionada
 - El **formulario de estudiantes** se edita en Formularios
   (`/school/configuraciones/formularios/estudiantes`) — ver [15-configuracion-colegio](15-configuracion-colegio.md).
+- La **planilla de inscripción** se configura en
+  `/school/configuraciones/inscripcion-campos` — ver [08-planillas](08-planillas.md).
 
 ## Por documentar
 - Ciclo de vida del estudiante (inscripción → año escolar → sección → notas).

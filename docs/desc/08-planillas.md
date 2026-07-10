@@ -8,12 +8,18 @@ Generación y configuración de planillas (formatos de datos/listados) del coleg
 
 ## Roles involucrados
 - **school** — genera y configura planillas (permiso `planillas.config`).
+- **representative** — puede descargar la planilla de inscripción de sus estudiantes
+  (lectura de config vía RLS; ver migraciones de políticas en
+  `enrollment_planilla_sections` y `planilla_general_config`).
 
 ## Casos de uso
 - El colegio configura la **planilla de inscripción**: qué campos se muestran, en qué
   secciones, con qué firmas y cabecera.
 - El colegio ajusta el **modal de inscripción** (campos visibles al inscribir).
 - Se genera/imprime la planilla de inscripción de un estudiante con ese formato.
+- El **representante** descarga la planilla desde **Mis Estudiantes**
+  (`/representative/estudiantes` → menú Descargas → Planilla de Inscripción), con el
+  mismo comportamiento que el colegio: sin bloqueo por campos opcionales vacíos.
 
 ## Configuración de Planillas (`/school/configuraciones/inscripcion-campos`)
 Pantalla `EnrollmentDisplayConfig` ("Configuración de Planillas") con **3 pestañas**:
@@ -30,15 +36,20 @@ Pantalla `EnrollmentDisplayConfig` ("Configuración de Planillas") con **3 pesta
 ## Operaciones / Funciones
 | Operación | Rol | Ruta | Permiso | Descripción |
 |---|---|---|---|---|
-| Planillas | school | `/planillas` | `planillas.config` | Generación de planillas. |
+| Planillas | school | `/planillas` | `planillas.config` | Generación de planillas (sábana, resumen final, etc.). |
 | Config. planillas | school | `/school/configuraciones/inscripcion-campos` | `planillas.config` | Campos/estructura de la planilla de inscripción. |
+| Descargar planilla inscripción | school | `/inscripciones` | `enrollments.view` | PDF por estudiante desde menú de acciones. |
+| Descargar planilla inscripción | representative | `/representative/estudiantes` | — | PDF por estudiante desde menú Descargas. |
 
 ## Rutas (frontend)
 - `/planillas`
 - `/school/configuraciones/inscripcion-campos` (pestañas: Generales / Modal / Planilla)
+- `/inscripciones` (descarga school)
+- `/representative/estudiantes` (descarga representative)
 
 ## Endpoints / Edge Functions
 - CRUD directo a tablas vía RLS. Subida de imágenes vía `s3-sign-upload`.
+- Generación PDF planilla inscripción: cliente (`downloadPlanillaInscripcion`).
 
 ## Datos / Tablas (Supabase)
 - `enrollment_display_config` — configuración de visualización de la inscripción.
@@ -51,9 +62,14 @@ Pantalla `EnrollmentDisplayConfig` ("Configuración de Planillas") con **3 pesta
 ## Reglas de negocio
 - La planilla se arma a partir de `form_fields` + secciones + firmas configuradas.
 - Las líneas de firma configuradas aquí se reutilizan en boletas estilo `simple`.
+- La descarga no exige que todos los campos de la planilla estén llenos; los vacíos se
+  muestran como `"No registrado"` en el PDF.
 
 ## Archivos clave (código)
 - `src/pages/school/EnrollmentDisplayConfig.tsx`
+- `src/pages/school/EnrollmentsList.tsx` — descarga planilla (school)
+- `src/pages/representative/StudentsList.tsx` — descarga planilla (representative)
+- `src/lib/export-utils.ts` — `downloadPlanillaInscripcion`
 - `src/components/planilla/...`, `src/components/planillas/...`
 
 ## Por documentar
