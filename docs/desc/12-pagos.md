@@ -175,6 +175,21 @@ El campo **Banco** de los métodos de pago usa la lista canónica **`src/lib/ven
 (`VENEZUELAN_BANKS`, código + nombre), la misma que usa el registro de pagos de familias
 (`PaymentReportModal`). El valor guardado es el **nombre** del banco.
 
+### Datos del método copiables (copiar/pegar)
+Para facilitar registrar el pago en la banca del colegio, los datos del método se muestran
+**un dato por línea, cada uno con su ícono de copiar al portapapeles** (no todo junto):
+- En **Registro de Nómina** hay una columna **"Método principal"** que muestra el método
+  predeterminado de cada beneficiario (banco, N° de cuenta, titular…) y además la **cédula**
+  y el **teléfono** del beneficiario, cada campo con su botón de copiar.
+- En el **modal de registro de pago**, al seleccionar un método aparece un bloque
+  "Datos para el pago" con los mismos campos copiables.
+- En el **modal de métodos** cada método guardado lista sus datos igual.
+
+Piezas de código: `src/lib/payroll/methodFields.ts` (`METHOD_FIELDS` + `methodLabeledValues`,
+define qué campos guarda cada tipo de método), `src/components/payroll/MethodDetails.tsx`
+(vista de datos copiables + `CopyableField` reutilizable), `src/components/payroll/CopyButton.tsx` (botón de copiar),
+`src/hooks/payroll/usePayrollDefaultMethods.ts` (método principal por beneficiario para la tabla).
+
 ### Reglas de negocio (nómina)
 - Segregación: `payroll.register` elabora, `payroll.approve` aprueba/paga (más `payroll_audit_log`).
 - Un beneficiario solo puede tener **un pago vivo por período** (los anulados no cuentan).

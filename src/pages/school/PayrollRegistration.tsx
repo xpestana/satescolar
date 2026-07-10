@@ -23,7 +23,9 @@ import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
 import { usePayrollBeneficiaries } from "@/hooks/payroll/usePayrollBeneficiaries";
 import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
 import { usePayrollPayments, type PayrollPaymentRow } from "@/hooks/payroll/usePayrollPayments";
+import { usePayrollDefaultMethods } from "@/hooks/payroll/usePayrollDefaultMethods";
 import { PayrollPaymentFormModal } from "@/components/payroll/PayrollPaymentFormModal";
+import { MethodDetails, CopyableField } from "@/components/payroll/MethodDetails";
 import { CATEGORY_LABELS, STATUS_LABELS, type PayrollBeneficiary, type PayrollCategory, type PayrollPaymentStatus } from "@/lib/payroll/types";
 
 export default function PayrollRegistration() {
@@ -42,6 +44,7 @@ export default function PayrollRegistration() {
   const activePeriodId = periodId || periods[0]?.id || "";
 
   const { payments, approvePayment, markPaid, voidPayment } = usePayrollPayments(schoolId, { periodId: activePeriodId });
+  const { data: defaultMethods = {} } = usePayrollDefaultMethods(schoolId);
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -174,6 +177,7 @@ export default function PayrollRegistration() {
                   <TableRow>
                     <TableHead>Beneficiario</TableHead>
                     <TableHead>Categoría</TableHead>
+                    <TableHead className="w-64">Método principal</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Neto (VES)</TableHead>
                     <TableHead className="w-64">Acción</TableHead>
@@ -181,7 +185,7 @@ export default function PayrollRegistration() {
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay beneficiarios.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay beneficiarios.</TableCell></TableRow>
                   ) : (
                     filtered.map((b) => {
                       const payment = paymentByBeneficiary[b.id];
@@ -194,6 +198,17 @@ export default function PayrollRegistration() {
                             <div className="text-xs text-muted-foreground">{b.document_id || "—"}</div>
                           </TableCell>
                           <TableCell><Badge variant="outline">{CATEGORY_LABELS[b.category]}</Badge></TableCell>
+                          <TableCell className="align-top">
+                            <div className="space-y-1">
+                              {defaultMethods[b.id] ? (
+                                <MethodDetails method={defaultMethods[b.id]} showType />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Sin método</span>
+                              )}
+                              {b.document_id && <CopyableField label="Cédula" value={b.document_id} />}
+                              {b.phone && <CopyableField label="Teléfono" value={b.phone} />}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             {isLive ? <Badge variant={badgeVariant(status!)}>{STATUS_LABELS[status!]}</Badge> : <span className="text-xs text-muted-foreground">Sin registrar</span>}
                           </TableCell>

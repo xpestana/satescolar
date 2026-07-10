@@ -14,6 +14,7 @@ import { usePayrollPayments } from "@/hooks/payroll/usePayrollPayments";
 import { calculatePayrollTotals, convertToVes, deductionsExceedEarnings } from "@/lib/payroll/calculateNet";
 import { formatMoney } from "@/lib/payroll/buildPayrollReceiptData";
 import { METHOD_LABELS, type ConceptKind, type PayrollCurrency } from "@/lib/payroll/types";
+import { MethodDetails } from "@/components/payroll/MethodDetails";
 
 interface PayrollPaymentFormModalProps {
   open: boolean;
@@ -58,6 +59,8 @@ export function PayrollPaymentFormModal({
   const [methodId, setMethodId] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<EditableLine[]>([newLine()]);
+
+  const selectedMethod = methods.find((m) => m.id === methodId);
 
   useEffect(() => {
     if (!open) return;
@@ -181,6 +184,14 @@ export function PayrollPaymentFormModal({
               </Select>
             </div>
           </div>
+
+          {/* Selected method details — one datum per line, each copyable */}
+          {selectedMethod && (
+            <div className="rounded-md border bg-muted/30 p-3">
+              <p className="text-xs font-medium mb-1.5">Datos para el pago</p>
+              <MethodDetails method={selectedMethod} />
+            </div>
+          )}
 
           {/* Line items */}
           <div className="space-y-2">

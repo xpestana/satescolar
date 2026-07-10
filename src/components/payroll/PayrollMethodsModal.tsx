@@ -10,6 +10,8 @@ import { Loader2, Plus, Trash2, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePayrollMethods } from "@/hooks/payroll/usePayrollMethods";
 import { METHOD_LABELS, type PayrollMethodType } from "@/lib/payroll/types";
+import { METHOD_FIELDS } from "@/lib/payroll/methodFields";
+import { MethodDetails } from "./MethodDetails";
 import { VENEZUELAN_BANKS } from "@/lib/venezuelan-banks";
 
 interface PayrollMethodsModalProps {
@@ -21,22 +23,6 @@ interface PayrollMethodsModalProps {
 }
 
 const METHOD_ORDER: PayrollMethodType[] = ["transfer", "mobile_payment", "cash", "check"];
-
-// Which config fields each method type collects.
-const FIELDS: Record<PayrollMethodType, { key: string; label: string }[]> = {
-  transfer: [
-    { key: "bank_name", label: "Banco" },
-    { key: "account_number", label: "N° de cuenta" },
-    { key: "account_holder", label: "Titular" },
-  ],
-  mobile_payment: [
-    { key: "bank_name", label: "Banco" },
-    { key: "phone", label: "Teléfono" },
-    { key: "document_id", label: "Cédula/RIF" },
-  ],
-  cash: [],
-  check: [{ key: "bank_name", label: "Banco" }],
-};
 
 export function PayrollMethodsModal({
   open,
@@ -73,12 +59,6 @@ export function PayrollMethodsModal({
     );
   };
 
-  const describe = (cfg: Record<string, unknown>) =>
-    Object.entries(cfg)
-      .filter(([, v]) => v)
-      .map(([, v]) => String(v))
-      .join(" · ");
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden">
@@ -102,7 +82,7 @@ export function PayrollMethodsModal({
                       <Badge className="text-xs gap-1"><Star className="h-3 w-3" />Predeterminado</Badge>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{describe(m.config) || "—"}</p>
+                  <MethodDetails method={m} className="mt-1" />
                 </div>
                 <Button
                   size="icon"
@@ -138,7 +118,7 @@ export function PayrollMethodsModal({
                 <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Ej: Banesco principal" />
               </div>
             </div>
-            {FIELDS[methodType].map((f) => (
+            {METHOD_FIELDS[methodType].map((f) => (
               <div key={f.key} className="space-y-1.5 min-w-0">
                 <Label className="text-xs">{f.label}</Label>
                 {f.key === "bank_name" ? (
