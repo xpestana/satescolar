@@ -64,6 +64,12 @@ Pantalla `EnrollmentDisplayConfig` ("Configuración de Planillas") con **3 pesta
 - Las líneas de firma configuradas aquí se reutilizan en boletas estilo `simple`.
 - La descarga no exige que todos los campos de la planilla estén llenos; los vacíos se
   muestran como `"No registrado"` en el PDF.
+- **RLS de lectura del representante:** el representante lee vía políticas `SELECT`
+  (patrón `family_schools` + `families`) las tablas `enrollment_planilla_sections`,
+  `planilla_general_config`, `planilla_signature_blocks` y `form_fields`. Con esto su planilla
+  se genera **idéntica a la de school** (mismos labels configurados y bloques de firma). Ver
+  migraciones `20260221231522` (sections/config) y
+  `20260710120000_add_representative_planilla_signature_rls` (firmas + form_fields).
 
 ## Archivos clave (código)
 - `src/pages/school/EnrollmentDisplayConfig.tsx`

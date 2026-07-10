@@ -51,7 +51,10 @@ Proceso de inscripción de estudiantes al colegio (matrícula por año escolar/s
   `EnrollStudentModal`). No se exigen todos los campos de la planilla.
 - **Descarga de planilla (school y representative):** no bloquea por campos opcionales
   de la planilla. Se genera el PDF con los datos existentes; los vacíos aparecen como
-  `"No registrado"`.
+  `"No registrado"`. El representante usa el mismo `downloadPlanillaInscripcion` que school
+  (sin validación de completitud); su planilla sale **idéntica** gracias a las políticas RLS
+  de lectura sobre `enrollment_planilla_sections`, `planilla_general_config`,
+  `planilla_signature_blocks` y `form_fields` (ver [08-planillas](08-planillas.md)).
 - **Lista de inscripciones (school):** `checkStudentCompleteness` compara los campos
   configurados en `enrollment_planilla_sections` solo para **colorear filas**
   (verde/ámbar/rojo), no para impedir la descarga.
