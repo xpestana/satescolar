@@ -34,6 +34,10 @@ sus estudiantes; el colegio los gestiona a través de familias, inscripciones y 
 - `students` — `family_id`, `document_id`, `photo_url`, `status` (enum `student_status`),
   **`form_data` (JSON)** con los campos dinámicos definidos por el Formulario de
   estudiantes (ver [15](15-configuracion-colegio.md)).
+  - **Claves canónicas del nombre** dentro de `form_data`: `primer_nombre`, `segundo_nombre`,
+    `primer_apellido`, `segundo_apellido`. El nombre a mostrar se arma
+    `[primer_nombre, primer_apellido].filter(Boolean).join(" ")` (patrón usado en toda la app;
+    ver búsqueda en `PaymentRegistration.tsx` y la tabla de "Últimos Pagos" en [12-pagos](12-pagos.md)).
 - Vínculos: `enrollments` (año/sección, ver [07](07-inscripciones.md)),
   `student_schools`/`student_concept_balances`/`student_payment_plans`
   (ver [12-pagos](12-pagos.md)).

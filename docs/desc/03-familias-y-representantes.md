@@ -34,10 +34,15 @@ El colegio administra el padrón de familias; el representante ve y edita su pro
 - `update-family-password` — cambio de contraseña de acceso.
 
 ## Datos / Tablas (Supabase)
-- `families` — datos socioeconómicos y de contacto de la familia: apellidos padre/madre,
+- `families` — datos socioeconómicos y de contacto de la familia: apellidos padre/madre
+  (**`father_last_name`, `mother_last_name`**, ambos nullable → pueden venir vacíos),
+  `default_invoice` (JSON con el titular de factura por defecto: `name`/`rif`/`phone`/`address`),
   vivienda (`housing_*`, `rooms_count`, `property_ownership`), ingresos (`monthly_income`,
   `income_contributor`), transporte, `dependents_count`, geo (`state_id`,
   `municipality_id`, `parish_id`, `city_id`), `is_suspended`, `user_id`.
+  - **Nombre a mostrar de la familia:** `Flia. [father_last_name] [mother_last_name]`. Como
+    ambos son nullable, para pagos se usa como respaldo `payments.invoice_name` (titular de la
+    factura) — ver "Últimos Pagos" en [12-pagos](12-pagos.md).
 - `representatives` — `family_id`, `document_id`, `email`, `phone`, `is_primary`,
   `photo_url`, **`form_data` (JSON)** (campos del Formulario de representantes).
 - `students` — cuelgan de `family_id` (ver [04-estudiantes](04-estudiantes.md)).

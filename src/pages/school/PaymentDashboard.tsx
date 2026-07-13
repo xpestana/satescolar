@@ -41,7 +41,7 @@ export default function PaymentDashboard() {
     queryKey: ["recent-payments", schoolId, activeYear?.id],
     queryFn: async () => {
       const { data } = (await supabase.from("payments")
-        .select("*, students(form_data, document_id), families(father_last_name, mother_last_name), payment_method_entries(method, currency, amount_ves)")
+        .select("*, students(form_data, document_id), families(father_last_name, mother_last_name), payment_items(student_id, students(form_data)), payment_method_entries(method, currency, amount_ves)")
         .eq("school_id", schoolId!)
         .eq("school_year_id", activeYear!.id)
         .eq("status", "completed")
@@ -167,14 +167,24 @@ export default function PaymentDashboard() {
                 <TableHeader><TableRow><TableHead>Fecha</TableHead><TableHead>{billingMode === "family" ? "Estudiante / Familia" : "Estudiante"}</TableHead><TableHead>N° Factura</TableHead><TableHead>N° Control</TableHead><TableHead>Monto</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {recentPayments.slice(0, 10).map((p: any) => {
-                    const fd = p.students?.form_data as any;
-                    const studentName = [fd?.primer_nombre, fd?.primer_apellido].filter(Boolean).join(" ");
+                    const buildName = (fd: any) => [fd?.primer_nombre, fd?.primer_apellido].filter(Boolean).join(" ");
+                    // Student(s): direct student_id (student mode) or via payment_items (family mode)
+                    const directForm = p.students?.form_data as any;
+                    const itemForms = ((p.payment_items || []) as any[]).map((it) => it.students?.form_data).filter(Boolean);
+                    const forms = directForm ? [directForm] : itemForms;
+                    const studentNames = Array.from(new Set(forms.map(buildName).filter(Boolean)));
+                    // Titular/familia: nombre de la familia si existe, si no el nombre de la factura
                     const familyName = [p.families?.father_last_name, p.families?.mother_last_name].filter(Boolean).join(" ");
-                    const name = studentName || (familyName ? `Flia. ${familyName}` : "—");
+                    const titular = familyName ? `Flia. ${familyName}` : (p.invoice_name || "");
+                    const primary = studentNames.length ? studentNames.join(", ") : (titular || "—");
+                    const secondary = studentNames.length && titular ? titular : "";
                     return (
                       <TableRow key={p.id}>
                         <TableCell className="text-xs">{formatDateOnly(p.payment_date)}</TableCell>
-                        <TableCell className="text-sm">{name}</TableCell>
+                        <TableCell className="text-sm">
+                          <div className="font-medium leading-tight">{primary}</div>
+                          {secondary && <div className="text-xs text-muted-foreground leading-tight">{secondary}</div>}
+                        </TableCell>
                         <TableCell className="text-xs font-mono">{p.invoice_number || "—"}</TableCell>
                         <TableCell className="text-xs font-mono">{p.control_number || "—"}</TableCell>
                         <TableCell className="font-medium text-sm">{p.total_amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>

@@ -119,6 +119,20 @@ llamando directo a `fetch-bcv-rates` aunque ya sea la fecha de hoy.
 encima de la tasa de `exchange_rates`. `PaymentReportModal` (representante) NO lo usa: las
 familias siempre convierten con la tasa oficial.
 
+## Dashboard de Pagos (`/pagos`) — "Últimos Pagos"
+Tabla `PaymentDashboard.tsx` con los últimos pagos `completed`. La columna
+**Estudiante / Familia** se resuelve así (un pago puede no traer `student_id`):
+- **Estudiante(s):** en **modo estudiante** el pago trae `student_id` → `students.form_data`.
+  En **modo familia** el pago trae `student_id = null` y `family_id` set; los estudiantes se
+  obtienen de **`payment_items.student_id`** (embebido `payment_items(student_id, students(form_data))`),
+  admitiendo varios hijos por pago.
+- **Titular/Familia:** `Flia. [father_last_name] [mother_last_name]`; si la familia no tiene
+  apellidos, se usa **`payments.invoice_name`** (titular de la factura, siempre capturado al
+  registrar). El nombre del estudiante va arriba y el titular/familia debajo.
+> 🐞 Bug corregido: antes solo se leía `students`/`families`; en modo familia (sin `student_id`
+> y con apellidos vacíos) la columna quedaba en "—". Ahora resuelve por `payment_items` y cae
+> a `invoice_name`.
+
 ## Reglas de negocio
 - **El formato de factura se define en `/formatos` (tabla `invoice_templates`) y la
   emisión/impresión debe respetarlo** — mismo patrón que la boleta en notas.
