@@ -133,13 +133,22 @@ Tabla `PaymentDashboard.tsx` con los últimos pagos `completed`. La columna
 > y con apellidos vacíos) la columna quedaba en "—". Ahora resuelve por `payment_items` y cae
 > a `invoice_name`.
 
-### Registro de Pagos — lista de familias (`FamilyPaymentRegistrationTab`)
+### Nombre de familia en las listas (`familyDisplayName.ts`)
 La columna **Familia** muestra `father_last_name`+`mother_last_name`; como suelen venir vacíos,
 si no hay apellidos propios se toman los del **representante principal**
 (`representatives.is_primary`, fallback: primer representante) desde su `form_data`
 (`primer_apellido`/`segundo_apellido`). **No** se usan los apellidos del estudiante. El sort y la
-búsqueda usan el mismo apellido de respaldo.
-> 🐞 Antes mostraba "Sin apellidos" para casi todas las familias aunque hubiera representante.
+búsqueda usan el mismo apellido de respaldo. Helper compartido en `src/lib/familyDisplayName.ts`
+(`familySurname` + `buildPrimaryRepMap`), usado por **Registro de Pagos**
+(`FamilyPaymentRegistrationTab`), **Estado de cuenta por familia** (`FamilyLedgerView`) y
+**Morosos por familia** (`DelinquentFamiliesView`).
+> 🐞 Antes las tres listas mostraban "Sin apellidos" para casi todas las familias aunque
+> hubiera representante.
+
+En **Morosos por familia** (`DelinquentFamiliesView`) la columna **"Estudiantes con Deuda"**
+lista los **nombres** de los estudiantes morosos (no solo el contador). Los nombres se resuelven
+con una consulta directa a `students` (`studentInfoMap`), para cubrir también a los morosos **no
+inscritos** en el año activo (que no aparecen en `enrollments`).
 
 ## Reglas de negocio
 - **El formato de factura se define en `/formatos` (tabla `invoice_templates`) y la

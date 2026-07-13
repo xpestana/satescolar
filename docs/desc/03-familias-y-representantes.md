@@ -42,10 +42,13 @@ El colegio administra el padrón de familias; el representante ve y edita su pro
   `municipality_id`, `parish_id`, `city_id`), `is_suspended`, `user_id`.
   - **Nombre a mostrar de la familia:** `[father_last_name] [mother_last_name]`. Como ambos son
     nullable (a menudo vacíos), se usan **respaldos** para no mostrar "Sin apellidos":
-    - En el **Registro de Pagos** (`FamilyPaymentRegistrationTab`) se toman los apellidos del
-      **representante principal** (`representatives.is_primary`, fallback: primer representante)
-      desde su `form_data` (`primer_apellido`/`segundo_apellido`, con fallbacks EN
-      `last_name`/`apellido`). **No** se usan los apellidos del estudiante.
+    - Helper compartido **`src/lib/familyDisplayName.ts`** (`familySurname` + `buildPrimaryRepMap`):
+      si la familia no tiene apellidos propios, toma los del **representante principal**
+      (`representatives.is_primary`, fallback: primer representante) desde su `form_data`
+      (`primer_apellido`/`segundo_apellido`, con fallbacks EN `last_name`/`apellido`).
+      **No** se usan los apellidos del estudiante. Lo usan **Registro de Pagos**
+      (`FamilyPaymentRegistrationTab`), **Estado de cuenta por familia** (`FamilyLedgerView`) y
+      **Morosos por familia** (`DelinquentFamiliesView`).
     - En **"Últimos Pagos"** del dashboard se cae a `payments.invoice_name` (titular de la
       factura) — ver [12-pagos](12-pagos.md).
 - `representatives` — `family_id`, `document_id`, `email`, `phone`, `is_primary`,

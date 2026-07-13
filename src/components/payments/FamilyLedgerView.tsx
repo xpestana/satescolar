@@ -19,6 +19,7 @@ import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
 import { buildInvoiceData } from "@/lib/buildInvoiceData";
 import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 import { formatGradeLevel } from "@/lib/utils";
+import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
 
 interface Props {
   schoolId: string;
@@ -92,6 +93,20 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
     enabled: familyIds.length > 0,
   });
 
+  // Representantes (apellido de respaldo desde el principal cuando la familia no los tiene)
+  const { data: representatives = [] } = useQuery({
+    queryKey: ["family-ledger-reps", schoolId, familyIds],
+    queryFn: async () => {
+      const { data } = await supabase.from("representatives")
+        .select("family_id, is_primary, form_data")
+        .in("family_id", familyIds);
+      return data || [];
+    },
+    enabled: familyIds.length > 0,
+  });
+
+  const primaryRepByFamily = useMemo(() => buildPrimaryRepMap(representatives as any[]), [representatives]);
+
   const enrollmentByStudent = useMemo(() => {
     const m: Record<string, any> = {};
     enrollments.forEach((e: any) => { m[e.student_id] = e; });
@@ -109,7 +124,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
     return map;
   }, [schoolStudents, enrollmentByStudent]);
 
-  const familyName = (f: any) => [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "Sin apellidos";
+  const familyName = (f: any) => familySurname(f, primaryRepByFamily[f?.id]);
 
   const selectedFamily = families.find((f: any) => f.id === selectedFamilyId);
   const familyChildren = selectedFamilyId ? (childrenByFamily[selectedFamilyId] || []) : [];
@@ -196,7 +211,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
       return (childrenByFamily[f.id] || []).some((c) =>
         normalize(studentFullName(c.student)).includes(q) || normalize(c.student?.document_id || "").includes(q));
     });
-  }, [families, childrenByFamily, search]);
+  }, [families, childrenByFamily, search, primaryRepByFamily]);
 
   const totalCharges = useMemo(() => balances.reduce((s: number, b: any) => s + (b.total_amount || 0), 0), [balances]);
   const totalDebt = useMemo(() => balances.reduce((s: number, b: any) => s + (b.balance || 0), 0), [balances]);

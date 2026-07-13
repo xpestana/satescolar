@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, AlertTriangle, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
+import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
 
 interface Props {
   schoolId: string;
@@ -70,8 +71,47 @@ export function DelinquentFamiliesView({ schoolId, schoolYearId }: Props) {
     return m;
   }, [enrollments]);
 
+  // Datos de los estudiantes morosos (nombre/cédula) — cubre también a los no inscritos,
+  // que no aparecen en `enrollments`.
+  const { data: studentRecords = [] } = useQuery({
+    queryKey: ["delinquent-families-students", schoolId, studentIds],
+    queryFn: async () => {
+      const { data } = await supabase.from("students")
+        .select("id, document_id, form_data")
+        .in("id", studentIds);
+      return data || [];
+    },
+    enabled: studentIds.length > 0,
+  });
+
+  const studentInfoMap = useMemo(() => {
+    const m: Record<string, any> = {};
+    studentRecords.forEach((s: any) => { m[s.id] = s; });
+    return m;
+  }, [studentRecords]);
+
+  // Representantes de las familias morosas (apellido de respaldo desde el principal)
+  const familyIds = useMemo(
+    () => [...new Set(delinquentFamilies.map((f) => f.family_id).filter(Boolean))],
+    [delinquentFamilies],
+  );
+
+  const { data: representatives = [] } = useQuery({
+    queryKey: ["delinquent-families-reps", schoolId, familyIds],
+    queryFn: async () => {
+      const { data } = await supabase.from("representatives")
+        .select("family_id, is_primary, form_data")
+        .in("family_id", familyIds);
+      return data || [];
+    },
+    enabled: familyIds.length > 0,
+  });
+
+  const primaryRepByFamily = useMemo(() => buildPrimaryRepMap(representatives as any[]), [representatives]);
+  const familyName = (f: DelinquentFamilyRow) => familySurname(f, primaryRepByFamily[f.family_id]);
+
   const studentName = (studentId: string) => {
-    const fd = enrollmentMap[studentId]?.students?.form_data as any;
+    const fd = (studentInfoMap[studentId]?.form_data ?? enrollmentMap[studentId]?.students?.form_data) as any;
     return [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ") || "Estudiante";
   };
 
@@ -82,13 +122,13 @@ export function DelinquentFamiliesView({ schoolId, schoolYearId }: Props) {
     if (search.trim()) {
       const q = normalize(search);
       result = result.filter((f) => {
-        const famName = `${f.father_last_name || ""} ${f.mother_last_name || ""}`;
+        const famName = familyName(f);
         if (normalize(famName).includes(q)) return true;
         return (f.students || []).some((s) => normalize(studentName(s.student_id)).includes(q));
       });
     }
     return [...result].sort((a, b) => (Number(b.total_owed) || 0) - (Number(a.total_owed) || 0));
-  }, [delinquentFamilies, search, enrollmentMap]);
+  }, [delinquentFamilies, search, enrollmentMap, studentInfoMap, primaryRepByFamily]);
 
   const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
 
@@ -142,11 +182,16 @@ export function DelinquentFamiliesView({ schoolId, schoolYearId }: Props) {
                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                             <Users className="h-4 w-4 text-primary" />
                           </div>
-                          <span className="font-medium">{[f.father_last_name, f.mother_last_name].filter(Boolean).join(" ") || "Sin apellidos"}</span>
+                          <span className="font-medium">{familyName(f)}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">{(f.students || []).length} estudiante(s)</Badge>
+                        <div className="flex flex-col gap-0.5">
+                          {(f.students || []).map((s) => (
+                            <span key={s.student_id} className="text-sm leading-tight">{studentName(s.student_id)}</span>
+                          ))}
+                          <span className="text-[10px] text-muted-foreground">{(f.students || []).length} estudiante(s) con deuda</span>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <span className="text-destructive font-bold flex items-center gap-1">
@@ -168,7 +213,9 @@ export function DelinquentFamiliesView({ schoolId, schoolYearId }: Props) {
                                       <Badge variant="outline" className="text-[10px]">
                                         {formatGradeLevel(e?.sections?.grade_level)}{e?.sections?.name ? ` - ${e.sections.name}` : ""}
                                       </Badge>
-                                      {e?.students?.document_id && <span className="text-xs text-muted-foreground">{e.students.document_id}</span>}
+                                      {(studentInfoMap[s.student_id]?.document_id || e?.students?.document_id) && (
+                                        <span className="text-xs text-muted-foreground">{studentInfoMap[s.student_id]?.document_id || e?.students?.document_id}</span>
+                                      )}
                                     </div>
                                     <span className="text-destructive font-semibold text-sm">
                                       {(Number(s.total_owed) || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES

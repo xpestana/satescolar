@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/ui/data-pagination";
 import { FamilyPaymentFormModal, type FamilyChildRow } from "@/components/payments/FamilyPaymentFormModal";
 import { FamilyPaymentHistoryModal } from "@/components/payments/FamilyPaymentHistoryModal";
+import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
 
 interface Props {
   schoolId: string;
@@ -37,22 +38,6 @@ const studentFullName = (student: any) => {
   return [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ") || "Sin nombre";
 };
 
-/** Apellidos del representante desde su `form_data` (soporta claves ES/EN). */
-const repSurname = (repFormData: any) => {
-  const fd = repFormData || {};
-  const primero = fd.primer_apellido || fd.last_name || fd.apellido || "";
-  return [primero, fd.segundo_apellido].filter(Boolean).join(" ").trim();
-};
-
-/**
- * Family surname to display. The `families` record's own last names are often empty,
- * so we fall back to the **primary representative's** apellidos (not the students').
- */
-const familySurname = (family: any, primaryRepFormData: any) => {
-  const own = [family?.father_last_name, family?.mother_last_name].filter(Boolean).join(" ");
-  if (own) return own;
-  return repSurname(primaryRepFormData) || "Sin apellidos";
-};
 
 export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
   const { toast } = useToast();
@@ -139,15 +124,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
   });
 
   // form_data del representante principal por familia (fallback: primer representante).
-  const primaryRepByFamily = useMemo(() => {
-    const map: Record<string, any> = {};
-    const hasPrimary: Record<string, boolean> = {};
-    (representatives as any[]).forEach((r) => {
-      if (r.is_primary) { map[r.family_id] = r.form_data; hasPrimary[r.family_id] = true; }
-      else if (!hasPrimary[r.family_id] && map[r.family_id] === undefined) { map[r.family_id] = r.form_data; }
-    });
-    return map;
-  }, [representatives]);
+  const primaryRepByFamily = useMemo(() => buildPrimaryRepMap(representatives as any[]), [representatives]);
 
   // Planes y saldos por estudiante (mismas keys que el modo por estudiante)
   const { data: studentPlans = [] } = useQuery({
