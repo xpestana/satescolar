@@ -9,9 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Download } from "lucide-react";
+import { exportIncomesExcel } from "@/lib/incomesExcel";
 
 interface IncomeRow {
   id: string;
@@ -45,6 +47,15 @@ export default function IncomesReport() {
     fecha: "", rif: "", nombre: "",
     factura: "", control: "", total: "",
     mensualidad: "", inscripcion: "", seguro: "", otros: "",
+  });
+
+  const { data: schoolName = "" } = useQuery({
+    queryKey: ["school-name", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("schools").select("name").eq("id", schoolId!).maybeSingle();
+      return data?.name ?? "";
+    },
+    enabled: !!schoolId,
   });
 
   const { data: years = [] } = useQuery({
@@ -171,6 +182,14 @@ export default function IncomesReport() {
   const setFilter = (k: keyof typeof filters) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFilters((prev) => ({ ...prev, [k]: e.target.value }));
 
+  const yearLabel = (years as any[]).find((y) => y.id === selectedYearId)?.year_range ?? "";
+  const handleExport = () => {
+    const monthLabel = filterMonth ? formatMonthLabel(filterMonth) : "Todos los meses";
+    const safe = (s: string) => s.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+    const parts = ["Ingresos", safe(yearLabel), safe(filterMonth || "todos")].filter(Boolean);
+    exportIncomesExcel(filtered, totals, { schoolName, yearLabel, monthLabel }, parts.join("_"));
+  };
+
   if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   return (
@@ -209,6 +228,17 @@ export default function IncomesReport() {
             </SelectContent>
           </Select>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto gap-2"
+          onClick={handleExport}
+          disabled={isLoading || filtered.length === 0}
+          title="Descargar el detalle de pagos en Excel"
+        >
+          <Download className="h-4 w-4" />
+          Descargar Excel
+        </Button>
       </div>
 
       {/* Summary cards */}

@@ -52,14 +52,23 @@ y **debe respetarse al generar/imprimir la factura**.
 - `/representative/pagos`
 
 ## Endpoints / Edge Functions
-- `send-delinquency-reminders` — recordatorios de morosidad. **Se dispara por cron diario**
-  (`cron.schedule('delinquency-reminders', '0 12 * * *', …)`, migración
-  `20260713120000_delinquency_reminders_cron.sql`, patrón del cron de nómina, secretos en
-  Vault `project_url`/`service_role_key`). La función filtra por colegio según
-  `delinquency_config.reminder_mode` (never/daily/weekly/monthly_days).
-  > 🐞 Causa raíz de "no se enviaban recordatorios": la función existía y respetaba la config,
-  > pero **no había ningún cron que la ejecutara** (solo estaba programado el de nómina). Se
-  > agregó el cron diario. Requiere aplicar la migración y que existan los secretos de Vault.
+- `send-delinquency-reminders` — recordatorios de morosidad. **Desplegado y activo.** Se dispara
+  por cron diario (`cron.schedule('delinquency-reminders', '0 12 * * *', …)` — 12:00 UTC / 08:00
+  VE, después del `delinquency-rebuild` de las 07:00; migración
+  `20260713120000_delinquency_reminders_cron.sql`, patrón del cron de nómina, secretos en Vault
+  `project_url`/`service_role_key`). La función filtra por colegio según
+  `delinquency_config.reminder_mode` (never/daily/weekly/monthly_days) y deduplica por día vía
+  `delinquency_notifications`.
+  > 🐞 "No se enviaban recordatorios" tenía **dos** causas, ambas corregidas y desplegadas:
+  > 1. **No había cron** que ejecutara la función (solo estaba el de nómina). Se agregó
+  >    `delinquency-reminders`. *(El cron `delinquency-rebuild` que ya existía solo reconstruye
+  >    saldos, no envía.)*
+  > 2. **Faltaba la FK** `delinquency_config.school_id → schools`, así que el embed
+  >    `schools(...)` de la función fallaba con 500 ("Could not find a relationship…"). Se agregó
+  >    la FK + índice único por colegio (migración `20260713110000_delinquency_config_school_fk.sql`)
+  >    y se recargó el schema cache de PostgREST.
+  > Verificado end-to-end: la función responde `{success:true, sent:0, errors:0}` en un día que no
+  > coincide con ninguna config (no envía correos de más).
 - `fetch-bcv-rates` — tasa de cambio BCV para conversión de montos.
 
 ## Configuración de Pagos (`/pagos/configuracion`)
@@ -82,7 +91,15 @@ en `delinquency_config`; alimenta la función `send-delinquency-reminders`.
   `amount`, `discount_type`/`discount_value`, `due_day`/`due_month`, `is_recurring`, `is_mandatory`.
 - `school_payment_methods` — métodos de pago configurados: `method_type`, `label`,
   `config` (JSON), `is_active`.
-- `delinquency_config` — reglas de morosidad.
+- `delinquency_config` — reglas de morosidad **(una fila por colegio)**: `school_id`
+  (**FK → `schools`**, con índice único por colegio — ambos agregados en
+  `20260713110000_delinquency_config_school_fk.sql`), `overdue_after_day` (día de corte),
+  `reminder_mode` (`never`/`daily`/`weekly`/`monthly_days`), `reminder_days_of_week` (jsonb,
+  p.ej. `["lunes","jueves"]`), `reminder_days_of_month` (jsonb, p.ej. `[1,15]`).
+- `delinquency_notifications` — **bitácora de recordatorios enviados**: `school_id`,
+  `student_id`, `family_id`, `email_sent_to`, `total_owed_ves`, `concepts_detail`, `status`
+  (`sent`/`failed`), `error_message`, `sent_at`. Sirve de **dedupe por día** (no reenviar al
+  mismo estudiante el mismo día) y de auditoría de envíos/fallos.
 
 **Asignación y saldos (estado de cuenta):**
 - `student_payment_plans` — plan asignado a un estudiante por año escolar.
@@ -156,6 +173,19 @@ En **Morosos por familia** (`DelinquentFamiliesView`) la columna **"Estudiantes 
 lista los **nombres** de los estudiantes morosos (no solo el contador). Los nombres se resuelven
 con una consulta directa a `students` (`studentInfoMap`), para cubrir también a los morosos **no
 inscritos** en el año activo (que no aparecen en `enrollments`).
+
+## Reporte de Ingresos (`/pagos/ingresos`)
+Pantalla `IncomesReport` con la tabla **"Detalle de Pagos"** (pagos no anulados del año/mes,
+`N°` de operación estable por mes) y tarjetas de totales (Total Ingresos / Mensualidad /
+Inscripción / Seguro Escolar / Otros).
+
+**Exportar a Excel** (botón "Descargar Excel", helper `src/lib/incomesExcel.ts`):
+- Usa **`xlsx-js-style`** (fork de SheetJS con estilos; el `xlsx` community no colorea celdas).
+- Encabezado y filas del detalle, y **una fila TOTALES** con el total impreso bajo cada columna
+  numérica, coloreada.
+- Debajo, un **resumen vertical centrado** (título + los 5 totales, uno debajo del otro),
+  también coloreado. Montos como número real con formato `#,##0.00`.
+- Respeta los filtros/mes activos (exporta `filtered`, no el crudo). Fechas con `formatDateOnly`.
 
 ## Reglas de negocio
 - **Fechas calendario (`payment_date`, etc.):** mostrar SIEMPRE con `formatDateOnly()` de
