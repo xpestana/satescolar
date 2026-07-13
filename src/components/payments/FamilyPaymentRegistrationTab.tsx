@@ -37,6 +37,23 @@ const studentFullName = (student: any) => {
   return [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ") || "Sin nombre";
 };
 
+/** Apellidos del representante desde su `form_data` (soporta claves ES/EN). */
+const repSurname = (repFormData: any) => {
+  const fd = repFormData || {};
+  const primero = fd.primer_apellido || fd.last_name || fd.apellido || "";
+  return [primero, fd.segundo_apellido].filter(Boolean).join(" ").trim();
+};
+
+/**
+ * Family surname to display. The `families` record's own last names are often empty,
+ * so we fall back to the **primary representative's** apellidos (not the students').
+ */
+const familySurname = (family: any, primaryRepFormData: any) => {
+  const own = [family?.father_last_name, family?.mother_last_name].filter(Boolean).join(" ");
+  if (own) return own;
+  return repSurname(primaryRepFormData) || "Sin apellidos";
+};
+
 export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -107,6 +124,30 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
     },
     enabled: familyIds.length > 0,
   });
+
+  // Representantes de esas familias (para el apellido de respaldo desde el principal)
+  const { data: representatives = [], isLoading: repsLoading } = useQuery({
+    queryKey: ["reps-payment-registration", schoolId, familyIds],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("representatives")
+        .select("family_id, is_primary, form_data")
+        .in("family_id", familyIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: familyIds.length > 0,
+  });
+
+  // form_data del representante principal por familia (fallback: primer representante).
+  const primaryRepByFamily = useMemo(() => {
+    const map: Record<string, any> = {};
+    const hasPrimary: Record<string, boolean> = {};
+    (representatives as any[]).forEach((r) => {
+      if (r.is_primary) { map[r.family_id] = r.form_data; hasPrimary[r.family_id] = true; }
+      else if (!hasPrimary[r.family_id] && map[r.family_id] === undefined) { map[r.family_id] = r.form_data; }
+    });
+    return map;
+  }, [representatives]);
 
   // Planes y saldos por estudiante (mismas keys que el modo por estudiante)
   const { data: studentPlans = [] } = useQuery({
@@ -259,11 +300,11 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
       })
       .filter((r: FamilyRow) => r.children.length > 0)
       .sort((a: FamilyRow, b: FamilyRow) =>
-        `${a.family.father_last_name || ""} ${a.family.mother_last_name || ""}`.localeCompare(
-          `${b.family.father_last_name || ""} ${b.family.mother_last_name || ""}`,
+        familySurname(a.family, primaryRepByFamily[a.family.id]).localeCompare(
+          familySurname(b.family, primaryRepByFamily[b.family.id]),
         ),
       );
-  }, [families, schoolStudents, enrollments, planMap, balanceMap]);
+  }, [families, schoolStudents, enrollments, planMap, balanceMap, primaryRepByFamily]);
 
   const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -274,12 +315,12 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
     if (!search.trim()) return allRows;
     const q = normalize(search);
     return allRows.filter((r) => {
-      const famName = `${r.family.father_last_name || ""} ${r.family.mother_last_name || ""}`;
+      const famName = familySurname(r.family, primaryRepByFamily[r.family.id]);
       if (normalize(famName).includes(q)) return true;
       return r.children.some((c) =>
         normalize(studentFullName(c.student)).includes(q) || normalize(c.student?.document_id || "").includes(q));
     });
-  }, [allRows, search]);
+  }, [allRows, search, primaryRepByFamily]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -298,9 +339,9 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
     enabled: visibleUserIds.length > 0,
   });
 
-  const isLoading = studentsLoading || enrollmentsLoading || familiesLoading;
+  const isLoading = studentsLoading || enrollmentsLoading || familiesLoading || repsLoading;
 
-  const familyName = (f: any) => [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "Sin apellidos";
+  const familyName = (row: any) => familySurname(row?.family, primaryRepByFamily[row?.family?.id]);
 
   return (
     <>
@@ -336,7 +377,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
                           <Users className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                          <p className="font-medium leading-tight">{familyName(row.family)}</p>
+                          <p className="font-medium leading-tight">{familyName(row)}</p>
                           <p className="text-xs text-muted-foreground">{emails[row.family.user_id] || "—"}</p>
                           {row.family.is_suspended && <Badge variant="destructive" className="text-[10px] mt-1">Familia suspendida</Badge>}
                         </div>
@@ -447,7 +488,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
           open={historyOpen}
           onOpenChange={setHistoryOpen}
           familyId={historyFamily.family.id}
-          familyName={familyName(historyFamily.family)}
+          familyName={familyName(historyFamily)}
           studentIds={historyFamily.children.map((c) => c.student.id)}
           studentNames={Object.fromEntries(historyFamily.children.map((c) => [c.student.id, studentFullName(c.student)]))}
           schoolId={schoolId}

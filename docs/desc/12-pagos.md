@@ -133,6 +133,14 @@ Tabla `PaymentDashboard.tsx` con los últimos pagos `completed`. La columna
 > y con apellidos vacíos) la columna quedaba en "—". Ahora resuelve por `payment_items` y cae
 > a `invoice_name`.
 
+### Registro de Pagos — lista de familias (`FamilyPaymentRegistrationTab`)
+La columna **Familia** muestra `father_last_name`+`mother_last_name`; como suelen venir vacíos,
+si no hay apellidos propios se toman los del **representante principal**
+(`representatives.is_primary`, fallback: primer representante) desde su `form_data`
+(`primer_apellido`/`segundo_apellido`). **No** se usan los apellidos del estudiante. El sort y la
+búsqueda usan el mismo apellido de respaldo.
+> 🐞 Antes mostraba "Sin apellidos" para casi todas las familias aunque hubiera representante.
+
 ## Reglas de negocio
 - **El formato de factura se define en `/formatos` (tabla `invoice_templates`) y la
   emisión/impresión debe respetarlo** — mismo patrón que la boleta en notas.
