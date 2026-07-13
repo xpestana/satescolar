@@ -6,32 +6,9 @@ import {
   generatePrimaryDescriptiveHtml,
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
+import { fetchAsBase64 } from "@/lib/image-resolve";
 
-function proxyImageUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname.endsWith(".amazonaws.com")) {
-      return `/img-proxy/${parsed.hostname}${parsed.pathname}`;
-    }
-  } catch { /* not a valid URL, use as-is */ }
-  return url;
-}
-
-export async function fetchAsBase64(url: string): Promise<string> {
-  if (!url) return "";
-  try {
-    const res = await fetch(proxyImageUrl(url));
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve((reader.result as string) ?? "");
-      reader.onerror = () => resolve("");
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return "";
-  }
-}
+export { fetchAsBase64 };
 
 export interface PrimaryDescriptiveBoletaParams {
   schoolId:    string;

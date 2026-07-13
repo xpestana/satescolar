@@ -62,9 +62,14 @@ import AttendanceDashboard from "./pages/school/AttendanceDashboard";
 import PaymentDashboard from "./pages/school/PaymentDashboard";
 import PaymentConfig from "./pages/school/PaymentConfig";
 import PaymentRegistration from "./pages/school/PaymentRegistration";
+import PayrollDashboard from "./pages/school/PayrollDashboard";
+import PayrollRegistration from "./pages/school/PayrollRegistration";
+import PayrollBeneficiaries from "./pages/school/PayrollBeneficiaries";
+import PayrollConfig from "./pages/school/PayrollConfig";
 import StudentLedger from "./pages/school/StudentLedger";
 import DelinquentStudents from "./pages/school/DelinquentStudents";
 import DelinquencyConfig from "./pages/school/DelinquencyConfig";
+import IncomesReport from "./pages/school/IncomesReport";
 import FormatsConfig from "./pages/school/FormatsConfig";
 import NotFound from "./pages/NotFound";
 import SchoolUsersList from "./pages/school/SchoolUsersList";
@@ -395,6 +400,12 @@ const App = () => (
               <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><StudentLedger /></ProtectedRoute>} />
               <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
               <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
+              <Route path="/pagos/ingresos" element={<ProtectedRoute requiredRole="school"><IncomesReport /></ProtectedRoute>} />
+              {/* Payroll (Pagos de Nóminas) routes */}
+              <Route path="/pagos/nomina" element={<ProtectedRoute requiredRole="school"><PayrollDashboard /></ProtectedRoute>} />
+              <Route path="/pagos/nomina/registro" element={<ProtectedRoute requiredRole="school"><PayrollRegistration /></ProtectedRoute>} />
+              <Route path="/pagos/nomina/beneficiarios" element={<ProtectedRoute requiredRole="school"><PayrollBeneficiaries /></ProtectedRoute>} />
+              <Route path="/pagos/nomina/configuracion" element={<ProtectedRoute requiredRole="school"><PayrollConfig /></ProtectedRoute>} />
               <Route path="/formatos" element={<ProtectedRoute requiredRole="school"><FormatsConfig /></ProtectedRoute>} />
 
               <Route path="/pagos/reportes" element={<Navigate to="/pagos/registro?tab=reportes" replace />} />

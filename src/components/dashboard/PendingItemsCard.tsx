@@ -24,13 +24,14 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
     queryFn: async () => {
       const pending: PendingItem[] = [];
 
-      // 1. Students in system but NOT enrolled in active year
+      // 1. Active students in system but NOT enrolled in active year
       if (activeSchoolYearId) {
         const [{ data: allStudentSchools }, { data: enrolledStudents }] = await Promise.all([
           supabase
             .from("student_schools")
-            .select("student_id")
-            .eq("school_id", schoolId!),
+            .select("student_id, students!inner(status)")
+            .eq("school_id", schoolId!)
+            .eq("students.status", "active"),
           supabase
             .from("enrollments")
             .select("student_id")

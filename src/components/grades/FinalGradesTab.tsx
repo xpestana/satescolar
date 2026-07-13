@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText, Settings } from "lucide-react";
+import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText, Settings, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "./PrimaryFinalReportModal";
 import PreschoolFinalReportModal from "./PreschoolFinalReportModal";
@@ -91,6 +91,8 @@ export default function FinalGradesTab({
   const [literalNumericos, setLiteralNumericos] = useState<Record<string, string>>({});
   const [dbLiteralNumericos, setDbLiteralNumericos] = useState<Record<string, string>>({});
   const [savingLiteralKeys, setSavingLiteralKeys] = useState<Set<string>>(new Set());
+  /** Claves studentId-0 persistidas en esta sesión tras guardar (momento=0 en final_grades). */
+  const [sessionPersistedMomento0, setSessionPersistedMomento0] = useState<Set<string>>(new Set());
 
   const editedGradesRef = useRef(editedGrades);
   editedGradesRef.current = editedGrades;
@@ -137,6 +139,7 @@ export default function FinalGradesTab({
   const isPrimary = gradeLevel ? PRIMARY_GRADES.has(gradeLevel) : false;
   const isPreschool = gradeLevel ? PRESCHOOL_GRADES.has(gradeLevel) : false;
   const isQualitative = isPrimary || isPreschool;
+  const isBachillerato = isNumeric && !isPrimary && !isPreschool;
 
   // Fetch grades_config for primary report type
   const { data: gradesConfig } = useQuery({
@@ -252,6 +255,28 @@ export default function FinalGradesTab({
     enabled: assignmentIds.length > 0,
   });
 
+  const persistedMomento0Keys = useMemo(() => {
+    const keys = new Set<string>();
+    if (!isBachillerato || assignmentIds.length === 0) return keys;
+    const assignmentId = assignmentIds[0];
+    for (const fg of existingFinalGrades) {
+      if (
+        fg.assignment_id === assignmentId &&
+        fg.momento === 0 &&
+        fg.grade_value != null &&
+        String(fg.grade_value).trim() !== ""
+      ) {
+        keys.add(`${fg.student_id}-0`);
+      }
+    }
+    return keys;
+  }, [existingFinalGrades, assignmentIds, isBachillerato]);
+
+  const isMomento0Persisted = useCallback(
+    (key: string) => persistedMomento0Keys.has(key) || sessionPersistedMomento0.has(key),
+    [persistedMomento0Keys, sessionPersistedMomento0],
+  );
+
   const gradesMap = useMemo(() => {
     const map: Record<string, string> = {};
     allGrades.forEach((g: any) => {
@@ -309,6 +334,7 @@ export default function FinalGradesTab({
     setSavingAdjKeys(new Set());
     setSavingLiteralKeys(new Set());
     setSavedKeys(new Set());
+    setSessionPersistedMomento0(new Set());
     setInitialized(false);
   }, [selectedSubject, selectedSection, selectedGcrpAssignment, effectiveYear]);
 
@@ -477,7 +503,6 @@ export default function FinalGradesTab({
           });
           const calcVal = (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
           edited[key] = calcVal;
-          db[key] = calcVal;
           let totalAtt = 0, totalAbs = 0;
           for (const mo of [1, 2, 3]) {
             const moKey = `${s.student_id}-${mo}`;
@@ -507,6 +532,18 @@ export default function FinalGradesTab({
   const handleGradeChange = (studentId: string, momento: number, value: string) => {
     setEditedGrades(prev => ({ ...prev, [`${studentId}-${momento}`]: value }));
   };
+
+  const calculateAnnualAverageFromMoments = useCallback((studentId: string): string | null => {
+    const vals: number[] = [];
+    for (const m of [1, 2, 3]) {
+      const v = (editedGrades[`${studentId}-${m}`] || "").trim();
+      if (!v) return null;
+      const num = Number(v);
+      if (isNaN(num)) return null;
+      vals.push(num);
+    }
+    return (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
+  }, [editedGrades]);
 
   const handleExtraChange = (key: string, field: keyof ExtraFields, value: string | number) => {
     setExtraFields(prev => ({ ...prev, [key]: { ...(prev[key] || DEFAULT_EXTRA), [field]: value } }));
@@ -652,7 +689,56 @@ export default function FinalGradesTab({
     return counts;
   }, [students, isAnyDirty]);
 
-  const totalDirty = dirtyCountByMomento[0] + dirtyCountByMomento[1] + dirtyCountByMomento[2] + dirtyCountByMomento[3];
+  /** Algún estudiante sin nota cargada en momento 1, 2 o 3 — bloquea Guardar Todos. */
+  const hasMissingMomentGrades = useMemo(() => {
+    for (const s of students) {
+      for (const m of [1, 2, 3]) {
+        const key = `${s.student_id}-${m}`;
+        const val = isPrimary || isPreschool
+          ? (literals[key] || "").trim()
+          : (editedGrades[key] || "").trim();
+        if (!val) return true;
+      }
+    }
+    return false;
+  }, [students, editedGrades, literals, isPrimary, isPreschool]);
+
+  const isUnpersistedDefinitiva = useCallback(
+    (key: string) => {
+      const val = (editedGrades[key] || "").trim();
+      return isBachillerato && val !== "" && !isMomento0Persisted(key);
+    },
+    [editedGrades, isBachillerato, isMomento0Persisted],
+  );
+
+  const needsSave = useCallback(
+    (key: string, momento: number) => {
+      if (isAnyDirty(key)) return true;
+      return momento === 0 && isUnpersistedDefinitiva(key);
+    },
+    [isAnyDirty, isUnpersistedDefinitiva],
+  );
+
+  const totalToSave = useMemo(() => {
+    let count = 0;
+    for (const s of students) {
+      for (const m of [0, 1, 2, 3]) {
+        if (needsSave(`${s.student_id}-${m}`, m)) count++;
+      }
+    }
+    return count;
+  }, [students, needsSave]);
+
+  const unpersistedDefinitivaCount = useMemo(() => {
+    if (!isBachillerato) return 0;
+    let count = 0;
+    for (const s of students) {
+      const key = `${s.student_id}-0`;
+      const val = (editedGrades[key] || "").trim();
+      if (val && !isMomento0Persisted(key)) count++;
+    }
+    return count;
+  }, [students, editedGrades, isBachillerato, isMomento0Persisted]);
 
   const buildUpsertPayload = (studentId: string, momento: number, gradeValue: string, adjVal: number, ef: ExtraFields) => ({
     student_id: studentId,
@@ -686,7 +772,13 @@ export default function FinalGradesTab({
     const dbEf = dbExtraFieldsRef.current[key] || DEFAULT_EXTRA;
     const gradeChanged = val !== savedVal;
     const extraChanged = ef.observation !== dbEf.observation || ef.attendance_count !== dbEf.attendance_count || ef.absence_count !== dbEf.absence_count || ef.final_status !== dbEf.final_status;
-    if (!gradeChanged && !extraChanged) return;
+    const unpersistedDefinitiva =
+      momento === 0 &&
+      isBachillerato &&
+      val !== "" &&
+      !persistedMomento0Keys.has(key) &&
+      !sessionPersistedMomento0.has(key);
+    if (!gradeChanged && !extraChanged && !unpersistedDefinitiva) return;
 
     setSavingKeys(prev => new Set(prev).add(key));
     try {
@@ -710,6 +802,16 @@ export default function FinalGradesTab({
         setDbAdjustments(prev => { const n = { ...prev }; delete n[key]; return n; });
         setAdjustments(prev => { const n = { ...prev }; delete n[key]; return n; });
         setDbExtraFields(prev => ({ ...prev, [key]: { ...DEFAULT_EXTRA } }));
+        if (momento === 0) {
+          setSessionPersistedMomento0((prev) => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }
+      }
+      if (momento === 0 && (val !== "" || extraChanged)) {
+        setSessionPersistedMomento0((prev) => new Set(prev).add(key));
       }
       setSavedKeys(prev => {
         const next = new Set(prev).add(key);
@@ -721,7 +823,16 @@ export default function FinalGradesTab({
     } finally {
       setSavingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
-  }, [assignmentIds, schoolId, isNumeric]);
+  }, [assignmentIds, schoolId, isNumeric, isBachillerato, persistedMomento0Keys, sessionPersistedMomento0]);
+
+  const applyRecalculatedFinal = useCallback(async (studentId: string, newAverage: string) => {
+    const key = `${studentId}-0`;
+    editedGradesRef.current = { ...editedGradesRef.current, [key]: newAverage };
+    adjustmentsRef.current = { ...adjustmentsRef.current, [key]: 0 };
+    setEditedGrades(editedGradesRef.current);
+    setAdjustments((prev) => ({ ...prev, [key]: 0 }));
+    await saveGrade(studentId, 0);
+  }, [saveGrade]);
 
   const adjustPoint = useCallback(async (studentId: string, momento: number, delta: number) => {
     if (assignmentIds.length === 0) return;
@@ -758,7 +869,7 @@ export default function FinalGradesTab({
   }, [assignmentIds, editedGrades, dbValues, adjustments, extraFields, schoolId]);
 
   const saveAll = useCallback(async () => {
-    if (assignmentIds.length === 0 || totalDirty === 0) return;
+    if (assignmentIds.length === 0 || hasMissingMomentGrades || totalToSave === 0) return;
     setSavingAll(true);
     try {
       if (isPrimary || isPreschool) {
@@ -768,7 +879,7 @@ export default function FinalGradesTab({
         for (const s of students) {
           for (const m of [1, 2, 3, 0]) {
             const key = `${s.student_id}-${m}`;
-            if (!isAnyDirty(key)) continue;
+            if (!needsSave(key, m)) continue;
             const ef = extraFields[key] || DEFAULT_EXTRA;
             upserts.push({
               student_id: s.student_id,
@@ -803,7 +914,7 @@ export default function FinalGradesTab({
         for (const s of students) {
           for (const m of [1, 2, 3, 0]) {
             const key = `${s.student_id}-${m}`;
-            if (!isAnyDirty(key)) continue;
+            if (!needsSave(key, m)) continue;
             const val = (editedGrades[key] || "").trim();
             const ef = extraFields[key] || DEFAULT_EXTRA;
             if (val !== "" || dbValues[key]) {
@@ -828,6 +939,13 @@ export default function FinalGradesTab({
         setDbValues(newDb);
         setDbAdjustments(newDbAdj);
         setDbExtraFields(newDbExtra);
+        setSessionPersistedMomento0((prev) => {
+          const next = new Set(prev);
+          for (const u of upserts) {
+            if (u.momento === 0) next.add(`${u.student_id}-0`);
+          }
+          return next;
+        });
         toast.success(`${upserts.length} registros guardados correctamente`);
       }
     } catch {
@@ -835,7 +953,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingAll(false);
     }
-  }, [isPrimary, isPreschool, assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, isAnyDirty, totalDirty, literals, dbLiterals]);
+  }, [isPrimary, isPreschool, assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, needsSave, hasMissingMomentGrades, totalToSave, literals, dbLiterals]);
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return students;
@@ -1140,6 +1258,18 @@ export default function FinalGradesTab({
     const gradeNum = Number(value);
     const canAdd = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum < 20;
     const canSubtract = isNumeric && isSavedInDb && !dirty && !isNaN(gradeNum) && gradeNum > 0;
+    const currentFinalTrimmed = value.trim();
+    const recalculatedAverage = isFinal && isBachillerato
+      ? calculateAnnualAverageFromMoments(s.student_id)
+      : null;
+    const showStaleAveragePrompt =
+      isFinal &&
+      isBachillerato &&
+      currentFinalTrimmed !== "" &&
+      recalculatedAverage !== null &&
+      Number(currentFinalTrimmed).toFixed(2) !== Number(recalculatedAverage).toFixed(2);
+    const showUnpersistedWarning =
+      isFinal && isBachillerato && currentFinalTrimmed !== "" && !isMomento0Persisted(key) && !showStaleAveragePrompt;
 
     return (
       <TableCell key={m} className={`p-2 align-top ${isFinal ? "bg-muted/10" : ""}`}>
@@ -1202,6 +1332,35 @@ export default function FinalGradesTab({
               </Tooltip>
             )}
           </div>
+
+          {showStaleAveragePrompt && recalculatedAverage && (
+            <div className="flex items-start gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-1 dark:border-amber-900 dark:bg-amber-950/30">
+              <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-800 dark:text-amber-300 leading-tight">
+                Cambió las notas de los momentos y el promedio ya no coincide. Según los tres momentos actuales,
+                la definitiva debería ser <strong>{recalculatedAverage}</strong> (ahora tiene{" "}
+                <strong>{currentFinalTrimmed}</strong>).{" "}
+                <button
+                  type="button"
+                  onClick={() => applyRecalculatedFinal(s.student_id, recalculatedAverage)}
+                  className="underline font-semibold text-amber-900 dark:text-amber-200 hover:text-amber-950 dark:hover:text-amber-100"
+                >
+                  Haga clic aquí para colocar el nuevo promedio
+                </button>
+                .
+              </p>
+            </div>
+          )}
+
+          {showUnpersistedWarning && (
+            <div className="flex items-start gap-1 rounded border border-red-200 bg-red-50 px-1.5 py-1 dark:border-red-900 dark:bg-red-950/30">
+              <AlertTriangle className="h-3 w-3 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-red-700 dark:text-red-400 leading-tight">
+                Esta nota definitiva aún <strong>no está guardada</strong>. Salga del campo o use{" "}
+                <strong>Guardar Todos</strong> para que aparezca en la boleta definitiva del año escolar.
+              </p>
+            </div>
+          )}
 
           {/* Observation */}
           <div>
@@ -1318,15 +1477,26 @@ export default function FinalGradesTab({
                 <Loader2 className="h-4 w-4 animate-spin" /> Guardando...
               </div>
             )}
-            <Button
-              size="sm"
-              onClick={saveAll}
-              disabled={totalDirty === 0 || savingAll}
-              className="gap-1.5"
-            >
-              {savingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Guardar Todos {totalDirty > 0 && `(${totalDirty})`}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <Button
+                    size="sm"
+                    onClick={saveAll}
+                    disabled={hasMissingMomentGrades || savingAll}
+                    className="gap-1.5"
+                  >
+                    {savingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    Guardar Todos {totalToSave > 0 && `(${totalToSave})`}
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {hasMissingMomentGrades && (
+                <TooltipContent className="max-w-xs text-xs">
+                  <p>Complete y guarde las notas de los momentos 1, 2 y 3 de todos los estudiantes antes de usar Guardar Todos.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
             {isNumeric && !isPrimary && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1360,6 +1530,43 @@ export default function FinalGradesTab({
           </div>
         </div>
 
+        {isBachillerato && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 mb-4">
+            <div className="flex gap-2">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
+                <p className="font-semibold">Cómo usar las notas finales (Bachillerato)</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs text-blue-800 dark:text-blue-200">
+                  <li>
+                    <strong>Momentos 1, 2 y 3:</strong> las notas se calculan a partir del plan de evaluación del
+                    docente. Al salir de cada casilla, la nota de ese momento queda guardada.
+                  </li>
+                  <li>
+                    <strong>Definitiva Final:</strong> el sistema muestra el promedio de los tres momentos. Es una
+                    referencia hasta que usted la guarde de forma definitiva.
+                  </li>
+                  <li>
+                    Guardar las notas de un momento <strong>no guarda automáticamente</strong> la definitiva final.
+                    Debe guardar también esa columna (salir del campo o pulsar <strong>Guardar Todos</strong>).
+                  </li>
+                  <li>
+                    En la pestaña <strong>Descarga de Boletas</strong>, el momento seleccionado arriba define qué
+                    periodos incluye la boleta (Momento 1 = solo el primero; Momento 2 = primero y segundo; Momento 3 =
+                    los tres). La opción <strong>Definitiva Final</strong> es el boletín completo del año escolar.
+                  </li>
+                </ol>
+                {unpersistedDefinitivaCount > 0 && (
+                  <p className="text-xs font-medium text-red-700 dark:text-red-400 flex items-center gap-1 pt-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {unpersistedDefinitivaCount} estudiante{unpersistedDefinitivaCount !== 1 ? "s" : ""} con la nota
+                    definitiva calculada pero <strong>aún sin guardar</strong>.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
@@ -1392,6 +1599,11 @@ export default function FinalGradesTab({
                   <span className="text-[10px] text-muted-foreground">
                     {isPrimary ? "Literal Final" : "Promedio 3 momentos"}
                   </span>
+                  {isBachillerato && (
+                    <div className="text-[10px] text-red-600 dark:text-red-400 font-medium mt-0.5">
+                      Debe guardarse para la boleta anual
+                    </div>
+                  )}
                   {dirtyCountByMomento[0] > 0 && (
                     <div className="text-[10px] text-orange-500 font-medium">
                       ({dirtyCountByMomento[0]} sin guardar)

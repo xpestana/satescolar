@@ -3,6 +3,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import QRCode from "qrcode";
 import { buildAttendanceScanUrl } from "@/lib/attendance-url";
+import { resolveImageToPngDataUrl } from "@/lib/image-resolve";
 
 interface ExportColumn {
   key: string;
@@ -44,6 +45,14 @@ export interface PdfFooterConfig {
 function sanitize(val: any): string {
   if (val == null || val === "—") return "";
   return String(val);
+}
+
+const PDF_CELL_MAX_LEN = 80;
+
+function sanitizePdfCell(val: any): string {
+  const s = sanitize(val);
+  if (s.length <= PDF_CELL_MAX_LEN) return s;
+  return `${s.substring(0, PDF_CELL_MAX_LEN - 1)}…`;
 }
 
 // ── CSV ──────────────────────────────────────────────
@@ -89,52 +98,8 @@ export function downloadExcel(
 }
 
 // ── PDF ──────────────────────────────────────────────
-// Loads any image URL as a PNG data URL via fetch → blob URL → canvas.
-// Using a blob URL keeps the canvas same-origin so toDataURL() never throws.
-// Falls back to the image-proxy edge function when direct fetch fails (CORS).
 async function loadImageAsBase64(url: string): Promise<string | null> {
-  const fetchToPng = async (fetchUrl: string, headers?: Record<string, string>): Promise<string | null> => {
-    try {
-      const response = await fetch(fetchUrl, headers ? { headers } : undefined);
-      if (!response.ok) return null;
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = img.naturalWidth || 200;
-            canvas.height = img.naturalHeight || 200;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) { URL.revokeObjectURL(blobUrl); resolve(null); return; }
-            ctx.drawImage(img, 0, 0);
-            URL.revokeObjectURL(blobUrl);
-            resolve(canvas.toDataURL("image/png"));
-          } catch {
-            URL.revokeObjectURL(blobUrl);
-            resolve(null);
-          }
-        };
-        img.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(null); };
-        img.src = blobUrl;
-      });
-    } catch {
-      return null;
-    }
-  };
-
-  // Try direct fetch first (works when S3 bucket has CORS configured)
-  const direct = await fetchToPng(url);
-  if (direct) return direct;
-
-  // Fallback: proxy through Supabase edge function to bypass CORS restrictions
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
-  if (!supabaseUrl || !supabaseKey) return null;
-
-  const proxyUrl = `${supabaseUrl}/functions/v1/image-proxy?url=${encodeURIComponent(url)}`;
-  return fetchToPng(proxyUrl, { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` });
+  return resolveImageToPngDataUrl(url);
 }
 
 export async function downloadPDF(
@@ -153,9 +118,10 @@ export async function downloadPDF(
   const fc: PdfFooterConfig = footerConfig ?? {
     show_address: true, show_phone: true, show_rif: true,
   };
-  const isLandscape = columns.length > 6;
+  const isLandscape = columns.length > 5;
   const doc = new jsPDF({ orientation: isLandscape ? "landscape" : "portrait" });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 14;
   let startY = 15;
 
@@ -252,14 +218,20 @@ export async function downloadPDF(
     startY += 8;
   }
 
+  if (startY > pageHeight * 0.7) {
+    doc.addPage();
+    startY = 15;
+  }
+
   autoTable(doc, {
     head: [columns.map((c) => c.label)],
-    body: rows.map((r) => columns.map((c) => sanitize(r[c.key]))),
-    styles: { fontSize: 7, cellPadding: 2 },
+    body: rows.map((r) => columns.map((c) => sanitizePdfCell(r[c.key]))),
+    styles: { fontSize: 7, cellPadding: 2, overflow: "linebreak", cellWidth: "wrap" },
     headStyles: { fillColor: [41, 128, 185], fontSize: 7 },
-    margin: { top: startY, left: margin, right: margin },
+    horizontalPageBreak: true,
+    margin: { top: startY, left: margin, right: margin, bottom: 20 },
     didDrawPage: (data) => {
-      const pageHeight = doc.internal.pageSize.getHeight();
+      const currentPageHeight = doc.internal.pageSize.getHeight();
       const pageCount = (doc as any).internal.getNumberOfPages();
 
       // School footer info
@@ -278,7 +250,7 @@ export async function downloadPDF(
         if (footerParts.length > 0) {
           doc.setFontSize(6);
           doc.setTextColor(130);
-          doc.text(footerParts.join("  |  "), pageWidth / 2, pageHeight - 12, { align: "center" });
+          doc.text(footerParts.join("  |  "), pageWidth / 2, currentPageHeight - 12, { align: "center" });
         }
       }
 
@@ -288,13 +260,15 @@ export async function downloadPDF(
       doc.text(
         `Página ${data.pageNumber} de ${pageCount}`,
         pageWidth / 2,
-        pageHeight - 8,
+        currentPageHeight - 8,
         { align: "center" }
       );
     },
   });
 
-  doc.save(`${filename}.pdf`);
+  // Blob + anchor download works reliably in PWA/standalone; doc.save() often fails silently.
+  const blob = doc.output("blob");
+  triggerDownload(blob, `${filename}.pdf`);
 }
 
 // ── Carnet (vertical) ────────────────────────────────
@@ -610,7 +584,7 @@ function triggerDownload(blob: Blob, filename: string) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
 // ── Planilla de Inscripción ──────────────────────────

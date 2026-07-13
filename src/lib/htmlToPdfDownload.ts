@@ -125,10 +125,12 @@ async function addElementAsPdfPage(
   let drawH = canvas.height;
 
   if (canvas.height > pageHpx) {
+    // Content taller than the page: scale down uniformly and center horizontally.
     const fit = pageHpx / canvas.height;
     drawW = canvas.width * fit;
     drawH = pageHpx;
-    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, drawW, drawH);
+    const offsetX = (canvas.width - drawW) / 2;
+    ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, offsetX, 0, drawW, drawH);
   } else {
     ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, drawW, drawH);
   }

@@ -14,9 +14,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, Receipt, AlertTriangle, CheckCheck } from "lucide-react";
+import { Plus, Trash2, Loader2, Receipt, AlertTriangle, CheckCheck, Pencil } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
 import { todayCaracasIso } from "@/lib/dateUtils";
+
+interface InvoiceProfile {
+  id: string;
+  name: string;
+  rif: string;
+  phone: string;
+  address: string;
+}
 
 interface PaymentMethodLine {
   id: string;
@@ -60,7 +68,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   // Invoice data
   const [invoice, setInvoice] = useState({ name: "", rif: "", phone: "", address: "" });
+  const [invoiceReady, setInvoiceReady] = useState(false);
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [includeOtros, setIncludeOtros] = useState(false);
+  const invoiceInitializedRef = useRef(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [controlNumber, setControlNumber] = useState("");
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
   const autoSelectedRef = useRef(false);
@@ -125,44 +138,83 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     enabled: open && !!student?.id,
   });
 
-  // Load representative for invoice defaults
-  const { data: primaryRep } = useQuery({
-    queryKey: ["primary-rep", student?.family_id],
+  // Datos de la familia: default de factura guardado + campos de contacto
+  const { data: familyData, isLoading: isLoadingFamily } = useQuery({
+    queryKey: ["family-default-invoice", student?.family_id],
     queryFn: async () => {
-      const { data } = await supabase.from("representatives")
-        .select("*")
-        .eq("family_id", student.family_id)
-        .eq("is_primary", true)
-        .maybeSingle();
+      if (!student?.family_id) return null;
+      const { data } = await supabase.from("families")
+        .select("default_invoice, contact_phone, address")
+        .eq("id", student.family_id)
+        .single();
       return data;
     },
     enabled: open && !!student?.family_id,
   });
 
-  // Set invoice defaults from representative
+  // Todos los representantes de la familia
+  const { data: representatives = [], isLoading: isLoadingReps } = useQuery({
+    queryKey: ["family-representatives", student?.family_id],
+    queryFn: async () => {
+      const { data } = await supabase.from("representatives")
+        .select("*")
+        .eq("family_id", student.family_id)
+        .order("created_at");
+      return data || [];
+    },
+    enabled: open && !!student?.family_id,
+  });
+
+  const effectivePrimaryRep = useMemo(() =>
+    representatives.find((r: any) => r.is_primary) || representatives[0] || null,
+    [representatives]
+  );
+
+  const profiles = useMemo((): InvoiceProfile[] => {
+    const raw = familyData?.default_invoice;
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw as InvoiceProfile[];
+    const obj = raw as any;
+    if (obj.name || obj.rif) return [{ id: crypto.randomUUID(), name: obj.name || "", rif: obj.rif || "", phone: obj.phone || "", address: obj.address || "" }];
+    return [];
+  }, [familyData]);
+
+  // Inicializar datos de factura una sola vez por apertura del modal
   useEffect(() => {
-    if (primaryRep && open) {
-      const fd = primaryRep.form_data as Record<string, any> | null;
-      // Use document_id directly — it already contains the prefix (e.g. "V-12345678")
-      const doc = primaryRep.document_id || "";
-      const fullName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
-      setInvoice({
-        rif: doc,
-        name: fullName || "",
-        phone: primaryRep.phone || fd?.numero_contacto || "",
-        address: "",
-      });
+    if (!open || invoiceInitializedRef.current || isLoadingFamily || isLoadingReps) return;
+
+    if (profiles.length === 0) {
+      if (effectivePrimaryRep) {
+        const fd = effectivePrimaryRep.form_data as Record<string, any> | null;
+        const fullName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
+        setInvoice({
+          rif: effectivePrimaryRep.document_id || "",
+          name: fullName || "",
+          phone: effectivePrimaryRep.phone || fd?.numero_contacto || (familyData as any)?.contact_phone || "",
+          address: (familyData as any)?.address || "",
+        });
+      } else {
+        setInvoice({ name: "", rif: "", phone: (familyData as any)?.contact_phone || "", address: (familyData as any)?.address || "" });
+      }
     }
-  }, [primaryRep, open]);
+
+    invoiceInitializedRef.current = true;
+  }, [open, familyData, profiles, effectivePrimaryRep, isLoadingFamily, isLoadingReps]);
 
   // Reset on open + prefill from report if any
   useEffect(() => {
     if (open) {
       autoSelectedRef.current = false;
+      invoiceInitializedRef.current = false;
+      setInvoice({ name: "", rif: "", phone: "", address: "" });
+      setInvoiceReady(false);
+      setEditingProfileId(null);
+      setIncludeOtros(false);
       setSelectedConcepts({});
       setMethods([createMethodLine()]);
       setObservations("");
       setInvoiceNumber("");
+      setControlNumber("");
       if (fromReport) {
         setObservations(`Confirmación del reporte ${fromReport.reference_code || ""} · ${fromReport.notes || ""}`.trim());
         const m = createMethodLine();
@@ -185,16 +237,24 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   useEffect(() => {
     if (!open || !fromReport || autoSelectedRef.current || balances.length === 0) return;
     const match = balances.find((b: any) => b.plan_concept_id === fromReport.plan_concept_id && b.balance > 0);
-    if (match) {
-      setSelectedConcepts({ [match.id]: match.balance.toFixed(2) });
-      autoSelectedRef.current = true;
-    }
-  }, [balances, open, fromReport]);
+    if (!match) return;
+    const matchCurrency = match.currency || "VES";
+    if (matchCurrency !== "VES" && rates.length === 0) return; // Wait for rates to load before calculating
+    const currentRate = matchCurrency === "VES" ? 1 : (rates.find((r: any) => r.currency === matchCurrency)?.rate_to_ves || match.exchange_rate_snapshot || 1);
+    const displayTotal = matchCurrency === "VES" ? (match.total_amount || 0) : (match.original_amount || 0) * currentRate;
+    const displayBalance = Math.max(0, displayTotal - (match.paid_amount || 0));
+    setSelectedConcepts({ [match.id]: displayBalance.toFixed(2) });
+    autoSelectedRef.current = true;
+  }, [balances, rates, open, fromReport]);
 
   const getRate = (currency: string) => {
     if (currency === "VES") return 1;
     return rates.find((r) => r.currency === currency)?.rate_to_ves || 0;
   };
+
+  // Use current exchange rate for display/calculation instead of frozen snapshot
+  const getDisplayTotal = (b: any) => b.currency === "VES" ? (b.total_amount || 0) : (b.original_amount || 0) * getRate(b.currency || "VES");
+  const getDisplayBalance = (b: any) => Math.max(0, getDisplayTotal(b) - (b.paid_amount || 0));
 
   // Recalc method VES when currency/amount/rate changes
   const updateMethodField = (id: string, field: string, value: string) => {
@@ -225,8 +285,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   // Cierra un saldo residual (típicamente diferencia por tasa de cambio) marcándolo como pagado
   const closeBalanceMut = useMutation({
     mutationFn: async (bal: any) => {
+      const currentRate = getRate(bal.currency || "VES");
+      const newTotalAmount = getDisplayTotal(bal);
       const { error } = await supabase.from("student_concept_balances").update({
-        paid_amount: bal.total_amount,
+        exchange_rate_snapshot: currentRate,
+        total_amount: newTotalAmount,
+        paid_amount: newTotalAmount,
         balance: 0,
         status: "paid",
         last_payment_date: today(),
@@ -249,6 +313,42 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   const difference = totalMethods - totalConcepts;
 
+  // Guardar o actualizar perfil de factura en el array de la familia
+  const saveProfileMut = useMutation({
+    mutationFn: async () => {
+      const current = Array.isArray(familyData?.default_invoice) ? (familyData!.default_invoice as InvoiceProfile[]) : [];
+      const profileId = editingProfileId || crypto.randomUUID();
+      const newProfile: InvoiceProfile = { id: profileId, name: invoice.name, rif: invoice.rif, phone: invoice.phone, address: invoice.address };
+      const updated = editingProfileId
+        ? current.map((p) => p.id === editingProfileId ? newProfile : p)
+        : [...current, newProfile];
+      const { error } = await supabase.from("families").update({ default_invoice: updated } as any).eq("id", student.family_id);
+      if (error) throw error;
+      return profileId;
+    },
+    onSuccess: (profileId) => {
+      qc.invalidateQueries({ queryKey: ["family-default-invoice", student.family_id] });
+      setEditingProfileId(profileId);
+      toast({ title: editingProfileId ? "Perfil actualizado" : "Perfil de factura guardado" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  // Eliminar perfil de factura del array
+  const deleteProfileMut = useMutation({
+    mutationFn: async (profileId: string) => {
+      const current = Array.isArray(familyData?.default_invoice) ? (familyData!.default_invoice as InvoiceProfile[]) : [];
+      const updated = current.filter((p) => p.id !== profileId);
+      const { error } = await supabase.from("families").update({ default_invoice: updated } as any).eq("id", student.family_id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["family-default-invoice", student.family_id] });
+      toast({ title: "Perfil eliminado" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   // Save payment
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -269,6 +369,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         status: "completed",
         observations: observations || null,
         invoice_number: invoiceNumber.trim(),
+        control_number: controlNumber.trim(),
         invoice_name: invoice.name || null,
         invoice_rif: invoice.rif || null,
         invoice_phone: invoice.phone || null,
@@ -283,11 +384,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         return {
           payment_id: payment.id,
           plan_concept_id: bal!.plan_concept_id,
+          student_id: student.id,
           amount_ves: amount,
-          is_partial: amount < (bal?.balance || 0) - 0.01,
+          is_partial: amount < getDisplayBalance(bal!) - 0.01,
         };
       });
-      const { error: itemErr } = await supabase.from("payment_items").insert(items);
+      const { error: itemErr } = await supabase.from("payment_items").insert(items as any);
       if (itemErr) throw itemErr;
 
       // Insert payment method entries
@@ -313,18 +415,34 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         const amount = parseFloat(amountStr) || 0;
         const bal = balances.find((b) => b.id === balanceId);
         if (!bal) continue;
+        const currentRate = getRate(bal.currency || "VES");
+        const newTotalAmount = getDisplayTotal(bal);
         const newPaid = parseFloat(((bal.paid_amount || 0) + amount).toFixed(2));
-        const newBalance = parseFloat(((bal.total_amount || 0) - newPaid).toFixed(2));
+        const newBalance = parseFloat((newTotalAmount - newPaid).toFixed(2));
         // Absorb residuals ≤ EXCHANGE_RATE_TOLERANCE_VES caused by exchange rate drift
         const effectiveBalance = newBalance > 0 && newBalance <= EXCHANGE_RATE_TOLERANCE_VES ? 0 : Math.max(0, newBalance);
         const newStatus = effectiveBalance <= 0 ? "paid" : "partial";
         await supabase.from("student_concept_balances").update({
-          paid_amount: effectiveBalance <= 0 ? bal.total_amount : newPaid,
+          exchange_rate_snapshot: currentRate,
+          total_amount: newTotalAmount,
+          paid_amount: effectiveBalance <= 0 ? newTotalAmount : newPaid,
           balance: effectiveBalance,
           status: newStatus,
           last_payment_date: today(),
         }).eq("id", balanceId);
       }
+
+      // Guardar sobrepago en "Otros" si el usuario lo indicó
+      if (includeOtros && difference > 0.01) {
+        await supabase.from("payment_others").insert({
+          payment_id: payment.id,
+          school_id: schoolId,
+          amount_ves: parseFloat(difference.toFixed(2)),
+          invoice_number: invoiceNumber.trim() || null,
+          created_by: user!.id,
+        });
+      }
+
       return payment.id;
     },
     onSuccess: (paymentId: string) => {
@@ -351,7 +469,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[70vw] max-w-[70vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="flex items-center gap-2"><Receipt className="h-5 w-5" />Registrar Pago</DialogTitle></DialogHeader>
 
         <div className="space-y-6">
@@ -367,23 +485,86 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
             </CardContent>
           </Card>
 
-          {/* Invoice Data */}
+          {/* N° Factura y N° Control — datos por pago, siempre visibles */}
           <Card>
-            <CardHeader className="py-3"><CardTitle className="text-sm">Datos de Factura</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">N° de Factura <span className="text-destructive">*</span></Label>
                   <Input className="h-8 text-sm" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Obligatorio" required />
                 </div>
-                <div className="space-y-1"><Label className="text-xs">RIF / Cédula</Label><Input className="h-8 text-sm" value={invoice.rif} onChange={(e) => setInvoice({ ...invoice, rif: e.target.value })} /></div>
-                <div className="space-y-1"><Label className="text-xs">Nombre / Razón Social</Label><Input className="h-8 text-sm" value={invoice.name} onChange={(e) => setInvoice({ ...invoice, name: e.target.value })} /></div>
-                <div className="space-y-1"><Label className="text-xs">Teléfono</Label><Input className="h-8 text-sm" value={invoice.phone} onChange={(e) => setInvoice({ ...invoice, phone: e.target.value })} /></div>
-                <div className="space-y-1 md:col-span-4"><Label className="text-xs">Dirección</Label><Input className="h-8 text-sm" value={invoice.address} onChange={(e) => setInvoice({ ...invoice, address: e.target.value })} /></div>
+                <div className="space-y-1">
+                  <Label className="text-xs">N° de Control</Label>
+                  <Input className="h-8 text-sm" value={controlNumber} onChange={(e) => setControlNumber(e.target.value)} placeholder="ej: 00-00016725" />
+                </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Datos del cliente para la factura */}
+          <Card>
+            <CardHeader className="py-3"><CardTitle className="text-sm">Datos de Factura</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {/* Lista de perfiles guardados */}
+              {profiles.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs text-muted-foreground font-medium">Perfiles guardados — haz clic para seleccionar</p>
+                  {profiles.map((p) => (
+                    <div
+                      key={p.id}
+                      className={`flex items-center gap-2 border rounded-lg px-3 py-2 cursor-pointer hover:bg-accent transition-colors ${editingProfileId === p.id ? "border-primary bg-primary/5" : ""}`}
+                      onClick={() => { setInvoice({ name: p.name, rif: p.rif, phone: p.phone, address: p.address }); setInvoiceReady(true); setEditingProfileId(null); }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{p.name || p.rif || "Sin nombre"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{[p.phone, p.address].filter(Boolean).join(" · ")}</p>
+                      </div>
+                      <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" title="Editar perfil" onClick={() => { setInvoice({ name: p.name, rif: p.rif, phone: p.phone, address: p.address }); setEditingProfileId(p.id); setInvoiceReady(false); }}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" title="Eliminar perfil" disabled={deleteProfileMut.isPending} onClick={() => deleteProfileMut.mutate(p.id)}>
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-1" />
+                </div>
+              )}
+
+              {/* Campos editables */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="space-y-1"><Label className="text-xs">RIF / Cédula</Label><Input className="h-8 text-sm" value={invoice.rif} onChange={(e) => setInvoice({ ...invoice, rif: e.target.value })} /></div>
+                <div className="space-y-1"><Label className="text-xs">Nombre / Razón Social</Label><Input className="h-8 text-sm" value={invoice.name} onChange={(e) => setInvoice({ ...invoice, name: e.target.value })} /></div>
+                <div className="space-y-1"><Label className="text-xs">Teléfono</Label><Input className="h-8 text-sm" value={invoice.phone} onChange={(e) => setInvoice({ ...invoice, phone: e.target.value })} /></div>
+                <div className="space-y-1 md:col-span-3"><Label className="text-xs">Dirección</Label><Input className="h-8 text-sm" value={invoice.address} onChange={(e) => setInvoice({ ...invoice, address: e.target.value })} /></div>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={() => saveProfileMut.mutate()}
+                  disabled={saveProfileMut.isPending || !student?.family_id}
+                >
+                  {saveProfileMut.isPending && <Loader2 className="animate-spin h-3 w-3 mr-1" />}
+                  {editingProfileId ? "Actualizar perfil" : "Guardar como predeterminado"}
+                </Button>
+                {!invoiceReady ? (
+                  <Button size="sm" onClick={() => setInvoiceReady(true)}>
+                    Confirmar datos de factura
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => { setInvoiceReady(false); setEditingProfileId(null); }}>
+                    Editar datos de factura
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {invoiceReady && <>
           {/* Concepts Selection */}
           <Card>
             <CardHeader className="py-3 flex flex-row items-center justify-between">
@@ -411,20 +592,22 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                       const conceptName = (b.payment_plan_concepts as any)?.payment_concepts?.name || "—";
                       const cur = b.currency || "VES";
                       const isSelected = b.id in selectedConcepts;
+                      const displayTotal = getDisplayTotal(b);
+                      const displayBalance = getDisplayBalance(b);
                       return (
                         <TableRow key={b.id} className={isSelected ? "bg-primary/5" : ""}>
-                          <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, b.balance)} /></TableCell>
+                          <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, displayBalance)} /></TableCell>
                           <TableCell className="font-medium">
                             {conceptName}
                             {cur !== "VES" && (
                               <span className="ml-2 text-xs text-muted-foreground">
-                                ({Number(b.original_amount || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur} @ {Number(b.exchange_rate_snapshot || 1).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
+                                ({Number(b.original_amount || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur} @ {Number(getRate(cur)).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
                               </span>
                             )}
                           </TableCell>
-                          <TableCell>{b.total_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell>{displayTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                          <TableCell className="font-medium">{b.balance?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="font-medium">{displayBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell>
                             <Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>
                               {b.status === "paid" ? "Pagado" : b.status === "partial" ? "Parcial" : "Pendiente"}
@@ -439,12 +622,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                                   className="h-7 w-28 text-xs"
                                   value={selectedConcepts[b.id]}
                                   onChange={(e) => {
-                                    const val = Math.min(parseFloat(e.target.value) || 0, b.balance);
+                                    const val = Math.min(parseFloat(e.target.value) || 0, displayBalance);
                                     setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
                                   }}
                                 />
                               )}
-                              {b.paid_amount > 0 && b.balance > 0 && b.balance < (b.total_amount * 0.05) && (
+                              {b.paid_amount > 0 && displayBalance > 0 && displayBalance < (displayTotal * 0.05) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -534,22 +717,46 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
           </div>
 
           {/* Summary */}
-          <Card className={Math.abs(difference) > 0.01 ? "border-yellow-500" : "border-green-500"}>
-            <CardContent className="pt-4">
+          <Card className={difference < -0.01 ? "border-destructive" : (difference > 0.01 && !includeOtros) ? "border-yellow-500" : "border-green-500"}>
+            <CardContent className="pt-4 space-y-3">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Total Conceptos:</span><p className="text-lg font-bold">{totalConcepts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
                 <div><span className="text-muted-foreground">Total Pagado:</span><p className="text-lg font-bold">{totalMethods.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
                 <div>
                   <span className="text-muted-foreground">Diferencia:</span>
-                  <p className={`text-lg font-bold ${Math.abs(difference) < 0.01 ? "text-green-600" : difference > 0 ? "text-blue-600" : "text-destructive"}`}>
+                  <p className={`text-lg font-bold ${Math.abs(difference) < 0.01 ? "text-green-600" : difference > 0 ? (includeOtros ? "text-green-600" : "text-blue-600") : "text-destructive"}`}>
                     {difference > 0 ? "+" : ""}{difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
-                    {difference > 0.01 && " (Sobrepago)"}
+                    {difference > 0.01 && (includeOtros ? " → Otros" : " (Sobrepago)")}
                     {difference < -0.01 && " (Insuficiente)"}
                   </p>
                 </div>
               </div>
-              {Math.abs(difference) > 0.01 && (
-                <div className="flex items-center gap-2 mt-2 text-xs text-yellow-600"><AlertTriangle className="h-4 w-4" />{difference > 0 ? "Existe un sobrepago. Verifique los montos." : "El monto pagado no cubre el total seleccionado."}</div>
+              {difference > 0.01 && (
+                <div className="flex items-center justify-between border-t pt-2">
+                  {!includeOtros ? (
+                    <>
+                      <div className="flex items-center gap-2 text-xs text-yellow-600">
+                        <AlertTriangle className="h-4 w-4" />
+                        Existe un sobrepago de {difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES.
+                      </div>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setIncludeOtros(true)}>
+                        + Agregar a Otros
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 text-xs text-green-600">
+                        <span className="font-medium">{difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span> se registrarán en <span className="font-medium">Otros</span> al guardar.
+                      </div>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => setIncludeOtros(false)}>
+                        Quitar
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+              {difference < -0.01 && (
+                <div className="flex items-center gap-2 text-xs text-destructive"><AlertTriangle className="h-4 w-4" />El monto pagado no cubre el total seleccionado.</div>
               )}
             </CardContent>
           </Card>
@@ -561,6 +768,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
               Registrar Pago
             </Button>
           </div>
+          </>}
         </div>
       </DialogContent>
     </Dialog>

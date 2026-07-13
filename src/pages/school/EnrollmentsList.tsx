@@ -13,19 +13,24 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap, Columns, FileDown, FileSpreadsheet, GripVertical, Download } from "lucide-react";
+import { Search, ClipboardCheck, CheckCircle, MoreHorizontal, UserPen, Users, GraduationCap, Columns, FileDown, FileSpreadsheet, GripVertical, Download, Trash2 } from "lucide-react";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EnrollStudentModal } from "@/components/enrollments/EnrollStudentModal";
 import { Pagination } from "@/components/ui/data-pagination";
 import { checkStudentCompleteness, ENROLLMENT_CUSTOM_FIELDS } from "@/lib/enrollment-completeness";
-import { downloadPlanillaInscripcion, downloadPDF, downloadExcel, PdfSchoolInfo } from "@/lib/export-utils";
+import { buildGeoCacheFromFormData, resolveGeoDisplayValue } from "@/lib/geo-resolve";
+import { downloadPlanillaInscripcion, downloadPDF, downloadExcel, PdfSchoolInfo, PdfHeaderConfig, PdfFooterConfig } from "@/lib/export-utils";
 import { toast } from "sonner";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
@@ -46,6 +51,18 @@ const GRADE_LEVEL_LABELS: Record<string, string> = {
   "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
 };
 
+const GRADE_ORDER = [
+  "pre_maternal", "maternal", "i_nivel", "ii_nivel", "iii_nivel", "inicial",
+  "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado", "primaria",
+  "1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano", "media_general", "media_tecnica",
+];
+
+const GRADE_GROUPS = [
+  { label: "Preescolar / Maternal", grades: ["pre_maternal", "maternal", "i_nivel", "ii_nivel", "iii_nivel", "inicial"] },
+  { label: "Primaria", grades: ["1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado", "primaria"] },
+  { label: "Bachillerato", grades: ["1_ano", "2_ano", "3_ano", "4_ano", "5_ano", "6_ano", "media_general", "media_tecnica"] },
+];
+
 interface StudentWithEnrollment {
   id: string;
   document_id: string | null;
@@ -54,6 +71,7 @@ interface StudentWithEnrollment {
   family_id: string;
   familyName: string;
   isEnrolled: boolean;
+  enrollmentId?: string;
   enrollmentSection?: string;
   enrollmentType?: string;
   enrollmentGradeLevel?: string;
@@ -87,12 +105,16 @@ export default function EnrollmentsList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<StudentWithEnrollment | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<StudentWithEnrollment | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 20;
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<"all" | "enrolled" | "pending">("all");
   const [selectedYearId, setSelectedYearId] = useState<string>("active");
+  const [gradeFilter, setGradeFilter] = useState<string>("all");
 
   // Fetch school data for planilla download
   const { data: school } = useQuery({
@@ -162,6 +184,22 @@ export default function EnrollmentsList() {
     enabled: !!schoolId,
   });
 
+  // Fetch planilla config for PDF header/footer
+  const { data: planillaConfig } = useQuery({
+    queryKey: ["planilla-general-config", schoolId],
+    queryFn: async () => {
+      if (!schoolId) return null;
+      const { data, error } = await supabase
+        .from("planilla_general_config")
+        .select("header_config, footer_config")
+        .eq("school_id", schoolId)
+        .maybeSingle();
+      if (error && error.code !== "PGRST116") throw error;
+      return data as { header_config: PdfHeaderConfig; footer_config: PdfFooterConfig } | null;
+    },
+    enabled: !!schoolId,
+  });
+
   // Fetch planilla sections for dynamic columns + completeness
   const { data: planillaSections = [] } = useQuery({
     queryKey: ["enrollment-planilla-sections", schoolId],
@@ -214,7 +252,7 @@ export default function EnrollmentsList() {
 
   // Fixed columns that can be toggled (except Acciones and Foto which always show)
   const FIXED_COLUMNS: { key: string; label: string }[] = [
-    { key: "_estado", label: "Estado" },
+    { key: "_estado", label: "Estado inscripción" },
     { key: "_nombre", label: "Nombre" },
     { key: "_cedula", label: "Cédula" },
     { key: "_familia", label: "Familia" },
@@ -327,16 +365,17 @@ export default function EnrollmentsList() {
 
       const familyMap = new Map(families?.map(f => [f.id, `${f.father_last_name || ""} ${f.mother_last_name || ""}`.trim() || "Sin apellido"]) || []);
 
-      let enrollmentMap = new Map<string, { section: string; type: string; gradeLevel: string; year: string }>();
+      let enrollmentMap = new Map<string, { id: string; section: string; type: string; gradeLevel: string; year: string }>();
       if (resolvedYear?.id) {
         const { data: enrollments } = await supabase
           .from("enrollments")
-          .select("student_id, section_id, enrollment_type, sections(name, grade_level)")
+          .select("id, student_id, section_id, enrollment_type, sections(name, grade_level)")
           .eq("school_year_id", resolvedYear.id)
           .eq("school_id", schoolId);
 
         enrollments?.forEach((e: any) => {
           enrollmentMap.set(e.student_id, {
+            id: e.id,
             section: e.sections?.name || "",
             type: e.enrollment_type || "",
             gradeLevel: e.sections?.grade_level || "",
@@ -353,6 +392,7 @@ export default function EnrollmentsList() {
         family_id: s.family_id,
         familyName: familyMap.get(s.family_id) || "",
         isEnrolled: enrollmentMap.has(s.id),
+        enrollmentId: enrollmentMap.get(s.id)?.id,
         enrollmentSection: enrollmentMap.get(s.id)?.section,
         enrollmentType: enrollmentMap.get(s.id)?.type,
         enrollmentGradeLevel: enrollmentMap.get(s.id)?.gradeLevel,
@@ -394,6 +434,15 @@ export default function EnrollmentsList() {
     enabled: familyIds.length > 0,
   });
 
+  const availableGrades = useMemo(() =>
+    [...new Set(sections.map(s => s.grade_level))].sort((a, b) => {
+      const ai = GRADE_ORDER.indexOf(a);
+      const bi = GRADE_ORDER.indexOf(b);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    }),
+    [sections]
+  );
+
   const repMap = useMemo(() => new Map(representatives.map(r => [r.family_id, r.form_data as Record<string, string> | null])), [representatives]);
   const repIdMap = useMemo(() => new Map(representatives.map(r => [r.family_id, r.id])), [representatives]);
   const familyDataMap = useMemo(() => new Map(familiesData.map(f => [f.id, f as Record<string, any>])), [familiesData]);
@@ -413,45 +462,77 @@ export default function EnrollmentsList() {
     return parts.length > 0 ? parts.join(" ") : "Sin nombre";
   };
 
-  // Resolve dynamic column value for a student
-  const getDynamicValue = (student: StudentWithEnrollment, fieldKey: string): string => {
-    const [type, ...rest] = fieldKey.split(":");
-    const name = rest.join(":");
-    if (type === "student") return student.form_data?.[name] || "—";
-    if (type === "representative") {
-      const repData = repMap.get(student.family_id);
-      return (repData as any)?.[name] || "—";
-    }
-    if (type === "family") {
-      const fam = familyDataMap.get(student.family_id);
-      const val = fam?.[name];
-      return val !== null && val !== undefined && val !== "" ? String(val) : "—";
-    }
-    if (type === "custom") return student.form_data?.[name] || "—";
-    return "—";
-  };
-
-  // Apply filters: search + status
+  // Apply filters: search + status + grade
   const filtered = useMemo(() => {
     return students.filter(s => {
-      // Status filter
       if (statusFilter === "enrolled" && !s.isEnrolled) return false;
       if (statusFilter === "pending" && s.isEnrolled) return false;
 
-      // Text search
+      if (gradeFilter !== "all") {
+        if (s.isEnrolled) {
+          if (s.enrollmentGradeLevel !== gradeFilter) return false;
+        } else {
+          const nivelGrado = s.form_data?.nivel_grado;
+          if (nivelGrado) {
+            const labelForGrade = GRADE_LEVEL_LABELS[gradeFilter];
+            if (nivelGrado !== labelForGrade) return false;
+          }
+        }
+      }
+
       const name = getStudentName(s.form_data).toLowerCase();
       const doc = (s.document_id || "").toLowerCase();
       const family = s.familyName.toLowerCase();
       const term = searchTerm.toLowerCase();
       return name.includes(term) || doc.includes(term) || family.includes(term);
     });
-  }, [students, statusFilter, searchTerm]);
+  }, [students, statusFilter, gradeFilter, searchTerm]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const enrolledCount = filtered.filter(s => s.isEnrolled).length;
   const pendingCount = filtered.filter(s => !s.isEnrolled).length;
+
+  const collectFormDataForGeo = useCallback((studentList: StudentWithEnrollment[]) => {
+    const formDataList: Record<string, unknown>[] = [];
+    for (const s of studentList) {
+      if (s.form_data) formDataList.push(s.form_data);
+      const rep = repMap.get(s.family_id);
+      if (rep) formDataList.push(rep as Record<string, unknown>);
+      const fam = familyDataMap.get(s.family_id);
+      if (fam) formDataList.push(fam);
+    }
+    return formDataList;
+  }, [repMap, familyDataMap]);
+
+  const filteredStudentIds = useMemo(
+    () => filtered.map(s => s.id).sort().join(","),
+    [filtered],
+  );
+
+  const { data: geoCache = {} } = useQuery({
+    queryKey: ["enrollment-geo-cache", filteredStudentIds],
+    queryFn: () => buildGeoCacheFromFormData(collectFormDataForGeo(filtered)),
+    enabled: filtered.length > 0,
+  });
+
+  const getDynamicValue = useCallback((student: StudentWithEnrollment, fieldKey: string): string => {
+    const [type, ...rest] = fieldKey.split(":");
+    const name = rest.join(":");
+    if (type === "student") return resolveGeoDisplayValue(student.form_data?.[name], geoCache);
+    if (type === "representative") {
+      const repData = repMap.get(student.family_id);
+      return resolveGeoDisplayValue((repData as Record<string, unknown> | undefined)?.[name], geoCache);
+    }
+    if (type === "family") {
+      const fam = familyDataMap.get(student.family_id);
+      const val = fam?.[name];
+      return resolveGeoDisplayValue(val, geoCache);
+    }
+    if (type === "custom") return resolveGeoDisplayValue(student.form_data?.[name], geoCache);
+    return "—";
+  }, [geoCache, repMap, familyDataMap]);
 
   // School geo data for exports
   const { data: schoolGeo } = useQuery({
@@ -473,10 +554,27 @@ export default function EnrollmentsList() {
     enabled: !!school,
   });
 
-  // Build export data from filtered results and visible columns
-  const buildExportData = useCallback(() => {
+  const buildExportDataAsync = useCallback(async () => {
+    const exportGeoCache = await buildGeoCacheFromFormData(collectFormDataForGeo(filtered));
+
+    const resolveExportValue = (student: StudentWithEnrollment, fieldKey: string): string => {
+      const [type, ...rest] = fieldKey.split(":");
+      const name = rest.join(":");
+      if (type === "student") return resolveGeoDisplayValue(student.form_data?.[name], exportGeoCache);
+      if (type === "representative") {
+        const repData = repMap.get(student.family_id);
+        return resolveGeoDisplayValue((repData as Record<string, unknown> | undefined)?.[name], exportGeoCache);
+      }
+      if (type === "family") {
+        const fam = familyDataMap.get(student.family_id);
+        return resolveGeoDisplayValue(fam?.[name], exportGeoCache);
+      }
+      if (type === "custom") return resolveGeoDisplayValue(student.form_data?.[name], exportGeoCache);
+      return "—";
+    };
+
     const columns: { key: string; label: string }[] = [];
-    if (isColVisible("_estado")) columns.push({ key: "estado", label: "Estado" });
+    if (isColVisible("_estado")) columns.push({ key: "estado_inscripcion", label: "Estado inscripción" });
     if (isColVisible("_nombre")) columns.push({ key: "nombre", label: "Nombre" });
     if (isColVisible("_cedula")) columns.push({ key: "cedula", label: "Cédula" });
     if (isColVisible("_familia")) columns.push({ key: "familia", label: "Familia" });
@@ -485,42 +583,65 @@ export default function EnrollmentsList() {
 
     const rows = filtered.map(s => {
       const row: Record<string, string> = {
-        estado: s.isEnrolled ? `Inscrito - ${GRADE_LEVEL_LABELS[s.enrollmentGradeLevel || ""] || s.enrollmentGradeLevel} / ${s.enrollmentSection}` : "Pendiente",
+        estado_inscripcion: s.isEnrolled
+          ? `Inscrito - ${GRADE_LEVEL_LABELS[s.enrollmentGradeLevel || ""] || s.enrollmentGradeLevel} / ${s.enrollmentSection}`
+          : "Pendiente",
         nombre: getStudentName(s.form_data),
         cedula: s.document_id || "—",
         familia: s.familyName,
         grado: s.form_data?.grado || "—",
       };
       visibleDynamicColumns.forEach(col => {
-        row[col.key] = getDynamicValue(s, col.key);
+        row[col.key] = resolveExportValue(s, col.key);
       });
       return row;
     });
 
     return { columns, rows };
-  }, [filtered, visibleDynamicColumns, hiddenColumns]);
+  }, [filtered, visibleDynamicColumns, hiddenColumns, collectFormDataForGeo, repMap, familyDataMap]);
 
   const handleExportPDF = async () => {
-    const { columns, rows } = buildExportData();
-    const schoolInfo: PdfSchoolInfo | undefined = school && schoolGeo ? {
-      name: school.name,
-      deaCode: school.dea_code,
-      statisticalCode: school.statistical_code,
-      address: school.address,
-      state: schoolGeo.state,
-      municipality: schoolGeo.municipality,
-      city: schoolGeo.city,
-      parish: schoolGeo.parish,
-      logoUrl: school.logo_url || undefined,
-      phone: school.phone,
-      rif: school.rif,
-    } : undefined;
-    await downloadPDF(columns, rows, "Inscripciones", schoolInfo);
+    try {
+      toast.info("Generando PDF...");
+      const { columns, rows } = await buildExportDataAsync();
+      const schoolInfo: PdfSchoolInfo | undefined = school && schoolGeo ? {
+        name: school.name,
+        deaCode: school.dea_code,
+        statisticalCode: school.statistical_code,
+        address: school.address,
+        state: schoolGeo.state,
+        municipality: schoolGeo.municipality,
+        city: schoolGeo.city,
+        parish: schoolGeo.parish,
+        logoUrl: school.logo_url || undefined,
+        phone: school.phone,
+        rif: school.rif,
+      } : undefined;
+      await downloadPDF(
+        columns,
+        rows,
+        "Inscripciones",
+        schoolInfo,
+        planillaConfig?.header_config,
+        planillaConfig?.footer_config
+      );
+      toast.success("PDF generado correctamente");
+    } catch (err) {
+      console.error("Error exporting PDF:", err);
+      toast.error("Error al generar el PDF");
+    }
   };
 
-  const handleExportExcel = () => {
-    const { columns, rows } = buildExportData();
-    downloadExcel(columns, rows, "Inscripciones");
+  const handleExportExcel = async () => {
+    try {
+      toast.info("Generando Excel...");
+      const { columns, rows } = await buildExportDataAsync();
+      downloadExcel(columns, rows, "Inscripciones");
+      toast.success("Excel generado correctamente");
+    } catch (err) {
+      console.error("Error exporting Excel:", err);
+      toast.error("Error al generar el Excel");
+    }
   };
 
   const handleDownloadPlanilla = async (student: StudentWithEnrollment) => {
@@ -572,38 +693,11 @@ export default function EnrollmentsList() {
         form_data: student.form_data || {},
       };
 
-      // Build geoCache: collect all UUID values from student/rep form_data geographic fields
-      const geoFieldNames = ["estado_nacimiento", "municipio_nacimiento", "ciudad_nacimiento", "parroquia_nacimiento", "estado", "municipio", "ciudad", "parroquia"];
-      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
-      const uuidsToResolve = new Set<string>();
-      const studentFd = (student.form_data || {}) as Record<string, string>;
-      const repFd = (representative?.form_data || {}) as Record<string, string>;
-      
-      for (const fd of [studentFd, repFd]) {
-        for (const key of geoFieldNames) {
-          const val = fd[key];
-          if (val && uuidPattern.test(val)) uuidsToResolve.add(val);
-        }
-        // Also check all form_data values for UUIDs
-        for (const val of Object.values(fd)) {
-          if (typeof val === "string" && uuidPattern.test(val)) uuidsToResolve.add(val);
-        }
-      }
-
-      const geoCache: Record<string, string> = {};
-      if (uuidsToResolve.size > 0) {
-        const ids = Array.from(uuidsToResolve);
-        const [statesR, munisR, citiesR, parishesR] = await Promise.all([
-          supabase.from("states").select("id, name").in("id", ids),
-          supabase.from("municipalities").select("id, name").in("id", ids),
-          supabase.from("cities").select("id, name").in("id", ids),
-          supabase.from("parishes").select("id, name").in("id", ids),
-        ]);
-        for (const row of (statesR.data || [])) geoCache[row.id] = row.name;
-        for (const row of (munisR.data || [])) geoCache[row.id] = row.name;
-        for (const row of (citiesR.data || [])) geoCache[row.id] = row.name;
-        for (const row of (parishesR.data || [])) geoCache[row.id] = row.name;
-      }
+      const geoCache = await buildGeoCacheFromFormData([
+        student.form_data || {},
+        (representative?.form_data || {}) as Record<string, unknown>,
+        (familyRes.data || {}) as Record<string, unknown>,
+      ]);
 
       await downloadPlanillaInscripcion({
         student: studentFullData,
@@ -633,6 +727,32 @@ export default function EnrollmentsList() {
     }
     setSelectedStudent(student);
     setIsModalOpen(true);
+  };
+
+  const handleConfirmDelete = (student: StudentWithEnrollment) => {
+    setStudentToDelete(student);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDeleteEnrollment = async () => {
+    if (!studentToDelete?.enrollmentId) return;
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("enrollments")
+        .delete()
+        .eq("id", studentToDelete.enrollmentId);
+      if (error) throw error;
+      toast.success(`Inscripción de ${getStudentName(studentToDelete.form_data)} eliminada correctamente.`);
+      queryClient.invalidateQueries({ queryKey: ["enrollment-students"] });
+      setIsDeleteModalOpen(false);
+      setStudentToDelete(null);
+    } catch (err) {
+      console.error("Error deleting enrollment:", err);
+      toast.error("Error al eliminar la inscripción. Intente nuevamente.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const totalColSpan = 2 + visibleDynamicColumns.length + (isColVisible("_estado") ? 1 : 0) + (isColVisible("_nombre") ? 1 : 0) + (isColVisible("_cedula") ? 1 : 0) + (isColVisible("_familia") ? 1 : 0) + (isColVisible("_grado") ? 1 : 0);
@@ -739,6 +859,30 @@ export default function EnrollmentsList() {
               </Select>
             )}
 
+            {/* Grade filter */}
+            {availableGrades.length > 0 && (
+              <Select value={gradeFilter} onValueChange={(v) => { setGradeFilter(v); setCurrentPage(1); }}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Grado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los grados</SelectItem>
+                  {GRADE_GROUPS.map(group => {
+                    const groupGrades = group.grades.filter(g => availableGrades.includes(g));
+                    if (groupGrades.length === 0) return null;
+                    return (
+                      <SelectGroup key={group.label}>
+                        <SelectLabel>{group.label}</SelectLabel>
+                        {groupGrades.map(g => (
+                          <SelectItem key={g} value={g}>{GRADE_LEVEL_LABELS[g] || g}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            )}
+
             {/* Column toggle */}
             <Popover>
               <PopoverTrigger asChild>
@@ -824,7 +968,7 @@ export default function EnrollmentsList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Acciones</TableHead>
-                  {isColVisible("_estado") && <TableHead className="text-center">Estado</TableHead>}
+                  {isColVisible("_estado") && <TableHead className="text-center">Estado inscripción</TableHead>}
                   <TableHead>Foto</TableHead>
                   {isColVisible("_nombre") && <TableHead>Nombre</TableHead>}
                   {isColVisible("_cedula") && <TableHead>Cédula</TableHead>}
@@ -893,6 +1037,18 @@ export default function EnrollmentsList() {
                                 <FileDown className="h-4 w-4 mr-2" />
                                 Descargar Planilla
                               </DropdownMenuItem>
+                              {student.isEnrolled && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => handleConfirmDelete(student)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Eliminar Inscripción
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -965,6 +1121,42 @@ export default function EnrollmentsList() {
           }}
         />
       )}
+
+      <AlertDialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar inscripción?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar la inscripción de{" "}
+              <span className="font-semibold text-foreground">
+                {getStudentName(studentToDelete?.form_data ?? null)}
+              </span>
+              {studentToDelete?.enrollmentGradeLevel && (
+                <>
+                  {" "}en{" "}
+                  <span className="font-semibold text-foreground">
+                    {GRADE_LEVEL_LABELS[studentToDelete.enrollmentGradeLevel] || studentToDelete.enrollmentGradeLevel}
+                    {studentToDelete.enrollmentSection ? ` / ${studentToDelete.enrollmentSection}` : ""}
+                  </span>
+                </>
+              )}
+              {" "}del año escolar{" "}
+              <span className="font-semibold text-foreground">{resolvedYear?.year_range}</span>.
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteEnrollment}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Sí, eliminar inscripción"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

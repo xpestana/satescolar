@@ -3,6 +3,12 @@ project_id = "hqiqvegpyxsshxkdyigs"
 [functions.send-email]
 verify_jwt = false
 
+[functions.send-payroll-receipt]
+verify_jwt = false
+
+[functions.send-payroll-monthly-report]
+verify_jwt = false
+
 [functions.get-user-emails]
 verify_jwt = false
 

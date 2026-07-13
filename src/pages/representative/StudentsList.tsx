@@ -7,28 +7,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText, AlertTriangle, BookOpen, Key, Copy, Info, ArrowRight, MonitorSmartphone, ShieldCheck } from "lucide-react";
+import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText, BookOpen, Key, Copy, Info, MonitorSmartphone, ShieldCheck } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { downloadCarnet, downloadPlanillaInscripcion } from "@/lib/export-utils";
+import { buildGeoCacheFromFormData } from "@/lib/geo-resolve";
 import { useCarnetConfig } from "@/hooks/useCarnetConfig";
-import { checkStudentCompleteness } from "@/lib/enrollment-completeness";
 import { toast } from "sonner";
 
 export default function StudentsList() {
   const navigate = useNavigate();
   const { familyId, school } = useRepresentativeFamily();
-  const [missingFieldsModal, setMissingFieldsModal] = useState<{
-    open: boolean;
-    studentName: string;
-    missingStudent: string[];
-    missingRep: string[];
-    missingFamily: string[];
-  }>({ open: false, studentName: "", missingStudent: [], missingRep: [], missingFamily: [] });
 
   const { data: students = [] } = useQuery({
     queryKey: ["students", familyId],
@@ -43,8 +35,8 @@ export default function StudentsList() {
   const { data: schoolYear } = useQuery({
     queryKey: ["active-school-year", school?.id],
     queryFn: async () => {
-      const { data } = await supabase.from("school_years").select("year_range").eq("school_id", school!.id).eq("is_active", true).single();
-      return data?.year_range || "2024-2025";
+      const { data } = await supabase.from("school_years").select("id, year_range").eq("school_id", school!.id).eq("is_active", true).single();
+      return data ?? { id: null, year_range: "2024-2025" };
     },
     enabled: !!school?.id,
   });
@@ -98,7 +90,7 @@ export default function StudentsList() {
       schoolName: school?.name || "Institución",
       schoolLocation: school?.address || "",
       schoolLogoUrl: school?.logo_url || undefined,
-      schoolYear: schoolYear || "2024-2025",
+      schoolYear: schoolYear?.year_range || "2024-2025",
       primaryColor: carnetConfig?.primary_color || undefined,
       secondaryColor: carnetConfig?.secondary_color || undefined,
       watermarkUrl: carnetConfig?.watermark_url || undefined,
@@ -109,24 +101,27 @@ export default function StudentsList() {
     });
   };
 
-  const resolveFieldLabel = (fieldKey: string, formFields: { field_name: string; field_label: string; form_type: string }[]) => {
-    const [type, ...rest] = fieldKey.split(":");
-    const name = rest.join(":");
-    const match = formFields.find(f => f.field_name === name && f.form_type === type);
-    if (match) return match.field_label;
-    // Fallback: humanize the field name
-    return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-  };
-
   const handlePlanilla = async (student: any) => {
     if (!school?.id || !familyId) return;
     try {
-      // First check completeness
-      const [sectionsRes, familyRes, repRes, formFieldsRes] = await Promise.all([
-        supabase.from("enrollment_planilla_sections").select("*").eq("school_id", school.id).order("display_order"),
+      toast.info("Generando planilla...");
+
+      const [familyRes, repRes, sectionsRes, configRes, enrollmentRes, geoRes, formFieldsRes, blocksRes] = await Promise.all([
         supabase.from("families").select("*").eq("id", familyId).single(),
         supabase.from("representatives").select("*").eq("family_id", familyId).eq("is_primary", true).limit(1).maybeSingle(),
+        supabase.from("enrollment_planilla_sections").select("*").eq("school_id", school.id).order("display_order"),
+        supabase.from("planilla_general_config").select("*").eq("school_id", school.id).maybeSingle(),
+        schoolYear?.id
+          ? supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", school.id).eq("school_year_id", schoolYear.id).maybeSingle()
+          : supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", school.id).limit(1).maybeSingle(),
+        Promise.all([
+          school.state_id ? supabase.from("states").select("name").eq("id", school.state_id).single() : null,
+          school.municipality_id ? supabase.from("municipalities").select("name").eq("id", school.municipality_id).single() : null,
+          school.city_id ? supabase.from("cities").select("name").eq("id", school.city_id).single() : null,
+          school.parish_id ? supabase.from("parishes").select("name").eq("id", school.parish_id).single() : null,
+        ]),
         supabase.from("form_fields").select("field_name, field_label, form_type").eq("school_id", school.id).in("form_type", ["student", "representative"]),
+        supabase.from("planilla_signature_blocks" as any).select("*").eq("school_id", school.id).order("display_order"),
       ]);
 
       let representative = repRes.data;
@@ -134,45 +129,6 @@ export default function StudentsList() {
         const { data: fallbackRep } = await supabase.from("representatives").select("*").eq("family_id", familyId).order("created_at").limit(1).maybeSingle();
         representative = fallbackRep;
       }
-
-      const sections = (sectionsRes.data || []).map(s => ({
-        field_names: s.field_names as string[],
-        section_type: s.section_type,
-      }));
-
-      const completeness = checkStudentCompleteness(
-        sections,
-        (student.form_data as Record<string, string>) || null,
-        (representative?.form_data as Record<string, string>) || null,
-        familyRes.data || null,
-      );
-
-      if (!completeness.isComplete) {
-        const ff = formFieldsRes.data || [];
-        setMissingFieldsModal({
-          open: true,
-          studentName: getName(student),
-          missingStudent: completeness.missingStudentFields.map(f => resolveFieldLabel(f, ff)),
-          missingRep: completeness.missingRepresentativeFields.map(f => resolveFieldLabel(f, ff)),
-          missingFamily: completeness.missingFamilyFields.map(f => resolveFieldLabel(f, ff)),
-        });
-        return;
-      }
-
-      // Data is complete, proceed with download
-      toast.info("Generando planilla...");
-
-      const [configRes, enrollmentRes, geoRes, blocksRes] = await Promise.all([
-        supabase.from("planilla_general_config").select("*").eq("school_id", school.id).maybeSingle(),
-        supabase.from("enrollments").select("*, sections(*)").eq("student_id", student.id).eq("school_id", school.id).limit(1).maybeSingle(),
-        Promise.all([
-          school.state_id ? supabase.from("states").select("name").eq("id", school.state_id).single() : null,
-          school.municipality_id ? supabase.from("municipalities").select("name").eq("id", school.municipality_id).single() : null,
-          school.city_id ? supabase.from("cities").select("name").eq("id", school.city_id).single() : null,
-          school.parish_id ? supabase.from("parishes").select("name").eq("id", school.parish_id).single() : null,
-        ]),
-        supabase.from("planilla_signature_blocks" as any).select("*").eq("school_id", school.id).order("display_order"),
-      ]);
 
       const familyGeoPromises = await Promise.all([
         familyRes.data?.state_id ? supabase.from("states").select("name").eq("id", familyRes.data.state_id).single() : null,
@@ -182,46 +138,33 @@ export default function StudentsList() {
       ]);
 
       const [stateRes, muniRes, cityRes, parishRes] = geoRes;
-      const familyGeo = {
+      const planillaSchoolGeo = {
         state: familyGeoPromises[0]?.data?.name || stateRes?.data?.name,
         municipality: familyGeoPromises[1]?.data?.name || muniRes?.data?.name,
         city: familyGeoPromises[2]?.data?.name || cityRes?.data?.name,
         parish: familyGeoPromises[3]?.data?.name || parishRes?.data?.name,
       };
 
-      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
-      const uuidsToResolve = new Set<string>();
-      const studentFd = (student.form_data || {}) as Record<string, string>;
-      const repFd = (representative?.form_data || {}) as Record<string, string>;
-      for (const fd of [studentFd, repFd]) {
-        for (const val of Object.values(fd)) {
-          if (typeof val === "string" && uuidPattern.test(val)) uuidsToResolve.add(val);
-        }
-      }
-      const geoCache: Record<string, string> = {};
-      if (uuidsToResolve.size > 0) {
-        const ids = Array.from(uuidsToResolve);
-        const [stR, muR, ciR, paR] = await Promise.all([
-          supabase.from("states").select("id, name").in("id", ids),
-          supabase.from("municipalities").select("id, name").in("id", ids),
-          supabase.from("cities").select("id, name").in("id", ids),
-          supabase.from("parishes").select("id, name").in("id", ids),
-        ]);
-        for (const r of (stR.data || [])) geoCache[r.id] = r.name;
-        for (const r of (muR.data || [])) geoCache[r.id] = r.name;
-        for (const r of (ciR.data || [])) geoCache[r.id] = r.name;
-        for (const r of (paR.data || [])) geoCache[r.id] = r.name;
-      }
+      const studentFullData = {
+        ...student,
+        form_data: student.form_data || {},
+      };
+
+      const geoCache = await buildGeoCacheFromFormData([
+        student.form_data || {},
+        (representative?.form_data || {}) as Record<string, unknown>,
+        (familyRes.data || {}) as Record<string, unknown>,
+      ]);
 
       await downloadPlanillaInscripcion({
-        student,
+        student: studentFullData,
         representative,
         family: familyRes.data,
         school,
-        schoolGeo: familyGeo,
+        schoolGeo: planillaSchoolGeo,
         sections: sectionsRes.data || [],
         generalConfig: configRes.data,
-        schoolYear: schoolYear || "2024-2025",
+        schoolYear: schoolYear?.year_range || "2024-2025",
         enrollment: enrollmentRes.data,
         enrollmentSection: enrollmentRes.data?.sections,
         formFields: formFieldsRes.data || [],
@@ -364,51 +307,6 @@ export default function StudentsList() {
           </div>
         )}
       </div>
-
-      <Dialog open={missingFieldsModal.open} onOpenChange={(o) => setMissingFieldsModal(prev => ({ ...prev, open: o }))}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Datos Incompletos
-            </DialogTitle>
-            <DialogDescription>
-              No se puede generar la planilla de inscripción de <strong>{missingFieldsModal.studentName}</strong> porque faltan los siguientes datos:
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-60 overflow-y-auto space-y-3">
-            {missingFieldsModal.missingStudent.length > 0 && (
-              <div>
-                <p className="text-sm font-semibold mb-1">Estudiante:</p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
-                  {missingFieldsModal.missingStudent.map((f, i) => <li key={i}>{f}</li>)}
-                </ul>
-              </div>
-            )}
-            {missingFieldsModal.missingRep.length > 0 && (
-              <div>
-                <p className="text-sm font-semibold mb-1">Representante:</p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
-                  {missingFieldsModal.missingRep.map((f, i) => <li key={i}>{f}</li>)}
-                </ul>
-              </div>
-            )}
-            {missingFieldsModal.missingFamily.length > 0 && (
-              <div>
-                <p className="text-sm font-semibold mb-1">Familia:</p>
-                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-0.5">
-                  {missingFieldsModal.missingFamily.map((f, i) => <li key={i}>{f}</li>)}
-                </ul>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMissingFieldsModal(prev => ({ ...prev, open: false }))}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </DashboardLayout>
   );
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -19,6 +19,25 @@ import { supabase } from "@/integrations/supabase/client";
 import { isEffectivelyRequired } from "@/lib/protected-fields";
 
 import { AlertTriangle, GraduationCap, Users, UserPen } from "lucide-react";
+
+const GRADE_PROGRESSION: Record<string, string> = {
+  pre_maternal: "maternal",
+  maternal: "i_nivel",
+  i_nivel: "ii_nivel",
+  ii_nivel: "iii_nivel",
+  iii_nivel: "1_grado",
+  "1_grado": "2_grado",
+  "2_grado": "3_grado",
+  "3_grado": "4_grado",
+  "4_grado": "5_grado",
+  "5_grado": "6_grado",
+  "6_grado": "1_ano",
+  "1_ano": "2_ano",
+  "2_ano": "3_ano",
+  "3_ano": "4_ano",
+  "4_ano": "5_ano",
+  "5_ano": "6_ano",
+};
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal",
@@ -43,6 +62,10 @@ const GRADE_LABELS: Record<string, string> = {
   media_tecnica: "Media Técnica",
   "6_ano": "6to Año",
 };
+
+const GRADE_LABEL_TO_KEY = Object.fromEntries(
+  Object.entries(GRADE_LABELS).map(([k, v]) => [v, k])
+);
 
 const ENROLLMENT_TYPES = [
   "Regular",
@@ -74,10 +97,19 @@ interface Props {
 export function EnrollStudentModal({ open, onOpenChange, student, activeYear, sections, schoolId, onSuccess }: Props) {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [selectedSectionId, setSelectedSectionId] = useState("");
   const [enrollmentType, setEnrollmentType] = useState("");
   const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split("T")[0]);
   const [observations, setObservations] = useState("");
+  const [selectedPlanId, setSelectedPlanId] = useState("none");
+
+  // Grado actual y siguiente — computados aquí para usarlos en los effects
+  const studentGradeKey = (() => {
+    const label = student.form_data?.nivel_grado as string | undefined;
+    return label ? (GRADE_LABEL_TO_KEY[label] || label) : undefined;
+  })();
+  const nextGradeKey = studentGradeKey ? GRADE_PROGRESSION[studentGradeKey] : undefined;
 
   // Fetch existing enrollment data for pre-population
   const { data: existingEnrollment } = useQuery({
@@ -96,6 +128,40 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!student.id && !!activeYear.id && !!schoolId && student.isEnrolled,
   });
 
+  // Planes de pago activos del colegio (asignación opcional al inscribir)
+  const { data: availablePlans = [] } = useQuery({
+    queryKey: ["available-plans", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("payment_plans")
+        .select("id, name, description")
+        .eq("school_id", schoolId)
+        .eq("is_active", true)
+        .order("name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolId && open,
+  });
+
+  // Plan actual del estudiante (si ya tiene uno asignado este año)
+  const { data: currentPlan } = useQuery({
+    queryKey: ["student-current-plan", student.id, activeYear.id, schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("student_payment_plans")
+        .select("id, plan_id")
+        .eq("student_id", student.id)
+        .eq("school_year_id", activeYear.id)
+        .eq("school_id", schoolId)
+        .order("assigned_at", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data?.[0] || null;
+    },
+    enabled: !!student.id && !!activeYear.id && !!schoolId && open,
+  });
+
   // Pre-populate form when existing enrollment loads
   useEffect(() => {
     if (existingEnrollment && open) {
@@ -105,6 +171,11 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       setObservations(existingEnrollment.observations || "");
     }
   }, [existingEnrollment, open]);
+
+  // Pre-populate plan select with the student's current plan
+  useEffect(() => {
+    if (open) setSelectedPlanId(currentPlan?.plan_id || "none");
+  }, [currentPlan, open]);
 
   // Reset when modal closes
   useEffect(() => {
@@ -117,6 +188,14 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       }
     }
   }, [open, student.isEnrolled]);
+
+  // Auto-seleccionar la primera sección del grado siguiente en inscripciones nuevas
+  useEffect(() => {
+    if (open && !student.isEnrolled && nextGradeKey && sections.length > 0) {
+      const firstNextSection = sections.find(s => s.grade_level === nextGradeKey);
+      if (firstNextSection) setSelectedSectionId(firstNextSection.id);
+    }
+  }, [open, student.isEnrolled, nextGradeKey, sections]);
 
   // Fetch display config for this school
   const { data: displayConfig = [] } = useQuery({
@@ -229,8 +308,47 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         } as any, { onConflict: "student_id,school_year_id,school_id" });
 
       if (error) throw error;
+
+      // Sincronizar nivel_grado del estudiante con el grado de la sección inscrita
+      const enrolledSection = sections.find(s => s.id === selectedSectionId);
+      if (enrolledSection) {
+        const newGradeLabel = GRADE_LABELS[enrolledSection.grade_level] || enrolledSection.grade_level;
+        const updatedFormData = { ...(student.form_data || {}), nivel_grado: newGradeLabel };
+        const { error: studentErr } = await supabase
+          .from("students")
+          .update({ form_data: updatedFormData })
+          .eq("id", student.id);
+        if (studentErr) throw studentErr;
+      }
+
+      // Asignación opcional de plan de pago ("none" = dejar sin plan por ahora)
+      if (selectedPlanId && selectedPlanId !== "none") {
+        if (currentPlan) {
+          if (currentPlan.plan_id !== selectedPlanId) {
+            const { error: planErr } = await supabase
+              .from("student_payment_plans")
+              .update({ plan_id: selectedPlanId, assigned_at: new Date().toISOString() })
+              .eq("id", currentPlan.id);
+            if (planErr) throw planErr;
+          }
+        } else {
+          const { error: planErr } = await supabase
+            .from("student_payment_plans")
+            .insert({
+              student_id: student.id,
+              plan_id: selectedPlanId,
+              school_id: schoolId,
+              school_year_id: activeYear.id,
+            });
+          if (planErr) throw planErr;
+        }
+      }
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-student-plans"] });
+      qc.invalidateQueries({ queryKey: ["all-student-balances"] });
+      qc.invalidateQueries({ queryKey: ["student-current-plan"] });
+      qc.invalidateQueries({ queryKey: ["enrollment-students"] });
       toast({ title: "Estudiante inscrito", description: "La inscripción se realizó correctamente." });
       onSuccess();
     },
@@ -257,16 +375,12 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
         { name: "nivel_grado", label: "Grado" },
       ];
 
-  // Reverse map: label -> enum key
-  const GRADE_LABEL_TO_KEY = Object.fromEntries(
-    Object.entries(GRADE_LABELS).map(([k, v]) => [v, k])
-  );
-
-  // Filter sections by student's grade level
-  const studentGradeLabel = student.form_data?.nivel_grado as string | undefined;
-  const studentGradeKey = studentGradeLabel ? (GRADE_LABEL_TO_KEY[studentGradeLabel] || studentGradeLabel) : undefined;
+  // Mostrar secciones del grado actual y del siguiente (si existe progresión)
   const filteredSections = studentGradeKey
-    ? sections.filter(s => s.grade_level === studentGradeKey)
+    ? sections.filter(s =>
+        s.grade_level === studentGradeKey ||
+        (nextGradeKey && s.grade_level === nextGradeKey)
+      )
     : sections;
 
   const hasNoSections = filteredSections.length === 0;
@@ -412,6 +526,21 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
               <SelectContent>
                 {ENROLLMENT_TYPES.map(type => (
                   <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium">Plan de Pago</Label>
+            <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Sin plan por ahora..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin plan por ahora</SelectItem>
+                {availablePlans.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

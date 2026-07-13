@@ -22,6 +22,7 @@ import { InvoiceOverlayPreview } from "@/components/payments/InvoiceOverlayPrevi
  */
 export const OVERLAY_FIELDS = [
   { key: "invoice_number",      label: "N° Factura",                    example: "016725",               group: "header"  },
+  { key: "control_number",      label: "N° Control",                    example: "00-00016725",           group: "header"  },
   { key: "date_day",            label: "Fecha – Día",                   example: "11",                   group: "header"  },
   { key: "date_month",          label: "Fecha – Mes",                   example: "05",                   group: "header"  },
   { key: "date_year",           label: "Fecha – Año",                   example: "2026",                 group: "header"  },

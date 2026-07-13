@@ -26,3 +26,6 @@ dist-ssr
 
 # Supabase CLI temp files
 supabase/.temp/
+
+# Local reference / scratch (Word extracts, zips, etc.)
+tmp-*

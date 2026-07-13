@@ -25,9 +25,12 @@ import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
 import { buildInvoiceData } from "@/lib/buildInvoiceData";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
+import { useBillingMode } from "@/hooks/useBillingMode";
+import { FamilyLedgerView } from "@/components/payments/FamilyLedgerView";
 
 export default function StudentLedger() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
+  const { billingMode, isLoading: billingModeLoading } = useBillingMode(schoolId);
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -103,7 +106,7 @@ export default function StudentLedger() {
         .eq("school_id", schoolId!)
         .eq("is_active", true)
         .maybeSingle();
-      return data as InvoiceTemplate | null;
+      return data as unknown as InvoiceTemplate | null;
     },
     enabled: !!schoolId,
   });
@@ -216,7 +219,21 @@ export default function StudentLedger() {
     doc.save(`recibo_${payment.id.slice(0, 8)}.pdf`);
   };
 
-  if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
+  if (schoolLoading || !schoolId || billingModeLoading) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
+
+  // Modo familia: estado de cuenta consolidado por familia
+  if (billingMode === "family") {
+    return (
+      <DashboardLayout>
+        <PageHeader title="Estado de Cuenta" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Estado de Cuenta" }]} />
+        {activeYear?.id ? (
+          <FamilyLedgerView schoolId={schoolId} activeYear={activeYear} />
+        ) : (
+          <Card><CardContent className="py-8 text-center text-muted-foreground">No hay un año escolar activo configurado.</CardContent></Card>
+        )}
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

@@ -1,0 +1,39 @@
+# Búsqueda avanzada
+
+> 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
+> (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
+
+## Resumen
+Buscador transversal del colegio para localizar familias, estudiantes, docentes, etc.,
+con filtros avanzados.
+
+## Roles involucrados
+- **school** — acceso al buscador (sin permiso específico; visible para el rol `school`).
+
+## Casos de uso
+> ⏳ Por documentar.
+
+## Operaciones / Funciones
+| Operación | Rol | Ruta | Permiso | Descripción |
+|---|---|---|---|---|
+| Búsqueda avanzada | school | `/registros/busqueda-avanzada` | — | Búsqueda con filtros. |
+
+## Rutas (frontend)
+- `/registros/busqueda-avanzada`
+
+## Endpoints / Edge Functions
+> ⏳ Por documentar (consultas directas vs. función de búsqueda).
+
+## Datos / Tablas (Supabase)
+> ⏳ Por documentar (entidades y campos indexados/consultados).
+
+## Reglas de negocio
+> ⏳ Por documentar.
+
+## Archivos clave (código)
+- `src/pages/school/AdvancedSearch.tsx`
+- `src/components/search/...`
+
+## Por documentar
+- Qué entidades y campos abarca la búsqueda; este archivo es un consumidor clave de la
+  descripción de los demás temas (`desc/`).

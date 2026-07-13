@@ -77,6 +77,7 @@ export function buildInvoiceData(
 
   return {
     invoice_number:      payment.invoice_number || "",
+    control_number:      payment.control_number || "",
     date_day:            String(date.getDate()).padStart(2, "0"),
     date_month:          String(date.getMonth() + 1).padStart(2, "0"),
     date_year:           String(date.getFullYear()),

@@ -29,19 +29,19 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
   const { data: payments = [], isLoading } = useQuery({
     queryKey: ["student-payment-history", studentId, schoolYearId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payments")
+      const { data, error } = (await supabase.from("payments")
         .select(`
           *,
-          payment_items!payment_items_payment_id_fkey(id, plan_concept_id, amount_ves, is_partial, payment_plan_concepts(payment_concepts(name))),
+          payment_items!payment_items_payment_id_fkey(id, plan_concept_id, student_id, amount_ves, is_partial, payment_plan_concepts(payment_concepts(name))),
           payment_method_entries!payment_method_entries_payment_id_fkey(id, method, currency, amount_original, exchange_rate, amount_ves, reference_code, bank_name, payment_date)
         `)
         .eq("student_id", studentId)
         .eq("school_year_id", schoolYearId)
         .eq("school_id", schoolId)
         .order("payment_date", { ascending: false })
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })) as any;
       if (error) throw error;
-      return data || [];
+      return (data || []) as any[];
     },
     enabled: open && !!studentId,
   });
@@ -68,9 +68,11 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
 
       // 1) Reverse balances on student_concept_balances
       for (const item of payment.payment_items || []) {
+        // item.student_id cubre pagos familiares e items con backfill; fallback al pago/modal
+        const balanceStudentId = item.student_id ?? payment.student_id ?? studentId;
         const { data: bal } = await supabase.from("student_concept_balances")
           .select("*")
-          .eq("student_id", studentId)
+          .eq("student_id", balanceStudentId)
           .eq("school_year_id", schoolYearId)
           .eq("school_id", schoolId)
           .eq("plan_concept_id", item.plan_concept_id)
@@ -148,7 +150,8 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                       </TableCell>
                       <TableCell>{formatDateOnly(p.payment_date)}</TableCell>
                       <TableCell className="text-xs">
-                        {p.invoice_number && <div className="font-medium">N° {p.invoice_number}</div>}
+                        {p.invoice_number && <div className="font-medium">Fact. N° {p.invoice_number}</div>}
+                        {p.control_number && <div className="font-medium">Ctrl. N° {p.control_number}</div>}
                         {p.invoice_name || "—"}
                         {p.invoice_rif && <div className="text-muted-foreground">{p.invoice_rif}</div>}
                       </TableCell>

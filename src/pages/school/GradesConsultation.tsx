@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Search, Loader2, Eye, Check, ChevronsUpDown, Download, X } from "lucide-react";
+import { Search, Loader2, Eye, Check, ChevronsUpDown, Download, X, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
@@ -232,8 +232,8 @@ export default function GradesConsultation() {
       }
       return rows.map((e: any) => {
         const fd = e.student?.form_data as Record<string, any> | null;
-        const firstName = fd?.nombre || fd?.primer_nombre || "";
-        const lastName = fd?.apellido || fd?.primer_apellido || "";
+        const firstName = [fd?.primer_nombre || fd?.nombre, fd?.segundo_nombre].filter(Boolean).join(" ");
+        const lastName = [fd?.primer_apellido || fd?.apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
         return {
           student_id: e.student_id,
           student_name: `${lastName} ${firstName}`.trim() || "Sin nombre",
@@ -766,6 +766,29 @@ export default function GradesConsultation() {
                         />
                       </div>
                     </div>
+
+                    {isSecondary && (
+                      <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 mb-4">
+                        <div className="flex gap-2">
+                          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                          <div className="space-y-1.5 text-sm text-blue-900 dark:text-blue-100">
+                            <p className="font-semibold">Cómo descargar las boletas (Bachillerato)</p>
+                            <ul className="list-disc list-inside space-y-1 text-xs text-blue-800 dark:text-blue-200">
+                              <li>
+                                <strong>Descargar Boleta:</strong> usa el momento seleccionado arriba. Momento 1 muestra
+                                solo el I periodo; Momento 2 el I y II; Momento 3 los tres periodos.
+                              </li>
+                              <li>
+                                <strong>Descargar Definitiva Final:</strong> boletín anual completo con la nota
+                                definitiva de cada materia y los promedios del año. Para que aparezca el promedio
+                                general, las definitivas finales deben estar guardadas en la pestaña{" "}
+                                <strong>Notas Finales</strong>.
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="rounded-md border overflow-x-auto">
                       <Table>
