@@ -95,6 +95,30 @@ en `delinquency_config`; alimenta la función `send-delinquency-reminders`.
 
 **Tasas de cambio:** `bcv_rates`, `exchange_rates` (alimentan la conversión a VES).
 
+## Tasas de cambio (`ExchangeRateWidget`)
+Widget flotante (`src/components/payments/ExchangeRateWidget.tsx`) presente en Registro de
+Pagos y Registro de Nómina. Muestra USD/EUR/COP en VES.
+
+**Dos capas de tasa:**
+- **Oficial (BCV):** `bcv_rates` (global por `published_date`) → se propaga a `exchange_rates`
+  (por `school_id`) vía la edge function `fetch-bcv-rates`. **Es la fuente para conversiones.**
+- **Override personal (temporal):** cuando un usuario **edita** una tasa en el widget, NO se
+  escribe en la DB (eso la cambiaría para todos los colegios y además la sobrescribe el
+  auto-refresco BCV). Se guarda en **`localStorage`** por `school_id`+`currency` con **TTL de
+  3 horas** (`src/lib/exchangeRateOverride.ts`); al expirar se elimina y vuelve la tasa BCV.
+  Es **solo para ese usuario/navegador**.
+
+**Auto-refresco:** al montar, el widget llama `ensureFreshBcvRates()` (solo trae de BCV si la
+fecha en DB no es la de hoy en Caracas). El botón **"Actualizar hoy"** fuerza la descarga
+llamando directo a `fetch-bcv-rates` aunque ya sea la fecha de hoy.
+> Antes el widget del **colegio** nunca refrescaba (solo lo hacían flujos del representante en
+> `RepPayments`/`PaymentReportModal`), por eso la tasa se quedaba con la fecha vieja.
+
+**El override alcanza las conversiones del mismo usuario:** `PaymentFormModal`,
+`FamilyPaymentFormModal` (`getRate`) y `usePayrollUsdRate` aplican `applyRateOverride(...)`
+encima de la tasa de `exchange_rates`. `PaymentReportModal` (representante) NO lo usa: las
+familias siempre convierten con la tasa oficial.
+
 ## Reglas de negocio
 - **El formato de factura se define en `/formatos` (tabla `invoice_templates`) y la
   emisión/impresión debe respetarlo** — mismo patrón que la boleta en notas.

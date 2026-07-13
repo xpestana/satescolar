@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Loader2, Receipt, AlertTriangle, CheckCheck, Pencil } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
 import { todayCaracasIso } from "@/lib/dateUtils";
+import { applyRateOverride } from "@/lib/exchangeRateOverride";
 
 interface InvoiceProfile {
   id: string;
@@ -249,7 +250,8 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
   const getRate = (currency: string) => {
     if (currency === "VES") return 1;
-    return rates.find((r) => r.currency === currency)?.rate_to_ves || 0;
+    const dbRate = rates.find((r) => r.currency === currency)?.rate_to_ves || 0;
+    return applyRateOverride(schoolId, currency, dbRate);
   };
 
   // Use current exchange rate for display/calculation instead of frozen snapshot
