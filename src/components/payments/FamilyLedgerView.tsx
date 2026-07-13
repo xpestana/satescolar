@@ -19,6 +19,7 @@ import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
 import { buildInvoiceData } from "@/lib/buildInvoiceData";
 import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 import { formatGradeLevel } from "@/lib/utils";
+import { formatDateOnly } from "@/lib/dateUtils";
 import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
 
 interface Props {
@@ -297,7 +298,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
     doc.setFontSize(10);
     doc.text(`Familia: ${familyName(selectedFamily)}`, 14, 35);
     doc.text(`Estudiante(s): ${paymentDisplayName(payment)}`, 14, 42);
-    doc.text(`Fecha: ${new Date(payment.payment_date).toLocaleDateString("es-VE")}`, 14, 49);
+    doc.text(`Fecha: ${formatDateOnly(payment.payment_date)}`, 14, 49);
     doc.text(`Estado: ${payment.status === "completed" ? "Completado" : "Anulado"}`, 14, 56);
     if (payment.invoice_name) doc.text(`Facturado a: ${payment.invoice_name} - ${payment.invoice_rif || ""}`, 14, 63);
 
@@ -431,7 +432,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
             <TableBody>
               {payments.map((p: any) => (
                 <TableRow key={p.id} className={p.status === "voided" ? "opacity-50" : ""}>
-                  <TableCell>{new Date(p.payment_date).toLocaleDateString("es-VE")}</TableCell>
+                  <TableCell>{formatDateOnly(p.payment_date)}</TableCell>
                   <TableCell>
                     {p.family_id ? (
                       <Badge variant="secondary" className="text-xs gap-1"><Users className="h-3 w-3" />Familiar</Badge>

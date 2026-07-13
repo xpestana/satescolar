@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, History, Trash2, ChevronDown, ChevronRight, AlertTriangle, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { formatDateOnly } from "@/lib/dateUtils";
 
 interface Props {
   open: boolean;
@@ -157,7 +158,7 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
                           {expanded[p.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </Button>
                       </TableCell>
-                      <TableCell>{new Date(p.payment_date).toLocaleDateString("es-VE")}</TableCell>
+                      <TableCell>{formatDateOnly(p.payment_date)}</TableCell>
                       <TableCell className="text-xs">
                         {p.invoice_number && <div className="font-medium">Fact. N° {p.invoice_number}</div>}
                         {p.control_number && <div className="font-medium">Ctrl. N° {p.control_number}</div>}

@@ -52,7 +52,14 @@ y **debe respetarse al generar/imprimir la factura**.
 - `/representative/pagos`
 
 ## Endpoints / Edge Functions
-- `send-delinquency-reminders` — recordatorios de morosidad.
+- `send-delinquency-reminders` — recordatorios de morosidad. **Se dispara por cron diario**
+  (`cron.schedule('delinquency-reminders', '0 12 * * *', …)`, migración
+  `20260713120000_delinquency_reminders_cron.sql`, patrón del cron de nómina, secretos en
+  Vault `project_url`/`service_role_key`). La función filtra por colegio según
+  `delinquency_config.reminder_mode` (never/daily/weekly/monthly_days).
+  > 🐞 Causa raíz de "no se enviaban recordatorios": la función existía y respetaba la config,
+  > pero **no había ningún cron que la ejecutara** (solo estaba programado el de nómina). Se
+  > agregó el cron diario. Requiere aplicar la migración y que existan los secretos de Vault.
 - `fetch-bcv-rates` — tasa de cambio BCV para conversión de montos.
 
 ## Configuración de Pagos (`/pagos/configuracion`)
@@ -151,6 +158,13 @@ con una consulta directa a `students` (`studentInfoMap`), para cubrir también a
 inscritos** en el año activo (que no aparecen en `enrollments`).
 
 ## Reglas de negocio
+- **Fechas calendario (`payment_date`, etc.):** mostrar SIEMPRE con `formatDateOnly()` de
+  `src/lib/dateUtils.ts` (extrae `YYYY-MM-DD` sin conversión de zona). **Nunca**
+  `new Date(fecha).toLocaleDateString(...)` sobre una fecha "solo fecha": `new Date("2026-07-03")`
+  se interpreta como UTC y en Venezuela (UTC-4) retrocede al día 2.
+  > 🐞 Corregido en el historial familiar (`FamilyPaymentHistoryModal`) y en el estado de cuenta
+  > por familia + su PDF (`FamilyLedgerView`), que mostraban un día antes. El dashboard y
+  > `PaymentHistoryModal` ya usaban `formatDateOnly`.
 - **El formato de factura se define en `/formatos` (tabla `invoice_templates`) y la
   emisión/impresión debe respetarlo** — mismo patrón que la boleta en notas.
 - Solo una plantilla de factura activa por colegio.
