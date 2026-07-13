@@ -1,3 +1,5 @@
+import { parseDateOnly } from "@/lib/dateUtils";
+
 /** Human-readable labels for every grade_level enum value stored in the DB. */
 export const GRADE_LABELS: Record<string, string> = {
   pre_maternal:  "Pre-Maternal",
@@ -40,7 +42,7 @@ export function buildInvoiceData(
   sectionName: string,
   methodLabel: (raw: string) => string,
 ): Record<string, string> {
-  const date = new Date(payment.payment_date);
+  const date = parseDateOnly(payment.payment_date) ?? new Date(payment.payment_date);
   const fmt  = (n: number) =>
     n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -75,9 +77,9 @@ export function buildInvoiceData(
 
   return {
     invoice_number:      payment.invoice_number || "",
-    date_day:            String(date.getUTCDate()).padStart(2, "0"),
-    date_month:          String(date.getUTCMonth() + 1).padStart(2, "0"),
-    date_year:           String(date.getUTCFullYear()),
+    date_day:            String(date.getDate()).padStart(2, "0"),
+    date_month:          String(date.getMonth() + 1).padStart(2, "0"),
+    date_year:           String(date.getFullYear()),
     titular_nombre:      payment.invoice_name || "",
     titular_ci:          payment.invoice_rif  || "",
     student_name:        studentName,

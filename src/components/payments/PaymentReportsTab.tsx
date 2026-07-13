@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, XCircle, Eye, Loader2 } from "lucide-react";
 import { ReceiptViewerModal } from "@/components/payments/ReceiptViewerModal";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
+import { formatDateOnly } from "@/lib/dateUtils";
 
 export function PaymentReportsTab() {
   const { schoolId } = useSchoolId();
@@ -145,7 +146,7 @@ export function PaymentReportsTab() {
                         <div>
                           <p className="text-xs text-muted-foreground">Monto</p>
                           <p className="font-medium">{Number(r.amount_reported).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {r.currency_reported}</p>
-                          <p className="text-xs text-muted-foreground">{new Date(r.payment_date).toLocaleDateString("es-VE")}</p>
+                          <p className="text-xs text-muted-foreground">{formatDateOnly(r.payment_date)}</p>
                         </div>
 
                         <div>

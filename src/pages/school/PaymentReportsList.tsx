@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, XCircle, Clock, Eye, Loader2, Receipt } from "lucide-react";
 import { ReceiptViewerModal } from "@/components/payments/ReceiptViewerModal";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
+import { formatDateOnly } from "@/lib/dateUtils";
 
 export default function PaymentReportsList() {
   const { schoolId } = useSchoolId();
@@ -161,7 +162,7 @@ export default function PaymentReportsList() {
                         <div>
                           <p className="text-xs text-muted-foreground">Monto</p>
                           <p className="font-medium">{Number(r.amount_reported).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {r.currency_reported}</p>
-                          <p className="text-xs text-muted-foreground">{new Date(r.payment_date).toLocaleDateString("es-VE")}</p>
+                          <p className="text-xs text-muted-foreground">{formatDateOnly(r.payment_date)}</p>
                         </div>
 
                         <div>

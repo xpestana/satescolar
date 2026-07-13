@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, DollarSign, TrendingUp, AlertTriangle, Users, CreditCard } from "lucide-react";
+import { formatDateOnly, todayCaracasIso } from "@/lib/dateUtils";
 
 export default function PaymentDashboard() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -52,8 +53,8 @@ export default function PaymentDashboard() {
     enabled: !!schoolId && !!activeYear?.id,
   });
 
-  const today = new Date().toISOString().split("T")[0];
-  const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+  const today = todayCaracasIso();
+  const monthStart = `${today.slice(0, 7)}-01`;
 
   const todayPayments = recentPayments.filter((p: any) => p.payment_date === today);
   const totalToday = todayPayments.reduce((s: number, p: any) => s + (p.total_amount_ves || 0), 0);
@@ -146,7 +147,7 @@ export default function PaymentDashboard() {
                     const name = [fd?.primer_nombre, fd?.primer_apellido].filter(Boolean).join(" ");
                     return (
                       <TableRow key={p.id}>
-                        <TableCell className="text-xs">{new Date(p.payment_date).toLocaleDateString("es-VE")}</TableCell>
+                        <TableCell className="text-xs">{formatDateOnly(p.payment_date)}</TableCell>
                         <TableCell className="text-sm">{name}</TableCell>
                         <TableCell className="font-medium text-sm">{p.total_amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       </TableRow>

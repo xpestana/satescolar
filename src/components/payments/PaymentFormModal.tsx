@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Loader2, Receipt, AlertTriangle, CheckCheck } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
+import { todayCaracasIso } from "@/lib/dateUtils";
 
 interface PaymentMethodLine {
   id: string;
@@ -32,7 +33,7 @@ interface PaymentMethodLine {
 
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 
-const today = () => new Date().toISOString().split("T")[0];
+const today = () => todayCaracasIso();
 
 function createMethodLine(): PaymentMethodLine {
   return { id: crypto.randomUUID(), method: "transferencia", currency: "VES", amount_original: "", exchange_rate: "1", amount_ves: "", reference_code: "", bank_name: "", payment_date: today(), details: "" };

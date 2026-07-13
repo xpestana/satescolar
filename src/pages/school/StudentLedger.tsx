@@ -23,6 +23,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
 import { buildInvoiceData } from "@/lib/buildInvoiceData";
+import { formatDateOnly } from "@/lib/dateUtils";
 import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 
 export default function StudentLedger() {
@@ -189,7 +190,7 @@ export default function StudentLedger() {
     doc.text("Recibo de Pago", 105, 20, { align: "center" });
     doc.setFontSize(10);
     doc.text(`Estudiante: ${studentName}`, 14, 35);
-    doc.text(`Fecha: ${new Date(payment.payment_date).toLocaleDateString("es-VE")}`, 14, 42);
+    doc.text(`Fecha: ${formatDateOnly(payment.payment_date)}`, 14, 42);
     doc.text(`Estado: ${payment.status === "completed" ? "Completado" : "Anulado"}`, 14, 49);
     if (payment.invoice_name) doc.text(`Facturado a: ${payment.invoice_name} - ${payment.invoice_rif || ""}`, 14, 56);
 
@@ -296,7 +297,7 @@ export default function StudentLedger() {
                 <TableBody>
                   {payments.map((p: any) => (
                     <TableRow key={p.id} className={p.status === "voided" ? "opacity-50" : ""}>
-                      <TableCell>{new Date(p.payment_date).toLocaleDateString("es-VE")}</TableCell>
+                      <TableCell>{formatDateOnly(p.payment_date)}</TableCell>
                       <TableCell className="font-medium">{p.total_amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

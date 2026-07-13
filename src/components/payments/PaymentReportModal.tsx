@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Receipt, Upload, AlertTriangle } from "lucide-react";
 import { VENEZUELAN_BANKS, METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 import { ensureFreshBcvRates } from "@/lib/ensureFreshBcvRates";
+import { todayCaracasIso } from "@/lib/dateUtils";
 
 interface Props {
   open: boolean;
@@ -38,7 +39,7 @@ export function PaymentReportModal({
 
   const [amount, setAmount] = useState<string>("");
   const [paymentCurrency, setPaymentCurrency] = useState<string>("VES");
-  const [paymentDate, setPaymentDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [paymentDate, setPaymentDate] = useState<string>(todayCaracasIso());
   const [schoolMethodId, setSchoolMethodId] = useState<string>("");
   const [payerMethod, setPayerMethod] = useState<string>("transferencia");
   const [payerBank, setPayerBank] = useState<string>("");
@@ -62,7 +63,7 @@ export function PaymentReportModal({
             : 0
         ).toFixed(2)
       );
-      setPaymentDate(new Date().toISOString().split("T")[0]);
+      setPaymentDate(todayCaracasIso());
       setSchoolMethodId("");
       setPayerMethod("transferencia");
       setPayerBank(""); setPayerPhone(""); setPayerDocument("");

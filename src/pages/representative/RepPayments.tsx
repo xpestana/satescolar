@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { PaymentReportModal } from "@/components/payments/PaymentReportModal";
 import { ensureFreshBcvRates } from "@/lib/ensureFreshBcvRates";
+import { formatDateOnly } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
 
 export default function RepPayments() {
@@ -278,7 +279,7 @@ export default function RepPayments() {
               <TableBody>
                 {reports.map((r: any) => (
                   <TableRow key={r.id}>
-                    <TableCell>{new Date(r.payment_date).toLocaleDateString("es-VE")}</TableCell>
+                    <TableCell>{formatDateOnly(r.payment_date)}</TableCell>
                     <TableCell>{studentName(studentMap.get(r.student_id))}</TableCell>
                     <TableCell>{r.concept_name}</TableCell>
                     <TableCell>{Number(r.amount_reported).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {r.currency_reported}</TableCell>
