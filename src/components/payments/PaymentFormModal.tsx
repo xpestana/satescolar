@@ -79,6 +79,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   const [controlNumber, setControlNumber] = useState("");
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
+  const [applyToBalanceId, setApplyToBalanceId] = useState<string>("");
   const autoSelectedRef = useRef(false);
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
 
@@ -322,6 +323,22 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     methods.filter((m) => m.method === FAMILY_CREDIT_METHOD).reduce((s, m) => s + (parseFloat(m.amount_ves) || 0), 0), [methods]);
 
   const difference = totalMethods - totalConcepts;
+
+  // Cuánto más se le puede aplicar a un balance sin pasar su disponible (ya considerando lo seleccionado)
+  const remainingCapacity = (b: any) => Math.max(0, getDisplayBalance(b) - (parseFloat(selectedConcepts[b.id] || "0") || 0));
+
+  const eligibleForSurplus = useMemo(() =>
+    balances.filter((b: any) => remainingCapacity(b) > 0.01), [balances, selectedConcepts]);
+
+  const applySurplusToConcept = () => {
+    if (!applyToBalanceId) return;
+    const bal = balances.find((b: any) => b.id === applyToBalanceId);
+    if (!bal) return;
+    const amt = Math.min(difference, remainingCapacity(bal));
+    if (amt <= 0) return;
+    setSelectedConcepts((prev) => ({ ...prev, [applyToBalanceId]: ((parseFloat(prev[applyToBalanceId] || "0") || 0) + amt).toFixed(2) }));
+    setApplyToBalanceId("");
+  };
 
   // Guardar o actualizar perfil de factura en el array de la familia
   const saveProfileMut = useMutation({
@@ -831,24 +848,47 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                 </div>
               </div>
               {difference > 0.01 && (
-                <div className="flex items-center justify-between border-t pt-2">
+                <div className="border-t pt-2 space-y-2">
                   {surplusAction === "none" ? (
                     <>
                       <div className="flex items-center gap-2 text-xs text-yellow-600">
                         <AlertTriangle className="h-4 w-4" />
                         Existe un sobrepago de {difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES.
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSurplusAction("credit")}>
-                          + Guardar como saldo a favor
-                        </Button>
+                      {eligibleForSurplus.length > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Select value={applyToBalanceId} onValueChange={setApplyToBalanceId}>
+                            <SelectTrigger className="h-7 text-xs w-64"><SelectValue placeholder="Aplicar a una cuota específica..." /></SelectTrigger>
+                            <SelectContent>
+                              {eligibleForSurplus.map((b: any) => {
+                                const label = (b.payment_plan_concepts as any)?.payment_concepts?.name || "Concepto";
+                                const cap = remainingCapacity(b);
+                                return (
+                                  <SelectItem key={b.id} value={b.id}>
+                                    {label} (disp. {cap.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES)
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={!applyToBalanceId} onClick={applySurplusToConcept}>
+                            Aplicar a la cuota
+                          </Button>
+                        </div>
+                      )}
+                      <div className="flex gap-2 flex-wrap">
+                        {student.family_id && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSurplusAction("credit")}>
+                            + Guardar como saldo a favor
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSurplusAction("otros")}>
                           + Agregar a Otros
                         </Button>
                       </div>
                     </>
                   ) : (
-                    <>
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs text-green-600">
                         <span className="font-medium">{difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span> se registrarán {surplusAction === "credit" ? "como " : "en "}
                         <span className="font-medium">{surplusAction === "credit" ? "saldo a favor de la familia" : "Otros"}</span> al guardar.
@@ -856,7 +896,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                       <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => setSurplusAction("none")}>
                         Quitar
                       </Button>
-                    </>
+                    </div>
                   )}
                 </div>
               )}
