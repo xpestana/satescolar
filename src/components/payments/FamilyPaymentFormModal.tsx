@@ -13,10 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Loader2, Receipt, AlertTriangle, Users, Pencil } from "lucide-react";
+import { Plus, Trash2, Loader2, Receipt, AlertTriangle, Users, Pencil, Tag } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 import { applyRateOverride } from "@/lib/exchangeRateOverride";
+import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
+import { FAMILY_CREDIT_METHOD, FAMILY_CREDIT_LABEL } from "@/lib/familyCredit";
 
 interface InvoiceProfile {
   id: string;
@@ -71,7 +73,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
   const [invoice, setInvoice] = useState({ name: "", rif: "", phone: "", address: "" });
   const [invoiceReady, setInvoiceReady] = useState(false);
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
-  const [includeOtros, setIncludeOtros] = useState(false);
+  const [surplusAction, setSurplusAction] = useState<"none" | "otros" | "credit">("none");
   const invoiceInitializedRef = useRef(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [controlNumber, setControlNumber] = useState("");
@@ -94,6 +96,9 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
   const methodOptions = schoolMethods.length > 0
     ? schoolMethods.map((sm: any) => ({ value: sm.id, label: `${sm.label}`, config: sm.config, method_type: sm.method_type }))
     : Object.entries(METHOD_TYPE_LABELS).map(([k, v]) => ({ value: k, label: v, config: {}, method_type: k }));
+
+  // Family credit ("saldo a favor") balance and consumption
+  const { balance: creditBalance } = useFamilyCredits(family?.id);
 
   // Load rates
   const { data: rates = [] } = useQuery({
@@ -123,7 +128,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
     queryKey: ["family-students-balances", family?.id, schoolYearId, studentIds],
     queryFn: async () => {
       const { data, error } = await supabase.from("student_concept_balances")
-        .select("*, payment_plan_concepts(amount, display_order, is_mandatory, is_recurring, due_day, payment_concepts(name, concept_type))")
+        .select("*, payment_plan_concepts(amount, discount_type, discount_value, display_order, is_mandatory, is_recurring, due_day, payment_concepts(name, concept_type))")
         .in("student_id", studentIds)
         .eq("school_year_id", schoolYearId)
         .eq("school_id", schoolId)
@@ -192,7 +197,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
       setInvoice({ name: "", rif: "", phone: "", address: "" });
       setInvoiceReady(false);
       setEditingProfileId(null);
-      setIncludeOtros(false);
+      setSurplusAction("none");
       setSelectedConcepts({});
       setMethods([createMethodLine()]);
       setObservations("");
@@ -283,6 +288,9 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
   const totalMethods = useMemo(() =>
     methods.reduce((s, m) => s + (parseFloat(m.amount_ves) || 0), 0), [methods]);
 
+  const usedCredit = useMemo(() =>
+    methods.filter((m) => m.method === FAMILY_CREDIT_METHOD).reduce((s, m) => s + (parseFloat(m.amount_ves) || 0), 0), [methods]);
+
   const difference = totalMethods - totalConcepts;
 
   // Guardar o actualizar perfil de factura en el array de la familia
@@ -329,6 +337,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
       if (methods.length === 0) throw new Error("Agregue al menos una forma de pago");
       if (totalMethods <= 0) throw new Error("El monto total debe ser mayor a 0");
       if (Math.abs(difference) > 0.01 && difference < 0) throw new Error("El monto pagado es insuficiente para cubrir los conceptos seleccionados");
+      if (usedCredit > creditBalance + 0.01) throw new Error("El saldo a favor usado supera el disponible de la familia");
 
       const { data: payment, error: payErr } = await supabase.from("payments").insert({
         school_id: schoolId,
@@ -402,8 +411,8 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
         }).eq("id", balanceId);
       }
 
-      // Guardar sobrepago en "Otros" si el usuario lo indicó
-      if (includeOtros && difference > 0.01) {
+      // Guardar sobrepago en "Otros" (ingreso) o como saldo a favor, según lo indicado
+      if (surplusAction === "otros" && difference > 0.01) {
         await supabase.from("payment_others").insert({
           payment_id: payment.id,
           school_id: schoolId,
@@ -412,11 +421,36 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
           created_by: user!.id,
         });
       }
+      if (surplusAction === "credit" && difference > 0.01) {
+        await supabase.from("family_credits").insert({
+          school_id: schoolId,
+          family_id: family.id,
+          entry_type: "credit",
+          amount_ves: parseFloat(difference.toFixed(2)),
+          source_payment_id: payment.id,
+          note: observations || `Sobrante de factura ${invoiceNumber.trim()}`,
+          created_by: user!.id,
+        });
+      }
+
+      // Descontar el saldo a favor usado en esta factura
+      if (usedCredit > 0.01) {
+        await supabase.from("family_credits").insert({
+          school_id: schoolId,
+          family_id: family.id,
+          entry_type: "debit",
+          amount_ves: parseFloat(usedCredit.toFixed(2)),
+          applied_payment_id: payment.id,
+          note: `Aplicado a factura ${invoiceNumber.trim()}`,
+          created_by: user!.id,
+        });
+      }
 
       return payment.id;
     },
     onSuccess: (paymentId: string) => {
       qc.invalidateQueries({ queryKey: ["family-students-balances"] });
+      qc.invalidateQueries({ queryKey: ["family-credits", family.id] });
       qc.invalidateQueries({ queryKey: ["families-payment-registration"] });
       qc.invalidateQueries({ queryKey: ["all-student-balances"] });
       qc.invalidateQueries({ queryKey: ["payments"] });
@@ -597,6 +631,25 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                               <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, displayBalance)} /></TableCell>
                               <TableCell className="font-medium">
                                 {conceptName}
+                                {(() => {
+                                  const ppc = (b.payment_plan_concepts as any) || {};
+                                  const dType = ppc.discount_type;
+                                  const dValue = Number(ppc.discount_value || 0);
+                                  if ((dType !== "percentage" && dType !== "fixed") || dValue <= 0) return null;
+                                  const label = dType === "percentage"
+                                    ? `-${dValue.toLocaleString("es-VE", { maximumFractionDigits: 2 })}%`
+                                    : `-${dValue.toLocaleString("es-VE", { minimumFractionDigits: 2 })} ${cur}`;
+                                  return (
+                                    <Badge
+                                      variant="outline"
+                                      className="ml-2 gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                      title="Descuento del plan"
+                                    >
+                                      <Tag className="h-3 w-3" />
+                                      {label}
+                                    </Badge>
+                                  );
+                                })()}
                                 {cur !== "VES" && (
                                   <span className="ml-2 text-xs text-muted-foreground">
                                     ({Number(b.original_amount || 0).toLocaleString("es-VE", { minimumFractionDigits: 2 })} {cur} @ {Number(getRate(cur)).toLocaleString("es-VE", { minimumFractionDigits: 2 })})
@@ -639,11 +692,23 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
           {/* Payment Methods */}
           <Card>
             <CardHeader className="py-3 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm">Formas de Pago</CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm">Formas de Pago</CardTitle>
+                {creditBalance > 0.01 && (
+                  <Badge variant="outline" className="gap-1 border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400">
+                    <Tag className="h-3 w-3" />
+                    Saldo a favor: {creditBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                  </Badge>
+                )}
+              </div>
               <Button size="sm" variant="outline" onClick={addMethod}><Plus className="h-3 w-3 mr-1" />Agregar</Button>
             </CardHeader>
             <CardContent className="space-y-3">
-              {methods.map((m, idx) => (
+              {methods.map((m, idx) => {
+                const isCreditLine = m.method === FAMILY_CREDIT_METHOD;
+                const otherCreditUsed = usedCredit - (parseFloat(m.amount_ves) || 0);
+                const creditRemaining = Math.max(0, creditBalance - otherCreditUsed);
+                return (
                 <div key={m.id} className="border rounded-lg p-3 space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-medium text-muted-foreground">Pago #{idx + 1}</span>
@@ -652,11 +717,20 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs">Método</Label>
-                      <Select value={m.method} onValueChange={(v) => updateMethodField(m.id, "method", v)}>
+                      <Select value={m.method} onValueChange={(v) => {
+                        updateMethodField(m.id, "method", v);
+                        if (v === FAMILY_CREDIT_METHOD) {
+                          updateMethodField(m.id, "currency", "VES");
+                          updateMethodField(m.id, "exchange_rate", "1");
+                        }
+                      }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>{methodOptions.map((mt) => <SelectItem key={mt.value} value={mt.value}>{mt.label}</SelectItem>)}</SelectContent>
+                        <SelectContent>
+                          {methodOptions.map((mt) => <SelectItem key={mt.value} value={mt.value}>{mt.label}</SelectItem>)}
+                          {creditBalance > 0.01 && <SelectItem value={FAMILY_CREDIT_METHOD}>{FAMILY_CREDIT_LABEL}</SelectItem>}
+                        </SelectContent>
                       </Select>
-                      {(() => {
+                      {!isCreditLine && (() => {
                         const selected = methodOptions.find((mo) => mo.value === m.method);
                         if (!selected || !selected.config || Object.keys(selected.config).length === 0) return null;
                         const cfg = selected.config as Record<string, any>;
@@ -664,7 +738,11 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                         if (details.length === 0) return null;
                         return <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{details.join(" · ")}</p>;
                       })()}
+                      {isCreditLine && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">Disponible: {creditRemaining.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+                      )}
                     </div>
+                    {!isCreditLine && (
                     <div className="space-y-1">
                       <Label className="text-xs">Moneda</Label>
                       <Select value={m.currency} onValueChange={(v) => {
@@ -681,17 +759,34 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1"><Label className="text-xs">Monto ({m.currency})</Label><Input type="number" step="0.01" className="h-8 text-xs" value={m.amount_original} onChange={(e) => updateMethodField(m.id, "amount_original", e.target.value)} /></div>
-                    {m.currency !== "VES" && (
+                    )}
+                    <div className="space-y-1">
+                      <Label className="text-xs">Monto ({m.currency})</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        className="h-8 text-xs"
+                        value={m.amount_original}
+                        onChange={(e) => {
+                          const raw = parseFloat(e.target.value) || 0;
+                          const val = isCreditLine ? Math.min(raw, creditRemaining) : raw;
+                          updateMethodField(m.id, "amount_original", val.toString());
+                        }}
+                      />
+                    </div>
+                    {!isCreditLine && m.currency !== "VES" && (
                       <div className="space-y-1"><Label className="text-xs">Tasa</Label><Input type="number" step="0.01" className="h-8 text-xs" value={m.exchange_rate} onChange={(e) => updateMethodField(m.id, "exchange_rate", e.target.value)} /></div>
                     )}
                     <div className="space-y-1"><Label className="text-xs">= VES</Label><Input className="h-8 text-xs bg-muted" value={parseFloat(m.amount_ves || "0").toLocaleString("es-VE", { minimumFractionDigits: 2 })} readOnly /></div>
-                    <div className="space-y-1"><Label className="text-xs">Referencia</Label><Input className="h-8 text-xs" value={m.reference_code} onChange={(e) => updateMethodField(m.id, "reference_code", e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-xs">Banco</Label><Input className="h-8 text-xs" value={m.bank_name} onChange={(e) => updateMethodField(m.id, "bank_name", e.target.value)} /></div>
-                    <div className="space-y-1"><Label className="text-xs">Fecha</Label><Input type="date" className="h-8 text-xs" value={m.payment_date} onChange={(e) => updateMethodField(m.id, "payment_date", e.target.value)} /></div>
+                    {!isCreditLine && <>
+                      <div className="space-y-1"><Label className="text-xs">Referencia</Label><Input className="h-8 text-xs" value={m.reference_code} onChange={(e) => updateMethodField(m.id, "reference_code", e.target.value)} /></div>
+                      <div className="space-y-1"><Label className="text-xs">Banco</Label><Input className="h-8 text-xs" value={m.bank_name} onChange={(e) => updateMethodField(m.id, "bank_name", e.target.value)} /></div>
+                      <div className="space-y-1"><Label className="text-xs">Fecha</Label><Input type="date" className="h-8 text-xs" value={m.payment_date} onChange={(e) => updateMethodField(m.id, "payment_date", e.target.value)} /></div>
+                    </>}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
 
@@ -702,16 +797,18 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
           </div>
 
           {/* Summary */}
-          <Card className={difference < -0.01 ? "border-destructive" : (difference > 0.01 && !includeOtros) ? "border-yellow-500" : "border-green-500"}>
+          <Card className={difference < -0.01 ? "border-destructive" : (difference > 0.01 && surplusAction === "none") ? "border-yellow-500" : "border-green-500"}>
             <CardContent className="pt-4 space-y-3">
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div><span className="text-muted-foreground">Total Conceptos:</span><p className="text-lg font-bold">{totalConcepts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
                 <div><span className="text-muted-foreground">Total Pagado:</span><p className="text-lg font-bold">{totalMethods.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
                 <div>
                   <span className="text-muted-foreground">Diferencia:</span>
-                  <p className={`text-lg font-bold ${Math.abs(difference) < 0.01 ? "text-green-600" : difference > 0 ? (includeOtros ? "text-green-600" : "text-blue-600") : "text-destructive"}`}>
+                  <p className={`text-lg font-bold ${Math.abs(difference) < 0.01 ? "text-green-600" : difference > 0 ? (surplusAction !== "none" ? "text-green-600" : "text-blue-600") : "text-destructive"}`}>
                     {difference > 0 ? "+" : ""}{difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
-                    {difference > 0.01 && (includeOtros ? " → Otros" : " (Sobrepago)")}
+                    {difference > 0.01 && surplusAction === "otros" && " → Otros"}
+                    {difference > 0.01 && surplusAction === "credit" && " → Saldo a favor"}
+                    {difference > 0.01 && surplusAction === "none" && " (Sobrepago)"}
                     {difference < -0.01 && " (Insuficiente)"}
                   </p>
                 </div>
@@ -727,22 +824,28 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
               )}
               {difference > 0.01 && (
                 <div className="flex items-center justify-between border-t pt-2">
-                  {!includeOtros ? (
+                  {surplusAction === "none" ? (
                     <>
                       <div className="flex items-center gap-2 text-xs text-yellow-600">
                         <AlertTriangle className="h-4 w-4" />
                         Existe un sobrepago de {difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES.
                       </div>
-                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setIncludeOtros(true)}>
-                        + Agregar a Otros
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSurplusAction("credit")}>
+                          + Guardar como saldo a favor
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setSurplusAction("otros")}>
+                          + Agregar a Otros
+                        </Button>
+                      </div>
                     </>
                   ) : (
                     <>
                       <div className="flex items-center gap-2 text-xs text-green-600">
-                        <span className="font-medium">{difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span> se registrarán en <span className="font-medium">Otros</span> al guardar.
+                        <span className="font-medium">{difference.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span> se registrarán {surplusAction === "credit" ? "como " : "en "}
+                        <span className="font-medium">{surplusAction === "credit" ? "saldo a favor de la familia" : "Otros"}</span> al guardar.
                       </div>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => setIncludeOtros(false)}>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => setSurplusAction("none")}>
                         Quitar
                       </Button>
                     </>

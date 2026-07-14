@@ -78,9 +78,26 @@ Pantalla `PaymentConfig` ("Configuración de Pagos") con **4 pestañas**:
 - **Métodos de Pago** — métodos disponibles (ver `PaymentMethodsTab`).
 - **Configuraciones** — ajustes generales de facturación (ligado a `useBillingMode`).
 
-## Configuración de Morosidad (`/pagos/morosidad`)
-Pantalla `DelinquencyConfig` ("Configuración de Morosidad"): reglas/avisos de morosidad
-en `delinquency_config`; alimenta la función `send-delinquency-reminders`.
+## Morosidad (`/pagos/morosos` + `/pagos/morosidad`)
+- **Cálculo de morosos:** RPCs autoritativos (mismo criterio en UI y en la edge function):
+  `get_delinquent_students` (por estudiante) y `get_delinquent_families` (agrupado por familia,
+  lo usa `DelinquentFamiliesView`). Se basan en `student_concept_balances` y el `overdue_after_day`
+  del colegio. Antes de calcular se suele llamar `rebuild_student_concept_balances_for_active_year()`.
+- **Configuración** (`DelinquencyConfig`, `/pagos/morosidad`): guarda en `delinquency_config`
+  el día de corte y la frecuencia de recordatorios (`reminder_mode` + días).
+- **Pipeline de recordatorios:** cron diario `delinquency-reminders` (12:00 UTC) → invoca
+  `send-delinquency-reminders` → por cada colegio evalúa `reminder_mode` vs. hoy → arma la deuda
+  desde el RPC → envía por `send-email` (o SMTP si hay plantilla propia `email_templates`
+  `template_type='delinquency'`) → registra en `delinquency_notifications` (dedupe por día).
+  Ver detalle y correcciones en **Endpoints / Edge Functions**.
+- **Cron `delinquency-rebuild` (`0 7 * * *`):** solo ejecuta
+  `rebuild_student_concept_balances_for_active_year()` (reconstruye saldos), **no envía correos**;
+  no confundir con `delinquency-reminders`.
+
+> 📌 **Estado operativo (jul 2026):** los **4 colegios** están en `reminder_mode = 'never'` a
+> pedido — no se envía ningún recordatorio por ahora. Los 2 que no tenían fila tienen `never`
+> explícito. El cron `delinquency-reminders` queda agendado pero inofensivo (envía 0 mientras
+> todos estén en `never`); para reactivar, cambiar la frecuencia del colegio en `/pagos/morosidad`.
 
 ## Datos / Tablas (Supabase)
 - `invoice_templates` — plantillas de formato de factura: `school_id`, `config` (JSON),
@@ -89,6 +106,9 @@ en `delinquency_config`; alimenta la función `send-delinquency-reminders`.
 - `payment_concepts` — conceptos de cobro: `concept_type`, `currency`, `default_amount`, `is_active`.
 - `payment_plans` — planes; `payment_plan_concepts` — conceptos del plan con
   `amount`, `discount_type`/`discount_value`, `due_day`/`due_month`, `is_recurring`, `is_mandatory`.
+  El **descuento** puede ser `percentage` (0–100) o `fixed` (monto absoluto en la moneda del
+  concepto); el neto es `calcFinalAmount()` en `PaymentConfig.tsx`
+  (`amount·(1−%/100)` o `amount−fijo`, con piso en 0).
 - `school_payment_methods` — métodos de pago configurados: `method_type`, `label`,
   `config` (JSON), `is_active`.
 - `delinquency_config` — reglas de morosidad **(una fila por colegio)**: `school_id`
@@ -106,16 +126,37 @@ en `delinquency_config`; alimenta la función `send-delinquency-reminders`.
 - `student_concept_balances` — **el ledger**: saldo por estudiante × `plan_concept` × año:
   `total_amount`, `paid_amount`, `balance`, `status`, `currency`,
   `exchange_rate_snapshot`, `last_payment_date`. Fuente del estado de cuenta y morosidad.
+- `family_credits` — **ledger de "saldo a favor" por familia** (append-only): filas `entry_type`
+  `credit` (genera saldo) o `debit` (lo consume), `amount_ves`, `source_payment_id` (factura que
+  generó el crédito), `applied_payment_id` (factura donde se aplicó), `note`. El saldo disponible
+  es `SUM(credit) - SUM(debit)` (RPC `get_family_credit_balance(_family_id)`). Se usa cuando un
+  pago deja un sobrante que el representante quiere abonar a una cuota futura, en vez de
+  registrarlo como ingreso realizado en "Otros".
+  > 🐞 Bug corregido (migración `20260714130000_create_family_credits.sql`): antes, un sobrante
+  > sin marcar "Agregar a Otros" solo quedaba como texto libre en `payments.observations` — no
+  > existía ninguna tabla que lo registrara, así que no aparecía en el historial, el dashboard ni
+  > el estado de cuenta (caso real: factura 016836, 20,43 VES de sobrante documentados solo en la
+  > nota). La migración crea `family_credits` y hace un backfill retroactivo de ese caso.
 
 **Pagos / factura:**
 - `payments` — comprobante/factura emitida: `control_number`, `invoice_number`,
   `invoice_name`/`invoice_rif`/`invoice_address`/`invoice_phone`, `total_amount_ves`,
   `status`, anulación (`voided_at`/`voided_by`/`void_reason`), `student_id`, `school_year_id`.
-- `payment_items` — líneas del pago: `plan_concept_id`, `amount_ves`, `is_partial`.
+- `payment_items` — líneas del pago por concepto del plan: `plan_concept_id`, `student_id`
+  (**clave para resolver el/los estudiante(s) en modo familia**, donde `payments.student_id`
+  es null), `amount_ves`, `is_partial`. El **tipo** del concepto se obtiene vía
+  `payment_plan_concepts → payment_concepts.concept_type` (`mensualidad`, `inscripcion`,
+  `seguro_escolar`, …).
+- `payment_others` — líneas de ingresos que **no** cuelgan de un concepto del plan (categoría
+  **"Otros"** en Ingresos): `payment_id`, `amount_ves`.
 - `payment_method_entries` — pago **multi-método**: por entrada `method`, `currency`,
   `amount_original`, `amount_ves`, `exchange_rate`, `bank_name`, `reference_code`.
 - `payment_reports` — pagos **reportados por la familia** pendientes de confirmar
   (`confirmed_at`/`confirmed_payment_id`).
+- `payment_edit_log` — **auditoría de ediciones de pagos**: `payment_id`, `school_id`,
+  `edited_by`, `reason` (motivo, obligatorio en la UI), `before_snapshot`/`after_snapshot` (jsonb
+  con el pago + items + métodos + créditos antes/después de editar). Una fila por cada vez que se
+  usa **"Editar pago"** en el historial familiar.
 
 **Tasas de cambio:** `bcv_rates`, `exchange_rates` (alimentan la conversión a VES).
 
@@ -175,9 +216,18 @@ con una consulta directa a `students` (`studentInfoMap`), para cubrir también a
 inscritos** en el año activo (que no aparecen en `enrollments`).
 
 ## Reporte de Ingresos (`/pagos/ingresos`)
-Pantalla `IncomesReport` con la tabla **"Detalle de Pagos"** (pagos no anulados del año/mes,
-`N°` de operación estable por mes) y tarjetas de totales (Total Ingresos / Mensualidad /
-Inscripción / Seguro Escolar / Otros).
+Pantalla `IncomesReport` con la tabla **"Detalle de Pagos"** (pagos con `status <> 'voided'` del
+año/mes; `N°` de operación **estable por mes**, asignado por `created_at` ASC antes de filtrar) y
+tarjetas de totales (Total Ingresos / Mensualidad / Inscripción / Seguro Escolar / Otros).
+
+**Columnas por tipo de concepto:** cada pago se descompone sumando sus `payment_items` por
+`payment_plan_concepts → payment_concepts.concept_type`:
+- **Mensualidad** = items con `concept_type = 'mensualidad'`.
+- **Inscripción** = `'inscripcion'`.
+- **Seguro Escolar** = `'seguro_escolar'`.
+- **Otros** = suma de `payment_others.amount_ves` (no cuelgan de un concepto del plan).
+- **Total Ingresos** = `payments.total_amount_ves` (no la suma de columnas: puede haber conceptos
+  fuera de esas 4 categorías). Nombre/RIF salen de `invoice_name`/`invoice_rif`.
 
 **Exportar a Excel** (botón "Descargar Excel", helper `src/lib/incomesExcel.ts`):
 - Usa **`xlsx-js-style`** (fork de SheetJS con estilos; el `xlsx` community no colorea celdas).
@@ -203,17 +253,57 @@ Inscripción / Seguro Escolar / Otros).
 - Al asignar un plan (`student_payment_plans`) se generan los balances por concepto
   (ver funciones `create_missing_student_concept_balances_*`,
   `rebuild_student_concept_balances_for_active_year`).
+- **Descuento del plan aplicado al ledger:** el `discount_type`/`discount_value` del
+  `payment_plan_concepts` se descuenta al **sembrar** el balance, no en la UI. Las funciones
+  generadoras usan el helper SQL `discounted_plan_concept_amount(amount, type, value)` para
+  fijar `original_amount` (neto, en moneda del concepto) y `total_amount = neto · tasa`. Así el
+  descuento se refleja por igual en el **modal de registro** (`PaymentFormModal`, que solo
+  muestra el ledger), en el **estado de cuenta** y en **morosidad/ingresos**.
+  > 🐞 Bug corregido (migración `20260714120000_apply_plan_concept_discount_to_balances.sql`):
+  > las funciones de saldo eran anteriores a la columna de descuento (`20260610160000`), así que
+  > sembraban el **monto bruto** y la cuota salía sin descuento en el registro. La migración
+  > reescribe las 3 funciones generadoras, agrega `sync_unpaid_balances_for_plan_concept` +
+  > trigger para resincronizar cuotas **no pagadas** cuando se edita `amount`/descuento, y hace
+  > **backfill** de los balances no pagados ya creados. Solo toca cuotas con `paid_amount = 0`
+  > para no alterar pagos ya registrados.
 - Montos se manejan en **VES** con `exchange_rate` por entrada; la conversión usa
   `bcv_rates`/`exchange_rates` (función `fetch-bcv-rates`).
 - Un pago puede **anularse** (`voided_*`) y admite **múltiples métodos** por comprobante.
 - Las familias pueden **reportar** pagos (`payment_reports`) que el colegio confirma,
   generando el `payments` definitivo.
+- **Saldo a favor (`family_credits`):** cuando un pago deja un sobrante (`Total Pagado` >
+  `Total Conceptos`), el colegio elige en el modal de registro entre **"+ Agregar a Otros"**
+  (ingreso realizado, va a `payment_others`) o **"+ Guardar como saldo a favor"** (crédito para
+  la familia, va a `family_credits` con `entry_type = 'credit'`). El saldo a favor se **consume**
+  en un pago futuro seleccionándolo como una forma de pago más ("Saldo a favor (crédito)"), que
+  inserta una fila `entry_type = 'debit'`; el monto se descuenta en VES contra el `balance` de la
+  cuota igual que cualquier otro método, por lo que si la cuota es en USD, el descuento efectivo
+  en dólares depende de la **tasa BCV vigente el día en que se aplica** (mismo mecanismo de
+  `getDisplayTotal`/`exchange_rates` que ya usan las demás formas de pago). Visible en el
+  **historial de pagos por familia** (`FamilyPaymentHistoryModal`, sección "Movimientos de saldo
+  a favor"), en el **dashboard** (card "Créditos disponibles" + indicador por fila en "Últimos
+  Pagos") y en el **estado de cuenta** (`FamilyLedgerView` para el colegio, alerta en
+  `RepPayments` para el representante).
+- **Editar pago (`EditPaymentModal`):** desde el **historial de pagos por familia**
+  (`FamilyPaymentHistoryModal`, ícono lápiz junto a Eliminar) se puede corregir un pago ya
+  registrado — conceptos/montos, formas de pago, N° de factura/control, datos de facturación y
+  observaciones — para casos de error (p. ej. un descuento aplicado mal, un sobrante mal
+  clasificado). Requiere un **motivo obligatorio**. Al guardar: revierte el efecto del pago viejo
+  sobre `student_concept_balances` y sobre los `family_credits`/`payment_others` que hubiera
+  generado, reemplaza `payment_items`/`payment_method_entries`, reaplica los saldos con los
+  valores nuevos y **actualiza el mismo registro de `payments`** (no crea uno nuevo, conserva
+  N° de factura/control salvo que se cambien a propósito). Cada edición queda en
+  `payment_edit_log` con snapshot antes/después y el motivo, para auditoría.
 
 ## Archivos clave (código)
 - `src/pages/school/FormatsConfig.tsx` (contenedor de pestañas Facturas/Boletas)
 - `src/components/payments/InvoiceFormatTab.tsx` (editor de formato de factura)
 - `src/lib/buildInvoiceData.ts`, `src/hooks/useBillingMode.ts`
 - `src/components/payments/PaymentMethodsTab.tsx`, `src/components/payments/...`
+- `src/hooks/payments/useFamilyCredits.ts` (balance + movimientos de saldo a favor por familia),
+  `src/lib/familyCredit.ts` (constante del método `saldo_a_favor`)
+- `src/components/payments/EditPaymentModal.tsx` (edición de un pago ya registrado: revierte y
+  reaplica saldos/crédito, exige motivo, audita en `payment_edit_log`)
 
 ## Nómina (Pagos de Nóminas)
 Submódulo dentro del área de Pagos para registrar, aprobar y controlar los pagos al
@@ -303,4 +393,5 @@ define qué campos guarda cada tipo de método), `src/components/payroll/MethodD
 - `supabase/migrations/20260709120000_create_payroll_module_schema.sql`, `20260709130000_payroll_monthly_report_cron.sql`
 
 ## Por documentar
-- Modelo de conceptos de cobro, cuotas y cálculo de saldo/morosidad.
+- Modelo de conceptos de cobro y cuotas, y cálculo de saldo (`student_concept_balances`).
+  *(La detección de morosos y el pipeline de recordatorios ya están documentados arriba.)*

@@ -22,6 +22,23 @@ export function todayCaracasIso(): string {
 }
 
 /**
+ * Convierte un timestamp completo (p.ej. `created_at` con hora/zona) a la fecha
+ * calendario en Venezuela "YYYY-MM-DD". A diferencia de `payment_date` (que ya es
+ * fecha calendario pura), `created_at` es un instante y su fecha local depende de
+ * la zona horaria — por eso no se puede comparar como texto directamente.
+ */
+export function caracasDateFromTimestamp(value: string | null | undefined): string {
+  if (!value) return "";
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone: CARACAS_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(new Date(value));
+}
+
+/**
  * Formatea una fecha calendario ("YYYY-MM-DD" o ISO completo) como "d/m/yyyy"
  * sin aplicar corrimiento de zona horaria. Devuelve "" si la entrada es vacía.
  */

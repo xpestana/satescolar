@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -1292,7 +1292,15 @@ export type Database = {
           school_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "delinquency_config_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       delinquency_notifications: {
         Row: {
@@ -1840,6 +1848,74 @@ export type Database = {
           },
         ]
       }
+      family_credits: {
+        Row: {
+          amount_ves: number
+          applied_payment_id: string | null
+          created_at: string
+          created_by: string | null
+          entry_type: string
+          family_id: string
+          id: string
+          note: string
+          school_id: string
+          source_payment_id: string | null
+        }
+        Insert: {
+          amount_ves: number
+          applied_payment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          entry_type: string
+          family_id: string
+          id?: string
+          note?: string
+          school_id: string
+          source_payment_id?: string | null
+        }
+        Update: {
+          amount_ves?: number
+          applied_payment_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          entry_type?: string
+          family_id?: string
+          id?: string
+          note?: string
+          school_id?: string
+          source_payment_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_credits_applied_payment_id_fkey"
+            columns: ["applied_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_credits_family_id_fkey"
+            columns: ["family_id"]
+            isOneToOne: false
+            referencedRelation: "families"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_credits_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_credits_source_payment_id_fkey"
+            columns: ["source_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       family_schools: {
         Row: {
           created_at: string
@@ -2298,6 +2374,54 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      payment_edit_log: {
+        Row: {
+          after_snapshot: Json
+          before_snapshot: Json
+          created_at: string
+          edited_by: string
+          id: string
+          payment_id: string
+          reason: string
+          school_id: string
+        }
+        Insert: {
+          after_snapshot: Json
+          before_snapshot: Json
+          created_at?: string
+          edited_by: string
+          id?: string
+          payment_id: string
+          reason: string
+          school_id: string
+        }
+        Update: {
+          after_snapshot?: Json
+          before_snapshot?: Json
+          created_at?: string
+          edited_by?: string
+          id?: string
+          payment_id?: string
+          reason?: string
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_edit_log_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_edit_log_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_items: {
         Row: {
@@ -4947,6 +5071,14 @@ export type Database = {
         Args: { _plan_concept_id: string }
         Returns: undefined
       }
+      discounted_plan_concept_amount: {
+        Args: {
+          _amount: number
+          _discount_type: string
+          _discount_value: number
+        }
+        Returns: number
+      }
       get_all_balances_for_family: {
         Args: {
           _family_id: string
@@ -4996,6 +5128,10 @@ export type Database = {
           student_id: string
           total_owed: number
         }[]
+      }
+      get_family_credit_balance: {
+        Args: { _family_id: string }
+        Returns: number
       }
       has_permission: {
         Args: { _key: string; _user_id: string }
@@ -5057,6 +5193,10 @@ export type Database = {
       student_in_assignment: {
         Args: { _assignment_id: string; _student_id: string }
         Returns: boolean
+      }
+      sync_unpaid_balances_for_plan_concept: {
+        Args: { _plan_concept_id: string }
+        Returns: undefined
       }
       teacher_owns_assignment: {
         Args: { _assignment_id: string; _user_id: string }

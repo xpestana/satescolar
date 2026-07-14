@@ -15,6 +15,8 @@ import { PaymentReportModal } from "@/components/payments/PaymentReportModal";
 import { ensureFreshBcvRates } from "@/lib/ensureFreshBcvRates";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
+import { Tag } from "lucide-react";
 
 export default function RepPayments() {
   const { familyId, schoolId } = useRepresentativeFamily();
@@ -142,10 +144,21 @@ export default function RepPayments() {
   const studentMap = new Map(students.map((s) => [s.id, s]));
 
   const delinquentCount = balances.filter((b: any) => b.is_overdue).length;
+  const { entries: creditEntries, balance: creditBalance } = useFamilyCredits(familyId);
 
   return (
     <DashboardLayout>
       <PageHeader title="Mis pagos" breadcrumbs={[{ label: "Pagos" }]} />
+
+      {creditBalance > 0.01 && (
+        <Alert className="border-blue-300 bg-blue-50 mb-4">
+          <Tag className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-blue-700">
+            Tienes un <strong>saldo a favor</strong> de <strong>{creditBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</strong> que el colegio puede aplicar a tu próxima cuota.
+            {creditEntries[0]?.note && <span className="block text-xs mt-1 text-blue-600">{creditEntries[0].note}</span>}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {delinquentCount > 0 && (
         <Alert className="border-orange-300 bg-orange-50 mb-4">

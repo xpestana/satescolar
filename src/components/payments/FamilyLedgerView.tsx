@@ -21,6 +21,7 @@ import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 import { formatGradeLevel } from "@/lib/utils";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
+import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
 
 interface Props {
   schoolId: string;
@@ -217,6 +218,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
   const totalCharges = useMemo(() => balances.reduce((s: number, b: any) => s + (b.total_amount || 0), 0), [balances]);
   const totalDebt = useMemo(() => balances.reduce((s: number, b: any) => s + (b.balance || 0), 0), [balances]);
   const totalPaid = useMemo(() => balances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0), [balances]);
+  const { balance: creditBalance } = useFamilyCredits(selectedFamilyId);
 
   const balancesByStudent = useMemo(() => {
     const map: Record<string, any[]> = {};
@@ -377,11 +379,12 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
       <Button variant="outline" size="sm" className="mb-4" onClick={() => setSelectedFamilyId(null)}>← Volver</Button>
 
       {/* Family summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Familia</p><p className="font-bold">{familyName(selectedFamily)}</p><p className="text-xs text-muted-foreground mt-1">{familyChildren.length} estudiante(s)</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Total Cargos</p><p className="font-bold">{totalCharges.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Total Pagado</p><p className="font-bold text-green-600">{totalPaid.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Saldo Pendiente</p><p className={`font-bold ${totalDebt > 0 ? "text-destructive" : "text-green-600"}`}>{totalDebt.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Saldo a Favor</p><p className={`font-bold ${creditBalance > 0.01 ? "text-blue-600" : ""}`}>{creditBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></CardContent></Card>
       </div>
 
       {/* Concept Balances grouped by child */}

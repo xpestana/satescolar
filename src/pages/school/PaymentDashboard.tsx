@@ -9,8 +9,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, DollarSign, TrendingUp, AlertTriangle, Users, CreditCard } from "lucide-react";
-import { formatDateOnly, todayCaracasIso } from "@/lib/dateUtils";
+import { Loader2, DollarSign, TrendingUp, AlertTriangle, Users, CreditCard, Tag } from "lucide-react";
+import { formatDateOnly, todayCaracasIso, caracasDateFromTimestamp } from "@/lib/dateUtils";
 import { useBillingMode } from "@/hooks/useBillingMode";
 
 export default function PaymentDashboard() {
@@ -36,7 +36,7 @@ export default function PaymentDashboard() {
     enabled: !!schoolId,
   });
 
-  // Recent payments
+  // Recent payments (solo para la tabla "Últimos Pagos", limitada a 15)
   const { data: recentPayments = [], isLoading } = useQuery({
     queryKey: ["recent-payments", schoolId, activeYear?.id],
     queryFn: async () => {
@@ -51,6 +51,49 @@ export default function PaymentDashboard() {
     },
     enabled: !!schoolId && !!activeYear?.id,
   });
+
+  // Todos los pagos completados del año (sin límite) para las tarjetas de totales — el listado
+  // de "Últimos Pagos" está limitado a 15, pero los totales de Hoy/Mes deben contar TODOS los pagos.
+  const { data: allCompletedPayments = [] } = useQuery({
+    queryKey: ["all-completed-payments-stats", schoolId, activeYear?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("payments")
+        .select("payment_date, created_at, total_amount_ves, payment_method_entries(method, amount_ves)")
+        .eq("school_id", schoolId!)
+        .eq("school_year_id", activeYear!.id)
+        .eq("status", "completed");
+      return data || [];
+    },
+    enabled: !!schoolId && !!activeYear?.id,
+  });
+
+  // Family credits ("saldo a favor") total available for the school
+  const { data: creditRows = [] } = useQuery({
+    queryKey: ["all-family-credits-dashboard", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase.from("family_credits")
+        .select("entry_type, amount_ves, source_payment_id, applied_payment_id")
+        .eq("school_id", schoolId!);
+      return data || [];
+    },
+    enabled: !!schoolId,
+  });
+
+  // Map payment_id -> credit generated / credit used, to flag it in "Últimos Pagos"
+  const creditByPayment = useMemo(() => {
+    const map: Record<string, { generated: number; used: number }> = {};
+    (creditRows as any[]).forEach((c) => {
+      if (c.entry_type === "credit" && c.source_payment_id) {
+        map[c.source_payment_id] = map[c.source_payment_id] || { generated: 0, used: 0 };
+        map[c.source_payment_id].generated += c.amount_ves;
+      }
+      if (c.entry_type === "debit" && c.applied_payment_id) {
+        map[c.applied_payment_id] = map[c.applied_payment_id] || { generated: 0, used: 0 };
+        map[c.applied_payment_id].used += c.amount_ves;
+      }
+    });
+    return map;
+  }, [creditRows]);
 
   // All balances for stats
   const { data: allBalances = [] } = useQuery({
@@ -68,9 +111,14 @@ export default function PaymentDashboard() {
   const today = todayCaracasIso();
   const monthStart = `${today.slice(0, 7)}-01`;
 
-  const todayPayments = recentPayments.filter((p: any) => p.payment_date === today);
+  // "Hoy": pagos cuya FECHA DE TRANSFERENCIA (payment_date) es hoy — puede quedar en 0 si el
+  // colegio registra hoy pagos con fecha atrasada. "Registrados hoy": pagos creados en el sistema
+  // hoy (created_at), sin importar la fecha de la transferencia.
+  const todayPayments = allCompletedPayments.filter((p: any) => p.payment_date === today);
   const totalToday = todayPayments.reduce((s: number, p: any) => s + (p.total_amount_ves || 0), 0);
-  const totalMonth = recentPayments.filter((p: any) => p.payment_date >= monthStart).reduce((s: number, p: any) => s + (p.total_amount_ves || 0), 0);
+  const registeredTodayPayments = allCompletedPayments.filter((p: any) => caracasDateFromTimestamp(p.created_at) === today);
+  const totalRegisteredToday = registeredTodayPayments.reduce((s: number, p: any) => s + (p.total_amount_ves || 0), 0);
+  const totalMonth = allCompletedPayments.filter((p: any) => p.payment_date >= monthStart).reduce((s: number, p: any) => s + (p.total_amount_ves || 0), 0);
   const totalDebt = allBalances.reduce((s: number, b: any) => s + (b.balance || 0), 0);
   const totalCollected = allBalances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0);
   const delinquentStudents = new Set(allBalances.filter((b: any) => b.balance > 0).map((b: any) => b.student_id)).size;
@@ -79,6 +127,7 @@ export default function PaymentDashboard() {
     allBalances.filter((b: any) => b.balance > 0).map((b: any) => (b.students as any)?.family_id || b.student_id),
   ).size;
   const delinquentCount = billingMode === "family" ? delinquentFamilies : delinquentStudents;
+  const totalFamilyCredits = creditRows.reduce((s: number, c: any) => s + (c.entry_type === "credit" ? c.amount_ves : -c.amount_ves), 0);
 
   // Today methods breakdown — resuelve UUID de school_payment_method a su label
   const methodLabelMap = useMemo(() => {
@@ -105,35 +154,68 @@ export default function PaymentDashboard() {
       <PageHeader title="Dashboard de Pagos" breadcrumbs={[{ label: "Administrativo" }, { label: "Dashboard de Pagos" }]} />
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="pt-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center"><DollarSign className="h-5 w-5 text-green-600" /></div>
-            <div><p className="text-xs text-muted-foreground">Hoy</p><p className="text-lg font-bold">{totalToday.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</p></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Hoy (fecha de pago)</p>
+              <p className="text-lg font-bold">{totalToday.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center"><DollarSign className="h-5 w-5 text-emerald-600" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Registrados hoy</p>
+              <p className="text-lg font-bold">{totalRegisteredToday.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center"><TrendingUp className="h-5 w-5 text-blue-600" /></div>
-            <div><p className="text-xs text-muted-foreground">Este mes</p><p className="text-lg font-bold">{totalMonth.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</p></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Este mes</p>
+              <p className="text-lg font-bold">{totalMonth.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center"><CreditCard className="h-5 w-5 text-primary" /></div>
-            <div><p className="text-xs text-muted-foreground">Total recaudado</p><p className="text-lg font-bold">{totalCollected.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</p></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Total recaudado</p>
+              <p className="text-lg font-bold">{totalCollected.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-destructive/10 flex items-center justify-center"><AlertTriangle className="h-5 w-5 text-destructive" /></div>
-            <div><p className="text-xs text-muted-foreground">Deuda total</p><p className="text-lg font-bold text-destructive">{totalDebt.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</p></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Deuda total</p>
+              <p className="text-lg font-bold text-destructive">{totalDebt.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-yellow-500/10 flex items-center justify-center"><Users className="h-5 w-5 text-yellow-600" /></div>
-            <div><p className="text-xs text-muted-foreground">{billingMode === "family" ? "Familias morosas" : "Morosos"}</p><p className="text-lg font-bold">{delinquentCount}</p></div>
+            <div>
+              <p className="text-xs text-muted-foreground">{billingMode === "family" ? "Familias morosas" : "Morosos"}</p>
+              <p className="text-lg font-bold">{delinquentCount}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center"><Tag className="h-5 w-5 text-blue-600" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Créditos disponibles</p>
+              <p className="text-lg font-bold">{totalFamilyCredits.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -187,7 +269,15 @@ export default function PaymentDashboard() {
                         </TableCell>
                         <TableCell className="text-xs font-mono">{p.invoice_number || "—"}</TableCell>
                         <TableCell className="text-xs font-mono">{p.control_number || "—"}</TableCell>
-                        <TableCell className="font-medium text-sm">{p.total_amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                        <TableCell className="font-medium text-sm">
+                          {p.total_amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}
+                          {creditByPayment[p.id]?.generated > 0.01 && (
+                            <div className="text-[10px] font-normal text-blue-600 flex items-center gap-1"><Tag className="h-2.5 w-2.5" />+{creditByPayment[p.id].generated.toLocaleString("es-VE", { minimumFractionDigits: 2 })} a favor</div>
+                          )}
+                          {creditByPayment[p.id]?.used > 0.01 && (
+                            <div className="text-[10px] font-normal text-muted-foreground flex items-center gap-1"><Tag className="h-2.5 w-2.5" />-{creditByPayment[p.id].used.toLocaleString("es-VE", { minimumFractionDigits: 2 })} de crédito</div>
+                          )}
+                        </TableCell>
                       </TableRow>
                     );
                   })}

@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, History, Trash2, ChevronDown, ChevronRight, AlertTriangle, Users } from "lucide-react";
+import { Loader2, History, Trash2, Pencil, ChevronDown, ChevronRight, AlertTriangle, Users, Tag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { formatDateOnly } from "@/lib/dateUtils";
+import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
+import { EditPaymentModal } from "@/components/payments/EditPaymentModal";
 
 interface Props {
   open: boolean;
@@ -27,6 +29,7 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editPaymentId, setEditPaymentId] = useState<string | null>(null);
 
   // Incluye pagos familiares (family_id) y pagos individuales históricos de los hijos
   const orFilter = useMemo(() => {
@@ -116,6 +119,8 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
 
   const totalGlobal = payments.reduce((s: number, p: any) => s + (Number(p.total_amount_ves) || 0), 0);
 
+  const { entries: creditEntries, balance: creditBalance } = useFamilyCredits(open ? familyId : null);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -125,6 +130,37 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
             Historial de Pagos — Familia {familyName}
           </DialogTitle>
         </DialogHeader>
+
+        {creditBalance > 0.01 && (
+          <Badge variant="outline" className="gap-1 border-blue-500/40 bg-blue-500/10 text-blue-700 dark:text-blue-400 w-fit">
+            <Tag className="h-3 w-3" />
+            Saldo a favor disponible: {creditBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+          </Badge>
+        )}
+
+        {creditEntries.length > 0 && (
+          <Card>
+            <CardContent className="py-3">
+              <p className="text-sm font-semibold mb-2">Movimientos de saldo a favor</p>
+              <div className="space-y-1 text-xs">
+                {creditEntries.map((c) => (
+                  <div key={c.id} className="flex justify-between items-start border-b py-1 last:border-0">
+                    <div>
+                      <span className={c.entry_type === "credit" ? "text-green-600 font-medium" : "text-destructive font-medium"}>
+                        {c.entry_type === "credit" ? "+ Generado" : "− Aplicado"}
+                      </span>
+                      {" "}· {formatDateOnly(c.created_at)}
+                      {c.note && <div className="text-muted-foreground">{c.note}</div>}
+                    </div>
+                    <span className="font-medium whitespace-nowrap ml-2">
+                      {c.entry_type === "credit" ? "+" : "-"}{c.amount_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {isLoading ? (
           <div className="py-10 text-center"><Loader2 className="animate-spin h-6 w-6 mx-auto" /></div>
@@ -178,9 +214,14 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
                         <Badge variant={p.status === "completed" ? "default" : "secondary"}>{p.status}</Badge>
                       </TableCell>
                       <TableCell>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setConfirmDeleteId(p.id)}>
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
+                        <div className="flex gap-0.5">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" title="Editar pago" onClick={() => setEditPaymentId(p.id)}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7" title="Eliminar pago" onClick={() => setConfirmDeleteId(p.id)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                     {expanded[p.id] && (
@@ -246,6 +287,17 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {editPaymentId && (
+          <EditPaymentModal
+            open={!!editPaymentId}
+            onOpenChange={(v) => !v && setEditPaymentId(null)}
+            paymentId={editPaymentId}
+            schoolId={schoolId}
+            schoolYearId={schoolYearId}
+            onSaved={() => setEditPaymentId(null)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
