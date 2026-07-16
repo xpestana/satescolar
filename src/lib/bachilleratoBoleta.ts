@@ -11,7 +11,7 @@ import {
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 import { fmtGradeNum, formatBoletaGradeValue } from "@/lib/gradeLiteral";
-import { resolveImageToDataUrl } from "@/lib/image-resolve";
+import { resolveImageToDataUrl, resolveSignatureImages } from "@/lib/image-resolve";
 
 /** Inline signature/stamp images for html2canvas (same CORS fix as school logo). */
 async function resolveBoletinSignatures(
@@ -19,13 +19,7 @@ async function resolveBoletinSignatures(
 ): Promise<BachilleratoConfig> {
   const sigs = cfg.boletin?.signatures ?? [];
   if (sigs.length === 0) return cfg;
-  const resolved = await Promise.all(
-    sigs.map(async (sig) => ({
-      ...sig,
-      firma_url: sig.firma_url ? await resolveImageToDataUrl(sig.firma_url) : "",
-      sello_url: sig.sello_url ? await resolveImageToDataUrl(sig.sello_url) : "",
-    })),
-  );
+  const resolved = await resolveSignatureImages(sigs);
   return { ...cfg, boletin: { ...cfg.boletin!, signatures: resolved } };
 }
 

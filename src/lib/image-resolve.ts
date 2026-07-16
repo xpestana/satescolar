@@ -120,6 +120,22 @@ export async function resolveImageToDataUrl(url: string): Promise<string> {
 export const fetchAsBase64 = resolveImageToDataUrl;
 
 /**
+ * Inlines the firma/sello images of a signature list so html2canvas can draw them
+ * (a raw S3 URL is dropped as a cross-origin taint and prints blank).
+ */
+export async function resolveSignatureImages<T extends { firma_url: string; sello_url: string }>(
+  sigs: T[],
+): Promise<T[]> {
+  return Promise.all(
+    sigs.map(async (sig) => ({
+      ...sig,
+      firma_url: sig.firma_url ? await resolveImageToDataUrl(sig.firma_url) : "",
+      sello_url: sig.sello_url ? await resolveImageToDataUrl(sig.sello_url) : "",
+    })),
+  );
+}
+
+/**
  * Loads an image as a PNG data URL (for jsPDF addImage).
  * Uses canvas normalization when the source is not already PNG.
  */

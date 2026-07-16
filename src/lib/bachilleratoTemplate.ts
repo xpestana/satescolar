@@ -87,11 +87,17 @@ export interface BachilleratoConfig {
 
 export interface BoletinSignature {
   nombre:    string;
-  cedula:    string;
+  cedula:    string;   // optional — omitted from the render when empty
   cargo:     string;
   firma_url: string;
   sello_url: string;
+  /** undefined = active, so configs saved before this field keep rendering. Honoured by primaria_descriptivo only. */
+  enabled?:  boolean;
 }
+
+/** A signature with no data at all would render as an orphan line — treat it as absent. */
+export const isBlankSignature = (sig: BoletinSignature) =>
+  !sig.nombre?.trim() && !sig.cargo?.trim() && !sig.firma_url && !sig.sello_url;
 
 // ─── Boletín Completo types ────────────────────────────────────────────────────
 
@@ -817,6 +823,11 @@ export interface PrimaryDescriptiveRenderData {
   literal_numerico: string;
   main_report:      { subject_name: string; html: string } | null;
   especialistas:    { subject_name: string; html: string }[];
+  /**
+   * Signatures to print, already composed by the caller (teacher's own signature first,
+   * then the template's). Falls back to the template's own list when absent.
+   */
+  signatures?:      BoletinSignature[];
 }
 
 export const SAMPLE_PRIMARY_DESCRIPTIVE_DATA: PrimaryDescriptiveRenderData = {
@@ -933,7 +944,9 @@ export function generatePrimaryDescriptiveHtml(
   </div>`;
 
   // Signatures block
-  const cfgSigs = p.signatures ?? [];
+  const cfgSigs = (data.signatures ?? p.signatures ?? []).filter(
+    (sig) => sig.enabled !== false && !isBlankSignature(sig)
+  );
   const sigHtml = cfg.sections.signatures && cfgSigs.length > 0 ? (() => {
     const cols = cfgSigs.map((sig) => {
       const firmaImg = sig.firma_url

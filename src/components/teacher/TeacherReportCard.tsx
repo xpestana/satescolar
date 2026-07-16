@@ -11,6 +11,8 @@ import { Loader2, Check, FileText, Info, Save } from "lucide-react";
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "@/components/grades/PrimaryFinalReportModal";
 import PreschoolFinalReportModal from "@/components/grades/PreschoolFinalReportModal";
+import TeacherSignatureCard from "@/components/grades/TeacherSignatureCard";
+import { useTeacherData } from "@/hooks/useTeacherData";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const PRIMARY_GRADES = new Set([
@@ -60,6 +62,7 @@ export function TeacherReportCard({
   sectionLabel,
 }: TeacherReportCardProps) {
   const queryClient = useQueryClient();
+  const { teacher } = useTeacherData();
   const isPrimary = PRIMARY_GRADES.has(gradeLevel);
   const isPreschool = PRESCHOOL_GRADES.has(gradeLevel);
   const tableName = isPrimary ? "primary_final_reports" : "preschool_final_reports";
@@ -281,6 +284,10 @@ export function TeacherReportCard({
             </Button>
           )}
         </div>
+
+        {isPrimary && teacher?.id && (
+          <TeacherSignatureCard teacherId={teacher.id} schoolId={schoolId} />
+        )}
 
         <div className="rounded-md border overflow-x-auto">
           <Table>

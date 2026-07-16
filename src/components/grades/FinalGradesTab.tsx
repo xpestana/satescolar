@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Search, Loader2, Check, Save, Plus, Minus, Info, FileText, Settings, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import PrimaryFinalReportModal from "./PrimaryFinalReportModal";
+import TeacherSignatureCard from "./TeacherSignatureCard";
 import PreschoolFinalReportModal from "./PreschoolFinalReportModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -114,13 +115,13 @@ export default function FinalGradesTab({
         if (!selectedGcrpAssignment) return [];
         const { data } = await supabase
           .from("subject_teacher_assignments")
-          .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
+          .select("id, section_id, teacher_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
           .eq("id", selectedGcrpAssignment);
         return data || [];
       } else {
         const { data } = await supabase
           .from("subject_teacher_assignments")
-          .select("id, section_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
+          .select("id, section_id, teacher_id, section:section_id(id, grade_level), subject:subject_id(subject_type)")
           .eq("school_year_id", effectiveYear)
           .eq("subject_id", selectedSubject)
           .eq("school_id", schoolId)
@@ -1529,6 +1530,12 @@ export default function FinalGradesTab({
             </div>
           </div>
         </div>
+
+        {isPrimary && primaryReportType === "descriptive" && assignment?.teacher_id && (
+          <div className="mb-4">
+            <TeacherSignatureCard teacherId={assignment.teacher_id} schoolId={schoolId} />
+          </div>
+        )}
 
         {isBachillerato && (
           <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 mb-4">

@@ -4957,6 +4957,60 @@ export type Database = {
           },
         ]
       }
+      teacher_signatures: {
+        Row: {
+          cargo: string
+          cedula: string
+          created_at: string
+          firma_url: string
+          is_active: boolean
+          nombre: string
+          school_id: string
+          sello_url: string
+          teacher_id: string
+          updated_at: string
+        }
+        Insert: {
+          cargo?: string
+          cedula?: string
+          created_at?: string
+          firma_url?: string
+          is_active?: boolean
+          nombre?: string
+          school_id: string
+          sello_url?: string
+          teacher_id: string
+          updated_at?: string
+        }
+        Update: {
+          cargo?: string
+          cedula?: string
+          created_at?: string
+          firma_url?: string
+          is_active?: boolean
+          nombre?: string
+          school_id?: string
+          sello_url?: string
+          teacher_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teacher_signatures_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teacher_signatures_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: true
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teachers: {
         Row: {
           created_at: string
