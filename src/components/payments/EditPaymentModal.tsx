@@ -119,12 +119,18 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     enabled: open && childStudentIds.length > 0,
   });
 
-  // Contribución del pago original a cada concepto, para "revertir" su efecto solo en pantalla
+  // Contribución del pago original a cada concepto, en la MONEDA ORIGINAL del concepto,
+  // para "revertir" su efecto (legacy sin original_amount cae a amount_ves / snapshot).
   const oldContributionByBalance = useMemo(() => {
     const map: Record<string, number> = {};
     (paymentData?.items || []).forEach((it: any) => {
       const bal = rawBalances.find((b: any) => b.student_id === it.student_id && b.plan_concept_id === it.plan_concept_id);
-      if (bal) map[bal.id] = (map[bal.id] || 0) + Number(it.amount_ves || 0);
+      if (!bal) return;
+      const cur = bal.currency || "VES";
+      const orig = cur === "VES"
+        ? Number(it.amount_ves || 0)
+        : (it.original_amount != null ? Number(it.original_amount) : Number(it.amount_ves || 0) / (Number(bal.exchange_rate_snapshot) || 1));
+      map[bal.id] = (map[bal.id] || 0) + orig;
     });
     return map;
   }, [paymentData, rawBalances]);
@@ -164,8 +170,17 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
   };
 
   const getDisplayTotal = (b: any) => b.currency === "VES" ? (b.total_amount || 0) : (b.original_amount || 0) * getRate(b.currency || "VES");
-  // Balance "editable": el vigente + lo que este mismo pago ya había cubierto de ese concepto
-  const getEditableBalance = (b: any) => Math.max(0, getDisplayTotal(b) - (b.paid_amount || 0)) + (oldContributionByBalance[b.id] || 0);
+  // Remanente en la moneda original del concepto (balance/snapshot), exacto ante cambios de tasa
+  const getRemainingOriginal = (b: any) => b.currency === "VES"
+    ? (b.balance || 0)
+    : (b.balance || 0) / (b.exchange_rate_snapshot || getRate(b.currency || "VES") || 1);
+  // Balance "editable": el remanente vigente + lo que este mismo pago ya había cubierto (moneda
+  // original), revaluado a la tasa de hoy para VES.
+  const getEditableBalance = (b: any) => {
+    const cur = b.currency || "VES";
+    const remOrig = getRemainingOriginal(b) + (oldContributionByBalance[b.id] || 0);
+    return cur === "VES" ? Math.max(0, remOrig) : Math.max(0, remOrig * getRate(cur));
+  };
 
   const balances = rawBalances;
 
@@ -311,10 +326,22 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
           .eq("plan_concept_id", item.plan_concept_id)
           .maybeSingle();
         if (!bal) continue;
-        const newPaid = Math.max(0, (Number(bal.paid_amount) || 0) - (Number(item.amount_ves) || 0));
-        const newBalance = Math.max(0, (Number(bal.total_amount) || 0) - newPaid);
+        // Revertir en la moneda ORIGINAL del concepto: se devuelve la porción que este ítem
+        // había liquidado (original_amount; legacy cae a amount_ves / snapshot).
+        const cur = bal.currency || "VES";
+        const snap = Number(bal.exchange_rate_snapshot) || 1;
+        const itemOrig = cur === "VES"
+          ? Number(item.amount_ves || 0)
+          : (item.original_amount != null ? Number(item.original_amount) : Number(item.amount_ves || 0) / snap);
+        const remOrigBefore = cur === "VES" ? Number(bal.balance || 0) : Number(bal.balance || 0) / snap;
+        let remOrig = remOrigBefore + itemOrig;
+        if (cur !== "VES" && bal.original_amount != null) remOrig = Math.min(remOrig, Number(bal.original_amount));
+        const newTotalAmount = cur === "VES" ? Number(bal.total_amount || 0) : Number(bal.original_amount || 0) * snap;
+        const newBalance = parseFloat((cur === "VES" ? remOrig : remOrig * snap).toFixed(2));
+        const newPaid = parseFloat(Math.max(0, newTotalAmount - newBalance).toFixed(2));
         const newStatus = newPaid <= 0 ? "pending" : (newBalance <= 0 ? "paid" : "partial");
         await supabase.from("student_concept_balances").update({
+          total_amount: newTotalAmount,
           paid_amount: newPaid,
           balance: newBalance,
           status: newStatus,
@@ -346,11 +373,14 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
       const newItems = Object.entries(selectedConcepts).map(([balanceId, amountStr]) => {
         const bal = balances.find((b: any) => b.id === balanceId);
         const amount = parseFloat(amountStr) || 0;
+        const cur = bal!.currency || "VES";
+        const originalAmount = cur === "VES" ? amount : parseFloat((amount / (getRate(cur) || 1)).toFixed(4));
         return {
           payment_id: paymentId,
           plan_concept_id: bal!.plan_concept_id,
           student_id: bal!.student_id,
           amount_ves: amount,
+          original_amount: originalAmount,
           is_partial: amount < getEditableBalance(bal!) - 0.01,
         };
       });
@@ -381,17 +411,26 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
         if (!bal) continue;
         const { data: freshBal } = await supabase.from("student_concept_balances").select("*").eq("id", balanceId).single();
         if (!freshBal) continue;
-        const currentRate = getRate(bal.currency || "VES");
-        const newTotalAmount = getDisplayTotal(bal);
-        const newPaid = parseFloat(((Number(freshBal.paid_amount) || 0) + amount).toFixed(2));
-        const newBalance = parseFloat((newTotalAmount - newPaid).toFixed(2));
-        const effectiveBalance = newBalance > 0 && newBalance <= EXCHANGE_RATE_TOLERANCE_VES ? 0 : Math.max(0, newBalance);
-        const newStatus = effectiveBalance <= 0 ? "paid" : "partial";
+        // Reaplicar en la moneda ORIGINAL del concepto a la tasa de hoy (igual que el registro)
+        const cur = bal.currency || "VES";
+        const currentRate = getRate(cur);
+        const prevRemainingOrig = cur === "VES"
+          ? (Number(freshBal.balance) || 0)
+          : (Number(freshBal.balance) || 0) / (Number(freshBal.exchange_rate_snapshot) || currentRate || 1);
+        const paidOrig = cur === "VES" ? amount : amount / (currentRate || 1);
+        const tolOrig = cur === "VES" ? EXCHANGE_RATE_TOLERANCE_VES : EXCHANGE_RATE_TOLERANCE_VES / (currentRate || 1);
+        let remOrig = prevRemainingOrig - paidOrig;
+        if (remOrig > 0 && remOrig <= tolOrig) remOrig = 0;
+        remOrig = Math.max(0, remOrig);
+        const newTotalAmount = cur === "VES" ? (Number(freshBal.total_amount) || 0) : (Number(bal.original_amount) || 0) * currentRate;
+        const newBalance = parseFloat((cur === "VES" ? remOrig : remOrig * currentRate).toFixed(2));
+        const newPaid = parseFloat((newTotalAmount - newBalance).toFixed(2));
+        const newStatus = newBalance <= 0 ? "paid" : "partial";
         await supabase.from("student_concept_balances").update({
           exchange_rate_snapshot: currentRate,
           total_amount: newTotalAmount,
-          paid_amount: effectiveBalance <= 0 ? newTotalAmount : newPaid,
-          balance: effectiveBalance,
+          paid_amount: newPaid,
+          balance: newBalance,
           status: newStatus,
           last_payment_date: today(),
         }).eq("id", balanceId);
@@ -574,7 +613,7 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
                                 )}
                               </TableCell>
                               <TableCell>{displayTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                              <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell>{Math.max(0, displayTotal - editableBalance).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                               <TableCell className="font-medium">{editableBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                               <TableCell>
                                 <Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>

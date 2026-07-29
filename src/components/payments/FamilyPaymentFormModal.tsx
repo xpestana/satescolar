@@ -213,9 +213,16 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
     return applyRateOverride(schoolId, currency, dbRate);
   };
 
-  // Use current exchange rate for display/calculation instead of frozen snapshot
+  // Use current exchange rate for display/calculation instead of frozen snapshot.
+  // The remaining amount is tracked in the concept's ORIGINAL currency (balance/snapshot),
+  // so partial payments made at different rates stay exact; only the VES revaluation moves.
   const getDisplayTotal = (b: any) => b.currency === "VES" ? (b.total_amount || 0) : (b.original_amount || 0) * getRate(b.currency || "VES");
-  const getDisplayBalance = (b: any) => Math.max(0, getDisplayTotal(b) - (b.paid_amount || 0));
+  const getRemainingOriginal = (b: any) => b.currency === "VES"
+    ? (b.balance || 0)
+    : (b.balance || 0) / (b.exchange_rate_snapshot || getRate(b.currency || "VES") || 1);
+  const getDisplayBalance = (b: any) => b.currency === "VES"
+    ? Math.max(0, b.balance || 0)
+    : Math.max(0, getRemainingOriginal(b) * getRate(b.currency || "VES"));
 
   const updateMethodField = (id: string, field: string, value: string) => {
     setMethods((prev) => prev.map((m) => {
@@ -384,11 +391,15 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
       const items = Object.entries(selectedConcepts).map(([balanceId, amountStr]) => {
         const bal = balances.find((b: any) => b.id === balanceId);
         const amount = parseFloat(amountStr) || 0;
+        const cur = bal!.currency || "VES";
+        // Portion settled in the concept's original currency, at today's rate
+        const originalAmount = cur === "VES" ? amount : parseFloat((amount / (getRate(cur) || 1)).toFixed(4));
         return {
           payment_id: payment.id,
           plan_concept_id: bal!.plan_concept_id,
           student_id: bal!.student_id,
           amount_ves: amount,
+          original_amount: originalAmount,
           is_partial: amount < getDisplayBalance(bal!) - 0.01,
         };
       });
@@ -412,23 +423,32 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
         if (methErr) throw methErr;
       }
 
-      // Actualizar saldos de cada hijo
+      // Actualizar saldos de cada hijo — se descuenta el abono en la MONEDA ORIGINAL del
+      // concepto a la tasa de hoy, para que abonos en días distintos con tasas distintas
+      // liquiden exacto (25$ + 50$ = 75$) sin arrastrar diferencia cambiaria.
       for (const [balanceId, amountStr] of Object.entries(selectedConcepts)) {
         const amount = parseFloat(amountStr) || 0;
         const bal = balances.find((b: any) => b.id === balanceId);
         if (!bal) continue;
-        const currentRate = getRate(bal.currency || "VES");
-        const newTotalAmount = getDisplayTotal(bal);
-        const newPaid = parseFloat(((bal.paid_amount || 0) + amount).toFixed(2));
-        const newBalance = parseFloat((newTotalAmount - newPaid).toFixed(2));
-        // Absorb residuals ≤ EXCHANGE_RATE_TOLERANCE_VES caused by exchange rate drift
-        const effectiveBalance = newBalance > 0 && newBalance <= EXCHANGE_RATE_TOLERANCE_VES ? 0 : Math.max(0, newBalance);
-        const newStatus = effectiveBalance <= 0 ? "paid" : "partial";
+        const cur = bal.currency || "VES";
+        const currentRate = getRate(cur);
+        const prevRemainingOrig = cur === "VES"
+          ? (bal.balance || 0)
+          : (bal.balance || 0) / (bal.exchange_rate_snapshot || currentRate || 1);
+        const paidOrig = cur === "VES" ? amount : amount / (currentRate || 1);
+        const tolOrig = cur === "VES" ? EXCHANGE_RATE_TOLERANCE_VES : EXCHANGE_RATE_TOLERANCE_VES / (currentRate || 1);
+        let remOrig = prevRemainingOrig - paidOrig;
+        if (remOrig > 0 && remOrig <= tolOrig) remOrig = 0;
+        remOrig = Math.max(0, remOrig);
+        const newTotalAmount = cur === "VES" ? (bal.total_amount || 0) : (bal.original_amount || 0) * currentRate;
+        const newBalance = parseFloat((cur === "VES" ? remOrig : remOrig * currentRate).toFixed(2));
+        const newPaid = parseFloat((newTotalAmount - newBalance).toFixed(2));
+        const newStatus = newBalance <= 0 ? "paid" : "partial";
         await supabase.from("student_concept_balances").update({
           exchange_rate_snapshot: currentRate,
           total_amount: newTotalAmount,
-          paid_amount: effectiveBalance <= 0 ? newTotalAmount : newPaid,
-          balance: effectiveBalance,
+          paid_amount: newPaid,
+          balance: newBalance,
           status: newStatus,
           last_payment_date: today(),
         }).eq("id", balanceId);
@@ -680,7 +700,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                                 )}
                               </TableCell>
                               <TableCell>{displayTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                              <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                              <TableCell>{Math.max(0, displayTotal - displayBalance).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                               <TableCell className="font-medium">{displayBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                               <TableCell>
                                 <Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>

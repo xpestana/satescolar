@@ -2429,6 +2429,7 @@ export type Database = {
           created_at: string
           id: string
           is_partial: boolean
+          original_amount: number | null
           payment_id: string
           plan_concept_id: string
           student_id: string | null
@@ -2438,6 +2439,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_partial?: boolean
+          original_amount?: number | null
           payment_id: string
           plan_concept_id: string
           student_id?: string | null
@@ -2447,6 +2449,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_partial?: boolean
+          original_amount?: number | null
           payment_id?: string
           plan_concept_id?: string
           student_id?: string | null

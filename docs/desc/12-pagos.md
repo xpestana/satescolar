@@ -268,6 +268,21 @@ tarjetas de totales (Total Ingresos / Mensualidad / Inscripción / Seguro Escola
   > para no alterar pagos ya registrados.
 - Montos se manejan en **VES** con `exchange_rate` por entrada; la conversión usa
   `bcv_rates`/`exchange_rates` (función `fetch-bcv-rates`).
+- **Abonos de cuotas en moneda extranjera (USD/EUR) a tasas de días distintos:** cada abono
+  liquida su porción en la **moneda original** del concepto a la **tasa del día en que se paga**.
+  El remanente en moneda original vive en `balance / exchange_rate_snapshot` (así lo leen los
+  RPC de morosidad/estado de cuenta); el registro deduce `amount_ves / tasaHoy` en USD y
+  reescribe `balance`/`total_amount`/`paid_amount`/`snapshot` de forma coherente. Cada
+  `payment_items.original_amount` guarda la porción liquidada en moneda original (para revert
+  exacto en `EditPaymentModal`; legacy cae a `amount_ves / snapshot`).
+  > 🐞 Bug corregido (migración `20260729120000_add_original_amount_to_payment_items.sql`): el
+  > write path acumulaba `paid_amount` como **suma de Bs a tasas históricas** y recalculaba
+  > `total_amount = original × tasa_actual`, mezclando bolívares de tasas distintas. Una cuota
+  > USD abonada en 2 días (p. ej. 25$ @124,51 + 50$ @156,37 = 75$) quedaba con un **saldo
+  > fantasma** `= 25 × (156,37−124,51) = 796,50 Bs` (≈5,09$) en vez de pagada. Se corrigieron
+  > los 3 modales (`PaymentFormModal`, `FamilyPaymentFormModal`, `EditPaymentModal`) para operar
+  > en moneda original y se ajustó en BD la única cuota afectada (factura 016273 + 016315,
+  > estudiante Andrés Salas). *La otra cara — pagos únicos parciales — nunca tuvo drift.*
 - Un pago puede **anularse** (`voided_*`) y admite **múltiples métodos** por comprobante.
 - Las familias pueden **reportar** pagos (`payment_reports`) que el colegio confirma,
   generando el `payments` definitivo.
