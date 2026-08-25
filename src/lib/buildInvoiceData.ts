@@ -1,4 +1,5 @@
 import { parseDateOnly } from "@/lib/dateUtils";
+import { conceptAmountKey } from "@/lib/invoiceFieldValue";
 
 /** Human-readable labels for every grade_level enum value stored in the DB. */
 export const GRADE_LABELS: Record<string, string> = {
@@ -29,8 +30,9 @@ export const GRADE_LABELS: Record<string, string> = {
  * Converts a payment record into the flat key→value map used by the invoice overlay.
  *
  * Concept fields use the key format "concept:{payment_concept_id}".
- * If that concept was paid in this payment → value is "✓".
- * If not paid → key is absent from the map (nothing prints).
+ * If that concept was paid in this payment → value is "✓" and the amount paid is
+ * also exposed under "concept:{id}#amount" (used by fields with `show_amount`).
+ * If not paid → both keys are absent from the map (nothing prints).
  *
  * The template only prints the concepts whose keys are in this map,
  * so unpaid concepts are automatically skipped.
@@ -52,6 +54,7 @@ export function buildInvoiceData(
   // ── Concept marks: one entry per paid concept ─────────────────────────
   // payment_items → payment_plan_concepts.concept_id  (payment_concepts.id)
   const conceptMarks: Record<string, string> = {};
+  const conceptTotals: Record<string, number> = {};
   const conceptNames: string[] = [];
 
   items.forEach((item: any) => {
@@ -59,8 +62,17 @@ export function buildInvoiceData(
     const conceptName = item.payment_plan_concepts?.payment_concepts?.name || "";
     if (conceptId) {
       conceptMarks[`concept:${conceptId}`] = "✓";
+      // Several items can hit the same concept (e.g. one per student in a family
+      // payment) — the invoice prints the total paid for that concept.
+      conceptTotals[conceptId] = (conceptTotals[conceptId] || 0) + Number(item.amount_ves || 0);
     }
     if (conceptName) conceptNames.push(conceptName);
+  });
+
+  // Amount variant of every concept key — used by fields with `show_amount`
+  const conceptAmounts: Record<string, string> = {};
+  Object.entries(conceptTotals).forEach(([conceptId, total]) => {
+    conceptAmounts[conceptAmountKey(`concept:${conceptId}`)] = fmt(total);
   });
 
   // ── General summary field (all paid concept names on one line) ────────
@@ -88,6 +100,7 @@ export function buildInvoiceData(
     student_section:     sectionName,
     concepts_all:        conceptsAll,
     ...conceptMarks,
+    ...conceptAmounts,
     total_amount:        fmt(Number(payment.total_amount_ves || 0)),
     payment_method_text: methodText,
   };

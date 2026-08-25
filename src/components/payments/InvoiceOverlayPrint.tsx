@@ -1,4 +1,5 @@
 import { InvoiceTemplate, OverlayField } from "@/pages/school/InvoiceTemplateConfig";
+import { resolveOverlayValue } from "@/lib/invoiceFieldValue";
 
 /**
  * Opens a new browser window with the invoice overlay positioned for printing.
@@ -9,11 +10,11 @@ export function printInvoiceOverlay(template: InvoiceTemplate, paymentData: Reco
   const win = window.open("", "_blank", "width=900,height=700");
   if (!win) return;
 
-  const fields = (template.fields || []).filter((f: OverlayField) => !!paymentData[f.key]);
+  const fields = (template.fields || []).filter((f: OverlayField) => !!resolveOverlayValue(f, paymentData));
 
   const fieldsHtml = fields
     .map((f: OverlayField) => {
-      const value = paymentData[f.key] || "";
+      const value = resolveOverlayValue(f, paymentData);
       return `
         <div style="
           position: absolute;

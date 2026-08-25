@@ -141,9 +141,32 @@ export function InvoiceCanvasEditor({
 
   /** Resolve sample/preview value for any field key */
   const resolveSample = (key: string): string => {
-    if (key.startsWith("concept:")) return "✓";   // all concepts show checked in preview
+    // all concepts show as paid in the preview: amount if configured, "✓" otherwise
+    if (key.startsWith("concept:")) return getField(key)?.show_amount ? "5.000,00" : "✓";
     return STATIC_SAMPLE[key] ?? OVERLAY_FIELDS.find((f) => f.key === key)?.example ?? key;
   };
+
+  /** Concept fields print either a "✓" or the amount paid — a check needs far less width */
+  const setShowAmount = (key: string, showAmount: boolean) => {
+    const f = getField(key);
+    if (!f) return;
+    updateField(key, {
+      show_amount: showAmount,
+      width_mm: showAmount ? Math.max(f.width_mm, 25) : f.width_mm,
+    });
+  };
+
+  /** Same switch applied to every concept field at once (single state update) */
+  const setShowAmountAll = (showAmount: boolean) => {
+    onChange(fields.map((f) => (
+      f.key.startsWith("concept:")
+        ? { ...f, show_amount: showAmount, width_mm: showAmount ? Math.max(f.width_mm, 25) : f.width_mm }
+        : f
+    )));
+  };
+
+  const conceptFields    = fields.filter((f) => f.key.startsWith("concept:"));
+  const allConceptAmount = conceptFields.length > 0 && conceptFields.every((f) => f.show_amount);
 
   const selectedField = selected ? getField(selected) : null;
   const selectedLabel = selected ? resolveLabel(selected) : null;
@@ -174,6 +197,13 @@ export function InvoiceCanvasEditor({
                 onChange={(e) => updateField(selected!, { bold: e.target.checked })} />
               Negrita
             </label>
+            {selected!.startsWith("concept:") && (
+              <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer mb-1.5">
+                <input type="checkbox" checked={selectedField.show_amount ?? false}
+                  onChange={(e) => setShowAmount(selected!, e.target.checked)} />
+                Imprimir monto (en vez de ✓)
+              </label>
+            )}
             <p className="text-[10px] text-slate-400 font-mono">
               x:{selectedField.x_mm} y:{selectedField.y_mm} w:{selectedField.width_mm}
             </p>
@@ -225,6 +255,14 @@ export function InvoiceCanvasEditor({
               Conceptos del colegio
             </p>
 
+            {conceptFields.length > 0 && (
+              <label className="flex items-center gap-1.5 px-1 mb-1 text-[10px] text-slate-500 cursor-pointer">
+                <input type="checkbox" checked={allConceptAmount}
+                  onChange={(e) => setShowAmountAll(e.target.checked)} />
+                Imprimir monto en todos los conceptos
+              </label>
+            )}
+
             {schoolConcepts.length === 0 ? (
               <p className="text-[10px] text-slate-400 px-1 italic">
                 No hay conceptos de pago activos configurados.
@@ -248,7 +286,9 @@ export function InvoiceCanvasEditor({
                         <p className={`text-[11px] leading-tight ${isSel ? "text-blue-700 font-semibold" : active ? "font-medium text-amber-700" : "text-slate-500"}`}>
                           {concept.name}
                         </p>
-                        <p className="text-[10px] text-slate-400">marca "✓" si fue pagado</p>
+                        <p className="text-[10px] text-slate-400">
+                          {getField(key)?.show_amount ? "imprime el monto pagado" : 'marca "✓" si fue pagado'}
+                        </p>
                       </div>
                     </div>
                   );

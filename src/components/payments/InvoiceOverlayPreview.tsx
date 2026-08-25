@@ -1,4 +1,5 @@
 import { OVERLAY_FIELDS, InvoiceTemplate, OverlayField } from "@/pages/school/InvoiceTemplateConfig";
+import { isConceptField, resolveOverlayValue } from "@/lib/invoiceFieldValue";
 
 // Demo data for preview
 const SAMPLE_DATA: Record<string, string> = {
@@ -85,7 +86,10 @@ export function InvoiceOverlayPreview({ template, paymentData, scale = 2 }: Prop
         {/* Overlay fields */}
         {(template.fields || []).map((field: OverlayField) => {
           const meta = OVERLAY_FIELDS.find((f) => f.key === field.key);
-          const value = data[field.key] || (meta?.example ?? "");
+          const sample = isConceptField(field.key)
+            ? (field.show_amount ? "5.000,00" : "✓")     // concept fields have no static example
+            : (meta?.example ?? "");
+          const value = resolveOverlayValue(field, data) || sample;
           if (!value) return null;
           return (
             <div
@@ -104,7 +108,7 @@ export function InvoiceOverlayPreview({ template, paymentData, scale = 2 }: Prop
                 textOverflow: "ellipsis",
                 lineHeight: 1.2,
               }}
-              title={`${meta?.label}: ${value}`}
+              title={`${field.label ?? meta?.label ?? field.key}: ${value}`}
             >
               {value}
             </div>

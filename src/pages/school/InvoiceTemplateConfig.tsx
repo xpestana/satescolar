@@ -46,6 +46,8 @@ export interface OverlayField {
   font_size_pt: number;
   width_mm: number;
   bold?: boolean;
+  /** Concept fields only: print the amount paid for that concept instead of the "✓" mark */
+  show_amount?: boolean;
 }
 
 export interface InvoiceTemplate {
