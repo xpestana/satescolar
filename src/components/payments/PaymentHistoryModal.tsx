@@ -10,6 +10,7 @@ import { Loader2, History, Trash2, ChevronDown, ChevronRight, AlertTriangle } fr
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { formatDateOnly } from "@/lib/dateUtils";
+import { getPaymentCoverage } from "@/lib/paymentStatus";
 
 interface Props {
   open: boolean;
@@ -135,6 +136,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                   <TableHead>Factura</TableHead>
                   <TableHead>Conceptos</TableHead>
                   <TableHead>Total VES</TableHead>
+                  <TableHead>Pago</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="w-20">Acción</TableHead>
                 </TableRow>
@@ -158,6 +160,12 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                       <TableCell className="text-xs">{(p.payment_items || []).length} concepto(s)</TableCell>
                       <TableCell className="font-medium">{Number(p.total_amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>
+                        {(() => {
+                          const cov = getPaymentCoverage(p);
+                          return <Badge variant="outline" className={cov.className}>{cov.label}</Badge>;
+                        })()}
+                      </TableCell>
+                      <TableCell>
                         <Badge variant={p.status === "completed" ? "default" : "secondary"}>{p.status}</Badge>
                       </TableCell>
                       <TableCell>
@@ -168,7 +176,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                     </TableRow>
                     {expanded[p.id] && (
                       <TableRow key={p.id + "-detail"} className="bg-muted/30">
-                        <TableCell colSpan={7} className="p-3">
+                        <TableCell colSpan={8} className="p-3">
                           <div className="grid md:grid-cols-2 gap-4 text-xs">
                             <div>
                               <p className="font-semibold mb-1">Conceptos pagados</p>
