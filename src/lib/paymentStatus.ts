@@ -19,12 +19,12 @@ export function getPaymentCoverage(payment: {
   if (partialCount === 0) {
     return {
       label: "Completo",
-      className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+      className: "whitespace-nowrap border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     };
   }
 
   return {
     label: partialCount === items.length ? "Parcial" : "Parcial (mixto)",
-    className: "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
+    className: "whitespace-nowrap border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400",
   };
 }

@@ -110,7 +110,7 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
@@ -150,15 +150,15 @@ export function PaymentHistoryModal({ open, onOpenChange, studentId, studentName
                           {expanded[p.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </Button>
                       </TableCell>
-                      <TableCell>{formatDateOnly(p.payment_date)}</TableCell>
+                      <TableCell className="whitespace-nowrap">{formatDateOnly(p.payment_date)}</TableCell>
                       <TableCell className="text-xs">
-                        {p.invoice_number && <div className="font-medium">Fact. N° {p.invoice_number}</div>}
-                        {p.control_number && <div className="font-medium">Ctrl. N° {p.control_number}</div>}
+                        {p.invoice_number && <div className="font-medium whitespace-nowrap">Fact. N° {p.invoice_number}</div>}
+                        {p.control_number && <div className="font-medium whitespace-nowrap">Ctrl. N° {p.control_number}</div>}
                         {p.invoice_name || "—"}
                         {p.invoice_rif && <div className="text-muted-foreground">{p.invoice_rif}</div>}
                       </TableCell>
-                      <TableCell className="text-xs">{(p.payment_items || []).length} concepto(s)</TableCell>
-                      <TableCell className="font-medium">{Number(p.total_amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">{(p.payment_items || []).length} concepto(s)</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{Number(p.total_amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>
                         {(() => {
                           const cov = getPaymentCoverage(p);
