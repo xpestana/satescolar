@@ -31,7 +31,14 @@ describe("formatResumenFinalGrade", () => {
 
   it("suma los puntos de ajuste antes de redondear", () => {
     expect(formatResumenFinalGrade("14.4", 1, "numeric")).toBe("15");
-    expect(formatResumenFinalGrade("9", 0, "numeric")).toBe("9");
+  });
+
+  // Mismo zero-padding que la boleta (fmtGradeNum), para no mezclar "9" y "09".
+  it("rellena con cero las notas de un dígito", () => {
+    expect(formatResumenFinalGrade("9", 0, "numeric")).toBe("09");
+    expect(formatResumenFinalGrade("8.6", 0, "numeric")).toBe("09");
+    expect(formatResumenFinalGrade("0", 0, "numeric")).toBe("00");
+    expect(formatResumenFinalGrade("10", 0, "numeric")).toBe("10");
   });
 
   it("valor no numérico deja vacío", () => {

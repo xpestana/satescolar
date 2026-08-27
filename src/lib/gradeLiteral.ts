@@ -32,5 +32,7 @@ export function formatResumenFinalGrade(
   if (isNaN(num)) return "";
   if (evalType === "literal") return formatBoletaGradeValue(num, evalType);
   // Redondeo básico a entero: 19.5 → 20, 18.2 → 18 (Math.round = mitad hacia arriba).
-  return String(Math.round(num));
+  // El entero pasa por fmtGradeNum para que las notas de un dígito lleven cero delante
+  // (9 → "09"), igual que en la boleta.
+  return fmtGradeNum(Math.round(num));
 }
