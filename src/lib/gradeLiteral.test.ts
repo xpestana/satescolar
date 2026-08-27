@@ -18,9 +18,24 @@ describe("formatResumenFinalGrade", () => {
     expect(formatResumenFinalGrade("", 0, "literal")).toBe("");
   });
 
-  it("mantiene formato numérico para materias no literales", () => {
+  // La planilla Resumen Final (31059/31060) lleva la nota como entero, así que desde
+  // 0fbf925 la función redondea en vez de conservar el decimal.
+  it("redondea a entero las materias no literales", () => {
     expect(formatResumenFinalGrade("15", 0, "numeric")).toBe("15");
-    expect(formatResumenFinalGrade("14.5", 0, "numeric")).toBe("14.5");
+    expect(formatResumenFinalGrade("14.5", 0, "numeric")).toBe("15");
+    expect(formatResumenFinalGrade("14.4", 0, "numeric")).toBe("14");
+    expect(formatResumenFinalGrade("19.5", 0, "numeric")).toBe("20");
+    expect(formatResumenFinalGrade("18.2", 0, "numeric")).toBe("18");
     expect(formatResumenFinalGrade(null, 0, "numeric")).toBe("");
+  });
+
+  it("suma los puntos de ajuste antes de redondear", () => {
+    expect(formatResumenFinalGrade("14.4", 1, "numeric")).toBe("15");
+    expect(formatResumenFinalGrade("9", 0, "numeric")).toBe("9");
+  });
+
+  it("valor no numérico deja vacío", () => {
+    expect(formatResumenFinalGrade("N/A", 0, "numeric")).toBe("");
+    expect(formatResumenFinalGrade("   ", 0, "numeric")).toBe("");
   });
 });
