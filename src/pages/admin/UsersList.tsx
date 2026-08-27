@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Pencil, Trash2, Ban, CheckCircle, LogIn } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Ban, CheckCircle, LogIn, X } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,16 @@ import { Pagination } from "@/components/ui/data-pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { toast } from "sonner";
+import {
+  ROLE_LABELS,
+  countActiveFilters,
+  countByRole,
+  filterUsers,
+  type ActivityFilter,
+  type StatusFilter,
+  type UserFilters,
+  type UserRoleKey,
+} from "@/lib/userFilters";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -80,6 +90,10 @@ export default function UsersList() {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<UserRoleKey | "all">("all");
+  const [schoolFilter, setSchoolFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -430,17 +444,37 @@ export default function UsersList() {
     }
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.school_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
+  const filters: UserFilters = {
+    search: searchTerm,
+    role: roleFilter,
+    school: schoolFilter,
+    status: statusFilter,
+    activity: activityFilter,
+  };
+
+  const filteredUsers = useMemo(() => filterUsers(users, filters), [users, searchTerm, roleFilter, schoolFilter, statusFilter, activityFilter]);
+
+  // Conteos por rol sobre la lista ya acotada por los OTROS filtros, para que el numero del
+  // selector coincida con lo que se ve al elegir ese rol.
+  const roleCounts = useMemo(
+    () => countByRole(filterUsers(users, { ...filters, role: "all" })),
+    [users, searchTerm, schoolFilter, statusFilter, activityFilter],
   );
 
-  // Reset to page 1 when search changes
+  const activeFilterCount = countActiveFilters(filters);
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setRoleFilter("all");
+    setSchoolFilter("all");
+    setStatusFilter("all");
+    setActivityFilter("all");
+  };
+
+  // Reset to page 1 when any filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, roleFilter, schoolFilter, statusFilter, activityFilter]);
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
@@ -459,24 +493,77 @@ export default function UsersList() {
 
       <div className="bg-card rounded-xl shadow-sm border">
         {/* Toolbar */}
-        <div className="flex items-center justify-between p-5 border-b">
-          <Button onClick={() => handleOpenDialog()} className="shadow-sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Agregar Usuario
-          </Button>
+        <div className="p-5 border-b space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button onClick={() => handleOpenDialog()} className="shadow-sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Usuario
+            </Button>
 
-          <div className="flex items-center gap-6">
-            <div className="relative">
+            <div className="relative flex-1 min-w-[240px] max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar usuarios..."
+                placeholder="Buscar por nombre, email, colegio o rol..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-72 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
+                className="pl-10 bg-muted/50 border-0 focus-visible:bg-background focus-visible:ring-1"
               />
             </div>
-            <span className="text-sm text-muted-foreground hidden lg:block">
-              Lista de Usuarios Registrados
+          </div>
+
+          {/* Filtros */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as UserRoleKey | "all")}>
+              <SelectTrigger className="w-[200px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los roles ({roleCounts.all})</SelectItem>
+                <SelectItem value="school">{ROLE_LABELS.school} ({roleCounts.school})</SelectItem>
+                <SelectItem value="teacher">{ROLE_LABELS.teacher} ({roleCounts.teacher})</SelectItem>
+                <SelectItem value="representative">{ROLE_LABELS.representative} ({roleCounts.representative})</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+              <SelectTrigger className="w-[220px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las instituciones</SelectItem>
+                <SelectItem value="none">Sin institución</SelectItem>
+                {schools.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+              <SelectTrigger className="w-[170px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Activos y suspendidos</SelectItem>
+                <SelectItem value="active">Solo activos</SelectItem>
+                <SelectItem value="suspended">Solo suspendidos</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={activityFilter} onValueChange={(v) => setActivityFilter(v as ActivityFilter)}>
+              <SelectTrigger className="w-[220px] h-9"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Cualquier actividad</SelectItem>
+                <SelectItem value="never">Nunca ha ingresado</SelectItem>
+                <SelectItem value="recent">Ingresó en los últimos 30 días</SelectItem>
+                <SelectItem value="dormant">Sin ingresar hace más de 90 días</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-1" />
+                Limpiar filtros ({activeFilterCount})
+              </Button>
+            )}
+
+            <span className="ml-auto text-sm text-muted-foreground">
+              {loading
+                ? "Cargando usuarios..."
+                : `${filteredUsers.length} de ${users.length} usuario${users.length === 1 ? "" : "s"}`}
             </span>
           </div>
         </div>
@@ -499,19 +586,22 @@ export default function UsersList() {
             ) : paginatedUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  {searchTerm
-                    ? "No se encontraron usuarios con ese criterio de búsqueda"
-                    : "No hay usuarios registrados. ¡Crea el primero!"}
+                  {activeFilterCount > 0 ? (
+                    <div className="space-y-2">
+                      <p>Ningún usuario coincide con los filtros aplicados</p>
+                      <Button variant="outline" size="sm" onClick={clearFilters}>
+                        <X className="h-4 w-4 mr-1" />
+                        Limpiar filtros
+                      </Button>
+                    </div>
+                  ) : (
+                    "No hay usuarios registrados. ¡Crea el primero!"
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
               paginatedUsers.map((user) => {
-                const roleLabel =
-                  user.role === "school"
-                    ? "Colegio"
-                    : user.role === "teacher"
-                    ? "Docente"
-                    : "Representante";
+                const roleLabel = ROLE_LABELS[user.role];
                 const roleBadgeClass =
                   user.role === "school"
                     ? "bg-primary/10 text-primary hover:bg-primary/20"

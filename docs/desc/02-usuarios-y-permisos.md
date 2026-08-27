@@ -39,6 +39,31 @@ permisos** granulares.
 - `user_roles`, `school_user_profiles`, `permission_profile_items`
 - `permission_profiles` (perfiles) — ⏳ verificar nombre.
 
+## Filtros de la lista de usuarios (`/admin/usuarios`)
+La lista mezcla los tres roles (colegio, docente, representante) de **todos** los colegios, así
+que solo con el buscador no se encontraba a nadie. Ahora hay cuatro filtros que se combinan
+entre sí, más una búsqueda mejorada:
+
+- **Rol** — Colegio / Docente / Representante, cada uno con su **conteo**. El conteo se calcula
+  sobre la lista ya acotada por los *otros* filtros, para que el número coincida con lo que sale
+  al elegir ese rol.
+- **Institución** — cualquiera de los colegios, o **"Sin institución"** (usuarios sin colegio
+  resuelto: ni `user_roles.school_id`, ni `teachers`, ni `family_schools`).
+- **Estado** — activos / suspendidos (la suspensión viene del `banned_until` que devuelve
+  `get-user-emails`, no de una columna propia).
+- **Actividad** — *Nunca ha ingresado*, *Ingresó en los últimos 30 días*, *Sin ingresar hace más
+  de 90 días*. Sale de `profiles.login_count` / `profiles.last_login_at`.
+- **Búsqueda** — sin acentos en ambos sentidos ("jose" encuentra "José") y **multi-término**:
+  cada palabra debe aparecer en algún lado, en cualquier orden ("maria luther" cae en María del
+  Martin Luther King). Busca en nombre, email, colegio y rol.
+
+Un contador *"N de M usuarios"* y un botón **Limpiar filtros** (con el número de filtros activos)
+evitan la confusión de quedar filtrado sin darse cuenta. Cambiar cualquier filtro vuelve a la
+página 1.
+
+La lógica vive en **`src/lib/userFilters.ts`** (puro, con `src/lib/userFilters.test.ts`); la
+página solo conecta estado y UI.
+
 ## Reglas de negocio
 - Un `school` **owner** no requiere permisos; ve todo.
 - Los perfiles agrupan `permission_key` con `scope` opcional (grado / año escolar).
