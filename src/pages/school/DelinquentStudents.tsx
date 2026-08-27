@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DashboardSkeleton, TableSkeleton } from "@/components/ui/loading-skeletons";
@@ -15,6 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Loader2, Search, AlertTriangle, Mail, Eye } from "lucide-react";
 import { useBillingMode } from "@/hooks/useBillingMode";
 import { DelinquentFamiliesView } from "@/components/payments/DelinquentFamiliesView";
+import { SchoolYearSelect } from "@/components/payments/SchoolYearSelect";
+import { useSchoolYearSelection } from "@/hooks/useSchoolYearSelection";
 
 export default function DelinquentStudents() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -24,42 +26,57 @@ export default function DelinquentStudents() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
-  const { data: activeYear } = useQuery({
-    queryKey: ["active-school-year", schoolId],
-    queryFn: async () => {
-      const { data } = await supabase.from("school_years").select("*").eq("school_id", schoolId!).eq("is_active", true).maybeSingle();
-      return data;
-    },
-    enabled: !!schoolId,
-  });
+  // Anos escolares del colegio. La morosidad se puede consultar de cualquiera de ellos, no solo
+  // del activo: los RPC (get_delinquent_students / get_delinquent_families) ya reciben el ano y
+  // filtran student_concept_balances por school_year_id.
+  const { schoolYears, selectedYearId, setSelectedYearId, selectedYear, isLoading: yearsLoading } =
+    useSchoolYearSelection(schoolId);
+
+  // Al cambiar de ano se cierra el historial abierto de un estudiante del ano anterior.
+  useEffect(() => {
+    setHistoryOpen(false);
+    setSelectedStudentId(null);
+    setSearch("");
+    setGradeFilter("all");
+  }, [selectedYearId]);
+
+  const yearSelect = (
+    <SchoolYearSelect
+      years={schoolYears}
+      value={selectedYearId}
+      onChange={setSelectedYearId}
+      isLoading={yearsLoading}
+      inactiveWarning="Está viendo la morosidad del año {year}, que no es el año en curso"
+    />
+  );
 
   // Delinquent students from server-side RPC.
   // get_delinquent_students internally calls rebuild_student_concept_balances_for_active_year
   // before querying, so balances are always up-to-date.
   const { data: delinquentRows = [], isLoading, error: delinquentError } = useQuery({
-    queryKey: ["delinquent-rpc", schoolId, activeYear?.id],
+    queryKey: ["delinquent-rpc", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_delinquent_students", {
         _school_id: schoolId!,
-        _school_year_id: activeYear!.id,
+        _school_year_id: selectedYear!.id,
       });
       if (error) throw error;
       return (data || []) as Array<{ student_id: string; total_owed: number; concepts: any[] }>;
     },
-    enabled: !!schoolId && !!activeYear?.id && billingMode === "student",
+    enabled: !!schoolId && !!selectedYear?.id && billingMode === "student",
   });
 
   // Get enrollments for student info
   const { data: enrollments = [] } = useQuery({
-    queryKey: ["enrolled-students-delinquent", schoolId, activeYear?.id],
+    queryKey: ["enrolled-students-delinquent", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
         .select("*, students(id, document_id, form_data, family_id), sections(name, grade_level)")
         .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear!.id);
+        .eq("school_year_id", selectedYear!.id);
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   // Families for email
@@ -151,10 +168,15 @@ export default function DelinquentStudents() {
     return (
       <DashboardLayout>
         <PageHeader title="Familias Morosas" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Morosos" }]} />
-        {activeYear?.id ? (
-          <DelinquentFamiliesView schoolId={schoolId} schoolYearId={activeYear.id} />
+        {yearSelect}
+        {selectedYear?.id ? (
+          // key: al cambiar de ano se remonta la vista, para no arrastrar filtros ni
+          // familias seleccionadas del ano anterior.
+          <DelinquentFamiliesView key={selectedYear.id} schoolId={schoolId} schoolYearId={selectedYear.id} />
+        ) : yearsLoading ? (
+          <div className="p-4"><Table><TableBody><TableSkeleton rows={5} columns={4} /></TableBody></Table></div>
         ) : (
-          <Card><CardContent className="py-8 text-center text-muted-foreground">No hay un año escolar activo configurado.</CardContent></Card>
+          <Card><CardContent className="py-8 text-center text-muted-foreground">No hay años escolares configurados.</CardContent></Card>
         )}
       </DashboardLayout>
     );
@@ -163,6 +185,8 @@ export default function DelinquentStudents() {
   return (
     <DashboardLayout>
       <PageHeader title="Estudiantes Morosos" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Morosos" }]} />
+
+      {yearSelect}
 
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px]">

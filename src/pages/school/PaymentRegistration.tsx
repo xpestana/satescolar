@@ -16,13 +16,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, CreditCard, AlertTriangle, History, Receipt, CalendarDays } from "lucide-react";
+import { Loader2, Search, CreditCard, AlertTriangle, History, Receipt } from "lucide-react";
 import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
 import { formatGradeLevel } from "@/lib/utils";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
 import { PaymentHistoryModal } from "@/components/payments/PaymentHistoryModal";
 import { PaymentReportsTab } from "@/components/payments/PaymentReportsTab";
 import { FamilyPaymentRegistrationTab } from "@/components/payments/FamilyPaymentRegistrationTab";
+import { SchoolYearSelect } from "@/components/payments/SchoolYearSelect";
+import { useSchoolYearSelection } from "@/hooks/useSchoolYearSelection";
 import { useBillingMode } from "@/hooks/useBillingMode";
 import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/ui/data-pagination";
@@ -55,34 +57,8 @@ export default function PaymentRegistration() {
   // Anos escolares del colegio. Se puede registrar pagos de cualquiera de ellos, no solo del
   // activo: el ledger (student_concept_balances), los planes asignados y los pagos estan todos
   // acotados por school_year_id, asi que cada ano lleva su propia cuenta.
-  const { data: schoolYears = [], isLoading: yearsLoading } = useQuery({
-    queryKey: ["school-years-all", schoolId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("school_years")
-        .select("*")
-        .eq("school_id", schoolId!)
-        .order("year_range", { ascending: false });
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!schoolId,
-  });
-
-  const [selectedYearId, setSelectedYearId] = useState("");
-
-  // Arranca en el ano activo (o el mas reciente si ninguno lo esta).
-  useEffect(() => {
-    if (schoolYears.length === 0) return;
-    if (selectedYearId && schoolYears.some((y: any) => y.id === selectedYearId)) return;
-    const active = schoolYears.find((y: any) => y.is_active);
-    setSelectedYearId(active?.id ?? (schoolYears[0] as any).id);
-  }, [schoolYears, selectedYearId]);
-
-  const selectedYear = useMemo(
-    () => (schoolYears as any[]).find((y: any) => y.id === selectedYearId) || null,
-    [schoolYears, selectedYearId],
-  );
+  const { schoolYears, selectedYearId, setSelectedYearId, selectedYear, isLoading: yearsLoading } =
+    useSchoolYearSelection(schoolId);
 
   // Al cambiar de ano se cierra todo lo que estuviera abierto: un modal de pago prellenado con
   // las cuotas del ano anterior no debe quedar apuntando al ano nuevo.
@@ -382,28 +358,13 @@ export default function PaymentRegistration() {
 
         <TabsContent value="registro">
       {/* Selector de año escolar: el pago se registra contra el año elegido aquí. */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          <Label className="text-sm text-muted-foreground">Año escolar</Label>
-        </div>
-        <Select value={selectedYearId} onValueChange={setSelectedYearId} disabled={yearsLoading || schoolYears.length === 0}>
-          <SelectTrigger className="w-[220px]"><SelectValue placeholder={yearsLoading ? "Cargando..." : "Seleccione un año"} /></SelectTrigger>
-          <SelectContent>
-            {(schoolYears as any[]).map((y: any) => (
-              <SelectItem key={y.id} value={y.id}>
-                {y.year_range}{y.is_active ? " (activo)" : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {selectedYear && !selectedYear.is_active && (
-          <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-            <AlertTriangle className="h-3 w-3 mr-1" />
-            Está registrando pagos del año {selectedYear.year_range}, que no es el año en curso
-          </Badge>
-        )}
-      </div>
+      <SchoolYearSelect
+        years={schoolYears}
+        value={selectedYearId}
+        onChange={setSelectedYearId}
+        isLoading={yearsLoading}
+        inactiveWarning="Está registrando pagos del año {year}, que no es el año en curso"
+      />
 
       {yearsLoading ? (
         <div className="space-y-3 py-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>

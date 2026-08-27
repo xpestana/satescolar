@@ -259,10 +259,27 @@ mientras 2025-2026 sigue siendo el año en curso).
 - En modo familia la lista sale de `student_schools` (no de `enrollments`), así que las familias
   aparecen aunque todavía no haya inscripciones en el año nuevo (los hijos salen "No inscrito").
 
+**Morosos (`/pagos/morosos`) tiene el mismo selector**, en los dos modos (Estudiantes Morosos y
+Familias Morosas). No hizo falta tocar la BD: `get_delinquent_students` y `get_delinquent_families`
+ya reciben `_school_year_id` y delegan en `_moroso_balance_lines(_school_id, _school_year_id)`,
+que filtra `student_concept_balances` por ese año **y deriva el rango de años
+(`v_start_year`/`v_end_year`) del `year_range` del año pedido**, no del activo — por eso los
+vencimientos por `due_month` se calculan bien en cualquier año.
+
+> El `PERFORM rebuild_student_concept_balances_for_active_year()` que hace
+> `_moroso_balance_lines` sigue apuntando al año activo, pero solo **inserta** cuotas faltantes
+> (nunca modifica las existentes), así que consultar otro año no altera nada.
+
+**Pieza compartida:** `src/hooks/useSchoolYearSelection.ts` (años del colegio + año elegido, con
+default al activo) y `src/components/payments/SchoolYearSelect.tsx` (el combo + el aviso ámbar).
+Las dos pantallas usan lo mismo; el texto del aviso se pasa por prop (`inactiveWarning`).
+
 > ⚠️ Lo que **sigue** atado al año activo (por diseño, no cambió): el **dashboard** `/pagos` y
-> **morosos** solo miran el año con `is_active = true`. Un pago registrado en un año futuro no
-> aparece en "Últimos Pagos" ni su deuda en morosidad hasta que ese año se active. Para verlo
-> antes, usar **Ingresos** (`/pagos/ingresos`), que ya tiene su propio selector de año.
+> los **recordatorios automáticos** de morosidad (`send-delinquency-reminders`, que resuelve el
+> año con `is_active = true`). Un pago registrado en un año futuro no aparece en "Últimos Pagos"
+> hasta que ese año se active, y el cron nunca manda correos por deudas de un año que no está en
+> curso. Para ver los ingresos de otro año, usar **Ingresos** (`/pagos/ingresos`), que ya tiene su
+> propio selector.
 
 ## Reglas de negocio
 - **Fechas calendario (`payment_date`, etc.):** mostrar SIEMPRE con `formatDateOnly()` de
