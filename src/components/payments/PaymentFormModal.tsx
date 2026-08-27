@@ -275,6 +275,17 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     [balances],
   );
 
+  // Tasa efectivamente aplicada a cada moneda al guardar, para congelarla en el pago y que una
+  // edicion futura no tenga que reconstruirla ni dependa de la tasa viva.
+  const buildConceptRates = () => {
+    const map: Record<string, number> = {};
+    conceptCurrencies.forEach((cur) => {
+      const r = getRate(cur);
+      if (r > 0) map[cur] = r;
+    });
+    return Object.keys(map).length > 0 ? map : null;
+  };
+
   const getDisplayTotal = (b: any) => b.currency === "VES" ? (b.total_amount || 0) : (b.original_amount || 0) * getRate(b.currency || "VES");
   const getRemainingOriginal = (b: any) => b.currency === "VES"
     ? (b.balance || 0)
@@ -421,6 +432,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         invoice_rif: invoice.rif || null,
         invoice_phone: invoice.phone || null,
         invoice_address: invoice.address || null,
+        concept_rates: buildConceptRates(),
       }).select("id").single();
       if (payErr) throw payErr;
 

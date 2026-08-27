@@ -2813,6 +2813,7 @@ export type Database = {
       }
       payments: {
         Row: {
+          concept_rates: Json | null
           control_number: string
           created_at: string
           created_by: string
@@ -2836,6 +2837,7 @@ export type Database = {
           voided_by: string | null
         }
         Insert: {
+          concept_rates?: Json | null
           control_number?: string
           created_at?: string
           created_by: string
@@ -2859,6 +2861,7 @@ export type Database = {
           voided_by?: string | null
         }
         Update: {
+          concept_rates?: Json | null
           control_number?: string
           created_at?: string
           created_by?: string

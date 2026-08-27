@@ -164,8 +164,12 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
   // Saldo disponible "como si este pago no existiera": se le devuelve lo que este mismo pago ya consumió
   const creditBalance = rawCreditBalance + oldUsedCredit;
 
-  // Tasa a la que se hizo el pago, por moneda: los bolivares que efectivamente entraron divididos
-  // entre lo que liquidaron en la moneda del concepto.
+  // Tasa a la que se hizo el pago, por moneda. La fuente buena es `payments.concept_rates`, que la
+  // congela al registrar. Los pagos anteriores a esa columna no la tienen, asi que se reconstruye
+  // desde las lineas: los bolivares que efectivamente entraron divididos entre lo que liquidaron en
+  // la moneda del concepto.
+  const storedRates = (paymentData?.payment?.concept_rates || {}) as Record<string, number>;
+
   const paymentRateByCurrency = useMemo(() => {
     const acc: Record<string, { ves: number; orig: number }> = {};
     (paymentData?.items || []).forEach((it: any) => {
@@ -193,6 +197,8 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     if (currency === "VES") return 1;
     const manual = getOverrideRate(schoolId, currency);
     if (manual != null) return manual;
+    const stored = Number(storedRates[currency] || 0);
+    if (stored > 0) return stored;
     const paidRate = paymentRateByCurrency[currency];
     if (paidRate > 0) return paidRate;
     return rates.find((r: any) => r.currency === currency)?.rate_to_ves || 0;
@@ -203,6 +209,17 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     () => Array.from(new Set((rawBalances as any[]).map((b: any) => b.currency || "VES"))).filter((c) => c !== "VES"),
     [rawBalances],
   );
+
+  // Tasa efectivamente aplicada a cada moneda al guardar, para congelarla en el pago y que una
+  // edicion futura no tenga que reconstruirla ni dependa de la tasa viva.
+  const buildConceptRates = () => {
+    const map: Record<string, number> = {};
+    conceptCurrencies.forEach((cur) => {
+      const r = getRate(cur);
+      if (r > 0) map[cur] = r;
+    });
+    return Object.keys(map).length > 0 ? map : null;
+  };
 
   const getDisplayTotal = (b: any) => b.currency === "VES" ? (b.total_amount || 0) : (b.original_amount || 0) * getRate(b.currency || "VES");
   // Remanente en la moneda original del concepto (balance/snapshot), exacto ante cambios de tasa
@@ -419,6 +436,7 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
         invoice_rif: invoice.rif || null,
         invoice_phone: invoice.phone || null,
         invoice_address: invoice.address || null,
+        concept_rates: buildConceptRates(),
         updated_at: new Date().toISOString(),
       }).eq("id", paymentId);
       if (payErr) throw payErr;
