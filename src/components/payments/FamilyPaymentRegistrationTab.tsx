@@ -20,7 +20,7 @@ import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
 
 interface Props {
   schoolId: string;
-  activeYear: any;
+  selectedYear: any;
 }
 
 interface FamilyRow {
@@ -39,7 +39,7 @@ const studentFullName = (student: any) => {
 };
 
 
-export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
+export function FamilyPaymentRegistrationTab({ schoolId, selectedYear }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
@@ -79,17 +79,17 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
 
   // Inscripciones del año activo (para mostrar grado/sección si está inscrito)
   const { data: enrollments = [], isLoading: enrollmentsLoading } = useQuery({
-    queryKey: ["family-reg-enrollments", schoolId, activeYear?.id],
+    queryKey: ["family-reg-enrollments", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("enrollments")
         .select("*, sections(id, name, grade_level)")
         .eq("school_id", schoolId)
-        .eq("school_year_id", activeYear.id)
+        .eq("school_year_id", selectedYear.id)
         .order("created_at");
       if (error) throw error;
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   // Familias de los estudiantes activos/suspendidos
@@ -128,29 +128,29 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
 
   // Planes y saldos por estudiante (mismas keys que el modo por estudiante)
   const { data: studentPlans = [] } = useQuery({
-    queryKey: ["all-student-plans", schoolId, activeYear?.id],
+    queryKey: ["all-student-plans", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("student_payment_plans")
         .select("*, payment_plans(name)")
         .eq("school_id", schoolId)
-        .eq("school_year_id", activeYear.id)
+        .eq("school_year_id", selectedYear.id)
         .order("assigned_at", { ascending: false })
         .order("created_at", { ascending: false });
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   const { data: allBalances = [] } = useQuery({
-    queryKey: ["all-student-balances", schoolId, activeYear?.id],
+    queryKey: ["all-student-balances", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("student_concept_balances")
         .select("student_id, balance, status")
         .eq("school_id", schoolId)
-        .eq("school_year_id", activeYear.id);
+        .eq("school_year_id", selectedYear.id);
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   const planMap = useMemo(() => {
@@ -191,7 +191,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
 
   const assignPlanMut = useMutation({
     mutationFn: async () => {
-      if (!planChild?.student?.id || !planId || !activeYear?.id) throw new Error("Datos incompletos");
+      if (!planChild?.student?.id || !planId || !selectedYear?.id) throw new Error("Datos incompletos");
       const currentPlan = planMap[planChild.student.id];
       if (currentPlan) {
         if (currentPlan.plan_id === planId) return;
@@ -208,7 +208,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
           student_id: planChild.student.id,
           plan_id: planId,
           school_id: schoolId,
-          school_year_id: activeYear.id,
+          school_year_id: selectedYear.id,
         });
       if (error) throw error;
     },
@@ -448,19 +448,19 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
       </Card>
 
       {/* Family Payment Modal */}
-      {paymentFamily && activeYear && (
+      {paymentFamily && selectedYear && (
         <FamilyPaymentFormModal
           open={paymentOpen}
           onOpenChange={setPaymentOpen}
           family={{ ...paymentFamily.family, email: emails[paymentFamily.family.user_id] || "" }}
           familyStudents={paymentFamily.children}
           schoolId={schoolId}
-          schoolYearId={activeYear.id}
+          schoolYearId={selectedYear.id}
         />
       )}
 
       {/* Family Payment History Modal */}
-      {historyFamily && activeYear && (
+      {historyFamily && selectedYear && (
         <FamilyPaymentHistoryModal
           open={historyOpen}
           onOpenChange={setHistoryOpen}
@@ -469,7 +469,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, activeYear }: Props) {
           studentIds={historyFamily.children.map((c) => c.student.id)}
           studentNames={Object.fromEntries(historyFamily.children.map((c) => [c.student.id, studentFullName(c.student)]))}
           schoolId={schoolId}
-          schoolYearId={activeYear.id}
+          schoolYearId={selectedYear.id}
         />
       )}
 

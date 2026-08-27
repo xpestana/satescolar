@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, CreditCard, AlertTriangle, History, Receipt } from "lucide-react";
+import { Loader2, Search, CreditCard, AlertTriangle, History, Receipt, CalendarDays } from "lucide-react";
 import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
 import { formatGradeLevel } from "@/lib/utils";
 import { PaymentFormModal } from "@/components/payments/PaymentFormModal";
@@ -52,29 +52,67 @@ export default function PaymentRegistration() {
   const [assignEnrollment, setAssignEnrollment] = useState<any>(null);
   const [assignPlanId, setAssignPlanId] = useState("");
 
-  // Active school year
-  const { data: activeYear } = useQuery({
-    queryKey: ["active-school-year", schoolId],
+  // Anos escolares del colegio. Se puede registrar pagos de cualquiera de ellos, no solo del
+  // activo: el ledger (student_concept_balances), los planes asignados y los pagos estan todos
+  // acotados por school_year_id, asi que cada ano lleva su propia cuenta.
+  const { data: schoolYears = [], isLoading: yearsLoading } = useQuery({
+    queryKey: ["school-years-all", schoolId],
     queryFn: async () => {
-      const { data } = await supabase.from("school_years").select("*").eq("school_id", schoolId!).eq("is_active", true).maybeSingle();
-      return data;
+      const { data, error } = await supabase
+        .from("school_years")
+        .select("*")
+        .eq("school_id", schoolId!)
+        .order("year_range", { ascending: false });
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!schoolId,
   });
 
+  const [selectedYearId, setSelectedYearId] = useState("");
+
+  // Arranca en el ano activo (o el mas reciente si ninguno lo esta).
+  useEffect(() => {
+    if (schoolYears.length === 0) return;
+    if (selectedYearId && schoolYears.some((y: any) => y.id === selectedYearId)) return;
+    const active = schoolYears.find((y: any) => y.is_active);
+    setSelectedYearId(active?.id ?? (schoolYears[0] as any).id);
+  }, [schoolYears, selectedYearId]);
+
+  const selectedYear = useMemo(
+    () => (schoolYears as any[]).find((y: any) => y.id === selectedYearId) || null,
+    [schoolYears, selectedYearId],
+  );
+
+  // Al cambiar de ano se cierra todo lo que estuviera abierto: un modal de pago prellenado con
+  // las cuotas del ano anterior no debe quedar apuntando al ano nuevo.
+  useEffect(() => {
+    setPaymentOpen(false);
+    setHistoryOpen(false);
+    setAssignOpen(false);
+    setSelectedStudent(null);
+    setSelectedEnrollment(null);
+    setSelectedStudentPlan(null);
+    setHistoryStudent(null);
+    setAssignStudentId(null);
+    setAssignEnrollment(null);
+    setAssignPlanId("");
+    setCurrentPage(1);
+  }, [selectedYearId]);
+
   // Enrollments with student data
   const { data: enrollments = [], isLoading: enrollmentsLoading } = useQuery({
-    queryKey: ["enrolled-students-payments", schoolId, activeYear?.id],
+    queryKey: ["enrolled-students-payments", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("enrollments")
         .select("*, students(id, document_id, form_data, family_id, photo_url), sections(id, name, grade_level)")
         .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear!.id)
+        .eq("school_year_id", selectedYear!.id)
         .order("created_at");
       if (error) throw error;
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   // All non-graduated/completed students for this school (to show unenrolled ones too)
@@ -103,30 +141,30 @@ export default function PaymentRegistration() {
 
   // Student payment plans
   const { data: studentPlans = [] } = useQuery({
-    queryKey: ["all-student-plans", schoolId, activeYear?.id],
+    queryKey: ["all-student-plans", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("student_payment_plans")
         .select("*, payment_plans(name)")
         .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear!.id)
+        .eq("school_year_id", selectedYear!.id)
         .order("assigned_at", { ascending: false })
         .order("created_at", { ascending: false });
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   // Student balances for pending amounts
   const { data: allBalances = [] } = useQuery({
-    queryKey: ["all-student-balances", schoolId, activeYear?.id],
+    queryKey: ["all-student-balances", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("student_concept_balances")
         .select("student_id, balance, status")
         .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear!.id);
+        .eq("school_year_id", selectedYear!.id);
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   // Available payment plans for assignment
@@ -220,7 +258,7 @@ export default function PaymentRegistration() {
   // Assign plan mutation
   const assignPlanMut = useMutation({
     mutationFn: async () => {
-      if (!assignStudentId || !assignPlanId || !activeYear?.id) throw new Error("Datos incompletos");
+      if (!assignStudentId || !assignPlanId || !selectedYear?.id) throw new Error("Datos incompletos");
 
       const currentPlan = planMap[assignStudentId];
       if (currentPlan) {
@@ -243,7 +281,7 @@ export default function PaymentRegistration() {
           student_id: assignStudentId,
           plan_id: assignPlanId,
           school_id: schoolId!,
-          school_year_id: activeYear.id,
+          school_year_id: selectedYear.id,
         });
       if (error) throw error;
     },
@@ -343,13 +381,43 @@ export default function PaymentRegistration() {
         </TabsContent>
 
         <TabsContent value="registro">
-      {!activeYear ? (
-        <Card><CardContent className="py-8 text-center text-muted-foreground">No hay un año escolar activo configurado.</CardContent></Card>
+      {/* Selector de año escolar: el pago se registra contra el año elegido aquí. */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <Label className="text-sm text-muted-foreground">Año escolar</Label>
+        </div>
+        <Select value={selectedYearId} onValueChange={setSelectedYearId} disabled={yearsLoading || schoolYears.length === 0}>
+          <SelectTrigger className="w-[220px]"><SelectValue placeholder={yearsLoading ? "Cargando..." : "Seleccione un año"} /></SelectTrigger>
+          <SelectContent>
+            {(schoolYears as any[]).map((y: any) => (
+              <SelectItem key={y.id} value={y.id}>
+                {y.year_range}{y.is_active ? " (activo)" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedYear && !selectedYear.is_active && (
+          <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="h-3 w-3 mr-1" />
+            Está registrando pagos del año {selectedYear.year_range}, que no es el año en curso
+          </Badge>
+        )}
+      </div>
+
+      {yearsLoading ? (
+        <div className="space-y-3 py-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+      ) : schoolYears.length === 0 ? (
+        <Card><CardContent className="py-8 text-center text-muted-foreground">No hay años escolares configurados.</CardContent></Card>
+      ) : !selectedYear ? (
+        <div className="space-y-3 py-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
       ) : billingModeLoading ? (
         <div className="space-y-3 py-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
       ) : billingMode === "family" ? (
         <>
-          <FamilyPaymentRegistrationTab schoolId={schoolId} activeYear={activeYear} />
+          {/* key: al cambiar de año se remonta la pestaña, para no arrastrar una familia
+              seleccionada ni un modal abierto contra el año anterior. */}
+          <FamilyPaymentRegistrationTab key={selectedYear.id} schoolId={schoolId} selectedYear={selectedYear} />
           <ExchangeRateWidget schoolId={schoolId} />
         </>
       ) : (
@@ -515,27 +583,27 @@ export default function PaymentRegistration() {
           </Dialog>
 
           {/* Payment Form Modal */}
-          {selectedStudent && selectedEnrollment && activeYear && (
+          {selectedStudent && selectedEnrollment && selectedYear && (
             <PaymentFormModal
               open={paymentOpen}
               onOpenChange={setPaymentOpen}
               student={selectedStudent}
               enrollment={selectedEnrollment}
               schoolId={schoolId}
-              schoolYearId={activeYear.id}
+              schoolYearId={selectedYear.id}
               initialStudentPlan={selectedStudentPlan}
             />
           )}
 
           {/* Payment History Modal */}
-          {historyStudent && activeYear && (
+          {historyStudent && selectedYear && (
             <PaymentHistoryModal
               open={historyOpen}
               onOpenChange={setHistoryOpen}
               studentId={historyStudent.id}
               studentName={historyStudent.name}
               schoolId={schoolId}
-              schoolYearId={activeYear.id}
+              schoolYearId={selectedYear.id}
             />
           )}
         </>

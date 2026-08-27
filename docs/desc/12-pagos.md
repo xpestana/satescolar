@@ -237,6 +237,33 @@ tarjetas de totales (Total Ingresos / Mensualidad / Inscripción / Seguro Escola
   también coloreado. Montos como número real con formato `#,##0.00`.
 - Respeta los filtros/mes activos (exporta `filtered`, no el crudo). Fechas con `formatDateOnly`.
 
+## Registro de Pagos por año escolar (`/pagos/registro`)
+La pestaña **Registro de Pagos** tiene un **selector de año escolar** (arriba de la lista, en
+ambos modos de facturación). Antes la pantalla quedaba fija en el año con `is_active = true`, así
+que no se podían cobrar cuotas de un año distinto (caso real: cobrar la matrícula de 2026-2027
+mientras 2025-2026 sigue siendo el año en curso).
+
+- El selector lista **todos** los `school_years` del colegio (`year_range` DESC) y arranca en el
+  activo; si ninguno lo está, en el más reciente. El activo se marca "(activo)" y, cuando el año
+  elegido **no** es el activo, aparece un aviso ámbar para que nadie cobre en el año equivocado.
+- **Todo** lo que cuelga del año se recarga con el año elegido: inscripciones (grado/sección),
+  `student_payment_plans`, `student_concept_balances` (columna "Saldo Pendiente"), el modal de
+  registro (`PaymentFormModal` / `FamilyPaymentFormModal` reciben `schoolYearId`) y el historial.
+  El pago se inserta con `school_year_id` = **el año elegido**.
+- Al cambiar de año se cierran los modales y se limpia la selección; en modo familia la pestaña
+  se **remonta** (`key={selectedYear.id}`) para no arrastrar estado del año anterior.
+- **Asignar plan en un año no activo funciona:** `student_payment_plans` es único por
+  (`student_id`, `school_id`, `school_year_id`) y el trigger de alta llama a
+  `create_missing_student_concept_balances_for_assignment`, que siembra los saldos con el
+  `school_year_id` **de la fila**, no con el año activo.
+- En modo familia la lista sale de `student_schools` (no de `enrollments`), así que las familias
+  aparecen aunque todavía no haya inscripciones en el año nuevo (los hijos salen "No inscrito").
+
+> ⚠️ Lo que **sigue** atado al año activo (por diseño, no cambió): el **dashboard** `/pagos` y
+> **morosos** solo miran el año con `is_active = true`. Un pago registrado en un año futuro no
+> aparece en "Últimos Pagos" ni su deuda en morosidad hasta que ese año se active. Para verlo
+> antes, usar **Ingresos** (`/pagos/ingresos`), que ya tiene su propio selector de año.
+
 ## Reglas de negocio
 - **Fechas calendario (`payment_date`, etc.):** mostrar SIEMPRE con `formatDateOnly()` de
   `src/lib/dateUtils.ts` (extrae `YYYY-MM-DD` sin conversión de zona). **Nunca**
