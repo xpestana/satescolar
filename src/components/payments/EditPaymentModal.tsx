@@ -194,10 +194,18 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     setObservations(payment.observations || "");
     setInvoice({ name: payment.invoice_name || "", rif: payment.invoice_rif || "", phone: payment.invoice_phone || "", address: payment.invoice_address || "" });
 
+    // El monto del item esta en bolivares a la tasa del dia en que se registro el pago. Si la
+    // tasa cambio desde entonces, ese numero ya NO es lo que vale el concepto hoy: hay que
+    // revaluarlo desde la moneda original, igual que hace getEditableBalance. Precargarlo crudo
+    // dejaba la linea inflada por encima de su propio concepto y, como el total de la factura es
+    // fijo, esa diferencia se le restaba al reparto de los demas conceptos.
     const sel: Record<string, string> = {};
-    items.forEach((it: any) => {
-      const bal = balances.find((b: any) => b.student_id === it.student_id && b.plan_concept_id === it.plan_concept_id);
-      if (bal) sel[bal.id] = Number(it.amount_ves || 0).toFixed(2);
+    Object.entries(oldContributionByBalance).forEach(([balanceId, origAmount]) => {
+      const bal = balances.find((b: any) => b.id === balanceId);
+      if (!bal) return;
+      const cur = bal.currency || "VES";
+      const ves = cur === "VES" ? origAmount : origAmount * getRate(cur);
+      sel[balanceId] = Math.min(ves, getEditableBalance(bal)).toFixed(2);
     });
     setSelectedConcepts(sel);
 
@@ -219,7 +227,7 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     setSurplusAction(hadCredit ? "credit" : hadOtros ? "otros" : "none");
 
     initializedRef.current = true;
-  }, [open, paymentData, balances, balancesFetched]);
+  }, [open, paymentData, balances, balancesFetched, oldContributionByBalance]);
 
   useEffect(() => {
     if (!open) {
@@ -310,6 +318,17 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
       if (methods.length === 0) throw new Error("Agregue al menos una forma de pago");
       if (totalMethods <= 0) throw new Error("El monto total debe ser mayor a 0");
       if (Math.abs(difference) > 0.01 && difference < 0) throw new Error("El monto pagado es insuficiente para cubrir los conceptos seleccionados");
+      // El libro mayor topa el abono al disponible del concepto, pero payment_items guarda el
+      // monto crudo. Si se dejara pasar un monto mayor, la diferencia se registraria en la
+      // factura sin acreditarse a nada. Mejor bloquear que perderla en silencio.
+      for (const [balanceId, amountStr] of Object.entries(selectedConcepts)) {
+        const bal = balances.find((b: any) => b.id === balanceId);
+        if (!bal) continue;
+        if ((parseFloat(amountStr) || 0) > getEditableBalance(bal) + 0.01) {
+          const name = bal.payment_plan_concepts?.payment_concepts?.name || "un concepto";
+          throw new Error(`El monto asignado a "${name}" supera su disponible (${getEditableBalance(bal).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES)`);
+        }
+      }
       if (usedCredit > creditBalance + 0.01) throw new Error("El saldo a favor usado supera el disponible de la familia");
 
       const { payment: oldPayment, items: oldItems, methodEntries: oldMethodEntries, creditRows: oldCreditRows, othersRows: oldOthersRows } = paymentData!;
