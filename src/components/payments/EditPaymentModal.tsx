@@ -16,7 +16,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Loader2, Pencil, AlertTriangle, Tag, Users } from "lucide-react";
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
-import { applyRateOverride } from "@/lib/exchangeRateOverride";
+import { PaymentRateNotice } from "@/components/payments/PaymentRateNotice";
+import { getOverrideRate } from "@/lib/exchangeRateOverride";
 import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
 import { FAMILY_CREDIT_METHOD, FAMILY_CREDIT_LABEL } from "@/lib/familyCredit";
 import { todayCaracasIso } from "@/lib/dateUtils";
@@ -163,11 +164,45 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
   // Saldo disponible "como si este pago no existiera": se le devuelve lo que este mismo pago ya consumió
   const creditBalance = rawCreditBalance + oldUsedCredit;
 
+  // Tasa a la que se hizo el pago, por moneda: los bolivares que efectivamente entraron divididos
+  // entre lo que liquidaron en la moneda del concepto.
+  const paymentRateByCurrency = useMemo(() => {
+    const acc: Record<string, { ves: number; orig: number }> = {};
+    (paymentData?.items || []).forEach((it: any) => {
+      const bal = rawBalances.find((b: any) => b.student_id === it.student_id && b.plan_concept_id === it.plan_concept_id);
+      if (!bal) return;
+      const cur = bal.currency || "VES";
+      if (cur === "VES") return;
+      const orig = it.original_amount != null
+        ? Number(it.original_amount)
+        : Number(it.amount_ves || 0) / (Number(bal.exchange_rate_snapshot) || 1);
+      if (!(orig > 0)) return;
+      acc[cur] = acc[cur] || { ves: 0, orig: 0 };
+      acc[cur].ves += Number(it.amount_ves || 0);
+      acc[cur].orig += orig;
+    });
+    const map: Record<string, number> = {};
+    Object.entries(acc).forEach(([cur, v]) => { if (v.orig > 0) map[cur] = v.ves / v.orig; });
+    return map;
+  }, [paymentData, rawBalances]);
+
+  // Editar un pago NO debe revaluarlo: los bolivares que la familia entrego son un hecho historico.
+  // Por eso la tasa base del modal es la del propio pago, no la de hoy. Si el usuario ajusta la
+  // tasa a mano (aviso de tasa / widget) esa manda, porque es una intencion explicita de recalcular.
   const getRate = (currency: string) => {
     if (currency === "VES") return 1;
-    const dbRate = rates.find((r: any) => r.currency === currency)?.rate_to_ves || 0;
-    return applyRateOverride(schoolId, currency, dbRate);
+    const manual = getOverrideRate(schoolId, currency);
+    if (manual != null) return manual;
+    const paidRate = paymentRateByCurrency[currency];
+    if (paidRate > 0) return paidRate;
+    return rates.find((r: any) => r.currency === currency)?.rate_to_ves || 0;
   };
+
+  // Monedas distintas de VES presentes en los conceptos, para el aviso de tasa.
+  const conceptCurrencies = useMemo(
+    () => Array.from(new Set((rawBalances as any[]).map((b: any) => b.currency || "VES"))).filter((c) => c !== "VES"),
+    [rawBalances],
+  );
 
   const getDisplayTotal = (b: any) => b.currency === "VES" ? (b.total_amount || 0) : (b.original_amount || 0) * getRate(b.currency || "VES");
   // Remanente en la moneda original del concepto (balance/snapshot), exacto ante cambios de tasa
@@ -574,6 +609,13 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
                 </div>
               </CardContent>
             </Card>
+
+            <PaymentRateNotice
+              schoolId={schoolId}
+              currencies={conceptCurrencies}
+              getRate={getRate}
+              mode="edit"
+            />
 
             {/* Concepts grouped by child */}
             <Card>

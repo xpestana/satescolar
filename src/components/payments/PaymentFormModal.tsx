@@ -41,6 +41,7 @@ interface PaymentMethodLine {
 }
 
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
+import { PaymentRateNotice } from "@/components/payments/PaymentRateNotice";
 import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
 import { FAMILY_CREDIT_METHOD, FAMILY_CREDIT_LABEL } from "@/lib/familyCredit";
 
@@ -268,6 +269,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   // Use current exchange rate for display/calculation instead of frozen snapshot.
   // The remaining amount is tracked in the concept's ORIGINAL currency (balance/snapshot),
   // so partial payments made at different rates stay exact; only the VES revaluation moves.
+  // Monedas distintas de VES presentes en los conceptos, para el aviso de tasa.
+  const conceptCurrencies = useMemo(
+    () => Array.from(new Set((balances as any[]).map((b: any) => b.currency || "VES"))).filter((c) => c !== "VES"),
+    [balances],
+  );
+
   const getDisplayTotal = (b: any) => b.currency === "VES" ? (b.total_amount || 0) : (b.original_amount || 0) * getRate(b.currency || "VES");
   const getRemainingOriginal = (b: any) => b.currency === "VES"
     ? (b.balance || 0)
@@ -644,6 +651,13 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
           </Card>
 
           {invoiceReady && <>
+          <PaymentRateNotice
+            schoolId={schoolId}
+            currencies={conceptCurrencies}
+            getRate={getRate}
+            mode="create"
+          />
+
           {/* Concepts Selection */}
           <Card>
             <CardHeader className="py-3 flex flex-row items-center justify-between">
