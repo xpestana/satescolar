@@ -72,6 +72,23 @@ export default function RepresentativeDashboard() {
     enabled: !!familyId && students.length > 0,
   });
 
+  const { data: enrolledCount = 0 } = useQuery({
+    queryKey: ["family-enrolled-count", familyId, schoolId, schoolYear?.id, students.length],
+    queryFn: async () => {
+      const studentIds = students.map((s) => s.id);
+      if (!studentIds.length) return 0;
+      const { count, error } = await supabase
+        .from("enrollments")
+        .select("id", { count: "exact", head: true })
+        .in("student_id", studentIds)
+        .eq("school_id", schoolId!)
+        .eq("school_year_id", schoolYear!.id);
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!schoolId && !!schoolYear?.id && students.length > 0,
+  });
+
   const { data: delinquentBalances = [] } = useQuery({
     queryKey: ["family-delinquent-balances-rep", familyId, schoolId, schoolYear?.id],
     queryFn: async () => {
@@ -152,11 +169,11 @@ export default function RepresentativeDashboard() {
         </Card>
         <Card>
           <CardContent className="flex items-center gap-4 pt-6">
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-              <School className="h-6 w-6 text-muted-foreground" />
+            <div className={`h-12 w-12 rounded-full flex items-center justify-center ${enrolledCount > 0 ? "bg-primary/10" : "bg-muted"}`}>
+              <School className={`h-6 w-6 ${enrolledCount > 0 ? "text-primary" : "text-muted-foreground"}`} />
             </div>
             <div>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{enrolledCount}</p>
               <p className="text-sm text-muted-foreground">Inscritos en plantel</p>
             </div>
           </CardContent>

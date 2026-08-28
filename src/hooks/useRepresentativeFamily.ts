@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { personSurname, resolveFamilySurname } from "@/lib/familyDisplayName";
 
 export function useRepresentativeFamily() {
   const { user, userRole } = useAuth();
@@ -38,9 +39,35 @@ export function useRepresentativeFamily() {
         school = s;
       }
 
+      // Surname fallbacks: family → primary representative → student
+      let primaryRepFormData: any = null;
+      let studentFormData: any = null;
+      const own = [family.father_last_name, family.mother_last_name].filter(Boolean).join(" ").trim();
+      if (!own) {
+        const { data: reps } = await supabase
+          .from("representatives")
+          .select("form_data, is_primary")
+          .eq("family_id", family.id)
+          .order("is_primary", { ascending: false })
+          .order("created_at")
+          .limit(1);
+        primaryRepFormData = reps?.[0]?.form_data ?? null;
+
+        if (!personSurname(primaryRepFormData)) {
+          const { data: studs } = await supabase
+            .from("students")
+            .select("form_data")
+            .eq("family_id", family.id)
+            .order("created_at")
+            .limit(1);
+          studentFormData = studs?.[0]?.form_data ?? null;
+        }
+      }
+
       return {
         familyId: family.id,
-        familyName: `${family.father_last_name || ""} ${family.mother_last_name || ""}`.trim() || "Mi Familia",
+        familyName:
+          resolveFamilySurname(family, primaryRepFormData, studentFormData) || "Mi Familia",
         schoolId: fs?.school_id || null,
         school,
       };

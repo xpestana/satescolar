@@ -42,13 +42,19 @@ El colegio administra el padrón de familias; el representante ve y edita su pro
   `municipality_id`, `parish_id`, `city_id`), `is_suspended`, `user_id`.
   - **Nombre a mostrar de la familia:** `[father_last_name] [mother_last_name]`. Como ambos son
     nullable (a menudo vacíos), se usan **respaldos** para no mostrar "Sin apellidos":
-    - Helper compartido **`src/lib/familyDisplayName.ts`** (`familySurname` + `buildPrimaryRepMap`):
-      si la familia no tiene apellidos propios, toma los del **representante principal**
-      (`representatives.is_primary`, fallback: primer representante) desde su `form_data`
-      (`primer_apellido`/`segundo_apellido`, con fallbacks EN `last_name`/`apellido`).
-      **No** se usan los apellidos del estudiante. Lo usan **Registro de Pagos**
-      (`FamilyPaymentRegistrationTab`), **Estado de cuenta por familia** (`FamilyLedgerView`) y
-      **Morosos por familia** (`DelinquentFamiliesView`).
+    - Helper compartido **`src/lib/familyDisplayName.ts`** (`personSurname`,
+      `resolveFamilySurname`, `familySurname` + `buildPrimaryRepMap`). Cadena de respaldo:
+      1. apellidos propios de la familia (`father_last_name` + `mother_last_name`);
+      2. apellidos del **representante principal** (`representatives.is_primary`, fallback:
+         primer representante) desde su `form_data` (`primer_apellido`/`segundo_apellido`,
+         con fallbacks EN `last_name`/`apellido`);
+      3. apellidos del **estudiante** (mismo `form_data`), solo si la familia no tiene
+         representante con apellidos;
+      4. `"Sin apellidos"` (`familySurname`) o `""` (`resolveFamilySurname`).
+      Lo usan **Registro de Pagos** (`FamilyPaymentRegistrationTab`), **Estado de cuenta por
+      familia** (`FamilyLedgerView`), **Morosos por familia** (`DelinquentFamiliesView`) y
+      el **portal del representante** (`useRepresentativeFamily` → `familyName`, que cae a
+      `"Mi Familia"` en vez de `"Sin apellidos"`).
     - En **"Últimos Pagos"** del dashboard se cae a `payments.invoice_name` (titular de la
       factura) — ver [12-pagos](12-pagos.md).
 - `representatives` — `family_id`, `document_id`, `email`, `phone`, `is_primary`,

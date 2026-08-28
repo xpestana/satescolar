@@ -1,26 +1,45 @@
 /**
- * Display name helpers for families in the payments module.
+ * Display name helpers for families.
  *
  * `families.father_last_name` / `mother_last_name` are nullable and in practice
  * often empty, so the family surname falls back to the **primary representative's**
- * apellidos (never the students'). See docs/desc/03-familias-y-representantes.md.
+ * apellidos and, when the family has no representative registered, to the
+ * **student's** apellidos. See docs/desc/03-familias-y-representantes.md.
  */
 
-/** Apellidos del representante desde su `form_data` (soporta claves ES/EN). */
-export function repSurname(repFormData: any): string {
-  const fd = repFormData || {};
+/** Apellidos desde un `form_data` de representante/estudiante (soporta claves ES/EN). */
+export function personSurname(formData: any): string {
+  const fd = formData || {};
   const primero = fd.primer_apellido || fd.last_name || fd.apellido || "";
   return [primero, fd.segundo_apellido].filter(Boolean).join(" ").trim();
 }
 
+/** @deprecated Usar `personSurname`. Se mantiene por compatibilidad. */
+export const repSurname = personSurname;
+
 /**
- * Family surname to display: the family's own last names if present, otherwise the
- * primary representative's apellidos, and "Sin apellidos" only as a last resort.
+ * Apellidos de la familia sin texto de respaldo: apellidos propios → apellidos del
+ * representante principal → apellidos del estudiante. Devuelve `""` si no hay ninguno.
  */
-export function familySurname(family: any, primaryRepFormData: any): string {
-  const own = [family?.father_last_name, family?.mother_last_name].filter(Boolean).join(" ");
+export function resolveFamilySurname(
+  family: any,
+  primaryRepFormData?: any,
+  studentFormData?: any,
+): string {
+  const own = [family?.father_last_name, family?.mother_last_name].filter(Boolean).join(" ").trim();
   if (own) return own;
-  return repSurname(primaryRepFormData) || "Sin apellidos";
+  return personSurname(primaryRepFormData) || personSurname(studentFormData);
+}
+
+/**
+ * Family surname to display, con `"Sin apellidos"` como último recurso.
+ */
+export function familySurname(
+  family: any,
+  primaryRepFormData?: any,
+  studentFormData?: any,
+): string {
+  return resolveFamilySurname(family, primaryRepFormData, studentFormData) || "Sin apellidos";
 }
 
 /**

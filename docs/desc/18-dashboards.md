@@ -30,11 +30,24 @@ Panel de inicio de cada rol, con métricas y accesos rápidos según el contexto
 > ⏳ Por documentar (métricas agregadas).
 
 ## Reglas de negocio
-> ⏳ Por documentar.
+### Dashboard del representante (`/representative/dashboard`)
+- **Título `Familia [apellidos]`:** usa `useRepresentativeFamily().familyName`, con la cadena
+  de respaldo apellidos de la familia → representante principal → estudiante → `"Mi Familia"`
+  (ver [03-familias-y-representantes](03-familias-y-representantes.md)).
+- **Representantes / Estudiantes:** total de filas de `representatives` / `students` de la
+  familia (sin filtrar por año escolar).
+- **Inscritos en plantel:** cuenta de `enrollments` de los estudiantes de la familia en el
+  **año escolar activo** (`school_years.is_active`) y el colegio de la familia
+  (`family_schools.school_id`). Sin año activo o sin estudiantes, muestra `0`.
+- **Aviso de morosidad:** `get_delinquent_balances_for_family` para la familia, colegio y
+  año escolar activo — ver [12-pagos](12-pagos.md).
 
 ## Archivos clave (código)
 - `src/pages/school/SchoolDashboard.tsx`
+- `src/pages/representative/RepresentativeDashboard.tsx`
+- `src/hooks/useRepresentativeFamily.ts`
+- `src/lib/familyDisplayName.ts`
 - `src/components/dashboard/...`
 
 ## Por documentar
-- Métricas/KPIs mostrados en cada dashboard.
+- Métricas/KPIs de los dashboards admin, colegio y docente.
