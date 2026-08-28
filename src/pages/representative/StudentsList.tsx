@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText, BookOpen, Key, Copy, Info, MonitorSmartphone, ShieldCheck } from "lucide-react";
+import { UserPlus, Edit, ChevronDown, GraduationCap, Download, FileText, BookOpen, Key, Copy, Info, MonitorSmartphone, ShieldCheck, ClipboardList } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -284,6 +284,9 @@ export default function StudentsList() {
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => navigate(`/representative/aula-virtual/${student.id}`)}>
                       <BookOpen className="h-3 w-3 mr-1" /> Aula Virtual
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`/representative/estudiante/${student.id}/notas`)}>
+                      <ClipboardList className="h-3 w-3 mr-1" /> Notas y Boletas
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

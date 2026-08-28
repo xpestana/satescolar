@@ -8,6 +8,7 @@ import {
   wrapAllBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 import { fetchAsBase64, resolveSignatureImages } from "@/lib/image-resolve";
+import { pickBoletaTemplate } from "@/lib/boletaTemplateSelection";
 
 export { fetchAsBase64 };
 
@@ -93,19 +94,12 @@ async function fetchTemplateAndCommon(schoolId: string, gradeKey: string) {
       .maybeSingle(),
   ]);
 
-  const allTemplates = (templateRes.data ?? []) as any[];
-  // Find best-matching template with style = "primaria_descriptivo"
-  const primaryTemplates = allTemplates.filter(
-    (t) => t.config?.style === "primaria_descriptivo"
+  // The editor always saves `level: "bachillerato"`, so primary templates are told apart by
+  // their style, not by the column. See docs/desc/09-notas-y-boletas.md.
+  const primaryTemplates = ((templateRes.data ?? []) as any[]).filter(
+    (t) => t.config?.style === "primaria_descriptivo",
   );
-  const tpl =
-    primaryTemplates.find(
-      (t) => Array.isArray(t.applicable_grades) && t.applicable_grades.includes(gradeKey)
-    ) ??
-    primaryTemplates.find(
-      (t) => !t.applicable_grades || t.applicable_grades.length === 0
-    ) ??
-    null;
+  const tpl = pickBoletaTemplate(primaryTemplates, gradeKey);
 
   const cfg: BachilleratoConfig = tpl?.config
     ? {

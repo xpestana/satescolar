@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Users, GraduationCap, AlertCircle, School, BookOpen, Key, Copy } from "lucide-react";
+import { Users, GraduationCap, AlertCircle, School, BookOpen, Key, Copy, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
@@ -280,15 +280,24 @@ export default function RepresentativeDashboard() {
                       </Button>
                     </div>
                   )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => navigate(`/representative/aula-virtual/${student.id}`)}
-                  >
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Aula Virtual
-                  </Button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`/representative/aula-virtual/${student.id}`)}
+                    >
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Aula Virtual
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`/representative/estudiante/${student.id}/notas`)}
+                    >
+                      <ClipboardList className="h-4 w-4 mr-2" />
+                      Notas
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}

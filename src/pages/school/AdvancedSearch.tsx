@@ -14,6 +14,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Pagination } from "@/components/ui/data-pagination";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, SlidersHorizontal, Loader2, GripVertical, FileText, FileSpreadsheet, FileDown, Eye, Edit, IdCard, Star, Users } from "lucide-react";
+import { useStudentGradeBlock } from "@/hooks/useStudentGradeBlock";
+import StudentGradeAccessToggle from "@/components/students/StudentGradeAccessToggle";
+import { studentFullName } from "@/lib/studentName";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
@@ -413,6 +416,16 @@ export default function AdvancedSearch() {
     currentPage * PAGE_SIZE
   );
 
+  // Grade access is only meaningful for students, and only for the page on screen.
+  const pageStudentIds = useMemo(
+    () => (formType === "student" ? paginated.map((r: any) => r.id) : []),
+    [formType, paginated],
+  );
+  const {
+    isBlocked: isGradeAccessBlocked,
+    setBlocked: setGradeAccessBlocked,
+  } = useStudentGradeBlock(schoolId, pageStudentIds);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [formType, searchTerm]);
@@ -793,6 +806,16 @@ export default function AdvancedSearch() {
                                   </TooltipTrigger>
                                   <TooltipContent>Descargar Carnet</TooltipContent>
                                 </Tooltip>
+                                {formType === "student" && (
+                                  <StudentGradeAccessToggle
+                                    studentName={studentFullName((record as any).form_data)}
+                                    isBlocked={isGradeAccessBlocked(record.id)}
+                                    disabled={setGradeAccessBlocked.isPending}
+                                    onToggle={(blocked) =>
+                                      setGradeAccessBlocked.mutate({ studentId: record.id, blocked })
+                                    }
+                                  />
+                                )}
                                 {formType === "representative" && (
                                   <Tooltip>
                                     <TooltipTrigger asChild>

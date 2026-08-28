@@ -2175,6 +2175,54 @@ export type Database = {
           },
         ]
       }
+      grade_visibility_settings: {
+        Row: {
+          created_at: string
+          id: string
+          is_visible: boolean
+          momento: number
+          school_id: string
+          school_year_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_visible?: boolean
+          momento: number
+          school_id: string
+          school_year_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_visible?: boolean
+          momento?: number
+          school_id?: string
+          school_year_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grade_visibility_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grade_visibility_settings_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grades_config: {
         Row: {
           created_at: string
@@ -4690,6 +4738,51 @@ export type Database = {
           },
         ]
       }
+      student_grade_access: {
+        Row: {
+          created_at: string
+          is_blocked: boolean
+          reason: string | null
+          school_id: string
+          student_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          is_blocked?: boolean
+          reason?: string | null
+          school_id: string
+          student_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          is_blocked?: boolean
+          reason?: string | null
+          school_id?: string
+          student_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_grade_access_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_grade_access_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_grades: {
         Row: {
           assignment_id: string
@@ -5218,8 +5311,20 @@ export type Database = {
         Returns: number
       }
       record_login: { Args: never; Returns: undefined }
+      representative_can_view_grades: {
+        Args: { _momento: number; _school_year_id: string; _student_id: string }
+        Returns: boolean
+      }
       representative_child_in_assignment: {
         Args: { _assignment_id: string; _user_id: string }
+        Returns: boolean
+      }
+      representative_grades_gate: {
+        Args: { _momento: number; _school_year_id: string; _student_id: string }
+        Returns: string
+      }
+      representative_has_grades_access_in_school: {
+        Args: { _school_id: string }
         Returns: boolean
       }
       resolve_student_display_names: {
@@ -5249,6 +5354,14 @@ export type Database = {
       sign: {
         Args: { algorithm?: string; payload: Json; secret: string }
         Returns: string
+      }
+      student_has_overdue_balance: {
+        Args: {
+          _school_id: string
+          _school_year_id: string
+          _student_id: string
+        }
+        Returns: boolean
       }
       student_in_assignment: {
         Args: { _assignment_id: string; _student_id: string }

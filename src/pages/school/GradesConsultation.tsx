@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import { usePermissions } from "@/hooks/usePermissions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
@@ -19,35 +20,16 @@ import FinalGradesTab from "@/components/grades/FinalGradesTab";
 import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas, downloadBachilleratoBoletaDefinitiva, downloadAllBachilleratoBoletasDefinitiva } from "@/lib/bachilleratoBoleta";
 import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
 import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
+import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES } from "@/lib/gradeLevels";
+import RepresentativeVisibilityTab from "@/components/grades/RepresentativeVisibilityTab";
 
-const GRADE_LABELS: Record<string, string> = {
-  pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
-  i_nivel: "I Nivel", ii_nivel: "II Nivel", iii_nivel: "III Nivel",
-  primaria: "Primaria",
-  "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
-  "4_grado": "4to Grado", "5_grado": "5to Grado", "6_grado": "6to Grado",
-  media_general: "Media General",
-  "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
-  "4_ano": "4to Año", "5_ano": "5to Año",
-  media_tecnica: "Media Técnica", "6_ano": "6to Año",
-};
 
-const NUMERIC_GRADES = new Set([
-  "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
-  "media_tecnica", "6_ano",
-]);
-
-const SECONDARY_GRADES = new Set([
-  "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
-  "media_tecnica", "6_ano",
-]);
-
-const PRIMARY_GRADES = new Set([
-  "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado",
-]);
 
 export default function GradesConsultation() {
   const { schoolId } = useSchoolId();
+  const { has: hasPermission, isOwner } = usePermissions();
+  // The visibility tab decides what families see, so it follows the grade editing permission.
+  const canManageVisibility = isOwner || hasPermission("grades.edit");
   const [activeTab, setActiveTab] = useState("consulta");
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("");
@@ -440,6 +422,9 @@ export default function GradesConsultation() {
           <TabsTrigger value="consulta">Consulta de Notas del Docente</TabsTrigger>
           <TabsTrigger value="finales">Notas Finales y Construcción de Boletas</TabsTrigger>
           <TabsTrigger value="descarga">Descarga de Boletas</TabsTrigger>
+          {canManageVisibility && (
+            <TabsTrigger value="visibilidad">Visibilidad para Representantes</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="consulta">
@@ -993,6 +978,27 @@ export default function GradesConsultation() {
             </>
           )}
         </TabsContent>
+
+        {canManageVisibility && (
+          <TabsContent value="visibilidad">
+            {!effectiveYear || !selectedSection ? (
+              <div className="text-center py-12 border rounded-md bg-muted/20">
+                <p className="text-muted-foreground">
+                  Seleccione el año escolar y la sección para configurar la visibilidad.
+                </p>
+              </div>
+            ) : (
+              <RepresentativeVisibilityTab
+                schoolId={schoolId!}
+                schoolYearId={effectiveYear}
+                yearRange={schoolYears.find((y) => y.id === effectiveYear)?.year_range || ""}
+                isActiveYear={effectiveYear === activeYear?.id}
+                sectionId={selectedSection}
+                sectionName={sections.find((s: any) => s.id === selectedSection)?.name || ""}
+              />
+            )}
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Modal for qualitative grade detail */}

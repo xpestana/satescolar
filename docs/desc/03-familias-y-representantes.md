@@ -22,11 +22,13 @@ El colegio administra el padrón de familias; el representante ve y edita su pro
 | Listar familias | school | `/registros/familias` | `families.view` | Padrón de familias del colegio. |
 | Mis representantes | representative | `/representative/representantes` | — | Representantes de la familia. |
 | Datos de la familia | representative | `/representative/datos-familia` | — | Información de la familia. |
+| Notas y boletas de un representado | representative | `/representative/estudiante/:studentId/notas` | — | Notas por momento y descarga de boleta — ver [09-notas](09-notas-y-boletas.md). |
 
 ## Rutas (frontend)
 - `/registros/familias`
 - `/representative/representantes`
 - `/representative/datos-familia`
+- `/representative/estudiante/:studentId/notas`
 
 ## Endpoints / Edge Functions
 - `create-family` — alta de familia + representante + credenciales.

@@ -13,7 +13,8 @@ importar calificaciones de forma masiva; el representante ve las boletas de sus 
 - **teacher** — carga de notas (vía aula virtual — ver [11](11-aula-virtual.md)) y su propia
   firma de boleta.
 - **admin** — importación masiva de calificaciones.
-- **representative** — visualización de boletas. ⏳ verificar ruta.
+- **representative** — consulta de notas y descarga de boletas de sus representados en
+  `/representative/estudiante/:studentId/notas` (ver *Notas y boletas del representante*).
 
 > `/notas/consulta` es **solo del rol `school`**: `ProtectedRoute requiredRole="school"`
 > (`App.tsx:174`) redirige al docente a `/teacher/dashboard`. El equivalente del docente es
@@ -26,7 +27,8 @@ importar calificaciones de forma masiva; el representante ve las boletas de sus 
 - El colegio **elige/diseña el formato de la boleta** en `/formatos` → pestaña
   **"Formato de Boletas"** y luego consulta e imprime boletas con ese formato.
 - El admin importa calificaciones masivamente desde archivo (incl. bachillerato).
-- El representante consulta las boletas de sus estudiantes.
+- El representante consulta las notas y descarga las boletas de sus representados.
+- El colegio decide qué momentos ve el representante y puede bloquear a un estudiante concreto.
 
 ## Formato de la boleta (`/formatos`)
 El **formato visual de la boleta se elige/configura en `/formatos`** (pestaña "Formato de
@@ -60,7 +62,9 @@ boleta**.
 > respetar la configuración de `/formatos` (tabla `boleta_templates`), no valores fijos.
 
 ### Cómo se elige la plantilla activa al imprimir
-Los generadores traen **todas** las plantillas activas del colegio y eligen en cliente:
+Los generadores traen **todas** las plantillas activas del colegio y eligen en cliente con
+`pickBoletaTemplate` (`src/lib/boletaTemplateSelection.ts`, un solo sitio; antes estaba copiado
+en los 5 generadores):
 
 1. Filtran las candidatas — **primaria por `config.style === "primaria_descriptivo"`**;
    **bachillerato por `.eq("level", "bachillerato")`**.
@@ -150,6 +154,66 @@ interruptor `is_active`.
   `teachers` (solo hay políticas de admin y de school), y dárselo le abriría también `form_data`
   e `is_suspended`. `teacher_signatures` permite una RLS acotada a la firma.
 
+## Notas y boletas del representante (`/representative/estudiante/:studentId/notas`)
+Pantalla `StudentGrades`, a la que se entra desde el botón **"Notas y Boletas"** de la card de
+cada estudiante (`representative/StudentsList.tsx` y la card reducida del dashboard).
+
+- **Selector de año escolar** — reutiliza `useSchoolYearSelection` + `SchoolYearSelect`: arranca
+  en el año `is_active` y permite consultar años anteriores o posteriores (avisa en ámbar cuando
+  el año elegido no es el activo).
+- **Selector de momento** — Momento 1 / 2 / 3 / **Definitiva Final** (`momento = 0`).
+- **Notas** — `StudentGradesPanel`, tres variantes según `resolveGradeLevelKind` del grado de la
+  sección: tabla numérica (secundaria), informe descriptivo + literal por área (primaria) e
+  informe (preescolar).
+- **Boleta** — `StudentBoletaDownload` llama a **los mismos generadores del colegio**
+  (`downloadBachilleratoBoleta`, `downloadBachilleratoBoletaDefinitiva`,
+  `downloadPrimaryDescriptiveBoleta`) y pasa el HTML por `htmlToPdfBlob` → vista previa en
+  `<iframe>` + botón de descarga. Así la boleta del representante respeta el formato de
+  `/formatos` sin duplicar reglas. En primaria la Definitiva Final es `momento: 3`.
+- **Preescolar** — se muestran las notas pero **no** hay descarga: el generador todavía no existe
+  (igual que la pestaña del colegio, que dice "Próximamente").
+- **Ayuda al representante** — panel colapsable que explica qué es un momento, la definitiva, el
+  literal de primaria y por qué un momento puede no verse.
+
+## Visibilidad para representantes (control del colegio)
+Cuarta pestaña de `/notas/consulta`, **"Visibilidad para Representantes"**
+(`RepresentativeVisibilityTab`, visible con `grades.edit` o siendo owner). Dos bloques:
+
+1. **Publicación por momento** — un interruptor por momento (1, 2, 3 y Definitiva Final) sobre el
+   año escolar seleccionado en los filtros de la página → tabla `grade_visibility_settings`.
+   **Sin fila = oculto**: la publicación es opt-in, ningún colegio empieza mostrando notas.
+2. **Bloqueo por estudiante** — interruptor por alumno de la sección seleccionada →
+   tabla `student_grade_access`. El bloqueo aplica a todos los años y momentos.
+
+El mismo bloqueo por estudiante se opera desde **la ficha de la familia**
+(`ViewFamilyModal`, junto al estado del estudiante) y desde **Búsqueda Avanzada**
+(`AdvancedSearch`, columna Acciones, solo en la pestaña Estudiantes). Los tres puntos comparten
+el componente `StudentGradeAccessToggle` y el hook `useStudentGradeBlock`.
+
+### El gate se aplica en RLS, no en la UI
+Los generadores de boleta son **cliente puro** (consultan Supabase desde el navegador), así que
+ocultar en la UI no serviría de nada: un representante podría leer las tablas desde la consola.
+Por eso el permiso se resuelve en la base de datos:
+
+```
+representative_grades_gate(student_id, school_year_id, momento) →
+  'not_child' | 'blocked_by_school' | 'delinquent' | 'hidden_by_school' | 'ok'
+```
+
+en ese orden de precedencia. `representative_can_view_grades()` (booleano) es lo que usan las
+políticas `SELECT` de `final_grades`, `primary_final_reports`, `preschool_final_reports` y las
+dos tablas de indicadores; `representative_has_grades_access_in_school()` cubre las tablas que no
+cuelgan de un alumno (`boleta_templates`, `school_subjects`, `teacher_signatures`, escalas e
+indicadores). La UI llama al gate (`useStudentGradesAccess`) **solo para explicar el motivo**
+(`src/lib/gradesAccess.ts`).
+
+> ⚠️ **Morosidad**: si el estudiante tiene alguna cuota vencida se bloquean **notas y boleta**
+> (decisión de producto), y el aviso enlaza a `/representative/pagos`. La comprobación es
+> `student_has_overdue_balance()`, una versión **STABLE** de `_moroso_balance_lines` con las mismas
+> reglas de vencimiento y días de gracia (`delinquency_config.overdue_after_day`) pero **sin**
+> `rebuild_student_concept_balances_for_active_year()`, que es VOLATILE y no puede usarse en RLS.
+> Ver [12-pagos](12-pagos.md).
+
 ## Operaciones / Funciones
 | Operación | Rol | Ruta | Permiso | Descripción |
 |---|---|---|---|---|
@@ -158,6 +222,8 @@ interruptor `is_active`.
 | Ajustes de notas | school | `/school/configuraciones/ajustes-notas` | `settings.school` | Escala/estructura de notas. |
 | Formato de Boletas | school | `/formatos` (pestaña Boletas) | `payments.config` | Diseño/elección del formato de boleta por nivel. |
 | Importar calificaciones | admin | `/admin/importar-calificaciones` | admin | Carga masiva de notas. |
+| Notas y boletas de mi representado | representative | `/representative/estudiante/:studentId/notas` | — | Consulta de notas y descarga de boleta. |
+| Visibilidad para representantes | school | `/notas/consulta` (pestaña) | `grades.edit` (solo UI) | Publicar/ocultar momentos y bloquear estudiantes. |
 
 ## Rutas (frontend)
 - `/notas/consulta` (solo `school`)
@@ -165,10 +231,22 @@ interruptor `is_active`.
 - `/school/configuraciones/ajustes-notas`
 - `/formatos` (pestaña "Formato de Boletas")
 - `/admin/importar-calificaciones`
+- `/representative/estudiante/:studentId/notas` (solo `representative`)
 
 ## Endpoints / Edge Functions
 - `import-grades` — importación masiva de calificaciones.
 - `import-bachillerato-grades` — importación específica de bachillerato.
+
+### Funciones SQL (gate del representante)
+Definidas en `supabase/migrations/20260828120000_representative_grades_access.sql`, todas
+`STABLE SECURITY DEFINER` y con `EXECUTE` solo para `authenticated`:
+- `representative_grades_gate(student_id, school_year_id, momento) → text` — el motivo.
+- `representative_can_view_grades(...) → boolean` — lo que usan las políticas por alumno.
+- `representative_has_grades_access_in_school(school_id) → boolean` — tablas no ligadas a alumno.
+- `student_has_overdue_balance(student_id, school_id, school_year_id) → boolean`.
+
+La política de `subject_teacher_assignments` reutiliza `representative_child_in_assignment()`,
+que ya existía para el aula virtual.
 
 ## Datos / Tablas (Supabase)
 - `boleta_templates` — plantillas de formato de boleta: `school_id`, `name`, `description`,
@@ -178,6 +256,13 @@ interruptor `is_active`.
   `school_id`, `nombre`, `cedula`, `cargo`, `firma_url`, `sello_url`, `is_active`. La edita el
   propio docente (RLS por `teachers.user_id = auth.uid()`) o el colegio. Se imprime en la boleta
   de `primaria_descriptivo`.
+- `grade_visibility_settings` — qué momentos ve el representante: `school_id`, `school_year_id`,
+  `momento` (0 = Definitiva Final, 1–3), `is_visible`. **UNIQUE(school_id, school_year_id,
+  momento)**; sin fila = oculto.
+- `student_grade_access` — bloqueo por estudiante (PK `student_id`): `school_id`, `is_blocked`,
+  `reason`. **Tabla aparte y no una columna en `students` a propósito**: el representante tiene
+  `UPDATE` sobre `students` sin `WITH CHECK` ni restricción de columnas, así que podría
+  desbloquearse solo. Su RLS le da al representante **solo `SELECT`**.
 - `grades_config` — config de notas por colegio: `preschool_report_type`,
   `primary_report_type`, `use_percentage_plan`, …
 - `primary_grading_scales`, `preschool_grading_scales` — escalas (sigla + descripción).
@@ -211,6 +296,10 @@ interruptor `is_active`.
   tiene `is_active`. Las imágenes se inlinean a data URL (`resolveSignatureImages`) porque
   html2canvas no puede dibujar una URL cruda de S3.
 
+- **El representante no ve nada por defecto**: cada momento se publica explícitamente desde la
+  pestaña de visibilidad, y el bloqueo por estudiante y la morosidad tienen prioridad sobre la
+  publicación.
+
 ## Archivos clave (código)
 - `src/pages/school/GradesConsultation.tsx` (3 pestañas + `openBoletaPreview`)
 - `src/components/grades/FinalGradesTab.tsx` (notas finales / construcción de boletas — school)
@@ -227,6 +316,16 @@ interruptor `is_active`.
   `src/lib/export-utils.ts`
 - `src/lib/image-resolve.ts` — `resolveImageToDataUrl` / `fetchAsBase64` /
   `resolveSignatureImages`: **obligatorio** para cualquier imagen que acabe en un PDF.
+- `src/pages/representative/StudentGrades.tsx` (módulo del representante),
+  `src/components/grades/StudentGradesPanel.tsx`, `src/components/grades/StudentBoletaDownload.tsx`
+- `src/components/grades/RepresentativeVisibilityTab.tsx` (pestaña de configuración),
+  `src/components/students/StudentGradeAccessToggle.tsx` (bloqueo por alumno, 3 puntos de entrada)
+- `src/hooks/useStudentGradesAccess.ts`, `useStudentReportCard.ts`,
+  `useGradeVisibilitySettings.ts`, `useStudentGradeBlock.ts`
+- `src/lib/gradesAccess.ts` (motivo del gate → mensaje), `src/lib/gradeLevels.ts`
+  (catálogo de grados y `resolveGradeLevelKind`, antes duplicado en `GradesConsultation` y
+  `FinalGradesTab`), `src/lib/boletaTemplateSelection.ts` (`pickBoletaTemplate`, antes duplicado
+  5 veces en los generadores), `src/lib/studentName.ts`
 - `src/lib/s3-upload.ts` — `uploadToS3`; las imágenes de firma van al folder `assets`
   (prefijos `boleta-sig-` y `teacher-sig-`) vía la edge function `s3-sign-upload`.
 
@@ -234,4 +333,3 @@ interruptor `is_active`.
 - Estructura de notas: cómo se calculan promedios y definitivas a partir del plan de evaluación
   (`use_percentage_plan`), y el flujo de `adjustment_points`.
 - Boleta de **Preescolar**: la pestaña "Descarga de Boletas" aún muestra "Próximamente".
-- Ruta del **representante** para ver boletas.

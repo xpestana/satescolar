@@ -90,6 +90,11 @@ Pantalla `PaymentConfig` ("Configuración de Pagos") con **4 pestañas**:
   desde el RPC → envía por `send-email` (o SMTP si hay plantilla propia `email_templates`
   `template_type='delinquency'`) → registra en `delinquency_notifications` (dedupe por día).
   Ver detalle y correcciones en **Endpoints / Edge Functions**.
+- **La morosidad bloquea notas y boletas:** un estudiante con alguna cuota vencida deja de ver
+  sus notas y no puede descargar la boleta desde el portal del representante. La comprobación es
+  `student_has_overdue_balance()`, una versión **STABLE** de `_moroso_balance_lines` (mismas
+  reglas de vencimiento y `overdue_after_day`) **sin** el `rebuild_...` VOLATILE, para poder
+  usarla dentro de las políticas RLS. Ver [09-notas](09-notas-y-boletas.md).
 - **Cron `delinquency-rebuild` (`0 7 * * *`):** solo ejecuta
   `rebuild_student_concept_balances_for_active_year()` (reconstruye saldos), **no envía correos**;
   no confundir con `delinquency-reminders`.

@@ -12,6 +12,7 @@ import {
 } from "@/lib/bachilleratoTemplate";
 import { fmtGradeNum, formatBoletaGradeValue } from "@/lib/gradeLiteral";
 import { resolveImageToDataUrl, resolveSignatureImages } from "@/lib/image-resolve";
+import { pickBoletaTemplate } from "@/lib/boletaTemplateSelection";
 
 /** Inline signature/stamp images for html2canvas (same CORS fix as school logo). */
 async function resolveBoletinSignatures(
@@ -336,17 +337,7 @@ export async function downloadBachilleratoBoleta(
       .maybeSingle(),
   ]);
 
-  const allTemplates = (templateRes.data ?? []) as any[];
-  const tpl =
-    allTemplates.find(
-      (t) =>
-        Array.isArray(t.applicable_grades) &&
-        t.applicable_grades.includes(gradeKey),
-    ) ??
-    allTemplates.find(
-      (t) => !t.applicable_grades || t.applicable_grades.length === 0,
-    ) ??
-    null;
+  const tpl = pickBoletaTemplate((templateRes.data ?? []) as any[], gradeKey);
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 
@@ -624,17 +615,7 @@ export async function downloadAllBachilleratoBoletas(params: {
       .maybeSingle(),
   ]);
 
-  const allTemplatesAll = (templateRes.data ?? []) as any[];
-  const tpl =
-    allTemplatesAll.find(
-      (t) =>
-        Array.isArray(t.applicable_grades) &&
-        t.applicable_grades.includes(gradeKey),
-    ) ??
-    allTemplatesAll.find(
-      (t) => !t.applicable_grades || t.applicable_grades.length === 0,
-    ) ??
-    null;
+  const tpl = pickBoletaTemplate((templateRes.data ?? []) as any[], gradeKey);
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 
@@ -883,17 +864,7 @@ export async function downloadBachilleratoBoletaDefinitiva(
       .maybeSingle(),
   ]);
 
-  const allTemplates = (templateRes.data ?? []) as any[];
-  const tpl =
-    allTemplates.find(
-      (t) =>
-        Array.isArray(t.applicable_grades) &&
-        t.applicable_grades.includes(gradeKey),
-    ) ??
-    allTemplates.find(
-      (t) => !t.applicable_grades || t.applicable_grades.length === 0,
-    ) ??
-    null;
+  const tpl = pickBoletaTemplate((templateRes.data ?? []) as any[], gradeKey);
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 
@@ -1074,17 +1045,7 @@ export async function downloadAllBachilleratoBoletasDefinitiva(params: {
       .maybeSingle(),
   ]);
 
-  const allTemplatesAll = (templateRes.data ?? []) as any[];
-  const tpl =
-    allTemplatesAll.find(
-      (t) =>
-        Array.isArray(t.applicable_grades) &&
-        t.applicable_grades.includes(gradeKey),
-    ) ??
-    allTemplatesAll.find(
-      (t) => !t.applicable_grades || t.applicable_grades.length === 0,
-    ) ??
-    null;
+  const tpl = pickBoletaTemplate((templateRes.data ?? []) as any[], gradeKey);
   const school = schoolRes.data;
   const planilla = planillaRes.data as any;
 

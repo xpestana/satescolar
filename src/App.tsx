@@ -53,6 +53,7 @@ import ClassroomList from "./pages/teacher/ClassroomList";
 import ClassroomDetail from "./pages/teacher/ClassroomDetail";
 import ChildClassroom from "./pages/representative/ChildClassroom";
 import RepPayments from "./pages/representative/RepPayments";
+import RepStudentGrades from "./pages/representative/StudentGrades";
 
 import ClassroomSupervision from "./pages/school/ClassroomSupervision";
 import AttendanceScan from "./pages/AttendanceScan";
@@ -377,6 +378,7 @@ const App = () => (
               <Route path="/representative/representante/:representativeId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddRepresentative /></ProtectedRoute>} />
               <Route path="/representative/estudiante/nuevo" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
               <Route path="/representative/estudiante/:studentId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
+              <Route path="/representative/estudiante/:studentId/notas" element={<ProtectedRoute requiredRole="representative"><RepStudentGrades /></ProtectedRoute>} />
               <Route path="/representative/aula-virtual/:studentId" element={<ProtectedRoute requiredRole="representative"><ChildClassroom /></ProtectedRoute>} />
               <Route path="/representative/pagos" element={<ProtectedRoute requiredRole="representative"><RepPayments /></ProtectedRoute>} />
               {/* Teacher routes */}

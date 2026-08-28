@@ -38,9 +38,26 @@ sus estudiantes; el colegio los gestiona a través de familias, inscripciones y 
     `primer_apellido`, `segundo_apellido`. El nombre a mostrar se arma
     `[primer_nombre, primer_apellido].filter(Boolean).join(" ")` (patrón usado en toda la app;
     ver búsqueda en `PaymentRegistration.tsx` y la tabla de "Últimos Pagos" en [12-pagos](12-pagos.md)).
+- `student_grade_access` — **bloqueo del acceso del representante a notas y boletas**
+  (PK `student_id`): `school_id`, `is_blocked`, `reason`. No es una columna de `students` a
+  propósito: el representante tiene `UPDATE` sobre `students` sin restricción de columnas y
+  podría desbloquearse solo. Ver [09-notas](09-notas-y-boletas.md).
 - Vínculos: `enrollments` (año/sección, ver [07](07-inscripciones.md)),
   `student_schools`/`student_concept_balances`/`student_payment_plans`
   (ver [12-pagos](12-pagos.md)).
+
+## Bloqueo de notas y boletas
+El usuario escolar puede impedir que el representante vea las notas y descargue la boleta de un
+estudiante concreto. El interruptor está en **tres sitios**, todos sobre `student_grade_access`
+y con el mismo componente `StudentGradeAccessToggle`:
+
+1. Ficha de la familia (`ViewFamilyModal`), junto al selector de estado del estudiante.
+2. Búsqueda Avanzada (`/registros/busqueda-avanzada`), pestaña Estudiantes → columna Acciones.
+3. `/notas/consulta` → pestaña "Visibilidad para Representantes", como lista por sección.
+
+El bloqueo aplica a **todos los años escolares y momentos**, se evalúa en RLS y tiene prioridad
+sobre la publicación por momento. Es independiente del `status` del estudiante
+(`active`/`suspended`/…), que sigue rigiendo la inscripción y la morosidad.
 
 ## Reglas de negocio
 - La descarga de planilla desde representante usa la configuración del colegio
@@ -49,6 +66,7 @@ sus estudiantes; el colegio los gestiona a través de familias, inscripciones y 
 
 ## Archivos clave (código)
 - `src/pages/representative/StudentsList.tsx`
+- `src/components/students/StudentGradeAccessToggle.tsx` + `src/hooks/useStudentGradeBlock.ts`
 
 ## Configuración relacionada
 - El **formulario de estudiantes** se edita en Formularios

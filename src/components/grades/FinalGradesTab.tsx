@@ -15,19 +15,8 @@ import PrimaryFinalReportModal from "./PrimaryFinalReportModal";
 import TeacherSignatureCard from "./TeacherSignatureCard";
 import PreschoolFinalReportModal from "./PreschoolFinalReportModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { NUMERIC_GRADES, PRIMARY_GRADES, PRESCHOOL_GRADES } from "@/lib/gradeLevels";
 
-const NUMERIC_GRADES = new Set([
-  "media_general", "1_ano", "2_ano", "3_ano", "4_ano", "5_ano",
-  "media_tecnica", "6_ano",
-]);
-
-const PRIMARY_GRADES = new Set([
-  "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado",
-]);
-
-const PRESCHOOL_GRADES = new Set([
-  "pre_maternal", "maternal", "i_nivel", "ii_nivel", "iii_nivel",
-]);
 
 const STATUS_OPTIONS = [
   { value: "aprobado", label: "Aprobado" },

@@ -28,6 +28,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
 import { DeleteRepresentativeDialog } from "./DeleteRepresentativeDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useStudentGradeBlock } from "@/hooks/useStudentGradeBlock";
+import StudentGradeAccessToggle from "@/components/students/StudentGradeAccessToggle";
 
 interface ViewFamilyModalProps {
   open: boolean;
@@ -89,6 +91,11 @@ export function ViewFamilyModal({
     },
     enabled: !!familyId && open,
   });
+
+  const {
+    isBlocked: isGradeAccessBlocked,
+    setBlocked: setGradeAccessBlocked,
+  } = useStudentGradeBlock(schoolId, (students || []).map((s) => s.id));
 
   // Fetch representatives
   const { data: representatives } = useQuery({
@@ -325,14 +332,24 @@ export function ViewFamilyModal({
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditStudent(student.id)}
-                            title="Editar estudiante"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditStudent(student.id)}
+                              title="Editar estudiante"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <StudentGradeAccessToggle
+                              studentName={getStudentName(student)}
+                              isBlocked={isGradeAccessBlocked(student.id)}
+                              disabled={setGradeAccessBlocked.isPending}
+                              onToggle={(blocked) =>
+                                setGradeAccessBlocked.mutate({ studentId: student.id, blocked })
+                              }
+                            />
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
