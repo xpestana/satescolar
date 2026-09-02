@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { getPaymentCoverage } from "@/lib/paymentStatus";
+import { itemCoverageVes } from "@/lib/paymentItemDiscount";
 import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
 import { EditPaymentModal } from "@/components/payments/EditPaymentModal";
 
@@ -45,7 +46,7 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
       const { data, error } = (await supabase.from("payments")
         .select(`
           *,
-          payment_items!payment_items_payment_id_fkey(id, plan_concept_id, student_id, amount_ves, is_partial, payment_plan_concepts(payment_concepts(name))),
+          payment_items!payment_items_payment_id_fkey(id, plan_concept_id, student_id, amount_ves, discount_amount_ves, discount_reason, is_partial, payment_plan_concepts(payment_concepts(name))),
           payment_method_entries!payment_method_entries_payment_id_fkey(id, method, currency, amount_original, exchange_rate, amount_ves, reference_code, bank_name, payment_date)
         `)
         .or(orFilter)
@@ -91,7 +92,8 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
           .eq("plan_concept_id", item.plan_concept_id)
           .maybeSingle();
         if (!bal) continue;
-        const newPaid = Math.max(0, (Number(bal.paid_amount) || 0) - (Number(item.amount_ves) || 0));
+        // Se devuelve la cobertura completa: efectivo + descuento ad-hoc de esa línea
+        const newPaid = Math.max(0, (Number(bal.paid_amount) || 0) - itemCoverageVes(item));
         const newBalance = Math.max(0, (Number(bal.total_amount) || 0) - newPaid);
         const newStatus = newPaid <= 0 ? "pending" : (newBalance <= 0 ? "paid" : "partial");
         await supabase.from("student_concept_balances").update({
@@ -244,6 +246,15 @@ export function FamilyPaymentHistoryModal({ open, onOpenChange, familyId, family
                                     {it.payment_plan_concepts?.payment_concepts?.name || "Concepto"}{it.is_partial ? " (parcial)" : ""}
                                     {(it.student_id || p.student_id) && (
                                       <span className="text-muted-foreground"> · {studentNames[it.student_id || p.student_id] || "Estudiante"}</span>
+                                    )}
+                                    {Number(it.discount_amount_ves) > 0 && (
+                                      <Badge
+                                        variant="outline"
+                                        className="ml-2 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                        title={`Descuento: ${it.discount_reason || ""}`}
+                                      >
+                                        −{Number(it.discount_amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                                      </Badge>
                                     )}
                                   </span>
                                   <span className="font-medium">{Number(it.amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</span>

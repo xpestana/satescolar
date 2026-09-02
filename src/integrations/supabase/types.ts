@@ -2475,6 +2475,11 @@ export type Database = {
         Row: {
           amount_ves: number
           created_at: string
+          discount_amount_ves: number
+          discount_original_amount: number | null
+          discount_reason: string | null
+          discount_type: string
+          discount_value: number
           id: string
           is_partial: boolean
           original_amount: number | null
@@ -2485,6 +2490,11 @@ export type Database = {
         Insert: {
           amount_ves?: number
           created_at?: string
+          discount_amount_ves?: number
+          discount_original_amount?: number | null
+          discount_reason?: string | null
+          discount_type?: string
+          discount_value?: number
           id?: string
           is_partial?: boolean
           original_amount?: number | null
@@ -2495,6 +2505,11 @@ export type Database = {
         Update: {
           amount_ves?: number
           created_at?: string
+          discount_amount_ves?: number
+          discount_original_amount?: number | null
+          discount_reason?: string | null
+          discount_type?: string
+          discount_value?: number
           id?: string
           is_partial?: boolean
           original_amount?: number | null

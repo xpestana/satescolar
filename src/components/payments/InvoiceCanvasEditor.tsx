@@ -17,6 +17,8 @@ const STATIC_SAMPLE: Record<string, string> = {
   student_section:     "A",
   concepts_all:        "Mensualidad Sep. / Seguro Escolar",
   total_amount:        "8.000,00",
+  total_discount:      "2.500,00",
+  discount_reason:     "Ingresó a mitad de mes",
   payment_method_text: "Transferencia Bancaria",
 };
 

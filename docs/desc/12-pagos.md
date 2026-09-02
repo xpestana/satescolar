@@ -30,6 +30,14 @@ y **debe respetarse al generar/imprimir la factura**.
   (una sola factura activa por colegio) — a diferencia de las boletas, que pueden tener
   varias activas segmentadas por grado.
 
+- **Campos disponibles** para arrastrar a la plantilla: catálogo `AVAILABLE_FIELDS` en
+  `InvoiceTemplateConfig.tsx` (encabezado, titular, estudiante, conceptos y totales). En el grupo
+  *totales* están `total_amount`, **`total_discount`** y **`discount_reason`** (estos dos, del
+  descuento ad-hoc de la cuota) y `payment_method_text`. Un campo solo se imprime si el colegio
+  lo coloca en su plantilla; las plantillas ya diseñadas no cambian al agregarse campos nuevos.
+  Los **recibos PDF** de estado de cuenta sí muestran el descuento siempre (columna + línea de
+  motivo), sin depender de la plantilla.
+
 > ⚠️ Regla clave: cualquier cambio en la generación/impresión de la factura debe leer y
 > respetar la configuración de `/formatos` (tabla `invoice_templates`), no valores fijos.
 
@@ -149,7 +157,9 @@ Pantalla `PaymentConfig` ("Configuración de Pagos") con **4 pestañas**:
   `status`, anulación (`voided_at`/`voided_by`/`void_reason`), `student_id`, `school_year_id`.
 - `payment_items` — líneas del pago por concepto del plan: `plan_concept_id`, `student_id`
   (**clave para resolver el/los estudiante(s) en modo familia**, donde `payments.student_id`
-  es null), `amount_ves`, `is_partial`. El **tipo** del concepto se obtiene vía
+  es null), `amount_ves`, `is_partial`, y el **descuento ad-hoc** de esa cuota
+  (`discount_amount_ves`, `discount_original_amount`, `discount_type`, `discount_value`,
+  `discount_reason` — ver "Descuento ad-hoc por cuota"). El **tipo** del concepto se obtiene vía
   `payment_plan_concepts → payment_concepts.concept_type` (`mensualidad`, `inscripcion`,
   `seguro_escolar`, …).
 - `payment_others` — líneas de ingresos que **no** cuelgan de un concepto del plan (categoría
@@ -320,6 +330,31 @@ Las dos pantallas usan lo mismo; el texto del aviso se pasa por prop (`inactiveW
   > trigger para resincronizar cuotas **no pagadas** cuando se edita `amount`/descuento, y hace
   > **backfill** de los balances no pagados ya creados. Solo toca cuotas con `paid_amount = 0`
   > para no alterar pagos ya registrados.
+- **Descuento ad-hoc por cuota (al registrar el pago):** además del descuento del plan, en los
+  modales de registro (`PaymentFormModal`, `FamilyPaymentFormModal`) y de edición
+  (`EditPaymentModal`) cada cuota seleccionada tiene una columna **Descuento** que aplica una
+  rebaja **solo a ese pago** — el caso típico es un alumno que ingresa a mitad de mes y paga
+  media mensualidad, sin tener que crearle un plan aparte. Se captura como **monto fijo** (en la
+  moneda del concepto) o **porcentaje del pendiente**, con **motivo obligatorio**.
+  - Regla de cobertura: **`cuota saldada = amount_ves (efectivo) + discount_amount_ves`**. El
+    descuento cierra la cuota (`balance = 0`, estado *Pagado*, fuera de morosos) pero **no es
+    ingreso**: `payments.total_amount_ves` y `payment_items.amount_ves` siguen siendo solo
+    efectivo, así que el reporte de **Ingresos** y su Excel cuadran sin cambios.
+  - Columnas en `payment_items` (migración `20260902120000_add_adhoc_discount_to_payment_items.sql`):
+    `discount_amount_ves`, `discount_original_amount` (moneda del concepto), `discount_type`
+    (`none`/`fixed`/`percentage`), `discount_value` (lo tecleado) y `discount_reason`
+    (CHECK: obligatorio si hay descuento). El cálculo vive en `src/lib/paymentItemDiscount.ts`
+    (con pruebas) y la UI en `src/components/payments/ConceptDiscountCell.tsx`.
+  - En el ledger, `paid_amount` **absorbe** el descuento para conservar el invariante
+    `paid_amount + balance = total_amount` (lo asumen las reversiones y el trigger
+    `sync_unpaid_balances_for_plan_concept`, que solo resincroniza filas con `paid_amount = 0`).
+    Por eso el Dashboard resta los descuentos a **"Total recaudado"** y los muestra aparte en el
+    KPI **"Descuentos otorgados"**.
+  - Anular o borrar un pago devuelve la **cobertura completa** (efectivo + descuento) con
+    `itemCoverageVes()`; editarlo reabre la cuota completa vía `oldContributionByBalance`.
+  - Comprobante/factura: los recibos PDF llevan columna **Descuento** y la línea
+    *"Descuentos otorgados"* con el motivo; las plantillas de factura ganan los campos
+    `total_discount` y `discount_reason` (opcionales, no cambian las plantillas existentes).
 - Montos se manejan en **VES** con `exchange_rate` por entrada; la conversión usa
   `bcv_rates`/`exchange_rates` (función `fetch-bcv-rates`).
 - **Abonos de cuotas en moneda extranjera (USD/EUR) a tasas de días distintos:** cada abono

@@ -56,10 +56,18 @@ export function buildInvoiceData(
   const conceptMarks: Record<string, string> = {};
   const conceptTotals: Record<string, number> = {};
   const conceptNames: string[] = [];
+  // Descuentos ad-hoc concedidos en este pago (no son ingreso; explican la cuota saldada)
+  let totalDiscountVes = 0;
+  const discountReasons: string[] = [];
 
   items.forEach((item: any) => {
     const conceptId   = item.payment_plan_concepts?.concept_id;
     const conceptName = item.payment_plan_concepts?.payment_concepts?.name || "";
+    const discount    = Number(item.discount_amount_ves || 0);
+    if (discount > 0) {
+      totalDiscountVes += discount;
+      if (item.discount_reason && !discountReasons.includes(item.discount_reason)) discountReasons.push(item.discount_reason);
+    }
     if (conceptId) {
       conceptMarks[`concept:${conceptId}`] = "✓";
       // Several items can hit the same concept (e.g. one per student in a family
@@ -102,6 +110,9 @@ export function buildInvoiceData(
     ...conceptMarks,
     ...conceptAmounts,
     total_amount:        fmt(Number(payment.total_amount_ves || 0)),
+    // Descuento concedido en el pago: vacío cuando no hubo, para que el campo no imprima nada
+    total_discount:      totalDiscountVes > 0 ? fmt(totalDiscountVes) : "",
+    discount_reason:     discountReasons.join(" · "),
     payment_method_text: methodText,
   };
 }

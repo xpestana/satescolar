@@ -17,6 +17,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
 import { buildInvoiceData } from "@/lib/buildInvoiceData";
+import { itemCoverageVes } from "@/lib/paymentItemDiscount";
 import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 import { formatGradeLevel } from "@/lib/utils";
 import { formatDateOnly } from "@/lib/dateUtils";
@@ -271,7 +272,8 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
           if (!balanceStudentId) continue;
           const bal = balances.find((b: any) => b.student_id === balanceStudentId && b.plan_concept_id === item.plan_concept_id);
           if (bal) {
-            const newPaid = Math.max(0, (bal.paid_amount || 0) - item.amount_ves);
+            // Se devuelve la cobertura completa: efectivo + descuento ad-hoc de esa línea
+            const newPaid = Math.max(0, (bal.paid_amount || 0) - itemCoverageVes(item));
             const newBalance = (bal.total_amount || 0) - newPaid;
             await supabase.from("student_concept_balances").update({
               paid_amount: newPaid,
@@ -308,9 +310,12 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
       studentNameMap[item.student_id ?? payment.student_id] || "—",
       (item.payment_plan_concepts as any)?.payment_concepts?.name || "—",
       `${item.amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`,
+      Number(item.discount_amount_ves) > 0
+        ? `${Number(item.discount_amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`
+        : "—",
       item.is_partial ? "Parcial" : "Completo",
     ]);
-    autoTable(doc, { startY: 70, head: [["Estudiante", "Concepto", "Monto", "Tipo"]], body: conceptRows, theme: "grid" });
+    autoTable(doc, { startY: 70, head: [["Estudiante", "Concepto", "Monto", "Descuento", "Tipo"]], body: conceptRows, theme: "grid" });
 
     const methodRows = (payment.payment_method_entries || []).map((m: any) => [
       methodLabel(m.method), m.currency, m.amount_original?.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
@@ -323,6 +328,17 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
     const finalY2 = (doc as any).lastAutoTable?.finalY || 150;
     doc.setFontSize(12);
     doc.text(`Total: ${payment.total_amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`, 14, finalY2 + 15);
+
+    // Descuentos concedidos en este pago: no son ingreso, pero explican por qué la cuota quedó saldada
+    const discountTotal = (payment.payment_items || []).reduce((s: number, it: any) => s + (Number(it.discount_amount_ves) || 0), 0);
+    if (discountTotal > 0) {
+      const reasons = Array.from(new Set((payment.payment_items || [])
+        .filter((it: any) => Number(it.discount_amount_ves) > 0 && it.discount_reason)
+        .map((it: any) => it.discount_reason as string)));
+      doc.setFontSize(10);
+      doc.text(`Descuentos otorgados: ${discountTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`, 14, finalY2 + 22);
+      if (reasons.length > 0) doc.text(`Motivo: ${reasons.join(" · ")}`, 14, finalY2 + 28);
+    }
 
     doc.save(`recibo_${payment.id.slice(0, 8)}.pdf`);
   };
@@ -447,9 +463,15 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {(p.payment_items || []).map((item: any, i: number) => (
-                        <Badge key={i} variant="outline" className="text-xs">
+                        <Badge
+                          key={i}
+                          variant="outline"
+                          className={`text-xs${Number(item.discount_amount_ves) > 0 ? " border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : ""}`}
+                          title={Number(item.discount_amount_ves) > 0 ? `Descuento: ${item.discount_reason || ""}` : undefined}
+                        >
                           {(item.payment_plan_concepts as any)?.payment_concepts?.name || "?"}
                           {item.student_id && studentNameMap[item.student_id] ? ` · ${(studentNameMap[item.student_id] || "").split(" ")[0]}` : ""}
+                          {Number(item.discount_amount_ves) > 0 && ` −${Number(item.discount_amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })}`}
                         </Badge>
                       ))}
                     </div>

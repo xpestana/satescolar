@@ -58,7 +58,7 @@ export default function PaymentDashboard() {
     queryKey: ["all-completed-payments-stats", schoolId, activeYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("payments")
-        .select("payment_date, created_at, total_amount_ves, payment_method_entries(method, amount_ves)")
+        .select("payment_date, created_at, total_amount_ves, payment_method_entries(method, amount_ves), payment_items(discount_amount_ves)")
         .eq("school_id", schoolId!)
         .eq("school_year_id", activeYear!.id)
         .eq("status", "completed");
@@ -120,7 +120,14 @@ export default function PaymentDashboard() {
   const totalRegisteredToday = registeredTodayPayments.reduce((s: number, p: any) => s + (p.total_amount_ves || 0), 0);
   const totalMonth = allCompletedPayments.filter((p: any) => p.payment_date >= monthStart).reduce((s: number, p: any) => s + (p.total_amount_ves || 0), 0);
   const totalDebt = allBalances.reduce((s: number, b: any) => s + (b.balance || 0), 0);
-  const totalCollected = allBalances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0);
+  // Descuentos ad-hoc otorgados en el año: cubren cuota pero no entran en caja, así que se
+  // restan de lo recaudado (paid_amount los incluye para no romper paid + balance = total).
+  const totalDiscounts = allCompletedPayments.reduce(
+    (s: number, p: any) => s + (p.payment_items || []).reduce((a: number, it: any) => a + (Number(it.discount_amount_ves) || 0), 0),
+    0,
+  );
+  const totalCoveredByBalances = allBalances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0);
+  const totalCollected = Math.max(0, totalCoveredByBalances - totalDiscounts);
   const delinquentStudents = new Set(allBalances.filter((b: any) => b.balance > 0).map((b: any) => b.student_id)).size;
   // En modo familia se cuenta una vez por familia (fallback al estudiante si no tiene familia)
   const delinquentFamilies = new Set(
@@ -188,6 +195,9 @@ export default function PaymentDashboard() {
             <div>
               <p className="text-xs text-muted-foreground">Total recaudado</p>
               <p className="text-lg font-bold">{totalCollected.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+              {totalDiscounts > 0.01 && (
+                <p className="text-[10px] text-muted-foreground">sin contar {totalDiscounts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} en descuentos</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -215,6 +225,15 @@ export default function PaymentDashboard() {
             <div>
               <p className="text-xs text-muted-foreground">Créditos disponibles</p>
               <p className="text-lg font-bold">{totalFamilyCredits.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center"><Tag className="h-5 w-5 text-emerald-600" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Descuentos otorgados</p>
+              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{totalDiscounts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
             </div>
           </CardContent>
         </Card>

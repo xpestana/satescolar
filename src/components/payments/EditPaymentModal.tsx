@@ -17,6 +17,17 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Loader2, Pencil, AlertTriangle, Tag, Users } from "lucide-react";
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 import { resolveBankOnMethodChange } from "@/lib/paymentMethodBank";
+import { ConceptDiscountCell } from "@/components/payments/ConceptDiscountCell";
+import {
+  computeAdHocDiscount,
+  itemCoverageOriginal,
+  settlesInstallment,
+  sumDiscountVes,
+  validateAdHocDiscount,
+  ZERO_DISCOUNT,
+  type AdHocDiscountDraft,
+  type DiscountComputation,
+} from "@/lib/paymentItemDiscount";
 import { PaymentRateNotice } from "@/components/payments/PaymentRateNotice";
 import { getOverrideRate } from "@/lib/exchangeRateOverride";
 import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
@@ -65,6 +76,8 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
   const [controlNumber, setControlNumber] = useState("");
   const [observations, setObservations] = useState("");
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
+  // Descuento puntual por cuota (adicional al descuento del plan), indexado por balance id
+  const [conceptDiscounts, setConceptDiscounts] = useState<Record<string, AdHocDiscountDraft>>({});
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
   const [surplusAction, setSurplusAction] = useState<"none" | "otros" | "credit">("none");
   const [applyToBalanceId, setApplyToBalanceId] = useState<string>("");
@@ -121,9 +134,27 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     enabled: open && childStudentIds.length > 0,
   });
 
-  // Contribución del pago original a cada concepto, en la MONEDA ORIGINAL del concepto,
-  // para "revertir" su efecto (legacy sin original_amount cae a amount_ves / snapshot).
+  // Cobertura del pago original sobre cada concepto, en la MONEDA ORIGINAL del concepto, para
+  // "revertir" su efecto (legacy sin original_amount cae a amount_ves / snapshot). Incluye el
+  // descuento ad-hoc: la cuota se había cerrado con efectivo + descuento, así que al reabrirla
+  // hay que devolver ambos o quedaría deuda por la parte condonada.
   const oldContributionByBalance = useMemo(() => {
+    const map: Record<string, number> = {};
+    (paymentData?.items || []).forEach((it: any) => {
+      const bal = rawBalances.find((b: any) => b.student_id === it.student_id && b.plan_concept_id === it.plan_concept_id);
+      if (!bal) return;
+      const cur = bal.currency || "VES";
+      const orig = cur === "VES"
+        ? Number(it.amount_ves || 0) + Number(it.discount_amount_ves || 0)
+        : itemCoverageOriginal(it, Number(bal.exchange_rate_snapshot) || 1);
+      map[bal.id] = (map[bal.id] || 0) + orig;
+    });
+    return map;
+  }, [paymentData, rawBalances]);
+
+  // Solo el EFECTIVO del pago original, para precargar el input "Monto a pagar" (lo condonado
+  // no se vuelve a cobrar: viaja en `conceptDiscounts`).
+  const oldCashByBalance = useMemo(() => {
     const map: Record<string, number> = {};
     (paymentData?.items || []).forEach((it: any) => {
       const bal = rawBalances.find((b: any) => b.student_id === it.student_id && b.plan_concept_id === it.plan_concept_id);
@@ -229,13 +260,57 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     : (b.balance || 0) / (b.exchange_rate_snapshot || getRate(b.currency || "VES") || 1);
   // Balance "editable": el remanente vigente + lo que este mismo pago ya había cubierto (moneda
   // original), revaluado a la tasa de hoy para VES.
+  const getEditableOriginal = (b: any) => Math.max(0, getRemainingOriginal(b) + (oldContributionByBalance[b.id] || 0));
   const getEditableBalance = (b: any) => {
     const cur = b.currency || "VES";
-    const remOrig = getRemainingOriginal(b) + (oldContributionByBalance[b.id] || 0);
+    const remOrig = getEditableOriginal(b);
     return cur === "VES" ? Math.max(0, remOrig) : Math.max(0, remOrig * getRate(cur));
   };
 
   const balances = rawBalances;
+
+  // ── Descuento ad-hoc por cuota ────────────────────────────────────────
+  const discountOf = (b: any): DiscountComputation => {
+    const draft = conceptDiscounts[b.id];
+    if (!draft || draft.type === "none") return ZERO_DISCOUNT;
+    return computeAdHocDiscount({
+      type: draft.type,
+      value: parseFloat(draft.value) || 0,
+      pendingOriginal: getEditableOriginal(b),
+      rate: getRate(b.currency || "VES"),
+    });
+  };
+
+  const discountByBalance = useMemo(() => {
+    const map: Record<string, DiscountComputation> = {};
+    (rawBalances as any[]).forEach((b: any) => {
+      const comp = discountOf(b);
+      if (comp.discountVes > 0) map[b.id] = comp;
+    });
+    return map;
+  }, [rawBalances, conceptDiscounts, rates, oldContributionByBalance]);
+
+  const totalDiscounts = useMemo(() => sumDiscountVes(Object.values(discountByBalance)), [discountByBalance]);
+
+  const applyConceptDiscount = (b: any, draft: AdHocDiscountDraft) => {
+    const comp = computeAdHocDiscount({
+      type: draft.type,
+      value: parseFloat(draft.value) || 0,
+      pendingOriginal: getEditableOriginal(b),
+      rate: getRate(b.currency || "VES"),
+    });
+    setConceptDiscounts((prev) => ({ ...prev, [b.id]: draft }));
+    setSelectedConcepts((prev) => ({ ...prev, [b.id]: comp.amountToPayVes.toFixed(2) }));
+  };
+
+  const clearConceptDiscount = (b: any) => {
+    setConceptDiscounts((prev) => {
+      const next = { ...prev };
+      delete next[b.id];
+      return next;
+    });
+    setSelectedConcepts((prev) => (b.id in prev ? { ...prev, [b.id]: getEditableBalance(b).toFixed(2) } : prev));
+  };
 
   // Inicializar formulario una sola vez, cuando ya están el pago y los saldos
   useEffect(() => {
@@ -252,13 +327,30 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     // revaluarlo desde la moneda original, igual que hace getEditableBalance. Precargarlo crudo
     // dejaba la linea inflada por encima de su propio concepto y, como el total de la factura es
     // fijo, esa diferencia se le restaba al reparto de los demas conceptos.
+    // Descuentos ad-hoc que traía el pago: se recuperan tal como se capturaron
+    const disc: Record<string, AdHocDiscountDraft> = {};
+    items.forEach((it: any) => {
+      const bal = balances.find((b: any) => b.student_id === it.student_id && b.plan_concept_id === it.plan_concept_id);
+      if (!bal || !(Number(it.discount_amount_ves) > 0)) return;
+      const cur = bal.currency || "VES";
+      const fallbackValue = cur === "VES" ? Number(it.discount_amount_ves) : Number(it.discount_original_amount || 0);
+      disc[bal.id] = {
+        type: it.discount_type === "percentage" ? "percentage" : "fixed",
+        value: String(Number(it.discount_value) > 0 ? Number(it.discount_value) : fallbackValue),
+        reason: it.discount_reason || "",
+      };
+    });
+    setConceptDiscounts(disc);
+
     const sel: Record<string, string> = {};
-    Object.entries(oldContributionByBalance).forEach(([balanceId, origAmount]) => {
+    Object.entries(oldCashByBalance).forEach(([balanceId, origAmount]) => {
       const bal = balances.find((b: any) => b.id === balanceId);
       if (!bal) return;
       const cur = bal.currency || "VES";
       const ves = cur === "VES" ? origAmount : origAmount * getRate(cur);
-      sel[balanceId] = Math.min(ves, getEditableBalance(bal)).toFixed(2);
+      const item = items.find((it: any) => it.student_id === bal.student_id && it.plan_concept_id === bal.plan_concept_id);
+      const discountVes = Number(item?.discount_amount_ves || 0);
+      sel[balanceId] = Math.min(ves, Math.max(0, getEditableBalance(bal) - discountVes)).toFixed(2);
     });
     setSelectedConcepts(sel);
 
@@ -280,12 +372,13 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     setSurplusAction(hadCredit ? "credit" : hadOtros ? "otros" : "none");
 
     initializedRef.current = true;
-  }, [open, paymentData, balances, balancesFetched, oldContributionByBalance]);
+  }, [open, paymentData, balances, balancesFetched, oldContributionByBalance, oldCashByBalance]);
 
   useEffect(() => {
     if (!open) {
       initializedRef.current = false;
       setReason("");
+      setConceptDiscounts({});
     }
   }, [open]);
 
@@ -313,6 +406,12 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     setSelectedConcepts((prev) => {
       const next = { ...prev };
       if (balanceId in next) { delete next[balanceId]; } else { next[balanceId] = maxAmount.toFixed(2); }
+      return next;
+    });
+    setConceptDiscounts((prev) => {
+      if (!(balanceId in prev)) return prev;
+      const next = { ...prev };
+      delete next[balanceId];
       return next;
     });
   };
@@ -345,7 +444,10 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
   const difference = totalMethods - totalConcepts;
 
   // Cuánto más se le puede aplicar a un balance sin pasar su disponible (ya considerando lo seleccionado)
-  const remainingCapacity = (b: any) => Math.max(0, getEditableBalance(b) - (parseFloat(selectedConcepts[b.id] || "0") || 0));
+  const remainingCapacity = (b: any) => Math.max(
+    0,
+    getEditableBalance(b) - (parseFloat(selectedConcepts[b.id] || "0") || 0) - (discountByBalance[b.id]?.discountVes || 0),
+  );
 
   const eligibleForSurplus = useMemo(() =>
     balances.filter((b: any) => remainingCapacity(b) > 0.01), [balances, selectedConcepts]);
@@ -371,8 +473,9 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
       if (!reason.trim()) throw new Error("El motivo de la modificación es obligatorio");
       if (!invoiceNumber.trim()) throw new Error("El N° de factura es obligatorio");
       if (Object.keys(selectedConcepts).length === 0) throw new Error("Seleccione al menos un concepto");
-      if (methods.length === 0) throw new Error("Agregue al menos una forma de pago");
-      if (totalMethods <= 0) throw new Error("El monto total debe ser mayor a 0");
+      // Un pago 100% descontado (beca) es válido y no lleva formas de pago
+      if (methods.length === 0 && totalDiscounts <= 0) throw new Error("Agregue al menos una forma de pago");
+      if (totalMethods + totalDiscounts <= 0) throw new Error("El monto total debe ser mayor a 0");
       if (Math.abs(difference) > 0.01 && difference < 0) throw new Error("El monto pagado es insuficiente para cubrir los conceptos seleccionados");
       // El libro mayor topa el abono al disponible del concepto, pero payment_items guarda el
       // monto crudo. Si se dejara pasar un monto mayor, la diferencia se registraria en la
@@ -380,8 +483,12 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
       for (const [balanceId, amountStr] of Object.entries(selectedConcepts)) {
         const bal = balances.find((b: any) => b.id === balanceId);
         if (!bal) continue;
-        if ((parseFloat(amountStr) || 0) > getEditableBalance(bal) + 0.01) {
-          const name = bal.payment_plan_concepts?.payment_concepts?.name || "un concepto";
+        const name = bal.payment_plan_concepts?.payment_concepts?.name || "un concepto";
+        const discErr = validateAdHocDiscount(conceptDiscounts[balanceId], getEditableOriginal(bal), name);
+        if (discErr) throw new Error(discErr);
+        // El descuento también cubre cuota: se cuenta junto al efectivo contra el disponible
+        const covered = (parseFloat(amountStr) || 0) + (discountByBalance[balanceId]?.discountVes || 0);
+        if (covered > getEditableBalance(bal) + 0.01) {
           throw new Error(`El monto asignado a "${name}" supera su disponible (${getEditableBalance(bal).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES)`);
         }
       }
@@ -405,9 +512,10 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
         // había liquidado (original_amount; legacy cae a amount_ves / snapshot).
         const cur = bal.currency || "VES";
         const snap = Number(bal.exchange_rate_snapshot) || 1;
+        // Se devuelve la cobertura completa: efectivo + descuento ad-hoc
         const itemOrig = cur === "VES"
-          ? Number(item.amount_ves || 0)
-          : (item.original_amount != null ? Number(item.original_amount) : Number(item.amount_ves || 0) / snap);
+          ? Number(item.amount_ves || 0) + Number(item.discount_amount_ves || 0)
+          : itemCoverageOriginal(item, snap);
         const remOrigBefore = cur === "VES" ? Number(bal.balance || 0) : Number(bal.balance || 0) / snap;
         let remOrig = remOrigBefore + itemOrig;
         if (cur !== "VES" && bal.original_amount != null) remOrig = Math.min(remOrig, Number(bal.original_amount));
@@ -451,13 +559,20 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
         const amount = parseFloat(amountStr) || 0;
         const cur = bal!.currency || "VES";
         const originalAmount = cur === "VES" ? amount : parseFloat((amount / (getRate(cur) || 1)).toFixed(4));
+        const draft = conceptDiscounts[balanceId];
+        const comp = discountByBalance[balanceId] || ZERO_DISCOUNT;
         return {
           payment_id: paymentId,
           plan_concept_id: bal!.plan_concept_id,
           student_id: bal!.student_id,
           amount_ves: amount,
           original_amount: originalAmount,
-          is_partial: amount < getEditableBalance(bal!) - 0.01,
+          discount_amount_ves: comp.discountVes,
+          discount_original_amount: cur === "VES" ? null : comp.discountOriginal,
+          discount_type: comp.discountVes > 0 ? draft!.type : "none",
+          discount_value: comp.discountVes > 0 ? (parseFloat(draft!.value) || 0) : 0,
+          discount_reason: comp.discountVes > 0 ? draft!.reason.trim() : null,
+          is_partial: !settlesInstallment(amount, comp.discountVes, getEditableBalance(bal!)),
         };
       });
       const { error: itemErr } = await supabase.from("payment_items").insert(newItems as any);
@@ -494,8 +609,11 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
           ? (Number(freshBal.balance) || 0)
           : (Number(freshBal.balance) || 0) / (Number(freshBal.exchange_rate_snapshot) || currentRate || 1);
         const paidOrig = cur === "VES" ? amount : amount / (currentRate || 1);
+        // El descuento cubre cuota igual que el efectivo (en moneda original, sin reconvertir)
+        const comp = discountByBalance[balanceId] || ZERO_DISCOUNT;
+        const discountOrig = cur === "VES" ? comp.discountVes : comp.discountOriginal;
         const tolOrig = cur === "VES" ? EXCHANGE_RATE_TOLERANCE_VES : EXCHANGE_RATE_TOLERANCE_VES / (currentRate || 1);
-        let remOrig = prevRemainingOrig - paidOrig;
+        let remOrig = prevRemainingOrig - paidOrig - discountOrig;
         if (remOrig > 0 && remOrig <= tolOrig) remOrig = 0;
         remOrig = Math.max(0, remOrig);
         const newTotalAmount = cur === "VES" ? (Number(freshBal.total_amount) || 0) : (Number(bal.original_amount) || 0) * currentRate;
@@ -654,6 +772,7 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
                       <TableHead>Total</TableHead>
                       <TableHead>Pagado</TableHead>
                       <TableHead>Disponible</TableHead>
+                      <TableHead>Descuento</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Monto a pagar</TableHead>
                     </TableRow>
@@ -666,7 +785,7 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
                         familyId && (
                           <TableRow key={`header-${sid}`} className="bg-muted/40 hover:bg-muted/40">
                             <TableCell></TableCell>
-                            <TableCell colSpan={6}>
+                            <TableCell colSpan={7}>
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold">{studentName(child.student)}</span>
                               </div>
@@ -699,6 +818,17 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
                               <TableCell>{Math.max(0, displayTotal - editableBalance).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                               <TableCell className="font-medium">{editableBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                               <TableCell>
+                                <ConceptDiscountCell
+                                  conceptName={conceptName}
+                                  currency={cur}
+                                  pendingOriginal={getEditableOriginal(b)}
+                                  rate={getRate(cur)}
+                                  value={conceptDiscounts[b.id] || null}
+                                  onApply={(draft) => applyConceptDiscount(b, draft)}
+                                  onClear={() => clearConceptDiscount(b)}
+                                />
+                              </TableCell>
+                              <TableCell>
                                 <Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>
                                   {b.status === "paid" ? "Pagado" : b.status === "partial" ? "Parcial" : "Pendiente"}
                                 </Badge>
@@ -708,8 +838,10 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
                                   <Input
                                     type="number"
                                     step="0.01"
-                                    className="h-7 w-28 text-xs"
+                                    className={`h-7 w-28 text-xs${discountByBalance[b.id] ? " bg-muted" : ""}`}
                                     value={selectedConcepts[b.id]}
+                                    readOnly={!!discountByBalance[b.id]}
+                                    title={discountByBalance[b.id] ? "El descuento cierra la cuota; quite el descuento para editar el monto" : undefined}
                                     onChange={(e) => {
                                       const val = Math.min(parseFloat(e.target.value) || 0, editableBalance);
                                       setSelectedConcepts((p) => ({ ...p, [b.id]: val.toFixed(2) }));
@@ -827,8 +959,14 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
 
             <Card className={difference < -0.01 ? "border-destructive" : (difference > 0.01 && surplusAction === "none") ? "border-yellow-500" : "border-green-500"}>
               <CardContent className="pt-4 space-y-3">
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className={`grid ${totalDiscounts > 0.01 ? "grid-cols-4" : "grid-cols-3"} gap-4 text-sm`}>
                   <div><span className="text-muted-foreground">Total Conceptos:</span><p className="text-lg font-bold">{totalConcepts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
+                  {totalDiscounts > 0.01 && (
+                    <div>
+                      <span className="text-muted-foreground">Descuentos:</span>
+                      <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">−{totalDiscounts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+                    </div>
+                  )}
                   <div><span className="text-muted-foreground">Total Pagado:</span><p className="text-lg font-bold">{totalMethods.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p></div>
                   <div>
                     <span className="text-muted-foreground">Diferencia:</span>
@@ -841,6 +979,12 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
                     </p>
                   </div>
                 </div>
+                {totalDiscounts > 0.01 && (
+                  <p className="text-xs text-muted-foreground">
+                    Cuotas cubiertas: {(totalConcepts + totalDiscounts).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                    {" "}(incluye {totalDiscounts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} en descuentos, que no son ingreso)
+                  </p>
+                )}
                 {difference > 0.01 && (
                   <div className="border-t pt-2 space-y-2">
                     {surplusAction === "none" ? (

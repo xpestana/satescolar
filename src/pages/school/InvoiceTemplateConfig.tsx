@@ -34,6 +34,8 @@ export const OVERLAY_FIELDS = [
   // General: todos los conceptos pagados en una sola línea
   { key: "concepts_all",        label: "Todos los conceptos (general)", example: "Mensualidad / Seguro", group: "concepts"},
   { key: "total_amount",        label: "Monto Total",                   example: "7.000,00",             group: "totals"  },
+  { key: "total_discount",      label: "Descuento otorgado",            example: "2.500,00",             group: "totals"  },
+  { key: "discount_reason",     label: "Motivo del descuento",          example: "Ingresó a mitad de mes", group: "totals" },
   { key: "payment_method_text", label: "Forma de pago",                 example: "Zelle (USD)",          group: "totals"  },
 ];
 
