@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Trash2, Loader2, Pencil, AlertTriangle, Tag, Users } from "lucide-react";
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
+import { resolveBankOnMethodChange } from "@/lib/paymentMethodBank";
 import { PaymentRateNotice } from "@/components/payments/PaymentRateNotice";
 import { getOverrideRate } from "@/lib/exchangeRateOverride";
 import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
@@ -292,6 +293,9 @@ export function EditPaymentModal({ open, onOpenChange, paymentId, schoolId, scho
     setMethods((prev) => prev.map((m) => {
       if (m.id !== id) return m;
       const updated = { ...m, [field]: value };
+      if (field === "method") {
+        updated.bank_name = resolveBankOnMethodChange(methodOptions, m.method, value, m.bank_name);
+      }
       if (["amount_original", "exchange_rate", "currency"].includes(field)) {
         const rate = field === "currency" ? getRate(value).toString() : (field === "exchange_rate" ? value : updated.exchange_rate);
         const amount = field === "amount_original" ? value : updated.amount_original;

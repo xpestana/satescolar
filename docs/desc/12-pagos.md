@@ -156,6 +156,11 @@ Pantalla `PaymentConfig` ("Configuración de Pagos") con **4 pestañas**:
   **"Otros"** en Ingresos): `payment_id`, `amount_ves`.
 - `payment_method_entries` — pago **multi-método**: por entrada `method`, `currency`,
   `amount_original`, `amount_ves`, `exchange_rate`, `bank_name`, `reference_code`.
+  > **Autocompletado del banco:** al elegir un método del colegio que tenga banco configurado
+  > en su `config`, el campo **Banco** de esa línea se rellena solo con ese banco
+  > (`src/lib/paymentMethodBank.ts`, usado por `PaymentFormModal`, `FamilyPaymentFormModal` y
+  > `EditPaymentModal`). Si el usuario escribió un banco a mano no se sobrescribe: solo se
+  > reemplaza el valor que había puesto el método anterior.
 - `payment_reports` — pagos **reportados por la familia** pendientes de confirmar
   (`confirmed_at`/`confirmed_payment_id`).
 - `payment_edit_log` — **auditoría de ediciones de pagos**: `payment_id`, `school_id`,
