@@ -135,11 +135,11 @@ export default function PaymentsReport() {
 
   // Catálogos derivados de los propios datos, para no ofrecer filtros vacíos
   const conceptTypes = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.conceptType).filter(Boolean))).sort(),
+    () => Array.from(new Set(rows.flatMap((r) => r.conceptTypes).filter(Boolean))).sort(),
     [rows],
   );
   const currencies = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.conceptCurrency).filter(Boolean))).sort(),
+    () => Array.from(new Set(rows.flatMap((r) => r.conceptCurrencies).filter(Boolean))).sort(),
     [rows],
   );
 
@@ -215,8 +215,8 @@ export default function PaymentsReport() {
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Líneas</p><p className="text-lg font-bold">{totals.rows}</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Facturas</p><p className="text-lg font-bold">{totals.payments}</p></CardContent></Card>
+        <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Conceptos</p><p className="text-lg font-bold">{totals.lines}</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Cobrado (VES)</p><p className="text-lg font-bold">{fmt(totals.amountVes)}</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Descuentos</p><p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{fmt(totals.discountVes)}</p></CardContent></Card>
         <Card><CardContent className="pt-4"><p className="text-xs text-muted-foreground">Exonerado</p><p className="text-lg font-bold text-purple-700 dark:text-purple-400">{fmt(totals.exoneratedVes)}</p></CardContent></Card>
@@ -226,7 +226,7 @@ export default function PaymentsReport() {
         <p className="text-sm text-muted-foreground">
           {sorted.length === 0
             ? "Sin resultados"
-            : `Mostrando ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, sorted.length)} de ${sorted.length} línea(s)`}
+            : `Mostrando ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, sorted.length)} de ${sorted.length} factura(s)`}
           {activeFilters && " (filtrado)"}
         </p>
         <Button variant="outline" className="gap-2" onClick={handleExport} disabled={sorted.length === 0}>

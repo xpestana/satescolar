@@ -1,13 +1,12 @@
 /**
- * Reporte de Pagos: una fila por **línea** de pago, no por factura.
+ * Reporte de Pagos: **una fila por factura**.
  *
- * Una factura puede cubrir varias cuotas (y de varios hijos en modo familia), así que la unidad
- * del reporte es la línea: cada cuota cobrada, cada ingreso de "Otros" y cada cuota exonerada.
- * Así se puede buscar y filtrar por concepto, plan, estudiante o método sin perder el detalle.
+ * Una factura puede cubrir varias cuotas y varios hijos; todo eso se agrega dentro de la misma
+ * fila (estudiantes, grados, planes, conceptos y montos) y se puede desplegar para ver el
+ * detalle línea por línea. Antes había una fila por cuota y la misma factura aparecía repetida.
  *
- * A diferencia de **Ingresos** (`IncomesReport`), que es un cuadre fiscal de dinero cobrado y
- * tiene columnas fijas, este reporte es de consulta: trae todo lo que se sabe del pago y se
- * ordena/filtra libremente.
+ * A diferencia de **Ingresos** (`IncomesReport`), que es un cuadre fiscal de columnas fijas,
+ * este reporte es de consulta: trae todo lo que se sabe del pago y se ordena/filtra libremente.
  */
 
 export type PaymentRowKind = "cuota" | "otros" | "exoneracion";
@@ -18,21 +17,12 @@ export const ROW_KIND_LABELS: Record<PaymentRowKind, string> = {
   exoneracion: "Exoneración",
 };
 
-export interface PaymentReportRow {
-  /** Id único de la fila (no del pago): permite varias líneas por factura. */
+/** Detalle de la factura: una cuota cobrada, un ingreso de "Otros" o una cuota exonerada. */
+export interface PaymentReportLine {
   id: string;
   kind: PaymentRowKind;
-  paymentId: string | null;
-  invoiceNumber: string;
-  controlNumber: string;
-  /** Fecha del pago (ISO yyyy-mm-dd). En exoneraciones sueltas, la fecha en que se aplicó. */
-  paymentDate: string;
-  registeredAt: string;
-  status: string;
   studentId: string | null;
   studentName: string;
-  studentDocument: string;
-  familyName: string;
   gradeLabel: string;
   planId: string | null;
   planName: string;
@@ -41,15 +31,41 @@ export interface PaymentReportRow {
   conceptCurrency: string;
   /** Monto liquidado en la moneda del concepto (USD/EUR); null si la cuota es en VES. */
   originalAmount: number | null;
-  /** Efectivo de la línea, en VES. */
   amountVes: number;
   discountVes: number;
   discountReason: string;
   exoneratedVes: number;
   exonerationReason: string;
   isPartial: boolean;
-  /** Total en VES de la factura a la que pertenece la línea. */
+}
+
+export interface PaymentReportRow {
+  /** Id de la factura; las exoneraciones sin pago usan su propio id. */
+  id: string;
+  paymentId: string | null;
+  invoiceNumber: string;
+  controlNumber: string;
+  paymentDate: string;
+  registeredAt: string;
+  status: string;
+  /** Estudiantes cubiertos por la factura, en orden y sin repetir. */
+  studentNames: string[];
+  studentsLabel: string;
+  studentDocuments: string;
+  gradesLabel: string;
+  familyName: string;
+  planIds: string[];
+  plansLabel: string;
+  conceptTypes: string[];
+  conceptCurrencies: string[];
+  conceptsLabel: string;
+  /** Efectivo cobrado en la factura (suma de las líneas). */
+  amountVes: number;
+  /** `payments.total_amount_ves`, el total emitido. */
   paymentTotalVes: number;
+  discountVes: number;
+  exoneratedVes: number;
+  hasPartial: boolean;
   methodIds: string[];
   methodsLabel: string;
   banks: string;
@@ -58,6 +74,7 @@ export interface PaymentReportRow {
   holderName: string;
   holderDocument: string;
   observations: string;
+  lines: PaymentReportLine[];
 }
 
 export interface PaymentsReportFilters {
@@ -96,8 +113,8 @@ export const EMPTY_FILTERS: PaymentsReportFilters = {
 };
 
 export type PaymentsReportSortKey =
-  | "invoiceNumber" | "paymentDate" | "studentName" | "familyName"
-  | "conceptName" | "planName" | "amountVes" | "paymentTotalVes" | "status";
+  | "invoiceNumber" | "paymentDate" | "studentsLabel" | "familyName"
+  | "conceptsLabel" | "plansLabel" | "amountVes" | "paymentTotalVes" | "status";
 
 export type SortDirection = "asc" | "desc";
 
@@ -127,13 +144,13 @@ export function compareInvoiceNumbers(a: string, b: string): number {
   return rawA.localeCompare(rawB, "es");
 }
 
-/** Texto sobre el que corre la búsqueda libre de una fila. */
+/** Texto sobre el que corre la búsqueda libre: la factura y todo su detalle. */
 export function rowSearchText(row: PaymentReportRow): string {
   return normalize([
-    row.invoiceNumber, row.controlNumber, row.studentName, row.studentDocument,
-    row.familyName, row.holderName, row.holderDocument, row.conceptName, row.planName,
+    row.invoiceNumber, row.controlNumber, row.studentsLabel, row.studentDocuments,
+    row.familyName, row.holderName, row.holderDocument, row.conceptsLabel, row.plansLabel,
     row.references, row.banks, row.methodsLabel, row.observations,
-    row.discountReason, row.exonerationReason,
+    ...row.lines.map((l) => `${l.conceptName} ${l.discountReason} ${l.exonerationReason}`),
   ].filter(Boolean).join(" "));
 }
 
@@ -147,16 +164,17 @@ export function filterPaymentRows(rows: PaymentReportRow[], filters: PaymentsRep
     if (filters.dateFrom && row.paymentDate < filters.dateFrom) return false;
     if (filters.dateTo && row.paymentDate > filters.dateTo) return false;
     if (filters.status !== "all" && row.status !== filters.status) return false;
-    if (filters.kind !== "all" && row.kind !== filters.kind) return false;
-    if (filters.conceptType && row.conceptType !== filters.conceptType) return false;
-    if (filters.planId && row.planId !== filters.planId) return false;
+    // Los filtros de detalle se cumplen si CUALQUIER línea de la factura los cumple
+    if (filters.kind !== "all" && !row.lines.some((l) => l.kind === filters.kind)) return false;
+    if (filters.conceptType && !row.conceptTypes.includes(filters.conceptType)) return false;
+    if (filters.planId && !row.planIds.includes(filters.planId)) return false;
     if (filters.methodId && !row.methodIds.includes(filters.methodId)) return false;
-    if (filters.conceptCurrency && row.conceptCurrency !== filters.conceptCurrency) return false;
+    if (filters.conceptCurrency && !row.conceptCurrencies.includes(filters.conceptCurrency)) return false;
     if (min != null && !Number.isNaN(min) && row.amountVes < min) return false;
     if (max != null && !Number.isNaN(max) && row.amountVes > max) return false;
     if (filters.onlyDiscounts && row.discountVes <= 0) return false;
     if (filters.onlyExonerations && row.exoneratedVes <= 0) return false;
-    if (filters.onlyPartial && !row.isPartial) return false;
+    if (filters.onlyPartial && !row.hasPartial) return false;
     return true;
   });
 }
@@ -176,7 +194,7 @@ export function sortPaymentRows(
       default: return normalize(String(a[key] ?? "")).localeCompare(normalize(String(b[key] ?? "")), "es");
     }
   };
-  // Desempate estable por factura y concepto, para que dos corridas den el mismo orden
+  // Desempate estable por factura, para que dos corridas den el mismo orden
   return [...rows].sort((a, b) => {
     const result = compare(a, b);
     if (result !== 0) return result * factor;
@@ -186,28 +204,29 @@ export function sortPaymentRows(
 }
 
 export interface PaymentsReportTotals {
-  rows: number;
+  /** Facturas mostradas. */
   payments: number;
+  /** Líneas de detalle que hay dentro de esas facturas. */
+  lines: number;
   amountVes: number;
   discountVes: number;
   exoneratedVes: number;
 }
 
-/** Totales de lo mostrado. `payments` cuenta facturas distintas, no líneas. */
 export function summarizePaymentRows(rows: PaymentReportRow[]): PaymentsReportTotals {
-  const invoices = new Set<string>();
+  let lines = 0;
   let amountVes = 0;
   let discountVes = 0;
   let exoneratedVes = 0;
   rows.forEach((row) => {
-    if (row.paymentId) invoices.add(row.paymentId);
+    lines += row.lines.length;
     amountVes += row.amountVes;
     discountVes += row.discountVes;
     exoneratedVes += row.exoneratedVes;
   });
   return {
-    rows: rows.length,
-    payments: invoices.size,
+    payments: rows.length,
+    lines,
     amountVes: parseFloat(amountVes.toFixed(2)),
     discountVes: parseFloat(discountVes.toFixed(2)),
     exoneratedVes: parseFloat(exoneratedVes.toFixed(2)),

@@ -304,25 +304,33 @@ Consulta transversal de **todo lo cobrado, descontado y exonerado** en un año e
 (`PaymentsReport.tsx`). Complementa a **Ingresos**, que es un cuadre fiscal de columnas fijas y
 no se debe alterar: este reporte es de búsqueda y auditoría, y ahí sí se agregan datos libremente.
 
-**Grano: una fila por línea, no por factura.** Una factura cubre varias cuotas (y varios hijos en
-modo familia), así que cada fila es una **cuota cobrada** (`payment_items`), un **ingreso de
-"Otros"** (`payment_others`) o una **cuota exonerada** (`concept_exonerations`), etiquetada en la
-columna *Tipo*. Así se puede filtrar por concepto, plan o método sin perder el detalle.
+**Grano: una fila por FACTURA.** Una factura familiar cubre cuotas de varios hijos; todo eso se
+agrega en la misma fila (estudiantes, grados, planes, conceptos y montos) y se **despliega** con
+el chevrón para ver el detalle línea por línea, igual que el historial de pagos. Cada línea del
+detalle es una **cuota cobrada** (`payment_items`), un **ingreso de "Otros"** (`payment_others`)
+o una **cuota exonerada** (`concept_exonerations`), con su etiqueta de tipo.
+> 🐞 Corregido: la primera versión ponía una fila por cuota, así que una factura de tres
+> hermanos aparecía tres veces. El reporte es **por factura**; el desglose va dentro.
 
-**Columnas:** N° de factura, N° de control, fecha, tipo de línea, estudiante + cédula, grado y
-sección, familia (y titular de la factura), plan, concepto + tipo de concepto (con el monto en la
-moneda original si la cuota es en USD/EUR y la marca de *parcial*), monto en VES, descuento con su
-motivo, exonerado con su motivo, total de la factura, métodos + banco, referencia y estado.
+**Columnas:** acciones, chevrón de detalle, N° de factura (+ control), fecha, familia (+ titular),
+estudiantes (+ sus grados/secciones), conceptos (+ cuántos y si hay parciales), plan, total de la
+factura, descuento, exonerado, métodos (+ referencia) y estado. Al desplegar: cada concepto con
+su estudiante, grado, monto (y monto en moneda original), descuento o exoneración con su motivo,
+más las formas de pago, banco, referencia, titular y observaciones.
+
+Las **exoneraciones sin factura** (aplicadas sin cobrar nada) forman su propia fila, sin N° de
+factura ni acciones de impresión.
 
 **Orden:** por defecto **N° de factura ascendente**, tratando el número como número aunque traiga
 ceros a la izquierda (`016836` va después de `9836`) y dejando las vacías al final. Se puede
-ordenar por fecha, estudiante, familia, plan, concepto, monto, total o estado haciendo clic en la
+ordenar por fecha, estudiantes, familia, plan, conceptos, total o estado haciendo clic en la
 cabecera (segundo clic invierte). El desempate siempre es por factura, para que dos corridas den
 el mismo orden.
 
 **Filtros:** búsqueda libre (factura, control, estudiante, cédula, familia, titular, concepto,
 plan, referencia, banco, observaciones y motivos, **sin acentos**) más un panel avanzado con:
-rango de fechas, estado (completado/anulado), tipo de línea, plan, tipo de concepto, método de
+rango de fechas, estado (completado/anulado), tipo de línea (la factura entra si CUALQUIERA de
+sus líneas es de ese tipo), plan, tipo de concepto, método de
 pago, moneda del concepto, rango de monto y tres interruptores (*solo con descuento*, *solo
 exoneradas*, *solo abonos parciales*). El botón muestra cuántos filtros hay activos y permite
 limpiarlos.
@@ -330,9 +338,9 @@ limpiarlos.
 **Año escolar:** mismo selector compartido que Registro de Pagos y Morosos
 (`useSchoolYearSelection` + `SchoolYearSelect`), con el aviso ámbar cuando no es el año en curso.
 
-**Paginación:** 20 líneas por página, sobre el resultado ya filtrado y ordenado.
+**Paginación:** 20 facturas por página, sobre el resultado ya filtrado y ordenado.
 
-**Columna "Acciones" (primera de la tabla):** cada línea con pago asociado tiene dos botones:
+**Columna "Acciones" (primera de la tabla):** cada factura tiene dos botones:
 - 🖨 **Imprimir factura** — abre la **factura sobre el formato preimpreso** usando la plantilla
   **activa de `/formatos`** (`printInvoiceOverlay` + `buildInvoiceData`). El papel sale con el
   tamaño exacto de la plantilla (`@page size: {paper_width_mm}mm {paper_height_mm}mm; margin: 0`)
@@ -341,12 +349,14 @@ limpiarlos.
   formatos. Si el colegio no tiene plantilla activa, avisa y no imprime nada.
 - ⬇ **Descargar recibo PDF** — el comprobante **propio del sistema** (A4, con sus rótulos), no la
   factura fiscal: encabezado, conceptos con descuento, métodos, total y descuentos otorgados.
-Las exoneraciones sin pago asociado no tienen botones (no hay factura que imprimir).
+Las exoneraciones sin factura no tienen botones (no hay factura que imprimir).
 
 **Excel:** el botón *Descargar Excel* exporta **lo que esté filtrado en ese momento**; si no hay
-filtros, exporta todas las líneas del año. Sale con las 28 columnas, fila de TOTALES (cobrado,
-descuentos y exonerado), encabezado congelado y el mismo estilo que el Excel de Ingresos
-(`xlsx-js-style`). El nombre del archivo indica el año y si venía filtrado.
+filtros, exporta todas las facturas del año. Salen **dos hojas**: *"Facturas"* (una fila por
+factura, lo mismo que la pantalla, con fila de TOTALES) y *"Detalle por cuota"* (una fila por
+concepto/estudiante, para tabular sin perder el desglose). Encabezado congelado y el mismo estilo
+que el Excel de Ingresos (`xlsx-js-style`). El nombre del archivo indica el año y si venía
+filtrado.
 
 **Piezas:** lógica pura y probada en `src/lib/paymentsReport.ts` (filtros, orden, totales,
 paginación) y `src/lib/paymentsReportRows.ts` (mapeo de los datos crudos a filas), datos en

@@ -1,7 +1,11 @@
-import type { PaymentReportRow } from "@/lib/paymentsReport";
+import type { PaymentReportLine, PaymentReportRow } from "@/lib/paymentsReport";
 
 /**
  * Arma las filas del Reporte de Pagos a partir de los datos crudos de Supabase.
+ *
+ * **Una fila por factura.** Las cuotas, los ingresos de "Otros" y las cuotas exoneradas de esa
+ * factura viajan dentro, en `lines`, y la UI las despliega — igual que el historial de pagos.
+ * Las exoneraciones que no cuelgan de ningún pago forman su propia fila.
  *
  * Separado de `paymentsReport.ts` (filtros/orden/totales) para que el mapeo de la forma que
  * devuelve la consulta viva en un solo sitio y se pueda probar sin tocar la UI.
@@ -93,14 +97,18 @@ const EMPTY_CONTEXT: PaymentsReportContext = {
 
 const num = (v: unknown) => Number(v) || 0;
 const text = (v: unknown) => (v == null ? "" : String(v));
+const round = (n: number) => parseFloat(n.toFixed(2));
 
-/** Une valores no vacíos y sin repetir ("Zelle · Transferencia"). */
+/** Valores no vacíos, sin repetir y en orden de aparición. */
+const uniq = (values: (string | null | undefined)[]) =>
+  Array.from(new Set(values.map((v) => (v || "").trim()).filter(Boolean)));
+
 const joinUnique = (values: (string | null | undefined)[], separator = " · ") =>
-  Array.from(new Set(values.map((v) => (v || "").trim()).filter(Boolean))).join(separator);
+  uniq(values).join(separator);
 
 function methodSummary(entries: RawMethodEntry[], methodLabels: Record<string, string>) {
   return {
-    methodIds: Array.from(new Set(entries.map((m) => text(m.method)).filter(Boolean))),
+    methodIds: uniq(entries.map((m) => text(m.method))),
     methodsLabel: joinUnique(entries.map((m) => methodLabels[text(m.method)] || text(m.method))),
     banks: joinUnique(entries.map((m) => text(m.bank_name))),
     references: joinUnique(entries.map((m) => text(m.reference_code))),
@@ -108,49 +116,81 @@ function methodSummary(entries: RawMethodEntry[], methodLabels: Record<string, s
   };
 }
 
-/**
- * Una fila por cuota cobrada (`payment_items`), por ingreso de "Otros" (`payment_others`)
- * y por cuota exonerada (`concept_exonerations`).
- */
+/** Agrega en la fila de la factura lo que aportan sus líneas. */
+function summarizeLines(lines: PaymentReportLine[], ctx: PaymentsReportContext) {
+  const studentIds = uniq(lines.map((l) => l.studentId));
+  return {
+    studentNames: studentIds.map((id) => ctx.studentNames[id] || "").filter(Boolean),
+    studentsLabel: joinUnique(lines.map((l) => l.studentName), " / "),
+    studentDocuments: joinUnique(studentIds.map((id) => ctx.studentDocuments[id] || "")),
+    gradesLabel: joinUnique(lines.map((l) => l.gradeLabel)),
+    planIds: uniq(lines.map((l) => l.planId)),
+    plansLabel: joinUnique(lines.map((l) => l.planName)),
+    conceptTypes: uniq(lines.map((l) => l.conceptType)),
+    conceptCurrencies: uniq(lines.map((l) => l.conceptCurrency)),
+    conceptsLabel: joinUnique(lines.map((l) => l.conceptName), ", "),
+    amountVes: round(lines.reduce((s, l) => s + l.amountVes, 0)),
+    discountVes: round(lines.reduce((s, l) => s + l.discountVes, 0)),
+    exoneratedVes: round(lines.reduce((s, l) => s + l.exoneratedVes, 0)),
+    hasPartial: lines.some((l) => l.isPartial),
+  };
+}
+
 export function buildPaymentReportRows(
   payments: RawPayment[],
   exonerations: RawExoneration[] = [],
   context: Partial<PaymentsReportContext> = {},
 ): PaymentReportRow[] {
   const ctx = { ...EMPTY_CONTEXT, ...context };
-  const rows: PaymentReportRow[] = [];
-  const studentInfo = (studentId: string | null, fallbackFamily = "") => ({
+  const studentInfo = (studentId: string | null) => ({
     studentId,
     studentName: studentId ? (ctx.studentNames[studentId] || "") : "",
-    studentDocument: studentId ? (ctx.studentDocuments[studentId] || "") : "",
-    familyName: studentId ? (ctx.studentFamilies[studentId] || "") : fallbackFamily,
     gradeLabel: studentId ? (ctx.studentGrades[studentId] || "") : "",
   });
 
-  (payments || []).forEach((payment) => {
-    const methods = methodSummary(payment.payment_method_entries || [], ctx.methodLabels);
-    const base = {
-      paymentId: text(payment.id),
-      invoiceNumber: text(payment.invoice_number),
-      controlNumber: text(payment.control_number),
-      paymentDate: text(payment.payment_date),
-      registeredAt: text(payment.created_at),
-      status: text(payment.status),
-      paymentTotalVes: num(payment.total_amount_ves),
-      holderName: text(payment.invoice_name),
-      holderDocument: text(payment.invoice_rif),
-      observations: text(payment.observations),
-      ...methods,
+  // Exoneraciones agrupadas por la factura en cuyo registro se aplicaron
+  const exonerationsByPayment = new Map<string, RawExoneration[]>();
+  const looseExonerations: RawExoneration[] = [];
+  (exonerations || []).forEach((exoneration) => {
+    const paymentId = text(exoneration.payment_id);
+    if (!paymentId) { looseExonerations.push(exoneration); return; }
+    const list = exonerationsByPayment.get(paymentId) || [];
+    list.push(exoneration);
+    exonerationsByPayment.set(paymentId, list);
+  });
+
+  const exonerationLine = (exoneration: RawExoneration): PaymentReportLine => {
+    const planConcept = exoneration.payment_plan_concepts || {};
+    const concept = planConcept.payment_concepts || {};
+    return {
+      id: `exoneration:${exoneration.id}`,
+      kind: "exoneracion",
+      ...studentInfo(text(exoneration.student_id) || null),
+      planId: text(planConcept.plan_id) || null,
+      planName: text(planConcept.payment_plans?.name),
+      conceptName: text(concept.name),
+      conceptType: text(concept.concept_type),
+      conceptCurrency: text(exoneration.currency) || "VES",
+      originalAmount: exoneration.original_amount == null ? null : num(exoneration.original_amount),
+      amountVes: 0,
+      discountVes: 0,
+      discountReason: "",
+      exoneratedVes: num(exoneration.amount_ves),
+      exonerationReason: text(exoneration.reason),
+      isPartial: false,
     };
+  };
+
+  const rows: PaymentReportRow[] = (payments || []).map((payment) => {
+    const lines: PaymentReportLine[] = [];
 
     (payment.payment_items || []).forEach((item) => {
       const planConcept = item.payment_plan_concepts || {};
       const concept = planConcept.payment_concepts || {};
-      rows.push({
-        ...base,
+      lines.push({
         id: `item:${item.id}`,
         kind: "cuota",
-        ...studentInfo(text(item.student_id) || text(payment.student_id) || null, text(payment.invoice_name)),
+        ...studentInfo(text(item.student_id) || text(payment.student_id) || null),
         planId: text(planConcept.plan_id) || null,
         planName: text(planConcept.payment_plans?.name),
         conceptName: text(concept.name),
@@ -167,11 +207,10 @@ export function buildPaymentReportRows(
     });
 
     (payment.payment_others || []).forEach((other) => {
-      rows.push({
-        ...base,
+      lines.push({
         id: `other:${other.id}`,
         kind: "otros",
-        ...studentInfo(text(payment.student_id) || null, text(payment.invoice_name)),
+        ...studentInfo(text(payment.student_id) || null),
         planId: null,
         planName: "",
         conceptName: text(other.notes) || "Otros ingresos",
@@ -186,45 +225,58 @@ export function buildPaymentReportRows(
         isPartial: false,
       });
     });
+
+    (exonerationsByPayment.get(text(payment.id)) || []).forEach((exoneration) => {
+      lines.push(exonerationLine(exoneration));
+    });
+
+    const summary = summarizeLines(lines, ctx);
+    const firstStudentId = lines.map((l) => l.studentId).find(Boolean) || null;
+    return {
+      id: text(payment.id),
+      paymentId: text(payment.id),
+      invoiceNumber: text(payment.invoice_number),
+      controlNumber: text(payment.control_number),
+      paymentDate: text(payment.payment_date),
+      registeredAt: text(payment.created_at),
+      status: text(payment.status),
+      // La familia sale del primer hijo de la factura; si no hay, del titular facturado
+      familyName: (firstStudentId && ctx.studentFamilies[firstStudentId]) || text(payment.invoice_name),
+      holderName: text(payment.invoice_name),
+      holderDocument: text(payment.invoice_rif),
+      observations: text(payment.observations),
+      paymentTotalVes: num(payment.total_amount_ves),
+      ...methodSummary(payment.payment_method_entries || [], ctx.methodLabels),
+      ...summary,
+      lines,
+    };
   });
 
-  const paymentsById = new Map<string, RawPayment>();
-  (payments || []).forEach((p) => paymentsById.set(text(p.id), p));
-
-  (exonerations || []).forEach((exoneration) => {
-    const paymentId = text(exoneration.payment_id);
-    const payment = paymentId ? paymentsById.get(paymentId) : undefined;
-    const methods = methodSummary(payment?.payment_method_entries || [], ctx.methodLabels);
-    const planConcept = exoneration.payment_plan_concepts || {};
-    const concept = planConcept.payment_concepts || {};
+  // Exoneraciones sin factura: cada una es su propia fila
+  looseExonerations.forEach((exoneration) => {
+    const lines = [exonerationLine(exoneration)];
+    const summary = summarizeLines(lines, ctx);
+    const studentId = text(exoneration.student_id) || null;
     rows.push({
       id: `exoneration:${exoneration.id}`,
-      kind: "exoneracion",
-      paymentId: paymentId || null,
-      invoiceNumber: text(payment?.invoice_number),
-      controlNumber: text(payment?.control_number),
-      // Sin pago asociado, la fecha del hecho es la de la exoneración
-      paymentDate: text(payment?.payment_date) || text(exoneration.created_at).slice(0, 10),
+      paymentId: null,
+      invoiceNumber: "",
+      controlNumber: "",
+      paymentDate: text(exoneration.created_at).slice(0, 10),
       registeredAt: text(exoneration.created_at),
-      status: text(payment?.status) || "completed",
-      ...studentInfo(text(exoneration.student_id) || null),
-      planId: text(planConcept.plan_id) || null,
-      planName: text(planConcept.payment_plans?.name),
-      conceptName: text(concept.name),
-      conceptType: text(concept.concept_type),
-      conceptCurrency: text(exoneration.currency) || "VES",
-      originalAmount: exoneration.original_amount == null ? null : num(exoneration.original_amount),
-      amountVes: 0,
-      discountVes: 0,
-      discountReason: "",
-      exoneratedVes: num(exoneration.amount_ves),
-      exonerationReason: text(exoneration.reason),
-      isPartial: false,
-      paymentTotalVes: num(payment?.total_amount_ves),
-      holderName: text(payment?.invoice_name),
-      holderDocument: text(payment?.invoice_rif),
-      observations: text(payment?.observations),
-      ...methods,
+      status: "completed",
+      familyName: (studentId && ctx.studentFamilies[studentId]) || "",
+      holderName: "",
+      holderDocument: "",
+      observations: "",
+      paymentTotalVes: 0,
+      methodIds: [],
+      methodsLabel: "",
+      banks: "",
+      references: "",
+      paymentCurrencies: "",
+      ...summary,
+      lines,
     });
   });
 
