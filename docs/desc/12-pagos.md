@@ -40,7 +40,7 @@ y **debe respetarse al generar/imprimir la factura**.
 
 - **Dónde se imprime la factura con la plantilla:** Estado de cuenta por estudiante
   (`StudentLedger`), Estado de cuenta por familia (`FamilyLedgerView`) y **Reporte de Pagos**
-  (`/pagos/reporte`, columna *Factura*). Las tres usan la misma pieza,
+  (`/pagos/reporte`, columna *Acciones*). Las tres usan la misma pieza,
   `printInvoiceOverlay(activeTemplate, buildInvoiceData(...))`: abre una ventana con
   `@page size: {paper_width_mm}mm {paper_height_mm}mm; margin: 0` y solo los datos posicionados
   en `x_mm`/`y_mm`, porque los rótulos y recuadros los pone el papel preimpreso.
@@ -321,7 +321,7 @@ limpiarlos.
 
 **Paginación:** 20 líneas por página, sobre el resultado ya filtrado y ordenado.
 
-**Columna "Factura" (imprimir / descargar):** cada línea con pago asociado tiene dos botones:
+**Columna "Acciones" (primera de la tabla):** cada línea con pago asociado tiene dos botones:
 - 🖨 **Imprimir factura** — abre la **factura sobre el formato preimpreso** usando la plantilla
   **activa de `/formatos`** (`printInvoiceOverlay` + `buildInvoiceData`). El papel sale con el
   tamaño exacto de la plantilla (`@page size: {paper_width_mm}mm {paper_height_mm}mm; margin: 0`)

@@ -20,6 +20,8 @@ interface Column {
 
 /** Columnas de la tabla; `key` no nulo = se puede ordenar por ella. */
 const COLUMNS: Column[] = [
+  // Las acciones van primero: imprimir la factura es lo que más se hace desde este reporte
+  { key: null, label: "Acciones" },
   { key: "invoiceNumber", label: "Factura" },
   { key: null, label: "Control" },
   { key: "paymentDate", label: "Fecha" },
@@ -36,7 +38,6 @@ const COLUMNS: Column[] = [
   { key: null, label: "Métodos" },
   { key: null, label: "Referencia" },
   { key: "status", label: "Estado" },
-  { key: null, label: "Factura", className: "text-right" },
 ];
 
 const KIND_BADGE: Record<string, string> = {
@@ -98,6 +99,32 @@ export function PaymentsReportTable({
             </TableRow>
           ) : rows.map((row) => (
             <TableRow key={row.id} className={row.status === "voided" ? "opacity-60" : ""}>
+              <TableCell>
+                {row.paymentId ? (
+                  <div className="flex gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      title="Imprimir factura en el formato del colegio"
+                      onClick={() => onPrintInvoice(row.paymentId!)}
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      title="Descargar recibo en PDF"
+                      onClick={() => onDownloadReceipt(row.paymentId!)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </TableCell>
               <TableCell className="whitespace-nowrap font-medium">{row.invoiceNumber || "—"}</TableCell>
               <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{row.controlNumber || "—"}</TableCell>
               <TableCell className="whitespace-nowrap">{row.paymentDate ? formatDateOnly(row.paymentDate) : "—"}</TableCell>
@@ -152,32 +179,6 @@ export function PaymentsReportTable({
                 <Badge variant={row.status === "voided" ? "destructive" : "default"} className="whitespace-nowrap">
                   {row.status === "voided" ? "Anulado" : "Completado"}
                 </Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                {row.paymentId ? (
-                  <div className="flex justify-end gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      title="Imprimir factura en el formato del colegio"
-                      onClick={() => onPrintInvoice(row.paymentId!)}
-                    >
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-7 w-7"
-                      title="Descargar recibo en PDF"
-                      onClick={() => onDownloadReceipt(row.paymentId!)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
               </TableCell>
             </TableRow>
           ))}
