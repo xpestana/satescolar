@@ -160,7 +160,10 @@ export default function StudentLedger() {
       toast({ title: "Sin plantilla activa", description: "Configura y activa una plantilla de factura en Configuración > Formato de Factura.", variant: "destructive" });
       return;
     }
-    const data = buildInvoiceData(payment, studentName, gradeLevel, sectionName, methodLabel);
+    // Modo estudiante: la factura es de un solo hijo, así que su bloque es el único que se llena
+    const data = buildInvoiceData(payment, studentName, gradeLevel, sectionName, methodLabel, [
+      { name: studentName, gradeLevel, sectionName },
+    ]);
     printInvoiceOverlay(activeTemplate, data);
   };
 

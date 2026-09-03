@@ -37,12 +37,39 @@ export const GRADE_LABELS: Record<string, string> = {
  * The template only prints the concepts whose keys are in this map,
  * so unpaid concepts are automatically skipped.
  */
+/**
+ * Cuántos estudiantes admite la factura con campos propios (nombre, grado y sección).
+ * Una factura familiar cubre las mensualidades de varios hijos y cada uno debe salir en la
+ * línea que le toca del formato preimpreso, con **su** grado y sección.
+ */
+export const MAX_INVOICE_STUDENTS = 4;
+
+/** Un estudiante de la factura, tal como se imprime en su línea. */
+export interface InvoiceStudent {
+  name: string;
+  /** Valor del enum `grade_level` (se traduce con GRADE_LABELS) o el texto ya formateado. */
+  gradeLevel: string;
+  sectionName: string;
+}
+
+/** Claves de plantilla del estudiante n (1-based): `student_name_2`, `student_grade_2`, … */
+export const invoiceStudentKeys = (index: number) => ({
+  name: `student_name_${index}`,
+  grade: `student_grade_${index}`,
+  section: `student_section_${index}`,
+});
+
 export function buildInvoiceData(
   payment: any,
   studentName: string,
   gradeLevel: string,
   sectionName: string,
   methodLabel: (raw: string) => string,
+  /**
+   * Estudiantes del pago, en orden. Alimenta los campos numerados; si no se pasa, se asume uno
+   * solo con los tres parámetros anteriores (compatibilidad con las plantillas existentes).
+   */
+  students?: InvoiceStudent[],
 ): Record<string, string> {
   const date = parseDateOnly(payment.payment_date) ?? new Date(payment.payment_date);
   const fmt  = (n: number) =>
@@ -86,6 +113,20 @@ export function buildInvoiceData(
   // ── General summary field (all paid concept names on one line) ────────
   const conceptsAll = conceptNames.join(" / ");
 
+  // ── Un bloque de campos por estudiante ────────────────────────────────
+  // El formato preimpreso tiene una línea por hijo: cada uno imprime su nombre, su grado y su
+  // sección. Los sobrantes quedan vacíos y el overlay no los imprime.
+  const roster: InvoiceStudent[] = students && students.length > 0
+    ? students
+    : [{ name: studentName, gradeLevel, sectionName }];
+  const studentFields: Record<string, string> = {};
+  roster.slice(0, MAX_INVOICE_STUDENTS).forEach((student, index) => {
+    const keys = invoiceStudentKeys(index + 1);
+    studentFields[keys.name] = student.name || "";
+    studentFields[keys.grade] = GRADE_LABELS[student.gradeLevel] || student.gradeLevel || "";
+    studentFields[keys.section] = student.sectionName || "";
+  });
+
   // ── Payment method text ───────────────────────────────────────────────
   const methodText = methods
     .map((m: any) => {
@@ -106,6 +147,7 @@ export function buildInvoiceData(
     student_name:        studentName,
     student_grade:       GRADE_LABELS[gradeLevel] || gradeLevel,
     student_section:     sectionName,
+    ...studentFields,
     concepts_all:        conceptsAll,
     ...conceptMarks,
     ...conceptAmounts,

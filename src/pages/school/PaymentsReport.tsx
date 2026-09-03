@@ -82,14 +82,17 @@ export default function PaymentsReport() {
 
   const methodLabel = (raw: string) => context.methodLabels[raw] || raw || "—";
 
-  /** Nombre del estudiante (o de los hijos) que encabeza la factura y el recibo. */
-  const paymentStudentNames = (payment: { student_id?: string | null; payment_items?: { student_id?: string | null }[] | null }) => {
+  /** Estudiantes cubiertos por la factura, en orden y sin repetir. */
+  const paymentStudentIds = (payment: { student_id?: string | null; payment_items?: { student_id?: string | null }[] | null }) => {
     const ids = new Set<string>();
     if (payment.student_id) ids.add(payment.student_id);
     (payment.payment_items || []).forEach((it) => { if (it.student_id) ids.add(it.student_id); });
-    const names = [...ids].map((id) => context.studentNames[id]).filter(Boolean);
-    return names.join(" / ");
+    return [...ids];
   };
+
+  /** Nombre del estudiante (o de los hijos) que encabeza la factura y el recibo. */
+  const paymentStudentNames = (payment: { student_id?: string | null; payment_items?: { student_id?: string | null }[] | null }) =>
+    paymentStudentIds(payment).map((id) => context.studentNames[id]).filter(Boolean).join(" / ");
 
   const handlePrintInvoice = (paymentId: string) => {
     const payment = paymentsById.get(paymentId);
@@ -102,16 +105,19 @@ export default function PaymentsReport() {
       });
       return;
     }
-    // El grado/sección de la factura sale del primer estudiante del pago
-    const firstStudentId = payment.student_id
-      || (payment.payment_items || []).map((it) => it.student_id).find(Boolean)
-      || "";
+    // Un bloque por hijo: si la factura cubre a varios, cada uno lleva su grado y sección
+    const students = paymentStudentIds(payment).map((id) => ({
+      name: context.studentNames[id] || "",
+      gradeLevel: context.studentGradeLevels[id] || "",
+      sectionName: context.studentSections[id] || "",
+    }));
     const data = buildInvoiceData(
       payment,
       paymentStudentNames(payment),
-      context.studentGradeLevels[firstStudentId] || "",
-      context.studentSections[firstStudentId] || "",
+      students[0]?.gradeLevel || "",
+      students[0]?.sectionName || "",
       methodLabel,
+      students,
     );
     printInvoiceOverlay(activeTemplate, data);
   };

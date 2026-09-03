@@ -258,14 +258,25 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
       toast({ title: "Sin plantilla activa", description: "Configura y activa una plantilla de factura en Configuración > Formato de Factura.", variant: "destructive" });
       return;
     }
-    let grade = "";
-    let section = "";
-    if (!payment.family_id && payment.student_id) {
-      const e = enrollmentByStudent[payment.student_id];
-      grade = e?.sections?.grade_level || "";
-      section = e?.sections?.name || "";
-    }
-    const data = buildInvoiceData(payment, paymentDisplayName(payment), grade, section, methodLabel);
+    // Un bloque por hijo: la factura familiar cubre a varios y cada uno lleva su grado y sección
+    const studentIds = [...new Set([
+      ...(payment.student_id ? [payment.student_id] : []),
+      ...(payment.payment_items || []).map((it: any) => it.student_id).filter(Boolean),
+    ])] as string[];
+    const students = studentIds.map((id) => ({
+      name: studentNameMap[id] || "",
+      gradeLevel: enrollmentByStudent[id]?.sections?.grade_level || "",
+      sectionName: enrollmentByStudent[id]?.sections?.name || "",
+    }));
+    const first = students[0];
+    const data = buildInvoiceData(
+      payment,
+      paymentDisplayName(payment),
+      first?.gradeLevel || "",
+      first?.sectionName || "",
+      methodLabel,
+      students,
+    );
     printInvoiceOverlay(activeTemplate, data);
   };
 

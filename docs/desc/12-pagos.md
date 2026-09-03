@@ -38,6 +38,17 @@ y **debe respetarse al generar/imprimir la factura**.
   Los **recibos PDF** de estado de cuenta sí muestran el descuento siempre (columna + línea de
   motivo), sin depender de la plantilla.
 
+- **Varios hijos en una misma factura:** una factura familiar cubre las mensualidades de 2 o 3
+  hermanos y **cada uno debe salir en su línea, con su grado y su sección**. Para eso el catálogo
+  trae un **bloque por hijo**: `student_name_1..4`, `student_grade_1..4` y `student_section_1..4`
+  (*"Estudiante 2 — Grado"*, etc.), que el colegio coloca en las líneas que tenga su formato. El
+  tope es `MAX_INVOICE_STUDENTS` en `src/lib/buildInvoiceData.ts`. Los bloques sobrantes quedan
+  vacíos y **no se imprimen** (el overlay descarta los campos sin valor).
+  - Los campos antiguos siguen funcionando: `student_name` imprime **todos los nombres en una
+    línea** y `student_grade`/`student_section` son los del **primer** hijo, así que las
+    plantillas ya diseñadas no cambian de comportamiento.
+  - El orden de los hijos es el del pago: primero `payments.student_id` (modo estudiante) y luego
+    los `payment_items.student_id` sin repetir. Grado y sección salen de la inscripción del año.
 - **Dónde se imprime la factura con la plantilla:** Estado de cuenta por estudiante
   (`StudentLedger`), Estado de cuenta por familia (`FamilyLedgerView`) y **Reporte de Pagos**
   (`/pagos/reporte`, columna *Acciones*). Las tres usan la misma pieza,

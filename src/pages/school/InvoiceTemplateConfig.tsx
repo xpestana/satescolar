@@ -15,6 +15,7 @@ import { Plus, Edit, Trash2, Loader2, CheckCircle2, Eye } from "lucide-react";
 import { uploadToS3 } from "@/lib/s3-upload";
 import { InvoiceCanvasEditor } from "@/components/payments/InvoiceCanvasEditor";
 import { InvoiceOverlayPreview } from "@/components/payments/InvoiceOverlayPreview";
+import { MAX_INVOICE_STUDENTS, invoiceStudentKeys } from "@/lib/buildInvoiceData";
 
 /**
  * Static overlay fields (not concept-dependent).
@@ -28,9 +29,25 @@ export const OVERLAY_FIELDS = [
   { key: "date_year",           label: "Fecha – Año",                   example: "2026",                 group: "header"  },
   { key: "titular_nombre",      label: "Nombre / Razón Social",         example: "Juan Pérez",           group: "titular" },
   { key: "titular_ci",          label: "C.I. / RIF",                    example: "V-12345678",           group: "titular" },
-  { key: "student_name",        label: "Para acreditar a (estudiante)", example: "Ana García",           group: "student" },
-  { key: "student_grade",       label: "Grado",                         example: "3er Año",              group: "student" },
-  { key: "student_section",     label: "Sección",                       example: "A",                    group: "student" },
+  { key: "student_name",        label: "Estudiante(s) — todos en una línea", example: "Ana García / Luis García", group: "student" },
+  { key: "student_grade",       label: "Grado (del 1er estudiante)",    example: "3er Año",              group: "student" },
+  { key: "student_section",     label: "Sección (del 1er estudiante)",  example: "A",                    group: "student" },
+  // Un bloque por hijo: una factura familiar cubre a varios y cada uno lleva su grado y sección
+  ...Array.from({ length: MAX_INVOICE_STUDENTS }, (_, i) => {
+    const n = i + 1;
+    const keys = invoiceStudentKeys(n);
+    const examples = [
+      { name: "Ana García", grade: "3er Año", section: "A" },
+      { name: "Luis García", grade: "1er Año", section: "B" },
+      { name: "Sofía García", grade: "6to Grado", section: "U" },
+      { name: "Pedro García", grade: "2do Grado", section: "A" },
+    ][i];
+    return [
+      { key: keys.name,    label: `Estudiante ${n} — Nombre`,  example: examples.name,    group: "student" },
+      { key: keys.grade,   label: `Estudiante ${n} — Grado`,   example: examples.grade,   group: "student" },
+      { key: keys.section, label: `Estudiante ${n} — Sección`, example: examples.section, group: "student" },
+    ];
+  }).flat(),
   // General: todos los conceptos pagados en una sola línea
   { key: "concepts_all",        label: "Todos los conceptos (general)", example: "Mensualidad / Seguro", group: "concepts"},
   { key: "total_amount",        label: "Monto Total",                   example: "7.000,00",             group: "totals"  },
