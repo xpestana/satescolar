@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildInvoiceOverlayPdf, invoiceOverlayPdfName } from "./invoiceOverlayPdf";
+import { MIN_FIT_FONT_PT, buildInvoiceOverlayPdf, fitTextToField, invoiceOverlayPdfName } from "./invoiceOverlayPdf";
 import { printableOverlayFields } from "./invoiceFieldValue";
 import type { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 
@@ -52,8 +52,49 @@ describe("buildInvoiceOverlayPdf", () => {
     expect(() => buildInvoiceOverlayPdf(template({ fields: [] }), data)).not.toThrow();
   });
 
+  it("no deja que un texto largo se salga de su campo", () => {
+    const doc = buildInvoiceOverlayPdf(
+      template({
+        fields: [{ key: "student_name", x_mm: 20, y_mm: 40, width_mm: 40, font_size_pt: 9 }],
+      } as Partial<InvoiceTemplate>),
+      { student_name: "SARA BEATRIZ LEAL ALBORNOZ / MILLY ANDREA LEAL ALBORNOZ / JUAN ANDRES LEAL ALBORNOZ" },
+    );
+    // La letra queda por debajo de la configurada porque hubo que achicarla para que quepa
+    expect(doc.getFontSize()).toBeLessThan(9);
+  });
+
   it("nombra el archivo con el número de factura", () => {
     expect(invoiceOverlayPdfName({ invoice_number: "016725" })).toBe("factura_016725.pdf");
     expect(invoiceOverlayPdfName({})).toBe("factura_sin-numero.pdf");
+  });
+});
+
+describe("fitTextToField", () => {
+  // Medida ficticia y predecible: 0,5 mm de ancho por carácter y punto de fuente
+  const measure = (text: string, fontSizePt: number) => text.length * fontSizePt * 0.5;
+
+  it("deja el texto igual cuando cabe", () => {
+    const fitted = fitTextToField(measure, "016725", 40, 10);
+    expect(fitted).toEqual({ text: "016725", fontSizePt: 10, adjusted: false });
+  });
+
+  it("achica la letra hasta que quepa, sin recortar el texto", () => {
+    const fitted = fitTextToField(measure, "ANA / LUIS", 40, 10);
+    expect(fitted.adjusted).toBe(true);
+    expect(fitted.fontSizePt).toBeLessThan(10);
+    expect(measure(fitted.text, fitted.fontSizePt)).toBeLessThanOrEqual(40);
+    // El texto completo se conserva: solo cambió el tamaño de la letra
+    expect(fitted.text).toBe("ANA / LUIS");
+  });
+
+  it("recorta con puntos suspensivos si ni al mínimo cabe", () => {
+    const fitted = fitTextToField(measure, "X".repeat(200), 20, 10);
+    expect(fitted.fontSizePt).toBe(MIN_FIT_FONT_PT);
+    expect(fitted.text.endsWith("…")).toBe(true);
+    expect(measure(fitted.text, fitted.fontSizePt)).toBeLessThanOrEqual(20);
+  });
+
+  it("no toca nada si el campo no declara ancho", () => {
+    expect(fitTextToField(measure, "texto largo", 0, 9).adjusted).toBe(false);
   });
 });

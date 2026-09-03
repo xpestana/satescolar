@@ -1,6 +1,6 @@
 import { InvoiceTemplate, OverlayField } from "@/pages/school/InvoiceTemplateConfig";
 import { printableOverlayFields, resolveOverlayValue } from "@/lib/invoiceFieldValue";
-import { invoiceOverlayPdfName, invoiceOverlayPdfUrl } from "@/lib/invoiceOverlayPdf";
+import { MIN_FIT_FONT_PT, invoiceOverlayPdfName, invoiceOverlayPdfUrl } from "@/lib/invoiceOverlayPdf";
 
 /**
  * Abre una ventana con el overlay de la factura posicionado para imprimir sobre el formato
@@ -23,7 +23,7 @@ export function printInvoiceOverlay(template: InvoiceTemplate, paymentData: Reco
     .map((f: OverlayField) => {
       const value = resolveOverlayValue(f, paymentData);
       return `
-        <div style="
+        <div class="field" data-size="${f.font_size_pt}" style="
           position: absolute;
           left: ${f.x_mm}mm;
           top: ${f.y_mm}mm;
@@ -147,6 +147,18 @@ export function printInvoiceOverlay(template: InvoiceTemplate, paymentData: Reco
   <div id="overlay">
     ${fieldsHtml}
   </div>
+
+  <script>
+    // Mismo ajuste que el PDF: si un texto no cabe en su campo se achica la letra (hasta ${MIN_FIT_FONT_PT}pt)
+    // en vez de invadir los campos vecinos. El resto lo recorta el overflow del propio campo.
+    document.querySelectorAll(".field").forEach(function (el) {
+      var size = parseFloat(el.dataset.size);
+      while (el.scrollWidth > el.clientWidth && size > ${MIN_FIT_FONT_PT}) {
+        size = Math.round((size - 0.5) * 10) / 10;
+        el.style.fontSize = size + "pt";
+      }
+    });
+  </script>
 </body>
 </html>`;
 

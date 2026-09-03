@@ -19,6 +19,46 @@ import { printableOverlayFields, resolveOverlayValue } from "@/lib/invoiceFieldV
 const orientationOf = (template: InvoiceTemplate) =>
   template.paper_width_mm > template.paper_height_mm ? "landscape" : "portrait";
 
+/** Hasta dónde se puede achicar la letra para que un texto largo quepa en su campo. */
+export const MIN_FIT_FONT_PT = 5;
+
+export interface FittedText {
+  text: string;
+  fontSizePt: number;
+  /** true si hubo que achicar la letra o recortar el texto. */
+  adjusted: boolean;
+}
+
+/**
+ * Ajusta un texto al **ancho del campo** (`width_mm`): primero achica la letra y, si aun así no
+ * cabe, recorta con "…".
+ *
+ * Sin esto, un valor largo —los tres hermanos de una factura familiar en el campo "todos en una
+ * línea"— se imprimía por encima de los campos vecinos. El overlay HTML ya lo contenía con
+ * `overflow: hidden`; el PDF no tenía equivalente.
+ */
+export function fitTextToField(
+  measure: (text: string, fontSizePt: number) => number,
+  text: string,
+  widthMm: number,
+  fontSizePt: number,
+): FittedText {
+  if (!widthMm || widthMm <= 0 || !text) return { text, fontSizePt, adjusted: false };
+  if (measure(text, fontSizePt) <= widthMm) return { text, fontSizePt, adjusted: false };
+
+  let size = fontSizePt;
+  while (size > MIN_FIT_FONT_PT) {
+    size = Math.round((size - 0.5) * 10) / 10;
+    if (measure(text, size) <= widthMm) return { text, fontSizePt: size, adjusted: true };
+  }
+
+  let truncated = text;
+  while (truncated.length > 1 && measure(`${truncated}…`, size) > widthMm) {
+    truncated = truncated.slice(0, -1);
+  }
+  return { text: `${truncated}…`, fontSizePt: size, adjusted: true };
+}
+
 export function buildInvoiceOverlayPdf(
   template: InvoiceTemplate,
   paymentData: Record<string, string>,
@@ -33,9 +73,15 @@ export function buildInvoiceOverlayPdf(
   printableOverlayFields(template.fields, paymentData).forEach((field: OverlayField) => {
     const value = resolveOverlayValue(field, paymentData);
     doc.setFont("helvetica", field.bold ? "bold" : "normal");
-    doc.setFontSize(field.font_size_pt);
+    // El texto no puede salirse de su campo: se achica o se recorta para no pisar los vecinos
+    const measure = (text: string, fontSizePt: number) => {
+      doc.setFontSize(fontSizePt);
+      return doc.getTextWidth(text);
+    };
+    const fitted = fitTextToField(measure, value, field.width_mm, field.font_size_pt);
+    doc.setFontSize(fitted.fontSizePt);
     // `baseline: "top"` replica el `top: y_mm` del overlay HTML (jsPDF ancla en la línea base)
-    doc.text(value, field.x_mm, field.y_mm, { baseline: "top" });
+    doc.text(fitted.text, field.x_mm, field.y_mm, { baseline: "top" });
   });
 
   return doc;

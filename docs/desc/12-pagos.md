@@ -67,6 +67,13 @@ y **debe respetarse al generar/imprimir la factura**.
   > lado y diminuto), y el overlay dejaba de calzar. El PDF evita eso de raíz.
   - Ambos caminos imprimen exactamente los mismos campos: `printableOverlayFields()` en
     `src/lib/invoiceFieldValue.ts` (los que tienen valor).
+  - **Cada dato se queda dentro de su campo.** Si el texto no cabe en el `width_mm` configurado
+    se **achica la letra** (hasta `MIN_FIT_FONT_PT` = 5pt) y, si aun así no entra, se recorta con
+    "…" (`fitTextToField()` en `invoiceOverlayPdf.ts`, y el mismo ajuste por script en la ventana
+    HTML).
+    > 🐞 Corregido: el PDF ignoraba `width_mm`, así que un valor largo —los tres hermanos en el
+    > campo "todos en una línea"— se imprimía **por encima** de los campos vecinos (grado,
+    > sección). El overlay HTML sí lo contenía con `overflow: hidden`.
 - El **recibo PDF** (A4, comprobante propio del sistema, con sus rótulos) es otra cosa y vive en
   `src/lib/paymentReceiptPdf.ts`, compartido por esas mismas tres pantallas.
 
