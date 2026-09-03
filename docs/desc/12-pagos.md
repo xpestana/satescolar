@@ -204,8 +204,22 @@ llamando directo a `fetch-bcv-rates` aunque ya sea la fecha de hoy.
 encima de la tasa de `exchange_rates`. `PaymentReportModal` (representante) NO lo usa: las
 familias siempre convierten con la tasa oficial.
 
-## Dashboard de Pagos (`/pagos`) — "Últimos Pagos"
-Tabla `PaymentDashboard.tsx` con los últimos pagos `completed`. La columna
+## Dashboard de Pagos (`/pagos`)
+
+### Tarjetas (KPIs)
+`PaymentDashboard.tsx` muestra, para el **año escolar activo**: *Hoy* / *Registrados hoy* /
+*Este mes* (suma de `payments.total_amount_ves`), *Total recaudado*, *Deuda total*,
+*Morosos* (o *Familias morosas* según `billingMode`), *Créditos disponibles*,
+**Descuentos otorgados** y **Cuotas exoneradas**.
+
+> 💡 **Total recaudado = Σ `paid_amount` − descuentos ad-hoc − exoneraciones.** El ledger
+> mantiene `paid_amount + balance = total_amount`, así que `paid_amount` **incluye** lo
+> descontado y lo exonerado; ninguno de los dos entró en caja, por eso se restan y se muestran
+> en sus propias tarjetas (con el subtexto *"sin contar X en descuentos y exoneraciones"*).
+> *Deuda total* y *Morosos* salen de `balance`, que ya quedó en 0 en esas cuotas.
+
+### "Últimos Pagos"
+Tabla con los últimos pagos `completed`. La columna
 **Estudiante / Familia** se resuelve así (un pago puede no traer `student_id`):
 - **Estudiante(s):** en **modo estudiante** el pago trae `student_id` → `students.form_data`.
   En **modo familia** el pago trae `student_id = null` y `family_id` set; los estudiantes se
@@ -248,6 +262,12 @@ tarjetas de totales (Total Ingresos / Mensualidad / Inscripción / Seguro Escola
 - **Otros** = suma de `payment_others.amount_ves` (no cuelgan de un concepto del plan).
 - **Total Ingresos** = `payments.total_amount_ves` (no la suma de columnas: puede haber conceptos
   fuera de esas 4 categorías). Nombre/RIF salen de `invoice_name`/`invoice_rif`.
+
+> 💰 **Descuentos y exoneraciones no aparecen aquí, y es a propósito:** este reporte cuenta
+> **dinero cobrado**. `payment_items.amount_ves` es solo efectivo (el descuento vive en
+> `discount_amount_ves`) y las exoneraciones no generan líneas de pago, así que las columnas
+> siguen cuadrando con `total_amount_ves` sin ajustes. Lo condonado se consulta en el
+> **Dashboard** (KPIs *Descuentos otorgados* / *Cuotas exoneradas*).
 
 **Exportar a Excel** (botón "Descargar Excel", helper `src/lib/incomesExcel.ts`):
 - Usa **`xlsx-js-style`** (fork de SheetJS con estilos; el `xlsx` community no colorea celdas).
@@ -293,6 +313,14 @@ vencimientos por `due_month` se calculan bien en cualquier año.
 **Pieza compartida:** `src/hooks/useSchoolYearSelection.ts` (años del colegio + año elegido, con
 default al activo) y `src/components/payments/SchoolYearSelect.tsx` (el combo + el aviso ámbar).
 Las dos pantallas usan lo mismo; el texto del aviso se pasa por prop (`inactiveWarning`).
+
+### Columnas del modal por cuota
+En la tabla de conceptos del modal (estudiante y familia), además del checkbox y el
+*Monto a pagar*, cada cuota tiene dos acciones (detalle en **Reglas de negocio**):
+- **Descuento** — rebaja puntual de esa cuota en esa factura (monto fijo o % del pendiente,
+  motivo obligatorio). El monto a pagar se ajusta solo y la cuota queda saldada.
+- **Exonerar** — el estudiante **no paga** esa cuota: se cierra el saldo, no se cobra ni se
+  factura. Se puede cobrar unas cuotas y exonerar otras en el mismo registro.
 
 > ⚠️ Lo que **sigue** atado al año activo (por diseño, no cambió): el **dashboard** `/pagos` y
 > los **recordatorios automáticos** de morosidad (`send-delinquency-reminders`, que resuelve el
