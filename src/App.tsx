@@ -71,6 +71,7 @@ import StudentLedger from "./pages/school/StudentLedger";
 import DelinquentStudents from "./pages/school/DelinquentStudents";
 import DelinquencyConfig from "./pages/school/DelinquencyConfig";
 import IncomesReport from "./pages/school/IncomesReport";
+import PaymentsReport from "./pages/school/PaymentsReport";
 import FormatsConfig from "./pages/school/FormatsConfig";
 import NotFound from "./pages/NotFound";
 import SchoolUsersList from "./pages/school/SchoolUsersList";
@@ -403,6 +404,7 @@ const App = () => (
               <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
               <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
               <Route path="/pagos/ingresos" element={<ProtectedRoute requiredRole="school"><IncomesReport /></ProtectedRoute>} />
+              <Route path="/pagos/reporte" element={<ProtectedRoute requiredRole="school"><PaymentsReport /></ProtectedRoute>} />
               {/* Payroll (Pagos de Nóminas) routes */}
               <Route path="/pagos/nomina" element={<ProtectedRoute requiredRole="school"><PayrollDashboard /></ProtectedRoute>} />
               <Route path="/pagos/nomina/registro" element={<ProtectedRoute requiredRole="school"><PayrollRegistration /></ProtectedRoute>} />

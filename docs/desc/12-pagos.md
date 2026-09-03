@@ -49,13 +49,15 @@ y **debe respetarse al generar/imprimir la factura**.
 | Estado de cuenta | school | `/pagos/estado-cuenta` | `payments.view` | Estado de cuenta por familia/estudiante. |
 | Morosos | school | `/pagos/morosos` | `payments.delinquency` | Listado de morosos. |
 | Ingresos | school | `/pagos/ingresos` | `payments.view` | Reporte de ingresos. |
+| Reporte de Pagos | school | `/pagos/reporte` | `payments.view` | Consulta de pagos con búsqueda, filtros avanzados y Excel. |
 | Config. pagos | school | `/pagos/configuracion` | `payments.config` | Conceptos, planes, métodos y ajustes (4 pestañas). |
 | Formato de Facturas | school | `/formatos` (pestaña Facturas) | `payments.config` | Diseño/elección del formato de factura/comprobante. |
 | Config. morosidad | school | `/pagos/morosidad` | `payments.delinquency` | Reglas/avisos de morosidad. |
 | Mis pagos | representative | `/representative/pagos` | — | Pagos de la familia. |
 
 ## Rutas (frontend)
-- `/pagos`, `/pagos/registro`, `/pagos/estado-cuenta`, `/pagos/morosos`, `/pagos/ingresos`
+- `/pagos`, `/pagos/registro`, `/pagos/estado-cuenta`, `/pagos/morosos`, `/pagos/ingresos`,
+  `/pagos/reporte`
 - `/pagos/configuracion`, `/formatos`, `/pagos/morosidad`
 - `/representative/pagos`
 
@@ -277,6 +279,52 @@ tarjetas de totales (Total Ingresos / Mensualidad / Inscripción / Seguro Escola
   también coloreado. Montos como número real con formato `#,##0.00`.
 - Respeta los filtros/mes activos (exporta `filtered`, no el crudo). Fechas con `formatDateOnly`.
 
+## Reporte de Pagos (`/pagos/reporte`)
+Consulta transversal de **todo lo cobrado, descontado y exonerado** en un año escolar
+(`PaymentsReport.tsx`). Complementa a **Ingresos**, que es un cuadre fiscal de columnas fijas y
+no se debe alterar: este reporte es de búsqueda y auditoría, y ahí sí se agregan datos libremente.
+
+**Grano: una fila por línea, no por factura.** Una factura cubre varias cuotas (y varios hijos en
+modo familia), así que cada fila es una **cuota cobrada** (`payment_items`), un **ingreso de
+"Otros"** (`payment_others`) o una **cuota exonerada** (`concept_exonerations`), etiquetada en la
+columna *Tipo*. Así se puede filtrar por concepto, plan o método sin perder el detalle.
+
+**Columnas:** N° de factura, N° de control, fecha, tipo de línea, estudiante + cédula, grado y
+sección, familia (y titular de la factura), plan, concepto + tipo de concepto (con el monto en la
+moneda original si la cuota es en USD/EUR y la marca de *parcial*), monto en VES, descuento con su
+motivo, exonerado con su motivo, total de la factura, métodos + banco, referencia y estado.
+
+**Orden:** por defecto **N° de factura ascendente**, tratando el número como número aunque traiga
+ceros a la izquierda (`016836` va después de `9836`) y dejando las vacías al final. Se puede
+ordenar por fecha, estudiante, familia, plan, concepto, monto, total o estado haciendo clic en la
+cabecera (segundo clic invierte). El desempate siempre es por factura, para que dos corridas den
+el mismo orden.
+
+**Filtros:** búsqueda libre (factura, control, estudiante, cédula, familia, titular, concepto,
+plan, referencia, banco, observaciones y motivos, **sin acentos**) más un panel avanzado con:
+rango de fechas, estado (completado/anulado), tipo de línea, plan, tipo de concepto, método de
+pago, moneda del concepto, rango de monto y tres interruptores (*solo con descuento*, *solo
+exoneradas*, *solo abonos parciales*). El botón muestra cuántos filtros hay activos y permite
+limpiarlos.
+
+**Año escolar:** mismo selector compartido que Registro de Pagos y Morosos
+(`useSchoolYearSelection` + `SchoolYearSelect`), con el aviso ámbar cuando no es el año en curso.
+
+**Paginación:** 20 líneas por página, sobre el resultado ya filtrado y ordenado.
+
+**Excel:** el botón *Descargar Excel* exporta **lo que esté filtrado en ese momento**; si no hay
+filtros, exporta todas las líneas del año. Sale con las 28 columnas, fila de TOTALES (cobrado,
+descuentos y exonerado), encabezado congelado y el mismo estilo que el Excel de Ingresos
+(`xlsx-js-style`). El nombre del archivo indica el año y si venía filtrado.
+
+**Piezas:** lógica pura y probada en `src/lib/paymentsReport.ts` (filtros, orden, totales,
+paginación) y `src/lib/paymentsReportRows.ts` (mapeo de los datos crudos a filas), datos en
+`src/hooks/payments/usePaymentsReportData.ts`, exportación en `src/lib/paymentsReportExcel.ts`, y
+UI en `PaymentsReportFilters.tsx` + `PaymentsReportTable.tsx`.
+
+> El año completo se trae en una consulta y se filtra/ordena **en cliente** (cientos de facturas
+> por año), para que escribir en el buscador no dispare una consulta por tecla.
+
 ## Registro de Pagos por año escolar (`/pagos/registro`)
 La pestaña **Registro de Pagos** tiene un **selector de año escolar** (arriba de la lista, en
 ambos modos de facturación). Antes la pantalla quedaba fija en el año con `is_active = true`, así
@@ -471,6 +519,12 @@ En la tabla de conceptos del modal (estudiante y familia), además del checkbox 
   `src/lib/familyCredit.ts` (constante del método `saldo_a_favor`)
 - `src/components/payments/EditPaymentModal.tsx` (edición de un pago ya registrado: revierte y
   reaplica saldos/crédito, exige motivo, audita en `payment_edit_log`)
+- `src/lib/paymentItemDiscount.ts` (descuento ad-hoc por cuota) y
+  `src/lib/conceptExonerations.ts` + `src/hooks/payments/useConceptExonerations.ts` (exoneraciones)
+- **Reporte de Pagos:** `src/pages/school/PaymentsReport.tsx`,
+  `src/lib/paymentsReport.ts` + `src/lib/paymentsReportRows.ts` (lógica pura, con pruebas),
+  `src/hooks/payments/usePaymentsReportData.ts`, `src/lib/paymentsReportExcel.ts` y los
+  componentes `PaymentsReportFilters.tsx` / `PaymentsReportTable.tsx`
 
 ## Nómina (Pagos de Nóminas)
 Submódulo dentro del área de Pagos para registrar, aprobar y controlar los pagos al

@@ -36,7 +36,7 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { usePermissions } from "@/hooks/usePermissions";
-import { ShieldCheck, Receipt } from "lucide-react";
+import { ShieldCheck, Receipt, ReceiptText } from "lucide-react";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -130,6 +130,7 @@ const navSections: NavSection[] = [
       { label: "Estado de Cuenta", href: "/pagos/estado-cuenta", icon: FileText, requiredRole: "school", permission: "payments.view" },
       { label: "Morosos", href: "/pagos/morosos", icon: Users, requiredRole: "school", permission: "payments.delinquency" },
       { label: "Ingresos", href: "/pagos/ingresos", icon: BarChart3, requiredRole: "school", permission: "payments.view" },
+      { label: "Reporte de Pagos", href: "/pagos/reporte", icon: ReceiptText, requiredRole: "school", permission: "payments.view" },
       { label: "Nómina", href: "/pagos/nomina", icon: Wallet, requiredRole: "school", permission: "payroll.view" },
       { label: "Registro de Nómina", href: "/pagos/nomina/registro", icon: HandCoins, requiredRole: "school", permission: "payroll.register" },
       { label: "Beneficiarios", href: "/pagos/nomina/beneficiarios", icon: Users, requiredRole: "school", permission: "payroll.view" },
