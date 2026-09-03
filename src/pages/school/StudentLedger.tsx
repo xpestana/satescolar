@@ -19,10 +19,9 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Search, FileText, Download, Ban, Eye, Printer } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
 import { buildInvoiceData } from "@/lib/buildInvoiceData";
+import { downloadPaymentReceiptPdf } from "@/lib/paymentReceiptPdf";
 import { itemCoverageVes } from "@/lib/paymentItemDiscount";
 import { conceptStatusLabel, conceptStatusVariant } from "@/lib/paymentStatus";
 import { useConceptExonerations } from "@/hooks/payments/useConceptExonerations";
@@ -205,52 +204,10 @@ export default function StudentLedger() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  // Generate receipt PDF
-  const generateReceipt = (payment: any) => {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.text("Recibo de Pago", 105, 20, { align: "center" });
-    doc.setFontSize(10);
-    doc.text(`Estudiante: ${studentName}`, 14, 35);
-    doc.text(`Fecha: ${formatDateOnly(payment.payment_date)}`, 14, 42);
-    doc.text(`Estado: ${payment.status === "completed" ? "Completado" : "Anulado"}`, 14, 49);
-    if (payment.invoice_name) doc.text(`Facturado a: ${payment.invoice_name} - ${payment.invoice_rif || ""}`, 14, 56);
+  // Recibo propio del sistema (distinto de la factura impresa sobre el formato de /formatos)
+  const generateReceipt = (payment: any) =>
+    downloadPaymentReceiptPdf(payment, { headerName: studentName, methodLabel });
 
-    const conceptRows = (payment.payment_items || []).map((item: any) => [
-      (item.payment_plan_concepts as any)?.payment_concepts?.name || "—",
-      `${item.amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`,
-      Number(item.discount_amount_ves) > 0
-        ? `${Number(item.discount_amount_ves).toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`
-        : "—",
-      item.is_partial ? "Parcial" : "Completo",
-    ]);
-    autoTable(doc, { startY: 65, head: [["Concepto", "Monto", "Descuento", "Tipo"]], body: conceptRows, theme: "grid" });
-
-    const methodRows = (payment.payment_method_entries || []).map((m: any) => [
-      methodLabel(m.method), m.currency, m.amount_original?.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
-      m.exchange_rate, `${m.amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`,
-      m.reference_code || "—",
-    ]);
-    const finalY = (doc as any).lastAutoTable?.finalY || 100;
-    autoTable(doc, { startY: finalY + 10, head: [["Método", "Moneda", "Monto Orig.", "Tasa", "Monto VES", "Ref."]], body: methodRows, theme: "grid" });
-
-    const finalY2 = (doc as any).lastAutoTable?.finalY || 150;
-    doc.setFontSize(12);
-    doc.text(`Total: ${payment.total_amount_ves?.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`, 14, finalY2 + 15);
-
-    // Descuentos concedidos en este pago: no son ingreso, pero explican por qué la cuota quedó saldada
-    const discountTotal = (payment.payment_items || []).reduce((s: number, it: any) => s + (Number(it.discount_amount_ves) || 0), 0);
-    if (discountTotal > 0) {
-      const reasons = Array.from(new Set((payment.payment_items || [])
-        .filter((it: any) => Number(it.discount_amount_ves) > 0 && it.discount_reason)
-        .map((it: any) => it.discount_reason as string)));
-      doc.setFontSize(10);
-      doc.text(`Descuentos otorgados: ${discountTotal.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`, 14, finalY2 + 22);
-      if (reasons.length > 0) doc.text(`Motivo: ${reasons.join(" · ")}`, 14, finalY2 + 28);
-    }
-
-    doc.save(`recibo_${payment.id.slice(0, 8)}.pdf`);
-  };
 
   if (schoolLoading || !schoolId || billingModeLoading) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 

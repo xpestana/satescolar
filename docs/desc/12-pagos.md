@@ -38,6 +38,15 @@ y **debe respetarse al generar/imprimir la factura**.
   Los **recibos PDF** de estado de cuenta sí muestran el descuento siempre (columna + línea de
   motivo), sin depender de la plantilla.
 
+- **Dónde se imprime la factura con la plantilla:** Estado de cuenta por estudiante
+  (`StudentLedger`), Estado de cuenta por familia (`FamilyLedgerView`) y **Reporte de Pagos**
+  (`/pagos/reporte`, columna *Factura*). Las tres usan la misma pieza,
+  `printInvoiceOverlay(activeTemplate, buildInvoiceData(...))`: abre una ventana con
+  `@page size: {paper_width_mm}mm {paper_height_mm}mm; margin: 0` y solo los datos posicionados
+  en `x_mm`/`y_mm`, porque los rótulos y recuadros los pone el papel preimpreso.
+- El **recibo PDF** (A4, comprobante propio del sistema, con sus rótulos) es otra cosa y vive en
+  `src/lib/paymentReceiptPdf.ts`, compartido por esas mismas tres pantallas.
+
 > ⚠️ Regla clave: cualquier cambio en la generación/impresión de la factura debe leer y
 > respetar la configuración de `/formatos` (tabla `invoice_templates`), no valores fijos.
 
@@ -312,6 +321,17 @@ limpiarlos.
 
 **Paginación:** 20 líneas por página, sobre el resultado ya filtrado y ordenado.
 
+**Columna "Factura" (imprimir / descargar):** cada línea con pago asociado tiene dos botones:
+- 🖨 **Imprimir factura** — abre la **factura sobre el formato preimpreso** usando la plantilla
+  **activa de `/formatos`** (`printInvoiceOverlay` + `buildInvoiceData`). El papel sale con el
+  tamaño exacto de la plantilla (`@page size: {paper_width_mm}mm {paper_height_mm}mm; margin: 0`)
+  y cada dato en las coordenadas `x_mm`/`y_mm`, `font_size_pt` y `bold` configuradas, para que
+  **calce** sobre la factura física — es lo mismo que muestra la vista previa del editor de
+  formatos. Si el colegio no tiene plantilla activa, avisa y no imprime nada.
+- ⬇ **Descargar recibo PDF** — el comprobante **propio del sistema** (A4, con sus rótulos), no la
+  factura fiscal: encabezado, conceptos con descuento, métodos, total y descuentos otorgados.
+Las exoneraciones sin pago asociado no tienen botones (no hay factura que imprimir).
+
 **Excel:** el botón *Descargar Excel* exporta **lo que esté filtrado en ese momento**; si no hay
 filtros, exporta todas las líneas del año. Sale con las 28 columnas, fila de TOTALES (cobrado,
 descuentos y exonerado), encabezado congelado y el mismo estilo que el Excel de Ingresos
@@ -521,6 +541,8 @@ En la tabla de conceptos del modal (estudiante y familia), además del checkbox 
   reaplica saldos/crédito, exige motivo, audita en `payment_edit_log`)
 - `src/lib/paymentItemDiscount.ts` (descuento ad-hoc por cuota) y
   `src/lib/conceptExonerations.ts` + `src/hooks/payments/useConceptExonerations.ts` (exoneraciones)
+- `src/lib/paymentReceiptPdf.ts` (recibo PDF compartido) y
+  `src/components/payments/InvoiceOverlayPrint.tsx` (factura sobre el formato preimpreso)
 - **Reporte de Pagos:** `src/pages/school/PaymentsReport.tsx`,
   `src/lib/paymentsReport.ts` + `src/lib/paymentsReportRows.ts` (lógica pura, con pruebas),
   `src/hooks/payments/usePaymentsReportData.ts`, `src/lib/paymentsReportExcel.ts` y los

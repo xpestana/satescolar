@@ -14,6 +14,11 @@ import { SchoolYearSelect } from "@/components/payments/SchoolYearSelect";
 import { PaymentsReportFilters } from "@/components/payments/PaymentsReportFilters";
 import { PaymentsReportTable } from "@/components/payments/PaymentsReportTable";
 import { exportPaymentsReportExcel } from "@/lib/paymentsReportExcel";
+import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
+import { buildInvoiceData } from "@/lib/buildInvoiceData";
+import { downloadPaymentReceiptPdf } from "@/lib/paymentReceiptPdf";
+import { useToast } from "@/hooks/use-toast";
+import type { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   EMPTY_FILTERS,
@@ -47,7 +52,8 @@ export default function PaymentsReport() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [page, setPage] = useState(1);
 
-  const { rows, isLoading, plans, methods } = usePaymentsReportData(schoolId, selectedYearId);
+  const { toast } = useToast();
+  const { rows, paymentsById, context, isLoading, plans, methods } = usePaymentsReportData(schoolId, selectedYearId);
 
   const { data: schoolName = "" } = useQuery({
     queryKey: ["school-name", schoolId],
@@ -57,6 +63,69 @@ export default function PaymentsReport() {
     },
     enabled: !!schoolId,
   });
+
+  // Plantilla de factura activa: es la que define el tamaño del papel y la posición de cada
+  // dato, para que lo impreso calce sobre el formato preimpreso del colegio (ver /formatos).
+  const { data: activeTemplate } = useQuery({
+    queryKey: ["active-invoice-template", schoolId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("invoice_templates")
+        .select("*")
+        .eq("school_id", schoolId!)
+        .eq("is_active", true)
+        .maybeSingle();
+      return data as unknown as InvoiceTemplate | null;
+    },
+    enabled: !!schoolId,
+  });
+
+  const methodLabel = (raw: string) => context.methodLabels[raw] || raw || "—";
+
+  /** Nombre del estudiante (o de los hijos) que encabeza la factura y el recibo. */
+  const paymentStudentNames = (payment: { student_id?: string | null; payment_items?: { student_id?: string | null }[] | null }) => {
+    const ids = new Set<string>();
+    if (payment.student_id) ids.add(payment.student_id);
+    (payment.payment_items || []).forEach((it) => { if (it.student_id) ids.add(it.student_id); });
+    const names = [...ids].map((id) => context.studentNames[id]).filter(Boolean);
+    return names.join(" / ");
+  };
+
+  const handlePrintInvoice = (paymentId: string) => {
+    const payment = paymentsById.get(paymentId);
+    if (!payment) return;
+    if (!activeTemplate) {
+      toast({
+        title: "Sin plantilla activa",
+        description: "Configure y active una plantilla de factura en Formatos > Formato de Facturas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    // El grado/sección de la factura sale del primer estudiante del pago
+    const firstStudentId = payment.student_id
+      || (payment.payment_items || []).map((it) => it.student_id).find(Boolean)
+      || "";
+    const data = buildInvoiceData(
+      payment,
+      paymentStudentNames(payment),
+      context.studentGradeLevels[firstStudentId] || "",
+      context.studentSections[firstStudentId] || "",
+      methodLabel,
+    );
+    printInvoiceOverlay(activeTemplate, data);
+  };
+
+  const handleDownloadReceipt = (paymentId: string) => {
+    const payment = paymentsById.get(paymentId);
+    if (!payment) return;
+    downloadPaymentReceiptPdf(payment, {
+      headerName: paymentStudentNames(payment) || payment.invoice_name || "—",
+      headerLabel: "Estudiante(s)",
+      methodLabel,
+      studentNameById: context.studentNames,
+    });
+  };
 
   // Catálogos derivados de los propios datos, para no ofrecer filtros vacíos
   const conceptTypes = useMemo(
@@ -172,6 +241,8 @@ export default function PaymentsReport() {
               sortKey={sortKey}
               sortDirection={sortDirection}
               onSort={handleSort}
+              onPrintInvoice={handlePrintInvoice}
+              onDownloadReceipt={handleDownloadReceipt}
             />
           )}
         </CardContent>

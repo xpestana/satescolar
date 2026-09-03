@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Download, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,6 +36,7 @@ const COLUMNS: Column[] = [
   { key: null, label: "Métodos" },
   { key: null, label: "Referencia" },
   { key: "status", label: "Estado" },
+  { key: null, label: "Factura", className: "text-right" },
 ];
 
 const KIND_BADGE: Record<string, string> = {
@@ -49,10 +50,16 @@ interface Props {
   sortKey: PaymentsReportSortKey;
   sortDirection: SortDirection;
   onSort: (key: PaymentsReportSortKey) => void;
+  /** Imprime la factura sobre el formato preimpreso del colegio (plantilla de /formatos). */
+  onPrintInvoice: (paymentId: string) => void;
+  /** Descarga el recibo propio del sistema en PDF. */
+  onDownloadReceipt: (paymentId: string) => void;
 }
 
 /** Tabla del Reporte de Pagos: una fila por línea, con orden por columna. */
-export function PaymentsReportTable({ rows, sortKey, sortDirection, onSort }: Props) {
+export function PaymentsReportTable({
+  rows, sortKey, sortDirection, onSort, onPrintInvoice, onDownloadReceipt,
+}: Props) {
   const sortIcon = (key: PaymentsReportSortKey | null) => {
     if (!key) return null;
     if (key !== sortKey) return <ChevronsUpDown className="ml-1 h-3 w-3 opacity-40" />;
@@ -145,6 +152,32 @@ export function PaymentsReportTable({ rows, sortKey, sortDirection, onSort }: Pr
                 <Badge variant={row.status === "voided" ? "destructive" : "default"} className="whitespace-nowrap">
                   {row.status === "voided" ? "Anulado" : "Completado"}
                 </Badge>
+              </TableCell>
+              <TableCell className="text-right">
+                {row.paymentId ? (
+                  <div className="flex justify-end gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      title="Imprimir factura en el formato del colegio"
+                      onClick={() => onPrintInvoice(row.paymentId!)}
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      title="Descargar recibo en PDF"
+                      onClick={() => onDownloadReceipt(row.paymentId!)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
               </TableCell>
             </TableRow>
           ))}

@@ -60,9 +60,9 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
           id, student_id, amount_ves, original_amount, is_partial,
           discount_amount_ves, discount_reason,
           payment_plan_concepts(
-            plan_id, currency,
+            plan_id, currency, concept_id,
             payment_plans(name),
-            payment_concepts(name, concept_type)
+            payment_concepts(id, name, concept_type)
           )
         ),
         payment_others(id, amount_ves, notes)
@@ -138,6 +138,7 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
     enabled: familyIds.length > 0,
   });
 
+  // Grado y sección alimentan tanto la columna del reporte como la factura impresa
   const { data: enrollments = [] } = useQuery({
     queryKey: ["payments-report-enrollments", schoolId, schoolYearId],
     queryFn: async () => {
@@ -190,10 +191,21 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
       studentFamilies[s.id] = family ? familySurname(family, primaryRepByFamily[family.id]) : "";
     });
 
+    // Grado y sección "crudos" (enum + nombre) los necesita la factura sobre el formato
+    const studentGradeLevels: Record<string, string> = {};
+    const studentSections: Record<string, string> = {};
+    enrollments.forEach((e) => {
+      studentGradeLevels[e.student_id] = e.sections?.grade_level || "";
+      studentSections[e.student_id] = e.sections?.name || "";
+    });
+
     const methodLabels: Record<string, string> = {};
     schoolMethods.forEach((m) => { methodLabels[m.id] = m.label; });
 
-    return { studentNames, studentDocuments, studentGrades, studentFamilies, methodLabels };
+    return {
+      studentNames, studentDocuments, studentGrades, studentFamilies, methodLabels,
+      studentGradeLevels, studentSections,
+    };
   }, [students, families, representatives, enrollments, schoolMethods]);
 
   const rows: PaymentReportRow[] = useMemo(
@@ -201,8 +213,13 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
     [payments, exonerations, context],
   );
 
+  /** Pago completo por id: lo necesitan la factura y el recibo, que trabajan sobre el pago entero. */
+  const paymentsById = useMemo(() => new Map(payments.map((p) => [p.id, p])), [payments]);
+
   return {
     rows,
+    paymentsById,
+    context,
     isLoading: loadingPayments || loadingExonerations,
     plans,
     methods: schoolMethods,

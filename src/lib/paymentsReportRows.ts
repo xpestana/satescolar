@@ -17,8 +17,10 @@ export interface RawMethodEntry {
 interface RawPlanConcept {
   plan_id?: string | null;
   currency?: string | null;
+  /** Necesario para la factura: `buildInvoiceData` marca los conceptos por este id. */
+  concept_id?: string | null;
   payment_plans?: { name?: string | null } | null;
-  payment_concepts?: { name?: string | null; concept_type?: string | null } | null;
+  payment_concepts?: { id?: string | null; name?: string | null; concept_type?: string | null } | null;
 }
 
 interface RawPaymentItem {
