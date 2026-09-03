@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from "react";
-import { OVERLAY_FIELDS, OverlayField } from "@/pages/school/InvoiceTemplateConfig";
+import { OVERLAY_FIELDS, OverlayField, InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
+import { buildCalibrationSheetPdf } from "@/lib/invoiceOverlayPdf";
 
 const CANVAS_W = 560; // px display width
 
@@ -70,10 +71,26 @@ export function InvoiceCanvasEditor({
   const canvasH = Math.round(paperHeightMm * scale);
 
   const [selected, setSelected] = useState<string | null>(null);
+  // Proporción real del escaneo: si no coincide con la del papel configurado, el fondo se
+  // estira (objectFit: fill) y colocar campos "a ojo" sobre él descuadra la impresión
+  const [backgroundRatio, setBackgroundRatio] = useState<number | null>(null);
+  const paperRatio = paperWidthMm / paperHeightMm;
+  const ratioMismatch = backgroundRatio != null && Math.abs(backgroundRatio - paperRatio) / paperRatio > 0.02;
   const dragRef = useRef<DragState | null>(null);
 
   const getField = (key: string) => fields.find((f) => f.key === key);
   const isActive = (key: string) => !!getField(key);
+
+  /** Abre la cuadrícula milimetrada del papel, para medir la factura física. */
+  const openCalibrationSheet = () => {
+    const doc = buildCalibrationSheetPdf({
+      name: "Calibración",
+      paper_width_mm: paperWidthMm,
+      paper_height_mm: paperHeightMm,
+      fields: [],
+    } as unknown as InvoiceTemplate);
+    window.open(URL.createObjectURL(doc.output("blob")), "_blank", "noopener");
+  };
 
   const updateField = useCallback(
     (key: string, updates: Partial<OverlayField>) => {
@@ -219,9 +236,24 @@ export function InvoiceCanvasEditor({
                 Imprimir monto (en vez de ✓)
               </label>
             )}
-            <p className="text-[10px] text-slate-400 font-mono">
-              x:{selectedField.x_mm} y:{selectedField.y_mm} w:{selectedField.width_mm}
-            </p>
+            {/* Posición exacta por teclado: con la hoja de calibración se mide el milímetro
+                real de cada casilla y se escribe aquí, sin depender del arrastre */}
+            <div className="grid grid-cols-3 gap-1">
+              {([
+                ["X mm", "x_mm", selectedField.x_mm],
+                ["Y mm", "y_mm", selectedField.y_mm],
+                ["Ancho", "width_mm", selectedField.width_mm],
+              ] as const).map(([label, prop, value]) => (
+                <label key={prop} className="text-[10px] text-muted-foreground">
+                  {label}
+                  <input
+                    type="number" step={0.5} min={0} value={value}
+                    onChange={(e) => updateField(selected!, { [prop]: parseFloat(e.target.value) || 0 })}
+                    className="w-full text-xs border border-slate-300 rounded px-1 py-0.5"
+                  />
+                </label>
+              ))}
+            </div>
           </div>
         )}
 
@@ -316,9 +348,29 @@ export function InvoiceCanvasEditor({
 
       {/* ── Canvas ──────────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto min-w-0">
-        <p className="text-[11px] text-muted-foreground mb-1.5">
-          Arrastra para mover · Borde derecho azul para cambiar ancho · Clic para editar fuente
-        </p>
+        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          <p className="text-[11px] text-muted-foreground">
+            Arrastra para mover · Borde derecho azul para cambiar ancho · Clic para editar fuente y posición exacta
+          </p>
+          <button
+            type="button"
+            onClick={openCalibrationSheet}
+            className="text-[11px] rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-50"
+            title="PDF del tamaño del papel con una cuadrícula milimetrada, para medir dónde cae cada casilla real"
+          >
+            📐 Hoja de calibración
+          </button>
+        </div>
+
+        {ratioMismatch && (
+          <p className="mb-1.5 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] leading-snug text-amber-800">
+            <strong>El escaneo del fondo no tiene la proporción del papel configurado</strong>
+            {" "}({paperWidthMm} × {paperHeightMm} mm). La imagen se estira para llenarlo, así que
+            colocar campos “a ojo” sobre ella descuadra al imprimir: usa la <strong>hoja de
+            calibración</strong> y escribe las medidas exactas en X/Y, o vuelve a subir el fondo
+            recortado justo al borde del papel.
+          </p>
+        )}
 
         <div
           style={{ position: "relative", width: CANVAS_W, height: canvasH, background: "white", border: "1px solid #cbd5e1", cursor: "default", flexShrink: 0, userSelect: "none" }}
@@ -329,6 +381,10 @@ export function InvoiceCanvasEditor({
         >
           {backgroundUrl && (
             <img src={backgroundUrl} alt="" draggable={false}
+              onLoad={(e) => {
+                const img = e.currentTarget;
+                if (img.naturalHeight > 0) setBackgroundRatio(img.naturalWidth / img.naturalHeight);
+              }}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "fill", pointerEvents: "none" }} />
           )}
 

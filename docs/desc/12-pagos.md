@@ -76,6 +76,16 @@ y **debe respetarse al generar/imprimir la factura**.
     > pero lo que se guardaba (`y_mm`, el borde de la caja) quedaba más arriba: al imprimir todo
     > salía alto y había que bajar los campos "de más" para que medio cuadraran. Ahora la
     > etiqueta va **fuera**, encima de la caja, y la caja mide lo que ocupa el texto impreso.
+  - **Calibrar cuando un campo no cuadra:** el fondo del editor es el **escaneo** de la factura y
+    se estira (`objectFit: fill`) para llenar el papel configurado; si el escaneo no tiene esa
+    misma proporción (recortado con márgenes, otro encuadre), colocar campos "a ojo" sobre él
+    descuadra la impresión en unas zonas sí y en otras no. Para eso el editor trae:
+    - **Hoja de calibración** (botón sobre el lienzo): PDF del tamaño del papel con cuadrícula
+      cada 10 mm numerada (`buildCalibrationSheetPdf`). Se imprime al 100%, se pone sobre la
+      factura física y se lee el milímetro exacto de cada casilla.
+    - **Campos X / Y / Ancho numéricos** en el panel del campo seleccionado, para escribir esa
+      medida en vez de arrastrar.
+    - Un **aviso ámbar** cuando la proporción del escaneo no coincide con la del papel.
   - **Cada dato se queda dentro de su campo.** Si el texto no cabe en el `width_mm` configurado
     se **achica la letra** (hasta `MIN_FIT_FONT_PT` = 5pt) y, si aun así no entra, se recorta con
     "…" (`fitTextToField()` en `invoiceOverlayPdf.ts`, y el mismo ajuste por script en la ventana

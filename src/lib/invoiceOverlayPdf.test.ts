@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   MIN_FIT_FONT_PT,
+  buildCalibrationSheetPdf,
   buildInvoiceOverlayPdf,
   fitTextToField,
   invoiceOverlayPdfName,
@@ -119,5 +120,18 @@ describe("overlayBaselineY", () => {
 
   it("convierte puntos a milímetros", () => {
     expect(ptToMm(72)).toBeCloseTo(25.4, 6);
+  });
+});
+
+describe("buildCalibrationSheetPdf", () => {
+  it("usa el tamaño del papel de la plantilla", () => {
+    const doc = buildCalibrationSheetPdf(template());
+    expect(doc.internal.pageSize.getWidth()).toBeCloseTo(216, 1);
+    expect(doc.internal.pageSize.getHeight()).toBeCloseTo(140, 1);
+  });
+
+  it("es una sola página y no depende de los campos", () => {
+    const doc = buildCalibrationSheetPdf(template({ fields: [] }));
+    expect(doc.getNumberOfPages()).toBe(1);
   });
 });

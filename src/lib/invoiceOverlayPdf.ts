@@ -118,3 +118,43 @@ export function invoiceOverlayPdfName(paymentData: Record<string, string>): stri
   const invoice = (paymentData.invoice_number || "").trim();
   return `factura_${invoice || "sin-numero"}.pdf`;
 }
+
+/**
+ * Hoja de calibración: el papel de la plantilla con una cuadrícula milimetrada.
+ *
+ * Se imprime en blanco y se coloca **encima de la factura física** (o se imprime sobre ella) para
+ * leer en milímetros dónde cae cada casilla real. Con esos números se ajustan los campos por
+ * teclado, sin depender de arrastrar sobre un escaneo que puede estar estirado.
+ */
+export function buildCalibrationSheetPdf(template: InvoiceTemplate): jsPDF {
+  const W = template.paper_width_mm;
+  const H = template.paper_height_mm;
+  const doc = new jsPDF({ unit: "mm", format: [W, H], orientation: orientationOf(template), compress: true });
+
+  doc.setDrawColor(190);
+  doc.setLineWidth(0.1);
+  for (let x = 10; x < W; x += 10) doc.line(x, 0, x, H);
+  for (let y = 10; y < H; y += 10) doc.line(0, y, W, y);
+
+  // Cada 50 mm, línea más marcada para orientarse de un vistazo
+  doc.setDrawColor(120);
+  doc.setLineWidth(0.3);
+  for (let x = 50; x < W; x += 50) doc.line(x, 0, x, H);
+  for (let y = 50; y < H; y += 50) doc.line(0, y, W, y);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(90);
+  for (let x = 10; x < W; x += 10) doc.text(String(x), x + 0.5, overlayBaselineY(1, 6));
+  for (let y = 10; y < H; y += 10) doc.text(String(y), 0.7, overlayBaselineY(y - 3.5, 6));
+
+  doc.setFontSize(8);
+  doc.setTextColor(60);
+  doc.text(
+    `Hoja de calibración · ${template.name} · papel ${W} × ${H} mm · imprimir al 100%`,
+    3,
+    overlayBaselineY(H - 6, 8),
+  );
+
+  return doc;
+}
