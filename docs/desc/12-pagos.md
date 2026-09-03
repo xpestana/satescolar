@@ -67,6 +67,15 @@ y **debe respetarse al generar/imprimir la factura**.
   > lado y diminuto), y el overlay dejaba de calzar. El PDF evita eso de raíz.
   - Ambos caminos imprimen exactamente los mismos campos: `printableOverlayFields()` en
     `src/lib/invoiceFieldValue.ts` (los que tienen valor).
+  - **Un solo origen para todo: el borde superior izquierdo del campo (`x_mm`, `y_mm`).** El
+    editor, la vista previa, la ventana de impresión y el PDF anclan el texto ahí, con altura de
+    línea 1; el PDF calcula la línea base con `overlayBaselineY()` (`0,8466 em` bajo el borde,
+    que es donde CSS la pone con Arial). Así, lo que se ve al arrastrar es lo que sale impreso.
+    > 🐞 Corregido: en el editor la **etiqueta del campo iba dentro de la caja** y empujaba el
+    > texto de muestra ~3 mm hacia abajo. El usuario arrastraba hasta ver el texto en su casilla,
+    > pero lo que se guardaba (`y_mm`, el borde de la caja) quedaba más arriba: al imprimir todo
+    > salía alto y había que bajar los campos "de más" para que medio cuadraran. Ahora la
+    > etiqueta va **fuera**, encima de la caja, y la caja mide lo que ocupa el texto impreso.
   - **Cada dato se queda dentro de su campo.** Si el texto no cabe en el `width_mm` configurado
     se **achica la letra** (hasta `MIN_FIT_FONT_PT` = 5pt) y, si aun así no entra, se recorta con
     "…" (`fitTextToField()` en `invoiceOverlayPdf.ts`, y el mismo ajuste por script en la ventana

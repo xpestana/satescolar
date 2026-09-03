@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { MIN_FIT_FONT_PT, buildInvoiceOverlayPdf, fitTextToField, invoiceOverlayPdfName } from "./invoiceOverlayPdf";
+import {
+  MIN_FIT_FONT_PT,
+  buildInvoiceOverlayPdf,
+  fitTextToField,
+  invoiceOverlayPdfName,
+  overlayBaselineY,
+  ptToMm,
+} from "./invoiceOverlayPdf";
 import { printableOverlayFields } from "./invoiceFieldValue";
 import type { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 
@@ -96,5 +103,21 @@ describe("fitTextToField", () => {
 
   it("no toca nada si el campo no declara ancho", () => {
     expect(fitTextToField(measure, "texto largo", 0, 9).adjusted).toBe(false);
+  });
+});
+
+describe("overlayBaselineY", () => {
+  it("ancla el BORDE SUPERIOR del texto en y_mm, como el div del overlay", () => {
+    // La línea base cae 0,8466 em por debajo del borde superior del campo
+    expect(overlayBaselineY(40, 9)).toBeCloseTo(40 + 0.8466 * ptToMm(9), 3);
+    expect(overlayBaselineY(40, 9) - 40).toBeCloseTo(2.688, 2);
+  });
+
+  it("el desplazamiento crece con el tamaño de la letra", () => {
+    expect(overlayBaselineY(60, 11) - 60).toBeGreaterThan(overlayBaselineY(60, 7) - 60);
+  });
+
+  it("convierte puntos a milímetros", () => {
+    expect(ptToMm(72)).toBeCloseTo(25.4, 6);
   });
 });

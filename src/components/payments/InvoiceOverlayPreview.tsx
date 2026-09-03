@@ -119,7 +119,9 @@ export function InvoiceOverlayPreview({ template, paymentData, scale = 2 }: Prop
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
-                lineHeight: 1.2,
+                // Misma altura de línea que la impresión y el PDF, para que la vista previa
+                // muestre el texto exactamente donde va a salir
+                lineHeight: 1,
               }}
               title={`${field.label ?? meta?.label ?? field.key}: ${value}`}
             >

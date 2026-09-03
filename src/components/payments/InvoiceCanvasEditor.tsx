@@ -360,7 +360,9 @@ export function InvoiceCanvasEditor({
                   left:       f.x_mm     * scale,
                   top:        f.y_mm     * scale,
                   width:      f.width_mm * scale,
-                  minHeight:  fontPx + 10,
+                  // La caja mide lo que ocupa el texto impreso: lo que se ve aquí es lo que
+                  // sale en el papel (mismo origen x_mm/y_mm y misma altura de línea)
+                  height:     Math.max(fontPx, 10),
                   cursor:     "move",
                   border:     isSel ? "1.5px solid #2563eb" : isConcept ? "1px dashed #d97706" : "1px dashed #94a3b8",
                   background: isSel ? "rgba(219,234,254,0.65)" : isConcept ? "rgba(254,243,199,0.6)" : "rgba(248,250,252,0.55)",
@@ -370,12 +372,13 @@ export function InvoiceCanvasEditor({
                 onMouseDown={(e) => startDrag(e, f.key, "move")}
                 onClick={(e) => { e.stopPropagation(); setSelected(f.key); }}
               >
-                {/* Tiny label */}
-                <div style={{ fontSize: 7, color: isSel ? "#1d4ed8" : isConcept ? "#92400e" : "#94a3b8", lineHeight: 1, paddingLeft: 2, paddingTop: 1, fontFamily: "sans-serif", whiteSpace: "nowrap" }}>
+                {/* Etiqueta FUERA de la caja: dentro empujaba el valor hacia abajo y lo que se
+                    guardaba (y_mm) quedaba unos milímetros más arriba de lo que se veía */}
+                <div style={{ position: "absolute", bottom: "100%", left: 0, fontSize: 7, color: isSel ? "#1d4ed8" : isConcept ? "#92400e" : "#94a3b8", lineHeight: 1, fontFamily: "sans-serif", whiteSpace: "nowrap", pointerEvents: "none" }}>
                   {label}
                 </div>
-                {/* Value preview */}
-                <div style={{ fontSize: fontPx, fontWeight: f.bold ? "bold" : "normal", fontFamily: "Arial, Helvetica, sans-serif", color: "#0f172a", lineHeight: 1.1, paddingLeft: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
+                {/* El valor arranca justo en el borde superior de la caja: ahí es donde imprime */}
+                <div style={{ fontSize: fontPx, fontWeight: f.bold ? "bold" : "normal", fontFamily: "Arial, Helvetica, sans-serif", color: "#0f172a", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden" }}>
                   {sample}
                 </div>
                 {/* Resize grip */}

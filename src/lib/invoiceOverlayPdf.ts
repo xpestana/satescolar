@@ -22,6 +22,24 @@ const orientationOf = (template: InvoiceTemplate) =>
 /** Hasta dónde se puede achicar la letra para que un texto largo quepa en su campo. */
 export const MIN_FIT_FONT_PT = 5;
 
+/**
+ * Distancia del borde superior del campo a la línea base del texto, en "em".
+ *
+ * El editor, la vista previa y la ventana de impresión colocan el texto en un bloque con
+ * `line-height: 1` cuyo borde superior es `y_mm`. Con Arial/Helvetica (ascendente 0,9052 em,
+ * descendente 0,2119 em) el medio-interlineado es `(1 − 1,1171) / 2` y la línea base cae en
+ * `−0,0586 + 0,9052 = 0,8466 em` bajo ese borde. El PDF usa el mismo número en vez de la
+ * métrica interna de jsPDF, para que impresión y pantalla coincidan al milímetro.
+ */
+export const BASELINE_OFFSET_EM = 0.8466;
+
+/** Puntos tipográficos a milímetros. */
+export const ptToMm = (pt: number) => (pt * 25.4) / 72;
+
+/** Línea base (lo que espera jsPDF) del campo cuyo borde superior está en `yMm`. */
+export const overlayBaselineY = (yMm: number, fontSizePt: number) =>
+  yMm + BASELINE_OFFSET_EM * ptToMm(fontSizePt);
+
 export interface FittedText {
   text: string;
   fontSizePt: number;
@@ -80,8 +98,8 @@ export function buildInvoiceOverlayPdf(
     };
     const fitted = fitTextToField(measure, value, field.width_mm, field.font_size_pt);
     doc.setFontSize(fitted.fontSizePt);
-    // `baseline: "top"` replica el `top: y_mm` del overlay HTML (jsPDF ancla en la línea base)
-    doc.text(fitted.text, field.x_mm, field.y_mm, { baseline: "top" });
+    // El campo se ancla por su borde superior (y_mm), igual que el div del overlay HTML
+    doc.text(fitted.text, field.x_mm, overlayBaselineY(field.y_mm, fitted.fontSizePt));
   });
 
   return doc;
