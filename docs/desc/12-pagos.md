@@ -356,11 +356,20 @@ Las dos pantallas usan lo mismo; el texto del aviso se pasa por prop (`inactiveW
     *"Descuentos otorgados"* con el motivo; las plantillas de factura ganan los campos
     `total_discount` y `discount_reason` (opcionales, no cambian las plantillas existentes).
 - **Exoneración de una cuota (`concept_exonerations`):** el colegio **perdona el pendiente
-  completo** de una cuota concreta (hijo de personal, beca, caso social). A diferencia del
-  descuento ad-hoc, **no va dentro de un pago**: se aplica desde el **Estado de cuenta**
-  (`StudentLedger` y `FamilyLedgerView`, columna *Exoneración*), no genera factura ni ingreso.
-  - Tabla `concept_exonerations` (migración `20260903120000_create_concept_exonerations.sql`):
-    `school_id`, `school_year_id`, `student_id`, `balance_id`, `plan_concept_id`, `amount_ves`,
+  completo** de una cuota concreta (hijo de personal, beca, caso social) porque el estudiante
+  **no la va a pagar**.
+  - **Dónde se aplica:** en el **registro de pago**, en la columna *Exonerar* — justo al lado de
+    *Descuento* — de `PaymentFormModal` y `FamilyPaymentFormModal`. Al marcarla, la cuota se
+    deselecciona (no se cobra) y deja de admitir descuento. Se puede registrar un pago que cobra
+    unas cuotas y exonera otras, o **solo exonerar**: si no hay nada por cobrar no se emite
+    factura (el botón pasa a decir *"Exonerar cuotas"*) y la exoneración queda con
+    `payment_id = NULL`.
+  - El **Estado de cuenta** (`StudentLedger`, `FamilyLedgerView`) solo la **muestra** en la
+    columna *Exoneración* y permite **quitarla**; no se exonera desde ahí.
+  - Tabla `concept_exonerations` (migraciones `20260903120000_create_concept_exonerations.sql`
+    y `20260903140000_link_exoneration_to_payment.sql`, esta última agrega `payment_id`):
+    `school_id`, `school_year_id`, `student_id`, `balance_id`, `plan_concept_id`, `payment_id`
+    (pago en cuyo registro se aplicó, NULL si no hubo cobro), `amount_ves`,
     `original_amount`/`currency`/`exchange_rate` (congelados al aplicar, para revertir exacto),
     `reason` (**obligatorio**, CHECK), `created_by`/`created_at` y `reverted_at`/`reverted_by`.
     Índice único parcial: **una sola exoneración vigente por cuota**.
@@ -373,7 +382,9 @@ Las dos pantallas usan lo mismo; el texto del aviso se pasa por prop (`inactiveW
     pendiente exonerado y el estado se recalcula (`pending`/`partial`/`paid`).
   - **Dashboard**: KPI *"Cuotas exoneradas"* y resta en *"Total recaudado"* junto con los
     descuentos. En el estado de cuenta, *"Total Pagado"* también descuenta lo exonerado.
-  - Lógica en `src/hooks/payments/useConceptExonerations.ts`; UI en
+  - Acceso a datos en `src/lib/conceptExonerations.ts` (`applyConceptExoneration` /
+    `revertConceptExoneration`, compartidos por los modales y el estado de cuenta); consulta y
+    reversa en `src/hooks/payments/useConceptExonerations.ts`; UI en
     `src/components/payments/ExonerateConceptCell.tsx`; etiquetas de estado en
     `src/lib/paymentStatus.ts` (`conceptStatusLabel`/`conceptStatusVariant`).
   > Nota de esquema: al crear la FK se detectó que en producción `student_concept_balances`

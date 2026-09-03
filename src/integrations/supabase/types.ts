@@ -1217,6 +1217,7 @@ export type Database = {
           exchange_rate: number
           id: string
           original_amount: number | null
+          payment_id: string | null
           plan_concept_id: string
           reason: string
           reverted_at: string | null
@@ -1234,6 +1235,7 @@ export type Database = {
           exchange_rate?: number
           id?: string
           original_amount?: number | null
+          payment_id?: string | null
           plan_concept_id: string
           reason: string
           reverted_at?: string | null
@@ -1251,6 +1253,7 @@ export type Database = {
           exchange_rate?: number
           id?: string
           original_amount?: number | null
+          payment_id?: string | null
           plan_concept_id?: string
           reason?: string
           reverted_at?: string | null
@@ -1265,6 +1268,13 @@ export type Database = {
             columns: ["balance_id"]
             isOneToOne: false
             referencedRelation: "student_concept_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "concept_exonerations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
             referencedColumns: ["id"]
           },
           {

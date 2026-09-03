@@ -133,7 +133,7 @@ export default function StudentLedger() {
     });
   }, [enrollments, search]);
 
-  const { byBalanceId: exonerationByBalance, exonerate, revert } = useConceptExonerations({
+  const { byBalanceId: exonerationByBalance, revert } = useConceptExonerations({
     schoolId,
     schoolYearId: activeYear?.id,
     studentIds: selectedStudentId ? [selectedStudentId] : [],
@@ -334,13 +334,14 @@ export default function StudentLedger() {
                       <TableCell className="font-medium">{b.balance?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell><Badge variant={conceptStatusVariant(b.status)}>{conceptStatusLabel(b.status)}</Badge></TableCell>
                       <TableCell>
+                        {/* La exoneración se aplica al registrar el pago; aquí solo se ve y se puede quitar */}
                         <ExonerateConceptCell
                           conceptName={(b.payment_plan_concepts as any)?.payment_concepts?.name || "esta cuota"}
                           pendingVes={Number(b.balance) || 0}
                           exoneration={exoneration}
-                          isPending={exonerate.isPending || revert.isPending}
-                          onExonerate={(reason) => exonerate.mutate({ balance: b, reason })}
-                          onRevert={() => revert.mutate({ exoneration: exoneration!, balance: b })}
+                          isPending={revert.isPending}
+                          readOnly
+                          onClear={() => revert.mutate({ exoneration: exoneration!, balance: b })}
                         />
                       </TableCell>
                     </TableRow>

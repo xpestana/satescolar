@@ -43,6 +43,9 @@ interface PaymentMethodLine {
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 import { resolveBankOnMethodChange } from "@/lib/paymentMethodBank";
 import { ConceptDiscountCell } from "@/components/payments/ConceptDiscountCell";
+import { ExonerateConceptCell } from "@/components/payments/ExonerateConceptCell";
+import { applyConceptExoneration, exonerablePendingVes, type ExonerationDraft } from "@/lib/conceptExonerations";
+import { invalidateExonerationQueries } from "@/hooks/payments/useConceptExonerations";
 import {
   computeAdHocDiscount,
   settlesInstallment,
@@ -93,6 +96,8 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
   // Descuento puntual por cuota (adicional al descuento del plan), indexado por balance id
   const [conceptDiscounts, setConceptDiscounts] = useState<Record<string, AdHocDiscountDraft>>({});
+  // Cuotas que el estudiante NO va a pagar: se exoneran al guardar, indexadas por balance id
+  const [conceptExonerations, setConceptExonerations] = useState<Record<string, ExonerationDraft>>({});
   const [applyToBalanceId, setApplyToBalanceId] = useState<string>("");
   const autoSelectedRef = useRef(false);
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
@@ -233,6 +238,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
       setSurplusAction("none");
       setSelectedConcepts({});
       setConceptDiscounts({});
+      setConceptExonerations({});
       setMethods([createMethodLine()]);
       setObservations("");
       setInvoiceNumber("");
@@ -387,6 +393,40 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     setSelectedConcepts((prev) => (b.id in prev ? { ...prev, [b.id]: getDisplayBalance(b).toFixed(2) } : prev));
   };
 
+  // ── Exoneración de una cuota ──────────────────────────────────────────
+  // El estudiante no paga ese concepto: al guardar se cierra el saldo y no se cobra nada.
+  const exonerateConcept = (b: any, reason: string) => {
+    setConceptExonerations((prev) => ({ ...prev, [b.id]: { reason } }));
+    // Una cuota exonerada no se cobra ni admite descuento
+    setSelectedConcepts((prev) => {
+      const next = { ...prev };
+      delete next[b.id];
+      return next;
+    });
+    setConceptDiscounts((prev) => {
+      const next = { ...prev };
+      delete next[b.id];
+      return next;
+    });
+  };
+
+  const clearConceptExoneration = (b: any) => {
+    setConceptExonerations((prev) => {
+      const next = { ...prev };
+      delete next[b.id];
+      return next;
+    });
+  };
+
+  // Se usa el pendiente del ledger (no revaluado): es exactamente el monto que se registrará
+  const totalExonerated = useMemo(
+    () => Object.keys(conceptExonerations).reduce((s, balanceId) => {
+      const bal = (balances as any[]).find((b: any) => b.id === balanceId);
+      return s + (bal ? exonerablePendingVes(bal) : 0);
+    }, 0),
+    [conceptExonerations, balances],
+  );
+
   // Cierra un saldo residual (típicamente diferencia por tasa de cambio) marcándolo como pagado
   const closeBalanceMut = useMutation({
     mutationFn: async (bal: any) => {
@@ -477,9 +517,24 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  /** Cierra las cuotas marcadas como exoneradas, opcionalmente ligadas al pago registrado. */
+  const applyExonerations = async (paymentId: string | null) => {
+    for (const [balanceId, draft] of Object.entries(conceptExonerations)) {
+      const bal = balances.find((b) => b.id === balanceId);
+      if (!bal) continue;
+      await applyConceptExoneration({ balance: bal as any, reason: draft.reason, userId: user!.id, paymentId });
+    }
+  };
+
   // Save payment
   const saveMut = useMutation({
     mutationFn: async () => {
+      // Exonerar sin cobrar nada es válido: no se emite factura, solo se cierran esas cuotas
+      const onlyExonerations = Object.keys(selectedConcepts).length === 0 && Object.keys(conceptExonerations).length > 0;
+      if (onlyExonerations) {
+        await applyExonerations(null);
+        return null;
+      }
       if (!invoiceNumber.trim()) throw new Error("El N° de factura es obligatorio");
       if (Object.keys(selectedConcepts).length === 0) throw new Error("Seleccione al menos un concepto");
       // Un pago 100% descontado (beca de un mes) es válido y no lleva formas de pago
@@ -631,13 +686,22 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
         });
       }
 
+      // Cuotas que el estudiante no paga: se exoneran junto con este pago
+      await applyExonerations(payment.id);
+
       return payment.id;
     },
-    onSuccess: (paymentId: string) => {
+    onSuccess: (paymentId: string | null) => {
       qc.invalidateQueries({ queryKey: ["student-balances"] });
       qc.invalidateQueries({ queryKey: ["payments"] });
       qc.invalidateQueries({ queryKey: ["enrolled-students-payments"] });
       qc.invalidateQueries({ queryKey: ["family-credits", student.family_id] });
+      invalidateExonerationQueries(qc);
+      if (!paymentId) {
+        toast({ title: "Cuotas exoneradas", description: "No se emitió factura: no hubo monto por cobrar." });
+        onOpenChange(false);
+        return;
+      }
       toast({ title: "Pago registrado exitosamente" });
       onSaved?.(paymentId);
       onOpenChange(false);
@@ -780,6 +844,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                       <TableHead>Pagado</TableHead>
                       <TableHead>Pendiente</TableHead>
                       <TableHead>Descuento</TableHead>
+                      <TableHead>Exonerar</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Monto a pagar</TableHead>
                     </TableRow>
@@ -789,11 +854,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                       const conceptName = (b.payment_plan_concepts as any)?.payment_concepts?.name || "—";
                       const cur = b.currency || "VES";
                       const isSelected = b.id in selectedConcepts;
+                      const isExonerated = b.id in conceptExonerations;
                       const displayTotal = getDisplayTotal(b);
                       const displayBalance = getDisplayBalance(b);
                       return (
-                        <TableRow key={b.id} className={isSelected ? "bg-primary/5" : ""}>
-                          <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, displayBalance)} /></TableCell>
+                        <TableRow key={b.id} className={isExonerated ? "bg-purple-500/5" : isSelected ? "bg-primary/5" : ""}>
+                          <TableCell><Checkbox checked={isSelected} disabled={isExonerated} onCheckedChange={() => toggleConcept(b.id, displayBalance)} /></TableCell>
                           <TableCell className="font-medium">
                             {conceptName}
                             {(() => {
@@ -825,14 +891,28 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                           <TableCell>{Math.max(0, displayTotal - displayBalance).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell className="font-medium">{displayBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                           <TableCell>
-                            <ConceptDiscountCell
+                            {isExonerated ? (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            ) : (
+                              <ConceptDiscountCell
+                                conceptName={conceptName}
+                                currency={cur}
+                                pendingOriginal={getRemainingOriginal(b)}
+                                rate={getRate(cur)}
+                                value={conceptDiscounts[b.id] || null}
+                                onApply={(draft) => applyConceptDiscount(b, draft)}
+                                onClear={() => clearConceptDiscount(b)}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <ExonerateConceptCell
                               conceptName={conceptName}
-                              currency={cur}
-                              pendingOriginal={getRemainingOriginal(b)}
-                              rate={getRate(cur)}
-                              value={conceptDiscounts[b.id] || null}
-                              onApply={(draft) => applyConceptDiscount(b, draft)}
-                              onClear={() => clearConceptDiscount(b)}
+                              pendingVes={exonerablePendingVes(b)}
+                              exoneration={isExonerated ? { amount_ves: exonerablePendingVes(b), reason: conceptExonerations[b.id].reason } : null}
+                              onExonerate={(reason) => exonerateConcept(b, reason)}
+                              onClear={() => clearConceptExoneration(b)}
+                              clearTitle="Quitar exoneración"
                             />
                           </TableCell>
                           <TableCell>
@@ -1016,6 +1096,12 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                   {" "}(incluye {totalDiscounts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} en descuentos, que no son ingreso)
                 </p>
               )}
+              {totalExonerated > 0.01 && (
+                <p className="text-xs text-purple-700 dark:text-purple-400">
+                  Cuotas exoneradas: {totalExonerated.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                  {" "}— no se cobran ni cuentan como ingreso.
+                </p>
+              )}
               {difference > 0.01 && (
                 <div className="border-t pt-2 space-y-2">
                   {surplusAction === "none" ? (
@@ -1077,9 +1163,9 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || Object.keys(selectedConcepts).length === 0}>
+            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || (Object.keys(selectedConcepts).length === 0 && Object.keys(conceptExonerations).length === 0)}>
               {saveMut.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
-              Registrar Pago
+              {Object.keys(selectedConcepts).length === 0 && Object.keys(conceptExonerations).length > 0 ? "Exonerar cuotas" : "Registrar Pago"}
             </Button>
           </div>
           </>}

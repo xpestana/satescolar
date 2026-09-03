@@ -18,6 +18,9 @@ import { formatGradeLevel } from "@/lib/utils";
 import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 import { resolveBankOnMethodChange } from "@/lib/paymentMethodBank";
 import { ConceptDiscountCell } from "@/components/payments/ConceptDiscountCell";
+import { ExonerateConceptCell } from "@/components/payments/ExonerateConceptCell";
+import { applyConceptExoneration, exonerablePendingVes, type ExonerationDraft } from "@/lib/conceptExonerations";
+import { invalidateExonerationQueries } from "@/hooks/payments/useConceptExonerations";
 import {
   computeAdHocDiscount,
   settlesInstallment,
@@ -93,6 +96,8 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
   const [selectedConcepts, setSelectedConcepts] = useState<Record<string, string>>({});
   // Descuento puntual por cuota (adicional al descuento del plan), indexado por balance id
   const [conceptDiscounts, setConceptDiscounts] = useState<Record<string, AdHocDiscountDraft>>({});
+  // Cuotas que ese hijo NO va a pagar: se exoneran al guardar, indexadas por balance id
+  const [conceptExonerations, setConceptExonerations] = useState<Record<string, ExonerationDraft>>({});
   const [methods, setMethods] = useState<PaymentMethodLine[]>([createMethodLine()]);
   const [applyToBalanceId, setApplyToBalanceId] = useState<string>("");
 
@@ -215,6 +220,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
       setSurplusAction("none");
       setSelectedConcepts({});
       setConceptDiscounts({});
+      setConceptExonerations({});
       setMethods([createMethodLine()]);
       setObservations("");
       setInvoiceNumber("");
@@ -334,6 +340,48 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
     setSelectedConcepts((prev) => (b.id in prev ? { ...prev, [b.id]: getDisplayBalance(b).toFixed(2) } : prev));
   };
 
+  // ── Exoneración de una cuota ──────────────────────────────────────────
+  // Ese hijo no paga ese concepto: al guardar se cierra el saldo y no se cobra nada.
+  const exonerateConcept = (b: any, reason: string) => {
+    setConceptExonerations((prev) => ({ ...prev, [b.id]: { reason } }));
+    setSelectedConcepts((prev) => {
+      const next = { ...prev };
+      delete next[b.id];
+      return next;
+    });
+    setConceptDiscounts((prev) => {
+      const next = { ...prev };
+      delete next[b.id];
+      return next;
+    });
+  };
+
+  const clearConceptExoneration = (b: any) => {
+    setConceptExonerations((prev) => {
+      const next = { ...prev };
+      delete next[b.id];
+      return next;
+    });
+  };
+
+  // Se usa el pendiente del ledger (no revaluado): es exactamente el monto que se registrará
+  const totalExonerated = useMemo(
+    () => Object.keys(conceptExonerations).reduce((s, balanceId) => {
+      const bal = (balances as any[]).find((b: any) => b.id === balanceId);
+      return s + (bal ? exonerablePendingVes(bal) : 0);
+    }, 0),
+    [conceptExonerations, balances],
+  );
+
+  /** Cierra las cuotas marcadas como exoneradas, opcionalmente ligadas al pago registrado. */
+  const applyExonerations = async (paymentId: string | null) => {
+    for (const [balanceId, draft] of Object.entries(conceptExonerations)) {
+      const bal = (balances as any[]).find((b: any) => b.id === balanceId);
+      if (!bal) continue;
+      await applyConceptExoneration({ balance: bal, reason: draft.reason, userId: user!.id, paymentId });
+    }
+  };
+
   // Balances agrupados por hijo (solo pendientes)
   const balancesByStudent = useMemo(() => {
     const map: Record<string, any[]> = {};
@@ -451,6 +499,12 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
   // Guardar pago familiar: 1 factura única, items atribuidos por hijo
   const saveMut = useMutation({
     mutationFn: async () => {
+      // Exonerar sin cobrar nada es válido: no se emite factura, solo se cierran esas cuotas
+      const onlyExonerations = Object.keys(selectedConcepts).length === 0 && Object.keys(conceptExonerations).length > 0;
+      if (onlyExonerations) {
+        await applyExonerations(null);
+        return null;
+      }
       if (!invoiceNumber.trim()) throw new Error("El N° de factura es obligatorio");
       if (Object.keys(selectedConcepts).length === 0) throw new Error("Seleccione al menos un concepto");
       // Un pago 100% descontado (beca de un mes) es válido y no lleva formas de pago
@@ -598,14 +652,23 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
         });
       }
 
+      // Cuotas que no se pagan: se exoneran junto con este pago
+      await applyExonerations(payment.id);
+
       return payment.id;
     },
-    onSuccess: (paymentId: string) => {
+    onSuccess: (paymentId: string | null) => {
       qc.invalidateQueries({ queryKey: ["family-students-balances"] });
       qc.invalidateQueries({ queryKey: ["family-credits", family.id] });
       qc.invalidateQueries({ queryKey: ["families-payment-registration"] });
       qc.invalidateQueries({ queryKey: ["all-student-balances"] });
       qc.invalidateQueries({ queryKey: ["payments"] });
+      invalidateExonerationQueries(qc);
+      if (!paymentId) {
+        toast({ title: "Cuotas exoneradas", description: "No se emitió factura: no hubo monto por cobrar." });
+        onOpenChange(false);
+        return;
+      }
       toast({ title: "Pago registrado exitosamente" });
       onSaved?.(paymentId);
       onOpenChange(false);
@@ -741,6 +804,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                       <TableHead>Pagado</TableHead>
                       <TableHead>Pendiente</TableHead>
                       <TableHead>Descuento</TableHead>
+                      <TableHead>Exonerar</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Monto a pagar</TableHead>
                     </TableRow>
@@ -760,7 +824,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                               <Checkbox checked={allSelected} onCheckedChange={() => toggleAllForStudent(sid)} title="Seleccionar todos los conceptos de este estudiante" />
                             )}
                           </TableCell>
-                          <TableCell colSpan={6}>
+                          <TableCell colSpan={7}>
                             <div className="flex items-center gap-2">
                               <span className="font-semibold">{studentName(child.student)}</span>
                               <Badge variant="outline" className="text-xs">{grade}{section ? ` - ${section}` : ""}</Badge>
@@ -776,7 +840,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                         ...(childBalances.length === 0 ? [
                           <TableRow key={`empty-${sid}`}>
                             <TableCell></TableCell>
-                            <TableCell colSpan={7} className="text-xs text-muted-foreground py-2">
+                            <TableCell colSpan={8} className="text-xs text-muted-foreground py-2">
                               {child.plan ? "Sin conceptos pendientes — al día." : "Este estudiante no tiene plan de pago asignado."}
                             </TableCell>
                           </TableRow>,
@@ -784,11 +848,12 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                           const conceptName = (b.payment_plan_concepts as any)?.payment_concepts?.name || "—";
                           const cur = b.currency || "VES";
                           const isSelected = b.id in selectedConcepts;
+                          const isExonerated = b.id in conceptExonerations;
                           const displayTotal = getDisplayTotal(b);
                           const displayBalance = getDisplayBalance(b);
                           return (
-                            <TableRow key={b.id} className={isSelected ? "bg-primary/5" : ""}>
-                              <TableCell><Checkbox checked={isSelected} onCheckedChange={() => toggleConcept(b.id, displayBalance)} /></TableCell>
+                            <TableRow key={b.id} className={isExonerated ? "bg-purple-500/5" : isSelected ? "bg-primary/5" : ""}>
+                              <TableCell><Checkbox checked={isSelected} disabled={isExonerated} onCheckedChange={() => toggleConcept(b.id, displayBalance)} /></TableCell>
                               <TableCell className="font-medium">
                                 {conceptName}
                                 {(() => {
@@ -820,14 +885,27 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                               <TableCell>{Math.max(0, displayTotal - displayBalance).toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                               <TableCell className="font-medium">{displayBalance.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                               <TableCell>
-                                <ConceptDiscountCell
+                                {isExonerated ? (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                ) : (
+                                  <ConceptDiscountCell
+                                    conceptName={conceptName}
+                                    currency={cur}
+                                    pendingOriginal={getRemainingOriginal(b)}
+                                    rate={getRate(cur)}
+                                    value={conceptDiscounts[b.id] || null}
+                                    onApply={(draft) => applyConceptDiscount(b, draft)}
+                                    onClear={() => clearConceptDiscount(b)}
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <ExonerateConceptCell
                                   conceptName={conceptName}
-                                  currency={cur}
-                                  pendingOriginal={getRemainingOriginal(b)}
-                                  rate={getRate(cur)}
-                                  value={conceptDiscounts[b.id] || null}
-                                  onApply={(draft) => applyConceptDiscount(b, draft)}
-                                  onClear={() => clearConceptDiscount(b)}
+                                  pendingVes={exonerablePendingVes(b)}
+                                  exoneration={isExonerated ? { amount_ves: exonerablePendingVes(b), reason: conceptExonerations[b.id].reason } : null}
+                                  onExonerate={(reason) => exonerateConcept(b, reason)}
+                                  onClear={() => clearConceptExoneration(b)}
                                 />
                               </TableCell>
                               <TableCell>
@@ -998,6 +1076,12 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                   {" "}(incluye {totalDiscounts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} en descuentos, que no son ingreso)
                 </p>
               )}
+              {totalExonerated > 0.01 && (
+                <p className="text-xs text-purple-700 dark:text-purple-400">
+                  Cuotas exoneradas: {totalExonerated.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES
+                  {" "}— no se cobran ni cuentan como ingreso.
+                </p>
+              )}
               {Object.keys(selectedTotalByStudent).length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-1 border-t">
                   {familyStudents.filter((c) => (selectedTotalByStudent[c.student?.id] || 0) > 0).map((c) => (
@@ -1066,9 +1150,9 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || Object.keys(selectedConcepts).length === 0}>
+            <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || (Object.keys(selectedConcepts).length === 0 && Object.keys(conceptExonerations).length === 0)}>
               {saveMut.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}
-              Registrar Pago
+              {Object.keys(selectedConcepts).length === 0 && Object.keys(conceptExonerations).length > 0 ? "Exonerar cuotas" : "Registrar Pago"}
             </Button>
           </div>
           </>}
