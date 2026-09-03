@@ -55,6 +55,18 @@ y **debe respetarse al generar/imprimir la factura**.
   `printInvoiceOverlay(activeTemplate, buildInvoiceData(...))`: abre una ventana con
   `@page size: {paper_width_mm}mm {paper_height_mm}mm; margin: 0` y solo los datos posicionados
   en `x_mm`/`y_mm`, porque los rótulos y recuadros los pone el papel preimpreso.
+- **La ventana de impresión ofrece PDF (recomendado) o impresión directa del navegador:**
+  - **PDF del tamaño exacto** (`src/lib/invoiceOverlayPdf.ts`, jsPDF con
+    `format: [paper_width_mm, paper_height_mm]`): el tamaño de página viaja **dentro del
+    archivo**, así que el visor y el driver lo respetan.
+  - **Imprimir desde el navegador**: depende del diálogo de impresión, y por eso la ventana
+    recuerda en pantalla: *Márgenes: Ninguno*, *Escala: 100%* (no "Ajustar al área de impresión")
+    y el papel del tamaño de la plantilla.
+  > 🐞 Corregido: imprimiendo desde el navegador, si el papel seleccionado era Carta u Oficio el
+  > driver **rotaba y reducía** el contenido (la vista previa del sistema salía con el texto de
+  > lado y diminuto), y el overlay dejaba de calzar. El PDF evita eso de raíz.
+  - Ambos caminos imprimen exactamente los mismos campos: `printableOverlayFields()` en
+    `src/lib/invoiceFieldValue.ts` (los que tienen valor).
 - El **recibo PDF** (A4, comprobante propio del sistema, con sus rótulos) es otra cosa y vive en
   `src/lib/paymentReceiptPdf.ts`, compartido por esas mismas tres pantallas.
 

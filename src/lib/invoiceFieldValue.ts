@@ -25,3 +25,14 @@ export function resolveOverlayValue(field: OverlayField, data: Record<string, st
   }
   return data[field.key] || "";
 }
+
+/**
+ * Campos de la plantilla que realmente se imprimen para un pago: los que tienen valor.
+ * Lo comparten el overlay HTML y el PDF, para que impriman exactamente lo mismo.
+ */
+export function printableOverlayFields(
+  fields: OverlayField[] | null | undefined,
+  data: Record<string, string>,
+): OverlayField[] {
+  return (fields || []).filter((field) => !!resolveOverlayValue(field, data));
+}
