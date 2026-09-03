@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, DollarSign, TrendingUp, AlertTriangle, Users, CreditCard, Tag } from "lucide-react";
+import { Loader2, DollarSign, TrendingUp, AlertTriangle, Users, CreditCard, Tag, BadgeCheck } from "lucide-react";
 import { formatDateOnly, todayCaracasIso, caracasDateFromTimestamp } from "@/lib/dateUtils";
 import { useBillingMode } from "@/hooks/useBillingMode";
 
@@ -62,6 +62,20 @@ export default function PaymentDashboard() {
         .eq("school_id", schoolId!)
         .eq("school_year_id", activeYear!.id)
         .eq("status", "completed");
+      return data || [];
+    },
+    enabled: !!schoolId && !!activeYear?.id,
+  });
+
+  // Cuotas exoneradas vigentes del año (no revertidas)
+  const { data: exonerationRows = [] } = useQuery({
+    queryKey: ["all-exonerations-dashboard", schoolId, activeYear?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("concept_exonerations")
+        .select("amount_ves, student_id, reason, created_at")
+        .eq("school_id", schoolId!)
+        .eq("school_year_id", activeYear!.id)
+        .is("reverted_at", null);
       return data || [];
     },
     enabled: !!schoolId && !!activeYear?.id,
@@ -126,8 +140,10 @@ export default function PaymentDashboard() {
     (s: number, p: any) => s + (p.payment_items || []).reduce((a: number, it: any) => a + (Number(it.discount_amount_ves) || 0), 0),
     0,
   );
+  // Cuotas exoneradas: mismo tratamiento, tampoco son dinero cobrado
+  const totalExonerations = exonerationRows.reduce((s: number, e: any) => s + (Number(e.amount_ves) || 0), 0);
   const totalCoveredByBalances = allBalances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0);
-  const totalCollected = Math.max(0, totalCoveredByBalances - totalDiscounts);
+  const totalCollected = Math.max(0, totalCoveredByBalances - totalDiscounts - totalExonerations);
   const delinquentStudents = new Set(allBalances.filter((b: any) => b.balance > 0).map((b: any) => b.student_id)).size;
   // En modo familia se cuenta una vez por familia (fallback al estudiante si no tiene familia)
   const delinquentFamilies = new Set(
@@ -195,8 +211,10 @@ export default function PaymentDashboard() {
             <div>
               <p className="text-xs text-muted-foreground">Total recaudado</p>
               <p className="text-lg font-bold">{totalCollected.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
-              {totalDiscounts > 0.01 && (
-                <p className="text-[10px] text-muted-foreground">sin contar {totalDiscounts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} en descuentos</p>
+              {(totalDiscounts + totalExonerations) > 0.01 && (
+                <p className="text-[10px] text-muted-foreground">
+                  sin contar {(totalDiscounts + totalExonerations).toLocaleString("es-VE", { minimumFractionDigits: 2 })} en descuentos y exoneraciones
+                </p>
               )}
             </div>
           </CardContent>
@@ -234,6 +252,18 @@ export default function PaymentDashboard() {
             <div>
               <p className="text-xs text-muted-foreground">Descuentos otorgados</p>
               <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400">{totalDiscounts.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4 flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center"><BadgeCheck className="h-5 w-5 text-purple-600" /></div>
+            <div>
+              <p className="text-xs text-muted-foreground">Cuotas exoneradas</p>
+              <p className="text-lg font-bold text-purple-700 dark:text-purple-400">{totalExonerations.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</p>
+              {exonerationRows.length > 0 && (
+                <p className="text-[10px] text-muted-foreground">{exonerationRows.length} cuota(s)</p>
+              )}
             </div>
           </CardContent>
         </Card>

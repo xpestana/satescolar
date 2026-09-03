@@ -355,6 +355,30 @@ Las dos pantallas usan lo mismo; el texto del aviso se pasa por prop (`inactiveW
   - Comprobante/factura: los recibos PDF llevan columna **Descuento** y la línea
     *"Descuentos otorgados"* con el motivo; las plantillas de factura ganan los campos
     `total_discount` y `discount_reason` (opcionales, no cambian las plantillas existentes).
+- **Exoneración de una cuota (`concept_exonerations`):** el colegio **perdona el pendiente
+  completo** de una cuota concreta (hijo de personal, beca, caso social). A diferencia del
+  descuento ad-hoc, **no va dentro de un pago**: se aplica desde el **Estado de cuenta**
+  (`StudentLedger` y `FamilyLedgerView`, columna *Exoneración*), no genera factura ni ingreso.
+  - Tabla `concept_exonerations` (migración `20260903120000_create_concept_exonerations.sql`):
+    `school_id`, `school_year_id`, `student_id`, `balance_id`, `plan_concept_id`, `amount_ves`,
+    `original_amount`/`currency`/`exchange_rate` (congelados al aplicar, para revertir exacto),
+    `reason` (**obligatorio**, CHECK), `created_by`/`created_at` y `reverted_at`/`reverted_by`.
+    Índice único parcial: **una sola exoneración vigente por cuota**.
+  - Efecto en el ledger: `paid_amount` absorbe lo exonerado (mismo invariante que el descuento),
+    `balance = 0` y `status = 'exonerated'` — **nuevo estado** admitido por el CHECK de
+    `student_concept_balances`. Como morosidad filtra `balance > 0`, la cuota sale sola de
+    morosos; `rebuild_student_concept_balances_for_active_year` solo inserta filas faltantes,
+    así que no reabre exoneraciones.
+  - **Revertir**: no se borra la fila, se marca `reverted_at`/`reverted_by`; el saldo vuelve al
+    pendiente exonerado y el estado se recalcula (`pending`/`partial`/`paid`).
+  - **Dashboard**: KPI *"Cuotas exoneradas"* y resta en *"Total recaudado"* junto con los
+    descuentos. En el estado de cuenta, *"Total Pagado"* también descuenta lo exonerado.
+  - Lógica en `src/hooks/payments/useConceptExonerations.ts`; UI en
+    `src/components/payments/ExonerateConceptCell.tsx`; etiquetas de estado en
+    `src/lib/paymentStatus.ts` (`conceptStatusLabel`/`conceptStatusVariant`).
+  > Nota de esquema: al crear la FK se detectó que en producción `student_concept_balances`
+  > había quedado **sin PRIMARY KEY** (drift respecto a `20260512155200`). La migración la
+  > restituye sobre `id` antes de crear la tabla.
 - Montos se manejan en **VES** con `exchange_rate` por entrada; la conversión usa
   `bcv_rates`/`exchange_rates` (función `fetch-bcv-rates`).
 - **Abonos de cuotas en moneda extranjera (USD/EUR) a tasas de días distintos:** cada abono

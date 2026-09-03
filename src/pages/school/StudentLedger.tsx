@@ -24,6 +24,9 @@ import autoTable from "jspdf-autotable";
 import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
 import { buildInvoiceData } from "@/lib/buildInvoiceData";
 import { itemCoverageVes } from "@/lib/paymentItemDiscount";
+import { conceptStatusLabel, conceptStatusVariant } from "@/lib/paymentStatus";
+import { useConceptExonerations } from "@/hooks/payments/useConceptExonerations";
+import { ExonerateConceptCell } from "@/components/payments/ExonerateConceptCell";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 import { useBillingMode } from "@/hooks/useBillingMode";
@@ -130,8 +133,22 @@ export default function StudentLedger() {
     });
   }, [enrollments, search]);
 
+  const { byBalanceId: exonerationByBalance, exonerate, revert } = useConceptExonerations({
+    schoolId,
+    schoolYearId: activeYear?.id,
+    studentIds: selectedStudentId ? [selectedStudentId] : [],
+  });
+
   const totalDebt = useMemo(() => balances.reduce((s: number, b: any) => s + (b.balance || 0), 0), [balances]);
-  const totalPaid = useMemo(() => balances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0), [balances]);
+  const totalExonerated = useMemo(
+    () => Object.values(exonerationByBalance).reduce((s: number, e: any) => s + (Number(e.amount_ves) || 0), 0),
+    [exonerationByBalance],
+  );
+  // Lo exonerado vive dentro de paid_amount (invariante del ledger), pero no es dinero cobrado
+  const totalPaid = useMemo(
+    () => Math.max(0, balances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0) - totalExonerated),
+    [balances, totalExonerated],
+  );
 
   const selectedEnrollment = enrollments.find((e: any) => e.student_id === selectedStudentId);
   const studentFd = selectedEnrollment?.students?.form_data as any;
@@ -305,17 +322,30 @@ export default function StudentLedger() {
             <CardHeader><CardTitle className="text-sm">Saldos por Concepto</CardTitle></CardHeader>
             <CardContent>
               <Table>
-                <TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead>Total</TableHead><TableHead>Pagado</TableHead><TableHead>Pendiente</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead>Total</TableHead><TableHead>Pagado</TableHead><TableHead>Pendiente</TableHead><TableHead>Estado</TableHead><TableHead>Exoneración</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {balances.map((b: any) => (
+                  {balances.map((b: any) => {
+                    const exoneration = exonerationByBalance[b.id] || null;
+                    return (
                     <TableRow key={b.id}>
                       <TableCell className="font-medium">{(b.payment_plan_concepts as any)?.payment_concepts?.name || "—"}</TableCell>
                       <TableCell>{b.total_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell className="font-medium">{b.balance?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                      <TableCell><Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>{b.status === "paid" ? "Pagado" : b.status === "partial" ? "Parcial" : "Pendiente"}</Badge></TableCell>
+                      <TableCell><Badge variant={conceptStatusVariant(b.status)}>{conceptStatusLabel(b.status)}</Badge></TableCell>
+                      <TableCell>
+                        <ExonerateConceptCell
+                          conceptName={(b.payment_plan_concepts as any)?.payment_concepts?.name || "esta cuota"}
+                          pendingVes={Number(b.balance) || 0}
+                          exoneration={exoneration}
+                          isPending={exonerate.isPending || revert.isPending}
+                          onExonerate={(reason) => exonerate.mutate({ balance: b, reason })}
+                          onRevert={() => revert.mutate({ exoneration: exoneration!, balance: b })}
+                        />
+                      </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>

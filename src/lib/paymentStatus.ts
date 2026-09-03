@@ -10,6 +10,26 @@ export type PaymentCoverage = {
   className: string;
 };
 
+/**
+ * Etiqueta del estado de una cuota en el ledger (`student_concept_balances.status`).
+ * `exonerated` es una cuota perdonada por el colegio: saldo cero sin haber cobrado.
+ */
+export function conceptStatusLabel(status?: string | null): string {
+  switch (status) {
+    case "paid": return "Pagado";
+    case "partial": return "Parcial";
+    case "exonerated": return "Exonerado";
+    case "voided": return "Anulado";
+    default: return "Pendiente";
+  }
+}
+
+export function conceptStatusVariant(status?: string | null): "default" | "secondary" | "outline" {
+  if (status === "paid") return "default";
+  if (status === "partial" || status === "exonerated") return "secondary";
+  return "outline";
+}
+
 export function getPaymentCoverage(payment: {
   payment_items?: { is_partial?: boolean | null }[] | null;
 }): PaymentCoverage {

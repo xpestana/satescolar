@@ -1207,6 +1207,96 @@ export type Database = {
           },
         ]
       }
+      concept_exonerations: {
+        Row: {
+          amount_ves: number
+          balance_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          exchange_rate: number
+          id: string
+          original_amount: number | null
+          plan_concept_id: string
+          reason: string
+          reverted_at: string | null
+          reverted_by: string | null
+          school_id: string
+          school_year_id: string
+          student_id: string
+        }
+        Insert: {
+          amount_ves: number
+          balance_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          exchange_rate?: number
+          id?: string
+          original_amount?: number | null
+          plan_concept_id: string
+          reason: string
+          reverted_at?: string | null
+          reverted_by?: string | null
+          school_id: string
+          school_year_id: string
+          student_id: string
+        }
+        Update: {
+          amount_ves?: number
+          balance_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          exchange_rate?: number
+          id?: string
+          original_amount?: number | null
+          plan_concept_id?: string
+          reason?: string
+          reverted_at?: string | null
+          reverted_by?: string | null
+          school_id?: string
+          school_year_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "concept_exonerations_balance_id_fkey"
+            columns: ["balance_id"]
+            isOneToOne: false
+            referencedRelation: "student_concept_balances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "concept_exonerations_plan_concept_id_fkey"
+            columns: ["plan_concept_id"]
+            isOneToOne: false
+            referencedRelation: "payment_plan_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "concept_exonerations_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "concept_exonerations_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "concept_exonerations_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       classroom_topics: {
         Row: {
           assignment_id: string

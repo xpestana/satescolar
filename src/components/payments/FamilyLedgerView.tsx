@@ -18,6 +18,9 @@ import autoTable from "jspdf-autotable";
 import { printInvoiceOverlay } from "@/components/payments/InvoiceOverlayPrint";
 import { buildInvoiceData } from "@/lib/buildInvoiceData";
 import { itemCoverageVes } from "@/lib/paymentItemDiscount";
+import { conceptStatusLabel, conceptStatusVariant } from "@/lib/paymentStatus";
+import { useConceptExonerations } from "@/hooks/payments/useConceptExonerations";
+import { ExonerateConceptCell } from "@/components/payments/ExonerateConceptCell";
 import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 import { formatGradeLevel } from "@/lib/utils";
 import { formatDateOnly } from "@/lib/dateUtils";
@@ -217,8 +220,22 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
   }, [families, childrenByFamily, search, primaryRepByFamily]);
 
   const totalCharges = useMemo(() => balances.reduce((s: number, b: any) => s + (b.total_amount || 0), 0), [balances]);
+  const { byBalanceId: exonerationByBalance, exonerate, revert } = useConceptExonerations({
+    schoolId,
+    schoolYearId: activeYear?.id,
+    studentIds: childIds,
+  });
+
   const totalDebt = useMemo(() => balances.reduce((s: number, b: any) => s + (b.balance || 0), 0), [balances]);
-  const totalPaid = useMemo(() => balances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0), [balances]);
+  const totalExonerated = useMemo(
+    () => Object.values(exonerationByBalance).reduce((s: number, e: any) => s + (Number(e.amount_ves) || 0), 0),
+    [exonerationByBalance],
+  );
+  // Lo exonerado vive dentro de paid_amount (invariante del ledger), pero no es dinero cobrado
+  const totalPaid = useMemo(
+    () => Math.max(0, balances.reduce((s: number, b: any) => s + (b.paid_amount || 0), 0) - totalExonerated),
+    [balances, totalExonerated],
+  );
   const { balance: creditBalance } = useFamilyCredits(selectedFamilyId);
 
   const balancesByStudent = useMemo(() => {
@@ -408,14 +425,14 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
         <CardHeader><CardTitle className="text-sm">Saldos por Concepto</CardTitle></CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead>Total</TableHead><TableHead>Pagado</TableHead><TableHead>Pendiente</TableHead><TableHead>Estado</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Concepto</TableHead><TableHead>Total</TableHead><TableHead>Pagado</TableHead><TableHead>Pendiente</TableHead><TableHead>Estado</TableHead><TableHead>Exoneración</TableHead></TableRow></TableHeader>
             <TableBody>
               {familyChildren.map((c) => {
                 const sid = c.student?.id;
                 const childBalances = balancesByStudent[sid] || [];
                 return [
                   <TableRow key={`header-${sid}`} className="bg-muted/40 hover:bg-muted/40">
-                    <TableCell colSpan={5}>
+                    <TableCell colSpan={6}>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{studentFullName(c.student)}</span>
                         <Badge variant="outline" className="text-xs">{c.enrollment ? `${formatGradeLevel(c.enrollment.sections?.grade_level)}${c.enrollment.sections?.name ? ` - ${c.enrollment.sections.name}` : ""}` : "No inscrito"}</Badge>
@@ -424,17 +441,30 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
                   </TableRow>,
                   ...(childBalances.length === 0 ? [
                     <TableRow key={`empty-${sid}`}>
-                      <TableCell colSpan={5} className="text-xs text-muted-foreground py-2">Sin saldos registrados — verifique que tenga un plan de pago asignado.</TableCell>
+                      <TableCell colSpan={6} className="text-xs text-muted-foreground py-2">Sin saldos registrados — verifique que tenga un plan de pago asignado.</TableCell>
                     </TableRow>,
-                  ] : childBalances.map((b: any) => (
+                  ] : childBalances.map((b: any) => {
+                    const exoneration = exonerationByBalance[b.id] || null;
+                    return (
                     <TableRow key={b.id}>
                       <TableCell className="font-medium">{(b.payment_plan_concepts as any)?.payment_concepts?.name || "—"}</TableCell>
                       <TableCell>{b.total_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell>{b.paid_amount?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                       <TableCell className="font-medium">{b.balance?.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
-                      <TableCell><Badge variant={b.status === "paid" ? "default" : b.status === "partial" ? "secondary" : "outline"}>{b.status === "paid" ? "Pagado" : b.status === "partial" ? "Parcial" : "Pendiente"}</Badge></TableCell>
+                      <TableCell><Badge variant={conceptStatusVariant(b.status)}>{conceptStatusLabel(b.status)}</Badge></TableCell>
+                      <TableCell>
+                        <ExonerateConceptCell
+                          conceptName={(b.payment_plan_concepts as any)?.payment_concepts?.name || "esta cuota"}
+                          pendingVes={Number(b.balance) || 0}
+                          exoneration={exoneration}
+                          isPending={exonerate.isPending || revert.isPending}
+                          onExonerate={(reason) => exonerate.mutate({ balance: b, reason })}
+                          onRevert={() => revert.mutate({ exoneration: exoneration!, balance: b })}
+                        />
+                      </TableCell>
                     </TableRow>
-                  ))),
+                    );
+                  })),
                 ];
               })}
             </TableBody>
