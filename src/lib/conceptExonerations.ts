@@ -1,4 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  computeExonerationSettlement,
+  type ExonerableBalance,
+} from "@/lib/conceptExonerationMath";
 
 /**
  * Exoneración de una cuota: el colegio decide que el estudiante NO va a pagar ese concepto.
@@ -7,21 +11,17 @@ import { supabase } from "@/integrations/supabase/client";
  *
  * Diferencia con el descuento ad-hoc: el descuento rebaja lo que se cobra en esa factura;
  * la exoneración perdona el pendiente completo y no cuelga de una línea de pago.
+ *
+ * La aritmética (pendiente en moneda original, revaluación a la tasa del día) vive en
+ * `conceptExonerationMath.ts`; aquí solo el acceso a datos.
  */
 
-/** Fila de `student_concept_balances` con lo mínimo para exonerar y revertir. */
-export interface ExonerableBalance {
-  id: string;
-  school_id: string;
-  school_year_id: string;
-  student_id: string;
-  plan_concept_id: string;
-  currency?: string | null;
-  exchange_rate_snapshot?: number | null;
-  total_amount?: number | null;
-  paid_amount?: number | null;
-  balance?: number | null;
-}
+export {
+  exonerableRemainingOriginal,
+  exonerablePendingVes,
+  exonerableTotalOriginal,
+  type ExonerableBalance,
+} from "@/lib/conceptExonerationMath";
 
 export interface ConceptExoneration {
   id: string;
@@ -47,30 +47,29 @@ export interface ExonerationDraft {
   reason: string;
 }
 
-/** Pendiente de la cuota en VES: es exactamente lo que se perdona. */
-export const exonerablePendingVes = (balance: ExonerableBalance) => Math.max(0, Number(balance.balance) || 0);
-
 /**
  * Registra la exoneración y cierra el saldo de la cuota.
  * El ledger conserva `paid_amount + balance = total_amount`: lo exonerado se suma a
  * `paid_amount` (no es dinero — el dashboard y el estado de cuenta lo restan de lo cobrado).
+ * Con `currentRate` la fila se revalúa a la tasa del día, igual que hace un cobro, para que
+ * exonerar y cobrar la misma cuota queden registrados en los mismos bolívares.
  */
 export async function applyConceptExoneration(params: {
   balance: ExonerableBalance;
   reason: string;
   userId?: string | null;
   paymentId?: string | null;
+  /** Tasa del día para la moneda del concepto; sin ella se conserva la tasa congelada. */
+  currentRate?: number | null;
 }): Promise<void> {
   const { balance, userId = null, paymentId = null } = params;
   const reason = params.reason.trim();
   if (!reason) throw new Error("El motivo de la exoneración es obligatorio");
 
-  const pendingVes = exonerablePendingVes(balance);
-  if (pendingVes <= 0) throw new Error("Esta cuota no tiene saldo pendiente por exonerar");
-
   const currency = balance.currency || "VES";
-  const snapshot = Number(balance.exchange_rate_snapshot) || 1;
-  const pendingOriginal = currency === "VES" ? pendingVes : pendingVes / snapshot;
+  const { rate, pendingOriginal, pendingVes, newTotalVes } =
+    computeExonerationSettlement(balance, params.currentRate);
+  if (pendingVes <= 0) throw new Error("Esta cuota no tiene saldo pendiente por exonerar");
 
   const { error: insErr } = await supabase.from("concept_exonerations").insert({
     school_id: balance.school_id,
@@ -82,14 +81,17 @@ export async function applyConceptExoneration(params: {
     amount_ves: parseFloat(pendingVes.toFixed(2)),
     original_amount: currency === "VES" ? null : parseFloat(pendingOriginal.toFixed(4)),
     currency,
-    exchange_rate: snapshot,
+    exchange_rate: rate,
     reason,
     created_by: userId,
   });
   if (insErr) throw insErr;
 
+  // La cuota queda saldada: el total se revalúa a la tasa aplicada y `paid_amount` lo absorbe.
   const { error: balErr } = await supabase.from("student_concept_balances").update({
-    paid_amount: parseFloat(((Number(balance.paid_amount) || 0) + pendingVes).toFixed(2)),
+    exchange_rate_snapshot: rate,
+    total_amount: newTotalVes,
+    paid_amount: newTotalVes,
     balance: 0,
     status: "exonerated",
   }).eq("id", balance.id);
@@ -99,6 +101,8 @@ export async function applyConceptExoneration(params: {
 /**
  * Deshace una exoneración: devuelve el pendiente exonerado a la cuota. La fila no se borra,
  * se marca `reverted_at`/`reverted_by` para conservar la auditoría.
+ * `amount_ves` y el `total_amount` del balance quedaron escritos en la misma tasa al exonerar,
+ * así que el pendiente restaurado es exacto.
  */
 export async function revertConceptExoneration(params: {
   exoneration: ConceptExoneration;

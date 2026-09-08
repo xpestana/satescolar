@@ -19,7 +19,7 @@ import { METHOD_TYPE_LABELS } from "@/lib/venezuelan-banks";
 import { resolveBankOnMethodChange } from "@/lib/paymentMethodBank";
 import { ConceptDiscountCell } from "@/components/payments/ConceptDiscountCell";
 import { ExonerateConceptCell } from "@/components/payments/ExonerateConceptCell";
-import { applyConceptExoneration, exonerablePendingVes, type ExonerationDraft } from "@/lib/conceptExonerations";
+import { applyConceptExoneration, type ExonerationDraft } from "@/lib/conceptExonerations";
 import { invalidateExonerationQueries } from "@/hooks/payments/useConceptExonerations";
 import {
   computeAdHocDiscount,
@@ -364,13 +364,13 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
     });
   };
 
-  // Se usa el pendiente del ledger (no revaluado): es exactamente el monto que se registrará
+  // Mismo marco que el cobro: se perdona el pendiente revaluado a la tasa del día
   const totalExonerated = useMemo(
     () => Object.keys(conceptExonerations).reduce((s, balanceId) => {
       const bal = (balances as any[]).find((b: any) => b.id === balanceId);
-      return s + (bal ? exonerablePendingVes(bal) : 0);
+      return s + (bal ? getDisplayBalance(bal) : 0);
     }, 0),
-    [conceptExonerations, balances],
+    [conceptExonerations, balances, rates],
   );
 
   /** Cierra las cuotas marcadas como exoneradas, opcionalmente ligadas al pago registrado. */
@@ -378,7 +378,13 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
     for (const [balanceId, draft] of Object.entries(conceptExonerations)) {
       const bal = (balances as any[]).find((b: any) => b.id === balanceId);
       if (!bal) continue;
-      await applyConceptExoneration({ balance: bal, reason: draft.reason, userId: user!.id, paymentId });
+      await applyConceptExoneration({
+        balance: bal,
+        reason: draft.reason,
+        userId: user!.id,
+        paymentId,
+        currentRate: getRate(bal.currency || "VES"),
+      });
     }
   };
 
@@ -902,8 +908,8 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                               <TableCell>
                                 <ExonerateConceptCell
                                   conceptName={conceptName}
-                                  pendingVes={exonerablePendingVes(b)}
-                                  exoneration={isExonerated ? { amount_ves: exonerablePendingVes(b), reason: conceptExonerations[b.id].reason } : null}
+                                  pendingVes={displayBalance}
+                                  exoneration={isExonerated ? { amount_ves: displayBalance, reason: conceptExonerations[b.id].reason } : null}
                                   onExonerate={(reason) => exonerateConcept(b, reason)}
                                   onClear={() => clearConceptExoneration(b)}
                                 />

@@ -533,6 +533,23 @@ En la tabla de conceptos del modal (estudiante y familia), además del checkbox 
     `student_concept_balances`. Como morosidad filtra `balance > 0`, la cuota sale sola de
     morosos; `rebuild_student_concept_balances_for_active_year` solo inserta filas faltantes,
     así que no reabre exoneraciones.
+  - **Se perdona en moneda original, congelado a la tasa del día — igual que un cobro.** El
+    pendiente de una cuota en USD/EUR vive en `balance / exchange_rate_snapshot`; al exonerar se
+    toman esos dólares y se convierten con la tasa vigente (`getRate`, la misma del modal), y la
+    fila del ledger se **revalúa**: `total_amount = original_amount × tasa`,
+    `paid_amount = total_amount`, `balance = 0` y `exchange_rate_snapshot = tasa`. Así cobrar y
+    exonerar la misma cuota quedan registrados en los mismos bolívares, y el KPI *Cuotas
+    exoneradas* es comparable con *Total recaudado* al restarlo. Aritmética pura y probada en
+    `src/lib/conceptExonerationMath.ts` (`exonerablePendingVes`, `computeExonerationSettlement`);
+    el acceso a datos en `conceptExonerations.ts`.
+    > 🐞 Corregido: la exoneración usaba el `balance` **crudo** del ledger mientras todas las
+    > demás columnas del modal (Total, Pendiente, Descuento, Monto a pagar) se revaluaban a la
+    > tasa de hoy. Con una cuota sembrada a una tasa distinta de la vigente, la fila decía
+    > *Pendiente 26.244,75* (75 USD @ 349,93) y la insignia *"Exonerado 61.030,21"* (los mismos
+    > 75 USD @ 813,74 congelados). Ese monto era además el que se guardaba en
+    > `concept_exonerations.amount_ves` y alimentaba el dashboard y el Reporte de Pagos.
+    > El estado de cuenta (`StudentLedger`), que muestra bolívares almacenados, no cambió:
+    > `exonerablePendingVes` sin tasa conserva el comportamiento anterior.
   - **Revertir**: no se borra la fila, se marca `reverted_at`/`reverted_by`; el saldo vuelve al
     pendiente exonerado y el estado se recalcula (`pending`/`partial`/`paid`).
   - **Dashboard**: KPI *"Cuotas exoneradas"* y resta en *"Total recaudado"* junto con los
@@ -599,6 +616,7 @@ En la tabla de conceptos del modal (estudiante y familia), además del checkbox 
 - `src/components/payments/EditPaymentModal.tsx` (edición de un pago ya registrado: revierte y
   reaplica saldos/crédito, exige motivo, audita en `payment_edit_log`)
 - `src/lib/paymentItemDiscount.ts` (descuento ad-hoc por cuota) y
+  `src/lib/conceptExonerationMath.ts` (aritmética pura, con pruebas) +
   `src/lib/conceptExonerations.ts` + `src/hooks/payments/useConceptExonerations.ts` (exoneraciones)
 - `src/lib/paymentReceiptPdf.ts` (recibo PDF compartido) y
   `src/components/payments/InvoiceOverlayPrint.tsx` (factura sobre el formato preimpreso)
