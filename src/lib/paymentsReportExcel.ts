@@ -21,9 +21,10 @@ const INVOICE_HEADERS = [
   "N° Factura", "N° Control", "Fecha", "Estado", "Familia", "Titular", "RIF / C.I.",
   "Estudiantes", "Grados / Secciones", "Planes", "Conceptos", "N° de conceptos",
   "Cobrado (VES)", "Total factura (VES)", "Descuento (VES)", "Exonerado (VES)",
+  "Saldo a favor usado (VES)", "Saldo a favor generado (VES)",
   "Métodos", "Banco", "Referencia", "Moneda del pago", "Observaciones",
 ];
-const INVOICE_NUM_COLS = [12, 13, 14, 15];
+const INVOICE_NUM_COLS = [12, 13, 14, 15, 16, 17];
 
 const DETAIL_HEADERS = [
   "N° Factura", "Fecha", "Tipo", "Estudiante", "Grado / Sección", "Plan",
@@ -140,6 +141,8 @@ function buildInvoicesSheet(rows: PaymentReportRow[], totals: PaymentsReportTota
       r.paymentTotalVes || 0,
       r.discountVes || 0,
       r.exoneratedVes || 0,
+      r.creditUsedVes || 0,
+      r.creditGeneratedVes || 0,
       r.methodsLabel || "—",
       r.banks || "—",
       r.references || "—",
@@ -160,7 +163,7 @@ function buildInvoicesSheet(rows: PaymentReportRow[], totals: PaymentsReportTota
   ws["!cols"] = [
     { wch: 12 }, { wch: 13 }, { wch: 12 }, { wch: 12 }, { wch: 24 }, { wch: 26 }, { wch: 14 },
     { wch: 34 }, { wch: 22 }, { wch: 18 }, { wch: 40 }, { wch: 8 },
-    { wch: 15 }, { wch: 17 }, { wch: 15 }, { wch: 15 },
+    { wch: 15 }, { wch: 17 }, { wch: 15 }, { wch: 15 }, { wch: 17 }, { wch: 19 },
     { wch: 24 }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 30 },
   ];
   styleSheet(ws, { colCount, headerRowIdx, dataStartIdx, dataEndIdx: totalsRowIdx, numCols: INVOICE_NUM_COLS, totalsRowIdx });

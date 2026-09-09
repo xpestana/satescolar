@@ -65,6 +65,10 @@ export interface PaymentReportRow {
   paymentTotalVes: number;
   discountVes: number;
   exoneratedVes: number;
+  /** Sobrante de esta factura guardado como saldo a favor de la familia. */
+  creditGeneratedVes: number;
+  /** Saldo a favor que esta factura consumió. */
+  creditUsedVes: number;
   hasPartial: boolean;
   methodIds: string[];
   methodsLabel: string;

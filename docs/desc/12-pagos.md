@@ -401,8 +401,27 @@ paginación) y `src/lib/paymentsReportRows.ts` (mapeo de los datos crudos a fila
 `src/hooks/payments/usePaymentsReportData.ts`, exportación en `src/lib/paymentsReportExcel.ts`, y
 UI en `PaymentsReportFilters.tsx` + `PaymentsReportTable.tsx`.
 
-> El año completo se trae en una consulta y se filtra/ordena **en cliente** (cientos de facturas
-> por año), para que escribir en el buscador no dispare una consulta por tecla.
+**Qué refleja del registro de pagos:** todo lo que escribe el modal al guardar — la factura
+(`payments`), sus cuotas con **descuento ad-hoc** y su motivo (`payment_items`), las **formas de
+pago** con banco y referencia (`payment_method_entries`), los ingresos de **"Otros"**
+(`payment_others`), las **cuotas exoneradas** (`concept_exonerations`) y el **saldo a favor**
+que la factura generó o consumió (`family_credits`), que aparece en el detalle desplegable y en
+el Excel.
+
+**Consultas planas, no anidadas (rendimiento):** el reporte pide cada tabla por separado y en
+paralelo, y las une en `buildPaymentReportRows`; el catálogo de conceptos del plan se trae una
+sola vez por colegio. El año completo se filtra/ordena **en cliente** (cientos de facturas por
+año), para que escribir en el buscador no dispare una consulta por tecla.
+
+> 🐞 **Timeout corregido (`57014`)**: la primera versión pedía un solo `select` con
+> `payments → payment_items → payment_plan_concepts → payment_plans/payment_concepts`
+> embebidos. Cada nivel de anidamiento **vuelve a evaluar las políticas RLS del nivel anterior**,
+> y esas políticas llamaban `auth.uid()`/`is_admin()` **por fila**: medido con
+> `EXPLAIN (ANALYZE, BUFFERS)` como rol `authenticated`, 587 líneas leían ~190.000 buffers y
+> tardaban 1,1 s solo en esa pieza; con los embebidos completos se pasaba del límite de 8 s y el
+> año 2025-2026 (405 facturas) no cargaba. Se corrigió por los dos lados —consultas planas y
+> políticas RLS optimizadas (ver **Rendimiento de RLS**)—: las cuatro consultas del reporte
+> tardan ahora **menos de 6 ms cada una**.
 
 ## Registro de Pagos por año escolar (`/pagos/registro`)
 La pestaña **Registro de Pagos** tiene un **selector de año escolar** (arriba de la lista, en
@@ -455,6 +474,29 @@ En la tabla de conceptos del modal (estudiante y familia), además del checkbox 
 > hasta que ese año se active, y el cron nunca manda correos por deudas de un año que no está en
 > curso. Para ver los ingresos de otro año, usar **Ingresos** (`/pagos/ingresos`), que ya tiene su
 > propio selector.
+
+## Rendimiento de RLS (módulo de pagos)
+Las políticas de las tablas de pago llamaban `auth.uid()` / `is_admin()` **directamente**, y
+Postgres las evalúa **una vez por fila**. Como el reporte y el estado de cuenta encadenan tablas
+(`payments → payment_items → payment_plan_concepts → payment_plans/payment_concepts`), cada nivel
+volvía a evaluar la política del anterior, y `user_roles` —que aparece dentro de casi todas—
+tiene a su vez su propia política. El resultado eran cientos de miles de buffers por consulta.
+
+**Regla:** en toda política nueva o editada, envolver esas llamadas en un **subselect escalar**:
+`ur.user_id = (select auth.uid())`, `(select public.is_admin())`. El planificador las evalúa
+entonces una sola vez por consulta (InitPlan) y la condición sigue siendo idéntica: no cambia
+quién ve qué, solo cuándo se evalúa.
+
+Aplicado en `20260909120000_optimize_payments_rls_and_indexes.sql` a `user_roles`, `payments`,
+`payment_items`, `payment_method_entries`, `payment_others`, `payment_plans`, `payment_concepts`,
+`payment_plan_concepts`, `student_concept_balances` y `concept_exonerations`. Medido antes/después
+sobre el mismo plan: **1.096 ms → 6,1 ms** y 190.000 → 4.471 buffers.
+
+La misma migración repara **drift de esquema** detectado en producción: faltaban las PRIMARY KEY
+de `payments`, `payment_items`, `payment_method_entries`, `payment_plan_concepts`, `payment_plans`
+y `payment_concepts` (existían solo índices únicos sobre `id`), e índices por
+`payment_items(plan_concept_id)`, `payment_others(payment_id)` y
+`payments(school_id, school_year_id, payment_date DESC)`.
 
 ## Reglas de negocio
 - **Fechas calendario (`payment_date`, etc.):** mostrar SIEMPRE con `formatDateOnly()` de
@@ -542,6 +584,10 @@ En la tabla de conceptos del modal (estudiante y familia), además del checkbox 
     exoneradas* es comparable con *Total recaudado* al restarlo. Aritmética pura y probada en
     `src/lib/conceptExonerationMath.ts` (`exonerablePendingVes`, `computeExonerationSettlement`);
     el acceso a datos en `conceptExonerations.ts`.
+  - **Se exonera la cuota, no un monto en bolívares:** en un concepto en USD/EUR la celda y el
+    diálogo dicen *"Exonerado 75,00 USD"* (los VES van en el tooltip como referencia del día);
+    solo las cuotas en VES se muestran en bolívares. Así se lee lo que realmente se perdona —
+    la cuota completa — sin depender de la tasa con que se convierta.
     > 🐞 Corregido: la exoneración usaba el `balance` **crudo** del ledger mientras todas las
     > demás columnas del modal (Total, Pendiente, Descuento, Monto a pagar) se revaluaban a la
     > tasa de hoy. Con una cuota sembrada a una tasa distinta de la vigente, la fila decía

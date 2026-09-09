@@ -234,6 +234,16 @@ export function PaymentsReportTable({
                         {row.banks && <p className="text-xs text-muted-foreground">Banco: {row.banks}</p>}
                         {row.references && <p className="text-xs text-muted-foreground">Referencia: {row.references}</p>}
                         {row.paymentCurrencies && <p className="text-xs text-muted-foreground">Moneda: {row.paymentCurrencies}</p>}
+                        {row.creditUsedVes > 0 && (
+                          <p className="text-xs text-blue-700 dark:text-blue-400">
+                            Saldo a favor aplicado: {fmt(row.creditUsedVes)} VES
+                          </p>
+                        )}
+                        {row.creditGeneratedVes > 0 && (
+                          <p className="text-xs text-blue-700 dark:text-blue-400">
+                            Sobrante guardado como saldo a favor: {fmt(row.creditGeneratedVes)} VES
+                          </p>
+                        )}
                         {row.holderDocument && <p className="mt-2 text-xs text-muted-foreground">Facturado a: {row.holderName} · {row.holderDocument}</p>}
                         {row.observations && <p className="mt-2 text-xs text-muted-foreground">Obs.: {row.observations}</p>}
                       </div>

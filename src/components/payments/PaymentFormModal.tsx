@@ -915,7 +915,14 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
                             <ExonerateConceptCell
                               conceptName={conceptName}
                               pendingVes={displayBalance}
-                              exoneration={isExonerated ? { amount_ves: displayBalance, reason: conceptExonerations[b.id].reason } : null}
+                              pendingOriginal={getRemainingOriginal(b)}
+                              currency={cur}
+                              exoneration={isExonerated ? {
+                                amount_ves: displayBalance,
+                                original_amount: getRemainingOriginal(b),
+                                currency: cur,
+                                reason: conceptExonerations[b.id].reason,
+                              } : null}
                               onExonerate={(reason) => exonerateConcept(b, reason)}
                               onClear={() => clearConceptExoneration(b)}
                               clearTitle="Quitar exoneración"

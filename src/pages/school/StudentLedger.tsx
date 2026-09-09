@@ -298,6 +298,7 @@ export default function StudentLedger() {
                         <ExonerateConceptCell
                           conceptName={(b.payment_plan_concepts as any)?.payment_concepts?.name || "esta cuota"}
                           pendingVes={Number(b.balance) || 0}
+                          currency={b.currency}
                           exoneration={exoneration}
                           isPending={revert.isPending}
                           readOnly

@@ -17,9 +17,26 @@ import {
 
 const fmt = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/**
+ * Lo que se perdona es **la cuota**, no un monto en bolívares: si el concepto es en USD/EUR se
+ * muestra en su moneda y los VES (la conversión del día) quedan como referencia.
+ */
+const fmtAmount = (ves: number, original?: number | null, currency?: string | null) =>
+  currency && currency !== "VES" && original != null
+    ? `${fmt(original)} ${currency}`
+    : fmt(ves);
+
+const fmtAmountLong = (ves: number, original?: number | null, currency?: string | null) =>
+  currency && currency !== "VES" && original != null
+    ? `${fmt(original)} ${currency} (${fmt(ves)} VES)`
+    : `${fmt(ves)} VES`;
+
 /** Exoneración mostrada en la celda: la ya guardada o la que se está por aplicar en el modal. */
 export interface ExonerationView {
   amount_ves: number;
+  /** Pendiente perdonado en la moneda del concepto (null en cuotas en VES). */
+  original_amount?: number | null;
+  currency?: string | null;
   reason: string;
 }
 
@@ -27,6 +44,10 @@ interface ExonerateConceptCellProps {
   conceptName: string;
   /** Pendiente de la cuota en VES: es lo que se perdona. */
   pendingVes: number;
+  /** Ese mismo pendiente en la moneda del concepto, cuando no es VES. */
+  pendingOriginal?: number | null;
+  /** Moneda del concepto (`USD`, `EUR`, `VES`…). */
+  currency?: string | null;
   exoneration: ExonerationView | null;
   isPending?: boolean;
   /** Solo lectura: muestra la exoneración vigente y permite quitarla, pero no aplicar una nueva. */
@@ -44,6 +65,8 @@ interface ExonerateConceptCellProps {
 export function ExonerateConceptCell({
   conceptName,
   pendingVes,
+  pendingOriginal,
+  currency,
   exoneration,
   isPending,
   readOnly,
@@ -60,10 +83,10 @@ export function ExonerateConceptCell({
         <Badge
           variant="outline"
           className="gap-1 whitespace-nowrap border-purple-500/40 bg-purple-500/10 text-purple-700 dark:text-purple-400"
-          title={`Exonerado: ${exoneration.reason}`}
+          title={`Exonerado ${fmtAmountLong(Number(exoneration.amount_ves), exoneration.original_amount, exoneration.currency ?? currency)}: ${exoneration.reason}`}
         >
           <BadgeCheck className="h-3 w-3" />
-          Exonerado {fmt(Number(exoneration.amount_ves))}
+          Exonerado {fmtAmount(Number(exoneration.amount_ves), exoneration.original_amount, exoneration.currency ?? currency)}
         </Badge>
         {onClear && (
           <Button size="icon" variant="ghost" className="h-6 w-6" title={clearTitle} disabled={isPending} onClick={onClear}>
@@ -94,8 +117,9 @@ export function ExonerateConceptCell({
             <AlertDialogTitle>Exonerar «{conceptName}»</AlertDialogTitle>
             <AlertDialogDescription>
               El estudiante no pagará esta cuota: se perdona el pendiente completo,
-              <strong> {fmt(pendingVes)} VES</strong>. El saldo queda en cero, la cuota sale de
-              morosos y el monto <strong>no</strong> se cuenta como ingreso.
+              <strong> {fmtAmountLong(pendingVes, pendingOriginal, currency)}</strong>. El saldo
+              queda en cero, la cuota sale de morosos y el monto <strong>no</strong> se cuenta
+              como ingreso.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-1">

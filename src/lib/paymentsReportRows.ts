@@ -7,39 +7,44 @@ import type { PaymentReportLine, PaymentReportRow } from "@/lib/paymentsReport";
  * factura viajan dentro, en `lines`, y la UI las despliega — igual que el historial de pagos.
  * Las exoneraciones que no cuelgan de ningún pago forman su propia fila.
  *
- * Separado de `paymentsReport.ts` (filtros/orden/totales) para que el mapeo de la forma que
- * devuelve la consulta viva en un solo sitio y se pueda probar sin tocar la UI.
+ * Recibe las tablas **planas** (pagos, líneas, métodos, otros, exoneraciones y saldo a favor) y
+ * las une aquí, en vez de pedirle a PostgREST un embebido anidado: cada nivel de anidamiento
+ * vuelve a evaluar las políticas RLS de la tabla padre y era lo que hacía expirar la consulta.
  */
 
 export interface RawMethodEntry {
+  payment_id?: string | null;
   method?: string | null;
   currency?: string | null;
   bank_name?: string | null;
   reference_code?: string | null;
 }
 
-interface RawPlanConcept {
+/** Concepto del plan ya resuelto (catálogo del colegio, se pide una sola vez). */
+export interface PlanConceptInfo {
   plan_id?: string | null;
+  plan_name?: string | null;
   currency?: string | null;
-  /** Necesario para la factura: `buildInvoiceData` marca los conceptos por este id. */
   concept_id?: string | null;
-  payment_plans?: { name?: string | null } | null;
-  payment_concepts?: { id?: string | null; name?: string | null; concept_type?: string | null } | null;
+  concept_name?: string | null;
+  concept_type?: string | null;
 }
 
-interface RawPaymentItem {
+export interface RawPaymentItem {
   id: string;
+  payment_id?: string | null;
   student_id?: string | null;
+  plan_concept_id?: string | null;
   amount_ves?: number | null;
   original_amount?: number | null;
   is_partial?: boolean | null;
   discount_amount_ves?: number | null;
   discount_reason?: string | null;
-  payment_plan_concepts?: RawPlanConcept | null;
 }
 
-interface RawPaymentOther {
+export interface RawPaymentOther {
   id: string;
+  payment_id?: string | null;
   amount_ves?: number | null;
   notes?: string | null;
 }
@@ -56,24 +61,29 @@ export interface RawPayment {
   observations?: string | null;
   total_amount_ves?: number | null;
   student_id?: string | null;
-  payment_method_entries?: RawMethodEntry[] | null;
-  payment_items?: RawPaymentItem[] | null;
-  payment_others?: RawPaymentOther[] | null;
 }
 
 export interface RawExoneration {
   id: string;
   payment_id?: string | null;
   student_id?: string | null;
+  plan_concept_id?: string | null;
   amount_ves?: number | null;
   original_amount?: number | null;
   currency?: string | null;
   reason?: string | null;
   created_at?: string | null;
-  payment_plan_concepts?: RawPlanConcept | null;
 }
 
-/** Datos auxiliares que no vienen embebidos en el pago. */
+/** Movimiento de "saldo a favor": lo genera un sobrante o lo consume una factura. */
+export interface RawFamilyCredit {
+  entry_type?: string | null;
+  amount_ves?: number | null;
+  source_payment_id?: string | null;
+  applied_payment_id?: string | null;
+}
+
+/** Datos auxiliares que no vienen en las tablas de pago. */
 export interface PaymentsReportContext {
   /** student_id → nombre completo. */
   studentNames: Record<string, string>;
@@ -85,6 +95,17 @@ export interface PaymentsReportContext {
   studentFamilies: Record<string, string>;
   /** id del método del colegio → etiqueta configurada. */
   methodLabels: Record<string, string>;
+  /** plan_concept_id → plan y concepto ya resueltos. */
+  planConcepts: Record<string, PlanConceptInfo>;
+}
+
+export interface PaymentsReportInput {
+  payments: RawPayment[];
+  items?: RawPaymentItem[];
+  methodEntries?: RawMethodEntry[];
+  others?: RawPaymentOther[];
+  exonerations?: RawExoneration[];
+  credits?: RawFamilyCredit[];
 }
 
 const EMPTY_CONTEXT: PaymentsReportContext = {
@@ -93,6 +114,7 @@ const EMPTY_CONTEXT: PaymentsReportContext = {
   studentGrades: {},
   studentFamilies: {},
   methodLabels: {},
+  planConcepts: {},
 };
 
 const num = (v: unknown) => Number(v) || 0;
@@ -105,6 +127,18 @@ const uniq = (values: (string | null | undefined)[]) =>
 
 const joinUnique = (values: (string | null | undefined)[], separator = " · ") =>
   uniq(values).join(separator);
+
+/** Agrupa filas por el id de la factura a la que pertenecen. */
+function groupByPayment<T extends { payment_id?: string | null }>(rows: T[]): Map<string, T[]> {
+  const map = new Map<string, T[]>();
+  rows.forEach((row) => {
+    const id = text(row.payment_id);
+    if (!id) return;
+    const list = map.get(id);
+    if (list) list.push(row); else map.set(id, [row]);
+  });
+  return map;
+}
 
 function methodSummary(entries: RawMethodEntry[], methodLabels: Record<string, string>) {
   return {
@@ -137,39 +171,49 @@ function summarizeLines(lines: PaymentReportLine[], ctx: PaymentsReportContext) 
 }
 
 export function buildPaymentReportRows(
-  payments: RawPayment[],
-  exonerations: RawExoneration[] = [],
+  input: PaymentsReportInput,
   context: Partial<PaymentsReportContext> = {},
 ): PaymentReportRow[] {
   const ctx = { ...EMPTY_CONTEXT, ...context };
+  const { payments = [], items = [], methodEntries = [], others = [], exonerations = [], credits = [] } = input;
+
+  const itemsByPayment = groupByPayment(items);
+  const methodsByPayment = groupByPayment(methodEntries);
+  const othersByPayment = groupByPayment(others);
+  const exonerationsByPayment = groupByPayment(exonerations);
+  const looseExonerations = exonerations.filter((e) => !text(e.payment_id));
+
+  // Saldo a favor: lo que la factura generó (sobrante guardado) y lo que consumió
+  const creditGenerated = new Map<string, number>();
+  const creditUsed = new Map<string, number>();
+  credits.forEach((c) => {
+    const amount = num(c.amount_ves);
+    if (c.entry_type === "credit" && c.source_payment_id) {
+      creditGenerated.set(c.source_payment_id, (creditGenerated.get(c.source_payment_id) || 0) + amount);
+    }
+    if (c.entry_type === "debit" && c.applied_payment_id) {
+      creditUsed.set(c.applied_payment_id, (creditUsed.get(c.applied_payment_id) || 0) + amount);
+    }
+  });
+
   const studentInfo = (studentId: string | null) => ({
     studentId,
     studentName: studentId ? (ctx.studentNames[studentId] || "") : "",
     gradeLabel: studentId ? (ctx.studentGrades[studentId] || "") : "",
   });
 
-  // Exoneraciones agrupadas por la factura en cuyo registro se aplicaron
-  const exonerationsByPayment = new Map<string, RawExoneration[]>();
-  const looseExonerations: RawExoneration[] = [];
-  (exonerations || []).forEach((exoneration) => {
-    const paymentId = text(exoneration.payment_id);
-    if (!paymentId) { looseExonerations.push(exoneration); return; }
-    const list = exonerationsByPayment.get(paymentId) || [];
-    list.push(exoneration);
-    exonerationsByPayment.set(paymentId, list);
-  });
+  const planConceptOf = (planConceptId: unknown) => ctx.planConcepts[text(planConceptId)] || {};
 
   const exonerationLine = (exoneration: RawExoneration): PaymentReportLine => {
-    const planConcept = exoneration.payment_plan_concepts || {};
-    const concept = planConcept.payment_concepts || {};
+    const planConcept = planConceptOf(exoneration.plan_concept_id);
     return {
       id: `exoneration:${exoneration.id}`,
       kind: "exoneracion",
       ...studentInfo(text(exoneration.student_id) || null),
       planId: text(planConcept.plan_id) || null,
-      planName: text(planConcept.payment_plans?.name),
-      conceptName: text(concept.name),
-      conceptType: text(concept.concept_type),
+      planName: text(planConcept.plan_name),
+      conceptName: text(planConcept.concept_name),
+      conceptType: text(planConcept.concept_type),
       conceptCurrency: text(exoneration.currency) || "VES",
       originalAmount: exoneration.original_amount == null ? null : num(exoneration.original_amount),
       amountVes: 0,
@@ -181,20 +225,20 @@ export function buildPaymentReportRows(
     };
   };
 
-  const rows: PaymentReportRow[] = (payments || []).map((payment) => {
+  const rows: PaymentReportRow[] = payments.map((payment) => {
+    const paymentId = text(payment.id);
     const lines: PaymentReportLine[] = [];
 
-    (payment.payment_items || []).forEach((item) => {
-      const planConcept = item.payment_plan_concepts || {};
-      const concept = planConcept.payment_concepts || {};
+    (itemsByPayment.get(paymentId) || []).forEach((item) => {
+      const planConcept = planConceptOf(item.plan_concept_id);
       lines.push({
         id: `item:${item.id}`,
         kind: "cuota",
         ...studentInfo(text(item.student_id) || text(payment.student_id) || null),
         planId: text(planConcept.plan_id) || null,
-        planName: text(planConcept.payment_plans?.name),
-        conceptName: text(concept.name),
-        conceptType: text(concept.concept_type),
+        planName: text(planConcept.plan_name),
+        conceptName: text(planConcept.concept_name),
+        conceptType: text(planConcept.concept_type),
         conceptCurrency: text(planConcept.currency) || "VES",
         originalAmount: item.original_amount == null ? null : num(item.original_amount),
         amountVes: num(item.amount_ves),
@@ -206,7 +250,7 @@ export function buildPaymentReportRows(
       });
     });
 
-    (payment.payment_others || []).forEach((other) => {
+    (othersByPayment.get(paymentId) || []).forEach((other) => {
       lines.push({
         id: `other:${other.id}`,
         kind: "otros",
@@ -226,15 +270,15 @@ export function buildPaymentReportRows(
       });
     });
 
-    (exonerationsByPayment.get(text(payment.id)) || []).forEach((exoneration) => {
+    (exonerationsByPayment.get(paymentId) || []).forEach((exoneration) => {
       lines.push(exonerationLine(exoneration));
     });
 
     const summary = summarizeLines(lines, ctx);
     const firstStudentId = lines.map((l) => l.studentId).find(Boolean) || null;
     return {
-      id: text(payment.id),
-      paymentId: text(payment.id),
+      id: paymentId,
+      paymentId,
       invoiceNumber: text(payment.invoice_number),
       controlNumber: text(payment.control_number),
       paymentDate: text(payment.payment_date),
@@ -246,7 +290,9 @@ export function buildPaymentReportRows(
       holderDocument: text(payment.invoice_rif),
       observations: text(payment.observations),
       paymentTotalVes: num(payment.total_amount_ves),
-      ...methodSummary(payment.payment_method_entries || [], ctx.methodLabels),
+      creditGeneratedVes: round(creditGenerated.get(paymentId) || 0),
+      creditUsedVes: round(creditUsed.get(paymentId) || 0),
+      ...methodSummary(methodsByPayment.get(paymentId) || [], ctx.methodLabels),
       ...summary,
       lines,
     };
@@ -270,6 +316,8 @@ export function buildPaymentReportRows(
       holderDocument: "",
       observations: "",
       paymentTotalVes: 0,
+      creditGeneratedVes: 0,
+      creditUsedVes: 0,
       methodIds: [],
       methodsLabel: "",
       banks: "",

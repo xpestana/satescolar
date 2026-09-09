@@ -67,6 +67,8 @@ const row = (over: Partial<PaymentReportRow> = {}): PaymentReportRow => {
     holderName: "María González",
     holderDocument: "V-15234567",
     observations: "",
+    creditGeneratedVes: 0,
+    creditUsedVes: 0,
     ...over,
     lines,
   };
@@ -200,40 +202,18 @@ describe("buildPaymentReportRows", () => {
     invoice_rif: "V-16307134",
     observations: "",
     student_id: null,
-    payment_method_entries: [
-      { method: "m1", bank_name: "PROVINCIAL", reference_code: "REF-1", currency: "VES" },
-    ],
-    payment_items: [
-      {
-        id: "i1", student_id: "s1", amount_ves: 14933.57, original_amount: null,
-        discount_amount_ves: 0, is_partial: false,
-        payment_plan_concepts: {
-          plan_id: "plan-1", currency: "VES",
-          payment_plans: { name: "Plan Anual" },
-          payment_concepts: { name: "Matricula INS", concept_type: "inscripcion" },
-        },
-      },
-      {
-        id: "i2", student_id: "s2", amount_ves: 4977.86, original_amount: null,
-        discount_amount_ves: 0, is_partial: false,
-        payment_plan_concepts: {
-          plan_id: "plan-1", currency: "VES",
-          payment_plans: { name: "Plan Anual" },
-          payment_concepts: { name: "Matricula INS", concept_type: "inscripcion" },
-        },
-      },
-      {
-        id: "i3", student_id: "s3", amount_ves: 7964.57, original_amount: null,
-        discount_amount_ves: 0, is_partial: true,
-        payment_plan_concepts: {
-          plan_id: "plan-1", currency: "VES",
-          payment_plans: { name: "Plan Anual" },
-          payment_concepts: { name: "Mes de Septiembre", concept_type: "mensualidad" },
-        },
-      },
-    ],
-    payment_others: [],
   };
+
+  const methodEntries = [
+    { payment_id: "p1", method: "m1", bank_name: "PROVINCIAL", reference_code: "REF-1", currency: "VES" },
+    { payment_id: "p1", method: "m1", bank_name: "PROVINCIAL", reference_code: "REF-1", currency: "VES" },
+  ];
+
+  const items = [
+    { id: "i1", payment_id: "p1", student_id: "s1", plan_concept_id: "pc-ins", amount_ves: 14933.57, original_amount: null, discount_amount_ves: 0, is_partial: false },
+    { id: "i2", payment_id: "p1", student_id: "s2", plan_concept_id: "pc-ins", amount_ves: 4977.86, original_amount: null, discount_amount_ves: 0, is_partial: false },
+    { id: "i3", payment_id: "p1", student_id: "s3", plan_concept_id: "pc-sep", amount_ves: 7964.57, original_amount: null, discount_amount_ves: 0, is_partial: true },
+  ];
 
   const context = {
     studentNames: { s1: "SARA BEATRIZ LEAL", s2: "MILLY ANDREA LEAL", s3: "JUAN ANDRES LEAL" },
@@ -241,10 +221,16 @@ describe("buildPaymentReportRows", () => {
     studentGrades: { s1: "2do Año - U", s2: "3er Año - U", s3: "4to Año - U" },
     studentFamilies: { s1: "ALBORNOZ RAMIREZ", s2: "ALBORNOZ RAMIREZ", s3: "ALBORNOZ RAMIREZ" },
     methodLabels: { m1: "Transferencia Bancaria" },
+    planConcepts: {
+      "pc-ins": { plan_id: "plan-1", plan_name: "Plan Anual", currency: "VES", concept_id: "c1", concept_name: "Matricula INS", concept_type: "inscripcion" },
+      "pc-sep": { plan_id: "plan-1", plan_name: "Plan Anual", currency: "VES", concept_id: "c2", concept_name: "Mes de Septiembre", concept_type: "mensualidad" },
+      "pc-oct": { plan_id: "plan-1", plan_name: "Plan Anual", currency: "VES", concept_id: "c3", concept_name: "Mes de Octubre", concept_type: "mensualidad" },
+      "pc-mar": { plan_id: "plan-1", plan_name: "Plan Anual", currency: "VES", concept_id: "c4", concept_name: "Mes de Marzo", concept_type: "mensualidad" },
+    },
   };
 
   it("una factura familiar con 3 hijos es UNA fila con 3 líneas", () => {
-    const rows = buildPaymentReportRows([familyPayment], [], context);
+    const rows = buildPaymentReportRows({ payments: [familyPayment], items, methodEntries }, context);
     expect(rows).toHaveLength(1);
     const invoice = rows[0];
     expect(invoice.invoiceNumber).toBe("016397");
@@ -258,18 +244,20 @@ describe("buildPaymentReportRows", () => {
     expect(invoice.hasPartial).toBe(true);
     // Los métodos repetidos no se duplican en la etiqueta
     expect(invoice.methodsLabel).toBe("Transferencia Bancaria");
+    expect(invoice.plansLabel).toBe("Plan Anual");
   });
 
   it("suma 'Otros' y la exoneración aplicada en esa misma factura", () => {
-    const rows = buildPaymentReportRows(
-      [{ ...familyPayment, payment_others: [{ id: "o1", amount_ves: 200, notes: "Uniforme" }] }],
-      [{
-        id: "e1", payment_id: "p1", student_id: "s2", amount_ves: 500, original_amount: null,
-        currency: "VES", reason: "Hijo de personal", created_at: "2025-10-15T11:00:00Z",
-        payment_plan_concepts: { payment_concepts: { name: "Mes de Octubre", concept_type: "mensualidad" } },
+    const rows = buildPaymentReportRows({
+      payments: [familyPayment],
+      items,
+      methodEntries,
+      others: [{ id: "o1", payment_id: "p1", amount_ves: 200, notes: "Uniforme" }],
+      exonerations: [{
+        id: "e1", payment_id: "p1", student_id: "s2", plan_concept_id: "pc-oct", amount_ves: 500,
+        original_amount: null, currency: "VES", reason: "Hijo de personal", created_at: "2025-10-15T11:00:00Z",
       }],
-      context,
-    );
+    }, context);
     expect(rows).toHaveLength(1);
     expect(rows[0].lines).toHaveLength(5);
     expect(rows[0].exoneratedVes).toBe(500);
@@ -277,16 +265,33 @@ describe("buildPaymentReportRows", () => {
     expect(rows[0].lines.map((l) => l.kind)).toEqual(["cuota", "cuota", "cuota", "otros", "exoneracion"]);
   });
 
+  it("refleja el saldo a favor que la factura generó y el que consumió", () => {
+    const rows = buildPaymentReportRows({
+      payments: [familyPayment],
+      items,
+      credits: [
+        { entry_type: "credit", amount_ves: 20.43, source_payment_id: "p1" },
+        { entry_type: "debit", amount_ves: 15, applied_payment_id: "p1" },
+        { entry_type: "credit", amount_ves: 99, source_payment_id: "otra-factura" },
+      ],
+    }, context);
+    expect(rows[0].creditGeneratedVes).toBe(20.43);
+    expect(rows[0].creditUsedVes).toBe(15);
+  });
+
   it("una exoneración sin factura es su propia fila, con su fecha", () => {
-    const rows = buildPaymentReportRows([], [{
-      id: "e2", payment_id: null, student_id: "s1", amount_ves: 300,
-      currency: "VES", reason: "Beca", created_at: "2025-10-05T12:00:00Z",
-      payment_plan_concepts: { payment_concepts: { name: "Mes de Marzo", concept_type: "mensualidad" } },
-    }], context);
+    const rows = buildPaymentReportRows({
+      payments: [],
+      exonerations: [{
+        id: "e2", payment_id: null, student_id: "s1", plan_concept_id: "pc-mar", amount_ves: 300,
+        currency: "VES", reason: "Beca", created_at: "2025-10-05T12:00:00Z",
+      }],
+    }, context);
     expect(rows).toHaveLength(1);
     expect(rows[0].paymentId).toBeNull();
     expect(rows[0].invoiceNumber).toBe("");
     expect(rows[0].paymentDate).toBe("2025-10-05");
     expect(rows[0].exoneratedVes).toBe(300);
+    expect(rows[0].lines[0].conceptName).toBe("Mes de Marzo");
   });
 });
