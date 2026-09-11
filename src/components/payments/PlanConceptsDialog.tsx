@@ -181,7 +181,8 @@ export function PlanConceptsDialog({ open, onOpenChange, plan, yearLabel, allCon
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+      {/* Ancho para que quepan todas las columnas (vencimientos y acciones) sin scroll horizontal */}
+      <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Conceptos del Plan: {plan.name} <span className="text-muted-foreground font-normal">({yearLabel})</span></DialogTitle>
         </DialogHeader>
@@ -220,7 +221,7 @@ export function PlanConceptsDialog({ open, onOpenChange, plan, yearLabel, allCon
                   const finalAmt = calcFinalAmount(baseAmt, discType, discVal);
                   return (
                     <TableRow key={pc.id}>
-                      <TableCell className="font-medium">{pc.payment_concepts?.name}</TableCell>
+                      <TableCell className="font-medium whitespace-nowrap">{pc.payment_concepts?.name}</TableCell>
                       <TableCell><Badge variant="outline" className="text-xs">{pc.payment_concepts?.concept_type}</Badge></TableCell>
                       <TableCell>
                         {discType === "none" ? (
