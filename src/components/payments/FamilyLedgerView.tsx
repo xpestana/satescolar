@@ -28,7 +28,7 @@ import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
 
 interface Props {
   schoolId: string;
-  activeYear: any;
+  schoolYear: any;
 }
 
 const studentFullName = (student: any) => {
@@ -36,7 +36,7 @@ const studentFullName = (student: any) => {
   return [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ") || "Sin nombre";
 };
 
-export function FamilyLedgerView({ schoolId, activeYear }: Props) {
+export function FamilyLedgerView({ schoolId, schoolYear }: Props) {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -69,17 +69,17 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
     enabled: !!schoolId,
   });
 
-  // Inscripciones del año activo (para mostrar grado/sección si está inscrito)
+  // Inscripciones del año elegido (para mostrar grado/sección si está inscrito)
   const { data: enrollments = [] } = useQuery({
-    queryKey: ["family-ledger-enrollments", schoolId, activeYear?.id],
+    queryKey: ["family-ledger-enrollments", schoolId, schoolYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
         .select("*, sections(name, grade_level)")
         .eq("school_id", schoolId)
-        .eq("school_year_id", activeYear.id);
+        .eq("school_year_id", schoolYear.id);
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!schoolYear?.id,
   });
 
   const familyIds = useMemo(
@@ -143,7 +143,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
 
   // Pagos: familiares + individuales históricos de los hijos
   const { data: payments = [] } = useQuery({
-    queryKey: ["family-payments-ledger", selectedFamilyId, schoolId, activeYear?.id],
+    queryKey: ["family-payments-ledger", selectedFamilyId, schoolId, schoolYear?.id],
     queryFn: async () => {
       const parts = [`family_id.eq.${selectedFamilyId}`];
       if (childIds.length > 0) parts.push(`student_id.in.(${childIds.join(",")})`);
@@ -151,26 +151,26 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
         .select("*, payment_items(*, payment_plan_concepts(concept_id, payment_concepts(id, name))), payment_method_entries(*)")
         .or(parts.join(","))
         .eq("school_id", schoolId)
-        .eq("school_year_id", activeYear.id)
+        .eq("school_year_id", schoolYear.id)
         .order("payment_date", { ascending: false })) as any;
       if (error) throw error;
       return (data || []) as any[];
     },
-    enabled: !!selectedFamilyId && !!activeYear?.id,
+    enabled: !!selectedFamilyId && !!schoolYear?.id,
   });
 
   // Saldos de todos los hijos
   const { data: balances = [] } = useQuery({
-    queryKey: ["family-balances-ledger", selectedFamilyId, activeYear?.id],
+    queryKey: ["family-balances-ledger", selectedFamilyId, schoolYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("student_concept_balances")
         .select("*, payment_plan_concepts(payment_concepts(name))")
         .in("student_id", childIds)
-        .eq("school_year_id", activeYear.id)
+        .eq("school_year_id", schoolYear.id)
         .eq("school_id", schoolId);
       return data || [];
     },
-    enabled: !!selectedFamilyId && childIds.length > 0 && !!activeYear?.id,
+    enabled: !!selectedFamilyId && childIds.length > 0 && !!schoolYear?.id,
   });
 
   const { data: schoolMethods = [] } = useQuery({
@@ -221,7 +221,7 @@ export function FamilyLedgerView({ schoolId, activeYear }: Props) {
   const totalCharges = useMemo(() => balances.reduce((s: number, b: any) => s + (b.total_amount || 0), 0), [balances]);
   const { byBalanceId: exonerationByBalance, revert } = useConceptExonerations({
     schoolId,
-    schoolYearId: activeYear?.id,
+    schoolYearId: schoolYear?.id,
     studentIds: childIds,
   });
 

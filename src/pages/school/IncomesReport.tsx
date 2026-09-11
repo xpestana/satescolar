@@ -14,6 +14,8 @@ import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart3, Download } from "lucide-react";
 import { exportIncomesExcel } from "@/lib/incomesExcel";
+import { SchoolYearSelect } from "@/components/payments/SchoolYearSelect";
+import { useSchoolYearSelection } from "@/hooks/useSchoolYearSelection";
 
 interface IncomeRow {
   id: string;
@@ -41,7 +43,6 @@ const formatMonthLabel = (yyyymm: string) => {
 
 export default function IncomesReport() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
-  const [selectedYearId, setSelectedYearId] = useState<string>("");
   const [filterMonth, setFilterMonth] = useState<string>("");
   const [filters, setFilters] = useState({
     fecha: "", rif: "", nombre: "",
@@ -58,25 +59,9 @@ export default function IncomesReport() {
     enabled: !!schoolId,
   });
 
-  const { data: years = [] } = useQuery({
-    queryKey: ["school-years-all", schoolId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("school_years")
-        .select("id, year_range, is_active")
-        .eq("school_id", schoolId!)
-        .order("year_range", { ascending: false });
-      return data || [];
-    },
-    enabled: !!schoolId,
-  });
-
-  useEffect(() => {
-    if ((years as any[]).length > 0 && !selectedYearId) {
-      const active = (years as any[]).find((y) => y.is_active);
-      setSelectedYearId(active?.id ?? (years as any[])[0].id);
-    }
-  }, [years, selectedYearId]);
+  // Mismo selector (y año recordado) que el resto de pantallas de pagos
+  const { schoolYears: years, selectedYearId, setSelectedYearId, selectedYear, isLoading: yearsLoading } =
+    useSchoolYearSelection(schoolId);
 
   // Reset month filter when year changes
   useEffect(() => { setFilterMonth(""); }, [selectedYearId]);
@@ -182,7 +167,7 @@ export default function IncomesReport() {
   const setFilter = (k: keyof typeof filters) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setFilters((prev) => ({ ...prev, [k]: e.target.value }));
 
-  const yearLabel = (years as any[]).find((y) => y.id === selectedYearId)?.year_range ?? "";
+  const yearLabel = selectedYear?.year_range ?? "";
   const handleExport = () => {
     const monthLabel = filterMonth ? formatMonthLabel(filterMonth) : "Todos los meses";
     const safe = (s: string) => s.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
@@ -196,24 +181,16 @@ export default function IncomesReport() {
     <DashboardLayout>
       <PageHeader title="Ingresos" breadcrumbs={[{ label: "Administrativo" }, { label: "Ingresos" }]} />
 
+      <SchoolYearSelect
+        years={years}
+        value={selectedYearId}
+        onChange={setSelectedYearId}
+        isLoading={yearsLoading}
+        inactiveWarning="Está viendo los ingresos del año {year}, que no es el año en curso"
+      />
+
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Año escolar:</span>
-          <Select value={selectedYearId} onValueChange={setSelectedYearId}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Seleccionar año" />
-            </SelectTrigger>
-            <SelectContent>
-              {(years as any[]).map((y) => (
-                <SelectItem key={y.id} value={y.id}>{y.year_range}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {(years as any[]).find((y) => y.id === selectedYearId)?.is_active && (
-            <Badge variant="secondary">Año activo</Badge>
-          )}
-        </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-muted-foreground">Mes:</span>
           <Select value={filterMonth || "__all__"} onValueChange={(v) => setFilterMonth(v === "__all__" ? "" : v)}>

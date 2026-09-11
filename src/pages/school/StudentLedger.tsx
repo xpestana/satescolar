@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,6 +30,8 @@ import { formatDateOnly } from "@/lib/dateUtils";
 import { InvoiceTemplate } from "@/pages/school/InvoiceTemplateConfig";
 import { useBillingMode } from "@/hooks/useBillingMode";
 import { FamilyLedgerView } from "@/components/payments/FamilyLedgerView";
+import { SchoolYearSelect } from "@/components/payments/SchoolYearSelect";
+import { useSchoolYearSelection } from "@/hooks/useSchoolYearSelection";
 
 export default function StudentLedger() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -43,52 +45,63 @@ export default function StudentLedger() {
   const [voidPaymentId, setVoidPaymentId] = useState<string | null>(null);
   const [voidReason, setVoidReason] = useState("");
 
-  const { data: activeYear } = useQuery({
-    queryKey: ["active-school-year", schoolId],
-    queryFn: async () => {
-      const { data } = await supabase.from("school_years").select("*").eq("school_id", schoolId!).eq("is_active", true).maybeSingle();
-      return data;
-    },
-    enabled: !!schoolId,
-  });
+  // Mismo año que Registro de Pagos (se recuerda por colegio): así, tras cobrar una cuota de un
+  // año anterior, el estado de cuenta muestra ese año y no rebota al activo.
+  const { schoolYears, selectedYearId, setSelectedYearId, selectedYear, isLoading: yearsLoading } =
+    useSchoolYearSelection(schoolId);
+
+  // El estudiante abierto puede no estar inscrito en el otro año: se vuelve a la lista.
+  useEffect(() => {
+    setSelectedStudentId(null);
+  }, [selectedYearId]);
+
+  const yearSelect = (
+    <SchoolYearSelect
+      years={schoolYears}
+      value={selectedYearId}
+      onChange={setSelectedYearId}
+      isLoading={yearsLoading}
+      inactiveWarning="Está viendo el estado de cuenta del año {year}, que no es el año en curso"
+    />
+  );
 
   const { data: enrollments = [], isLoading } = useQuery({
-    queryKey: ["enrolled-students-ledger", schoolId, activeYear?.id],
+    queryKey: ["enrolled-students-ledger", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
         .select("*, students(id, document_id, form_data, family_id), sections(name, grade_level)")
-        .eq("school_id", schoolId!).eq("school_year_id", activeYear!.id);
+        .eq("school_id", schoolId!).eq("school_year_id", selectedYear!.id);
       return data || [];
     },
-    enabled: !!schoolId && !!activeYear?.id,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   // Student payments
   const { data: payments = [] } = useQuery({
-    queryKey: ["student-payments-ledger", selectedStudentId, schoolId],
+    queryKey: ["student-payments-ledger", selectedStudentId, schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("payments")
         .select("*, payment_items(*, payment_plan_concepts(concept_id, payment_concepts(id, name))), payment_method_entries(*)")
         .eq("student_id", selectedStudentId!)
         .eq("school_id", schoolId!)
-        .eq("school_year_id", activeYear!.id)
+        .eq("school_year_id", selectedYear!.id)
         .order("payment_date", { ascending: false });
       return data || [];
     },
-    enabled: !!selectedStudentId && !!activeYear?.id,
+    enabled: !!selectedStudentId && !!selectedYear?.id,
   });
 
   const { data: balances = [] } = useQuery({
-    queryKey: ["student-balances-ledger", selectedStudentId, activeYear?.id],
+    queryKey: ["student-balances-ledger", selectedStudentId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("student_concept_balances")
         .select("*, payment_plan_concepts(payment_concepts(name))")
         .eq("student_id", selectedStudentId!)
-        .eq("school_year_id", activeYear!.id)
+        .eq("school_year_id", selectedYear!.id)
         .eq("school_id", schoolId!);
       return data || [];
     },
-    enabled: !!selectedStudentId && !!activeYear?.id,
+    enabled: !!selectedStudentId && !!selectedYear?.id,
   });
 
   const { data: schoolMethods = [] } = useQuery({
@@ -134,7 +147,7 @@ export default function StudentLedger() {
 
   const { byBalanceId: exonerationByBalance, revert } = useConceptExonerations({
     schoolId,
-    schoolYearId: activeYear?.id,
+    schoolYearId: selectedYear?.id,
     studentIds: selectedStudentId ? [selectedStudentId] : [],
   });
 
@@ -219,10 +232,14 @@ export default function StudentLedger() {
     return (
       <DashboardLayout>
         <PageHeader title="Estado de Cuenta" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Estado de Cuenta" }]} />
-        {activeYear?.id ? (
-          <FamilyLedgerView schoolId={schoolId} activeYear={activeYear} />
+        {yearSelect}
+        {selectedYear?.id ? (
+          // key: al cambiar de año se remonta, para no arrastrar la familia abierta del año anterior
+          <FamilyLedgerView key={selectedYear.id} schoolId={schoolId} schoolYear={selectedYear} />
+        ) : !yearsLoading && schoolYears.length === 0 ? (
+          <Card><CardContent className="py-8 text-center text-muted-foreground">No hay años escolares configurados.</CardContent></Card>
         ) : (
-          <Card><CardContent className="py-8 text-center text-muted-foreground">No hay un año escolar activo configurado.</CardContent></Card>
+          <div className="space-y-3 py-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
         )}
       </DashboardLayout>
     );
@@ -231,6 +248,7 @@ export default function StudentLedger() {
   return (
     <DashboardLayout>
       <PageHeader title="Estado de Cuenta" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Estado de Cuenta" }]} />
+      {yearSelect}
 
       {!selectedStudentId ? (
         <>

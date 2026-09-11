@@ -456,9 +456,23 @@ vencimientos por `due_month` se calculan bien en cualquier año.
 > `_moroso_balance_lines` sigue apuntando al año activo, pero solo **inserta** cuotas faltantes
 > (nunca modifica las existentes), así que consultar otro año no altera nada.
 
-**Pieza compartida:** `src/hooks/useSchoolYearSelection.ts` (años del colegio + año elegido, con
-default al activo) y `src/components/payments/SchoolYearSelect.tsx` (el combo + el aviso ámbar).
-Las dos pantallas usan lo mismo; el texto del aviso se pasa por prop (`inactiveWarning`).
+**Pieza compartida:** `src/hooks/useSchoolYearSelection.ts` (años del colegio + año elegido) y
+`src/components/payments/SchoolYearSelect.tsx` (el combo + el aviso ámbar). La usan **Registro de
+Pagos, Morosos, Reporte de Pagos, Estado de cuenta (estudiante y familia) e Ingresos**; el texto
+del aviso se pasa por prop (`inactiveWarning`).
+
+**El año elegido se recuerda** (`src/lib/schoolYearPreference.ts`, con pruebas): se guarda en
+`localStorage` por colegio (`payments-school-year:<school_id>`) y lo comparten todas esas
+pantallas, así que recargar o pasar de Registro a Estado de cuenta/Reporte **no rebota al año
+activo**. Solo se guarda un año **no activo**: elegir el activo borra la preferencia, para que al
+activarse un año nuevo todos lo sigan por defecto. Si el año guardado ya no existe, se usa el
+activo. Mientras el año elegido no sea el activo se muestra un **banner ámbar** con el botón
+*"Volver a {año activo}"*.
+> 🐞 Corregido (caso Martin Luther King, sep 2026): al activarse 2026-2027 la contadora elegía
+> 2025-2026 para cobrar deudas, pero la selección vivía solo en memoria y al recargar o volver a
+> la pantalla quedaba otra vez en 2026-2027; además el Estado de cuenta estaba fijo en el año
+> activo y no mostraba lo recién cobrado. Las facturas **sí** se guardaban en 2025-2026
+> (verificado en BD: 0 pagos y 0 saldos tocados en 2026-2027).
 
 ### Columnas del modal por cuota
 En la tabla de conceptos del modal (estudiante y familia), además del checkbox y el
@@ -468,8 +482,8 @@ En la tabla de conceptos del modal (estudiante y familia), además del checkbox 
 - **Exonerar** — el estudiante **no paga** esa cuota: se cierra el saldo, no se cobra ni se
   factura. Se puede cobrar unas cuotas y exonerar otras en el mismo registro.
 
-> ⚠️ Lo que **sigue** atado al año activo (por diseño, no cambió): el **dashboard** `/pagos` y
-> los **recordatorios automáticos** de morosidad (`send-delinquency-reminders`, que resuelve el
+> ⚠️ Lo que **sigue** atado al año activo (por diseño, no cambió): el **dashboard** `/pagos`, el
+> **portal del representante** (`RepPayments`) y los **recordatorios automáticos** de morosidad (`send-delinquency-reminders`, que resuelve el
 > año con `is_active = true`). Un pago registrado en un año futuro no aparece en "Últimos Pagos"
 > hasta que ese año se active, y el cron nunca manda correos por deudas de un año que no está en
 > curso. Para ver los ingresos de otro año, usar **Ingresos** (`/pagos/ingresos`), que ya tiene su
