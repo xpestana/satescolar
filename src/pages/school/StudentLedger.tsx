@@ -81,7 +81,7 @@ export default function StudentLedger() {
     queryKey: ["student-payments-ledger", selectedStudentId, schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("payments")
-        .select("*, payment_items(*, payment_plan_concepts(concept_id, payment_concepts(id, name))), payment_method_entries(*)")
+        .select("*, payment_items(*, payment_plan_concepts(concept_id, payment_concepts(id, name, lineage_id))), payment_method_entries(*)")
         .eq("student_id", selectedStudentId!)
         .eq("school_id", schoolId!)
         .eq("school_year_id", selectedYear!.id)

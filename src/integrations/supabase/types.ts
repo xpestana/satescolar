@@ -2493,8 +2493,10 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          lineage_id: string
           name: string
           school_id: string
+          school_year_id: string
           updated_at: string
         }
         Insert: {
@@ -2505,8 +2507,10 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          lineage_id: string
           name: string
           school_id: string
+          school_year_id: string
           updated_at?: string
         }
         Update: {
@@ -2517,11 +2521,21 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          lineage_id?: string
           name?: string
           school_id?: string
+          school_year_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "payment_concepts_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_edit_log: {
         Row: {
@@ -5342,6 +5356,15 @@ export type Database = {
         Args: { algorithm: string; secret: string; signables: string }
         Returns: string
       }
+      copy_payment_concepts_to_year: {
+        Args: {
+          _concept_ids?: string[]
+          _from_year_id: string
+          _school_id: string
+          _to_year_id: string
+        }
+        Returns: number
+      }
       copy_payment_plans_to_year: {
         Args: {
           _from_year_id: string
@@ -5366,6 +5389,10 @@ export type Database = {
           _discount_value: number
         }
         Returns: number
+      }
+      ensure_payment_concept_in_year: {
+        Args: { _concept_id: string; _to_year_id: string }
+        Returns: string
       }
       get_all_balances_for_family: {
         Args: {

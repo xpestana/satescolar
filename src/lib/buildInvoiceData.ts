@@ -79,7 +79,9 @@ export function buildInvoiceData(
   const methods: any[] = payment.payment_method_entries || [];
 
   // ── Concept marks: one entry per paid concept ─────────────────────────
-  // payment_items → payment_plan_concepts.concept_id  (payment_concepts.id)
+  // payment_items → payment_plan_concepts → payment_concepts.lineage_id. Los conceptos son por año
+  // y sus copias comparten el linaje del original, así que la misma casilla de la plantilla sirve
+  // en todos los años. Sin linaje (datos viejos) se usa el id del concepto.
   const conceptMarks: Record<string, string> = {};
   const conceptTotals: Record<string, number> = {};
   const conceptNames: string[] = [];
@@ -88,7 +90,7 @@ export function buildInvoiceData(
   const discountReasons: string[] = [];
 
   items.forEach((item: any) => {
-    const conceptId   = item.payment_plan_concepts?.concept_id;
+    const conceptId   = item.payment_plan_concepts?.payment_concepts?.lineage_id || item.payment_plan_concepts?.concept_id;
     const conceptName = item.payment_plan_concepts?.payment_concepts?.name || "";
     const discount    = Number(item.discount_amount_ves || 0);
     if (discount > 0) {

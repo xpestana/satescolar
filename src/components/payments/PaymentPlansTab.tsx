@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Edit, Trash2, Loader2, Link2, Copy } from "lucide-react";
 import { SchoolYearSelect } from "@/components/payments/SchoolYearSelect";
 import { PlanConceptsDialog, type ConceptOption } from "@/components/payments/PlanConceptsDialog";
-import { CopyPaymentPlansDialog } from "@/components/payments/CopyPaymentPlansDialog";
+import { CopyFromYearDialog, type CopyableItem } from "@/components/payments/CopyFromYearDialog";
 import { useSchoolYearSelection } from "@/hooks/useSchoolYearSelection";
 import { friendlyPaymentConfigError } from "@/lib/paymentConfigErrors";
 
@@ -31,9 +31,9 @@ interface PaymentPlanRow {
 const emptyForm = { name: "", description: "", is_active: true };
 
 /**
- * Pestaña "Planes" de Configuración de Pagos. Cada plan pertenece a un **año escolar**: los planes
- * del año nuevo se crean o se copian del anterior y se les ajustan montos/moneda sin tocar las
- * cuotas de otros años (ver migración `20260911120000_payment_plans_per_school_year.sql`).
+ * Pestaña "Planes" de Configuración de Pagos. Cada plan pertenece a un **año escolar** y usa los
+ * conceptos de ese mismo año: los planes del año nuevo se crean o se copian del anterior (junto
+ * con sus conceptos) y se les ajustan montos/moneda sin tocar las cuotas de otros años.
  */
 export function PaymentPlansTab({ schoolId }: { schoolId: string }) {
   const { toast } = useToast();
@@ -71,19 +71,26 @@ export function PaymentPlansTab({ schoolId }: { schoolId: string }) {
     enabled: !!selectedYearId,
   });
 
-  const { data: allConcepts = [] } = useQuery({
-    queryKey: ["payment-concepts", schoolId],
+  // Conceptos que se pueden agregar a un plan: los activos del mismo año
+  const { data: yearConcepts = [] } = useQuery({
+    queryKey: ["plan-concept-options", schoolId, selectedYearId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("payment_concepts").select("*").eq("school_id", schoolId).eq("is_active", true).order("name");
+      const { data, error } = await supabase
+        .from("payment_concepts")
+        .select("id, name, concept_type, default_amount, currency")
+        .eq("school_id", schoolId)
+        .eq("school_year_id", selectedYearId)
+        .eq("is_active", true)
+        .order("name");
       if (error) throw error;
-      return (data || []) as unknown as ConceptOption[];
+      return (data || []) as ConceptOption[];
     },
+    enabled: !!selectedYearId,
   });
 
   const invalidatePlans = () => {
-    qc.invalidateQueries({ queryKey: ["payment-plans"] });
-    qc.invalidateQueries({ queryKey: ["available-plans"] });
-    qc.invalidateQueries({ queryKey: ["payments-report-plans"] });
+    ["payment-plans", "available-plans", "payments-report-plans", "payment-concepts", "payment-concepts-usage", "plan-concept-options"]
+      .forEach((key) => qc.invalidateQueries({ queryKey: [key] }));
   };
 
   const savePlan = useMutation({
@@ -125,6 +132,27 @@ export function PaymentPlansTab({ schoolId }: { schoolId: string }) {
 
   const closeDialog = () => { setOpen(false); setEditId(null); setForm(emptyForm); };
   const openEdit = (p: PaymentPlanRow) => { setEditId(p.id); setForm({ name: p.name, description: p.description || "", is_active: p.is_active }); setOpen(true); };
+
+  const fetchSourcePlans = async (fromYearId: string): Promise<CopyableItem[]> => {
+    const { data, error } = await supabase
+      .from("payment_plans")
+      .select("id, name, is_active, payment_plan_concepts(id)")
+      .eq("school_id", schoolId)
+      .eq("school_year_id", fromYearId)
+      .order("name");
+    if (error) throw error;
+    return ((data || []) as unknown as PaymentPlanRow[]).map((p) => ({
+      id: p.id, name: p.name, detail: `${p.payment_plan_concepts?.length ?? 0} cuotas`, inactive: !p.is_active,
+    }));
+  };
+
+  const copyPlans = async (fromYearId: string, ids: string[]) => {
+    const { data, error } = await supabase.rpc("copy_payment_plans_to_year", {
+      _school_id: schoolId, _from_year_id: fromYearId, _to_year_id: selectedYearId, _plan_ids: ids,
+    });
+    if (error) throw error;
+    return (data as number | null) ?? 0;
+  };
 
   return (
     <>
@@ -184,7 +212,7 @@ export function PaymentPlansTab({ schoolId }: { schoolId: string }) {
                 {plans.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No hay planes en {yearLabel}. Use «Copiar de otro año» para traer los del año anterior y ajustar sus montos.
+                      No hay planes en {yearLabel}. Use «Copiar de otro año» para traer los del año anterior (con sus conceptos) y ajustar sus montos.
                     </TableCell>
                   </TableRow>
                 )}
@@ -214,18 +242,23 @@ export function PaymentPlansTab({ schoolId }: { schoolId: string }) {
           onOpenChange={(v) => { setAssocOpen(v); if (!v) setSelectedPlan(null); }}
           plan={selectedPlan}
           yearLabel={yearLabel}
-          allConcepts={allConcepts}
+          allConcepts={yearConcepts}
         />
       )}
 
       {selectedYear && (
-        <CopyPaymentPlansDialog
+        <CopyFromYearDialog
           open={copyOpen}
           onOpenChange={setCopyOpen}
-          schoolId={schoolId}
           years={schoolYears}
           targetYear={selectedYear}
+          noun={{ singular: "plan", plural: "planes" }}
+          description={`Se duplican los planes con sus cuotas (monto, moneda, descuento y vencimiento) y los conceptos que usan. Luego puede cambiar los montos de ${selectedYear.year_range} sin afectar al año de origen.`}
           existingNames={plans.map((p) => p.name)}
+          queryKeyBase={["copy-plans-source", schoolId]}
+          fetchItems={fetchSourcePlans}
+          copyItems={copyPlans}
+          onCopied={invalidatePlans}
         />
       )}
     </>

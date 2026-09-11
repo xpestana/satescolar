@@ -32,6 +32,24 @@ describe("buildInvoiceData", () => {
     expect(data.payment_method_text).toBe("Transferencia Bancaria (Ref: REF-9)");
   });
 
+  it("marca el concepto por su linaje, para que la plantilla sirva en todos los años", () => {
+    const copyOf2627 = {
+      ...payment,
+      payment_items: [{
+        amount_ves: 6000,
+        discount_amount_ves: 0,
+        payment_plan_concepts: {
+          concept_id: "c1-2627",
+          payment_concepts: { id: "c1-2627", name: "Mes de Septiembre", lineage_id: "c1" },
+        },
+      }],
+    };
+    const data = buildInvoiceData(copyOf2627, "Ana", "", "", methodLabel);
+    expect(data["concept:c1"]).toBe("✓");
+    expect(data["concept:c1#amount"]).toBe("6.000,00");
+    expect(data["concept:c1-2627"]).toBeUndefined();
+  });
+
   it("traduce el grado del enum a su etiqueta", () => {
     const data = buildInvoiceData(payment, "Ana González", "3_ano", "A", methodLabel);
     expect(data.student_grade).toBe("3er Año");

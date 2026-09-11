@@ -16,6 +16,7 @@ import { uploadToS3 } from "@/lib/s3-upload";
 import { InvoiceCanvasEditor } from "@/components/payments/InvoiceCanvasEditor";
 import { InvoiceOverlayPreview } from "@/components/payments/InvoiceOverlayPreview";
 import { MAX_INVOICE_STUDENTS, invoiceStudentKeys } from "@/lib/buildInvoiceData";
+import { uniqueConceptLineages } from "@/lib/invoiceConceptOptions";
 
 /**
  * Static overlay fields (not concept-dependent).
@@ -104,17 +105,17 @@ export default function InvoiceTemplateConfig() {
   const [fields, setFields] = useState<OverlayField[]>([]);
 
   // ── Queries ──────────────────────────────────────────────────────────────
-  /** Payment concepts configured for this school — used as dynamic concept fields */
+  /** Payment concepts of the school, one per lineage (yearly copies share a field) */
   const { data: schoolConcepts = [] } = useQuery({
     queryKey: ["payment-concepts-invoice", schoolId],
     queryFn: async () => {
       const { data } = await supabase
         .from("payment_concepts")
-        .select("id, name")
+        .select("lineage_id, name")
         .eq("school_id", schoolId!)
         .eq("is_active", true)
-        .order("name");
-      return (data || []) as { id: string; name: string }[];
+        .order("created_at", { ascending: false });
+      return uniqueConceptLineages(data || []);
     },
     enabled: !!schoolId,
   });

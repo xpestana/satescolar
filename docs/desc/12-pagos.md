@@ -152,9 +152,23 @@ Pantalla `PaymentConfig` ("Configuración de Pagos") con **4 pestañas**:
 Cada año tiene **sus propios planes y precios**: un mismo nombre ("Plan Base") puede costar 75 USD en
 2025-2026 y otra cantidad —o en otra moneda— en 2026-2027 sin que un año toque al otro.
 
-- **Modelo:** `payment_plans.school_year_id` (NOT NULL). Monto, moneda, descuento y vencimiento viven
-  en `payment_plan_concepts`, que cuelga del plan y por lo tanto del año. `payment_concepts` es solo
-  el **catálogo** (nombre + tipo); su monto/moneda son la sugerencia al agregarlo a un plan.
+- **Modelo:** `payment_plans.school_year_id` y `payment_concepts.school_year_id` (NOT NULL). Cada
+  año tiene sus **conceptos** (pestaña Conceptos, con su monto y moneda) y sus **planes**; una cuota
+  de plan (`payment_plan_concepts`) solo puede usar un concepto del mismo año
+  (`trg_plan_concept_matches_year`).
+- **El precio del concepto manda:** al cambiar monto o moneda de un concepto
+  (`trg_propagate_payment_concept_price`) se actualizan las cuotas de los planes de **ese año** que
+  tenían el precio anterior, y el sync recalcula sus cuotas sin pagos. Una cuota de plan con un monto
+  propio distinto al del concepto no se toca; los descuentos del plan se mantienen.
+- **Linaje (`payment_concepts.lineage_id`):** las copias de un concepto en otros años comparten el
+  linaje del original (`lineage_id = id` en los originales). La **factura** marca los conceptos por
+  linaje (`buildInvoiceData`, campos `concept:{lineage_id}`) y el editor de `/formatos` ofrece un
+  campo por linaje (`uniqueConceptLineages`, `src/lib/invoiceConceptOptions.ts`), así que las
+  plantillas ya diseñadas imprimen bien en todos los años.
+- **Copiar:** pestaña Conceptos → `copy_payment_concepts_to_year`; pestaña Planes →
+  `copy_payment_plans_to_year`, que además crea en el año destino los conceptos que falten
+  (`ensure_payment_concept_in_year`, por linaje o nombre). Diálogo compartido
+  `CopyFromYearDialog.tsx`.
 - **Pestaña Planes** tiene el selector de año compartido (`useSchoolYearSelection`) y el botón
   **"Copiar de otro año"**, que llama al RPC `copy_payment_plans_to_year(_school_id, _from_year_id,
   _to_year_id, _plan_ids)` (SECURITY INVOKER, respeta la RLS). Copia planes + cuotas y **omite** los

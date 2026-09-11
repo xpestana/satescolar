@@ -14,6 +14,7 @@ import { uploadToS3 } from "@/lib/s3-upload";
 import { InvoiceCanvasEditor } from "@/components/payments/InvoiceCanvasEditor";
 import { InvoiceOverlayPreview } from "@/components/payments/InvoiceOverlayPreview";
 import type { InvoiceTemplate, OverlayField } from "@/pages/school/InvoiceTemplateConfig";
+import { uniqueConceptLineages } from "@/lib/invoiceConceptOptions";
 
 export function InvoiceFormatTab() {
   const { schoolId } = useSchoolId();
@@ -35,16 +36,17 @@ export function InvoiceFormatTab() {
   });
   const [fields, setFields] = useState<OverlayField[]>([]);
 
+  // Un campo por linaje de concepto: las copias por año comparten la misma casilla de la factura
   const { data: schoolConcepts = [] } = useQuery({
     queryKey: ["payment-concepts-invoice", schoolId],
     queryFn: async () => {
       const { data } = await supabase
         .from("payment_concepts")
-        .select("id, name")
+        .select("lineage_id, name")
         .eq("school_id", schoolId!)
         .eq("is_active", true)
-        .order("name");
-      return (data || []) as { id: string; name: string }[];
+        .order("created_at", { ascending: false });
+      return uniqueConceptLineages(data || []);
     },
     enabled: !!schoolId,
   });

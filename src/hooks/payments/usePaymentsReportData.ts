@@ -45,7 +45,7 @@ interface PlanConceptRow {
   currency: string | null;
   concept_id: string | null;
   payment_plans: { name: string | null } | null;
-  payment_concepts: { name: string | null; concept_type: string | null } | null;
+  payment_concepts: { name: string | null; concept_type: string | null; lineage_id: string | null } | null;
 }
 
 export interface PlanOption { id: string; name: string }
@@ -160,7 +160,7 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
     queryKey: ["payments-report-plan-concepts", schoolId],
     queryFn: async () => {
       const { data, error } = await supabase.from("payment_plan_concepts")
-        .select("id, plan_id, currency, concept_id, payment_plans!inner(name, school_id), payment_concepts(name, concept_type)")
+        .select("id, plan_id, currency, concept_id, payment_plans!inner(name, school_id), payment_concepts(name, concept_type, lineage_id)")
         .eq("payment_plans.school_id", schoolId!);
       if (error) throw error;
       return (data || []) as unknown as PlanConceptRow[];
@@ -297,6 +297,8 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
 
   /** Pago con su detalle, para la factura y el recibo, que trabajan sobre el pago entero. */
   const paymentsById = useMemo(() => {
+    // Linaje del concepto de cada cuota: la factura marca los conceptos por linaje (estable entre años)
+    const lineageByPlanConcept = new Map(planConceptRows.map((pc) => [pc.id, pc.payment_concepts?.lineage_id ?? null]));
     const byId = new Map(payments.map((p) => [p.id, {
       ...p,
       payment_items: [] as (RawPaymentItem & { payment_plan_concepts?: unknown })[],
@@ -313,7 +315,11 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
         payment_plan_concepts: info
           ? {
               concept_id: info.concept_id,
-              payment_concepts: { id: info.concept_id, name: info.concept_name },
+              payment_concepts: {
+                id: info.concept_id,
+                name: info.concept_name,
+                lineage_id: lineageByPlanConcept.get(String(it.plan_concept_id)) ?? null,
+              },
             }
           : null,
       });
@@ -321,7 +327,7 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
     methodEntries.forEach((m) => byId.get(String(m.payment_id))?.payment_method_entries.push(m));
     others.forEach((o) => byId.get(String(o.payment_id))?.payment_others.push(o));
     return byId;
-  }, [payments, items, methodEntries, others, context]);
+  }, [payments, items, methodEntries, others, context, planConceptRows]);
 
   return {
     rows,

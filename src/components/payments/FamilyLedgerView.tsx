@@ -148,7 +148,7 @@ export function FamilyLedgerView({ schoolId, schoolYear }: Props) {
       const parts = [`family_id.eq.${selectedFamilyId}`];
       if (childIds.length > 0) parts.push(`student_id.in.(${childIds.join(",")})`);
       const { data, error } = (await supabase.from("payments")
-        .select("*, payment_items(*, payment_plan_concepts(concept_id, payment_concepts(id, name))), payment_method_entries(*)")
+        .select("*, payment_items(*, payment_plan_concepts(concept_id, payment_concepts(id, name, lineage_id))), payment_method_entries(*)")
         .or(parts.join(","))
         .eq("school_id", schoolId)
         .eq("school_year_id", schoolYear.id)
