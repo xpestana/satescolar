@@ -143,18 +143,19 @@ export default function PaymentRegistration() {
     enabled: !!schoolId && !!selectedYear?.id,
   });
 
-  // Available payment plans for assignment
+  // Planes asignables: solo los del año elegido (cada año tiene sus propios planes y montos)
   const { data: availablePlans = [] } = useQuery({
-    queryKey: ["available-plans", schoolId],
+    queryKey: ["available-plans", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("payment_plans")
         .select("id, name, description")
         .eq("school_id", schoolId!)
+        .eq("school_year_id", selectedYear!.id)
         .eq("is_active", true)
         .order("name");
       return data || [];
     },
-    enabled: !!schoolId,
+    enabled: !!schoolId && !!selectedYear?.id,
   });
 
   // Sections for filter

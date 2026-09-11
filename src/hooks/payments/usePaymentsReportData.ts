@@ -233,14 +233,15 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
     enabled: !!schoolId,
   });
 
+  // Opciones del filtro "Plan": los planes son por año escolar, así que solo los del año del reporte
   const { data: plans = [] } = useQuery({
-    queryKey: ["payments-report-plans", schoolId],
+    queryKey: ["payments-report-plans", schoolId, schoolYearId],
     queryFn: async () => {
       const { data } = await supabase.from("payment_plans")
-        .select("id, name").eq("school_id", schoolId!).order("name");
+        .select("id, name").eq("school_id", schoolId!).eq("school_year_id", schoolYearId!).order("name");
       return (data || []) as PlanOption[];
     },
-    enabled: !!schoolId,
+    enabled,
   });
 
   const context = useMemo(() => {

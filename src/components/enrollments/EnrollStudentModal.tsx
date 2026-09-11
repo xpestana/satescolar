@@ -128,14 +128,16 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     enabled: !!student.id && !!activeYear.id && !!schoolId && student.isEnrolled,
   });
 
-  // Planes de pago activos del colegio (asignación opcional al inscribir)
+  // Planes de pago activos del año de la inscripción (asignación opcional al inscribir): cada año
+  // tiene sus propios planes y montos.
   const { data: availablePlans = [] } = useQuery({
-    queryKey: ["available-plans", schoolId],
+    queryKey: ["available-plans", schoolId, activeYear.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("payment_plans")
         .select("id, name, description")
         .eq("school_id", schoolId)
+        .eq("school_year_id", activeYear.id)
         .eq("is_active", true)
         .order("name");
       if (error) throw error;

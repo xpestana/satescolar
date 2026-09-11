@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -1207,6 +1207,60 @@ export type Database = {
           },
         ]
       }
+      classroom_topics: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          description: string | null
+          display_order: number
+          id: string
+          is_archived: boolean
+          is_visible: boolean
+          name: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_archived?: boolean
+          is_visible?: boolean
+          name: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          id?: string
+          is_archived?: boolean
+          is_visible?: boolean
+          name?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_topics_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classroom_topics_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       concept_exonerations: {
         Row: {
           amount_ves: number
@@ -1303,60 +1357,6 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      classroom_topics: {
-        Row: {
-          assignment_id: string
-          created_at: string
-          description: string | null
-          display_order: number
-          id: string
-          is_archived: boolean
-          is_visible: boolean
-          name: string
-          school_id: string
-          updated_at: string
-        }
-        Insert: {
-          assignment_id: string
-          created_at?: string
-          description?: string | null
-          display_order?: number
-          id?: string
-          is_archived?: boolean
-          is_visible?: boolean
-          name: string
-          school_id: string
-          updated_at?: string
-        }
-        Update: {
-          assignment_id?: string
-          created_at?: string
-          description?: string | null
-          display_order?: number
-          id?: string
-          is_archived?: boolean
-          is_visible?: boolean
-          name?: string
-          school_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "classroom_topics_assignment_id_fkey"
-            columns: ["assignment_id"]
-            isOneToOne: false
-            referencedRelation: "subject_teacher_assignments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "classroom_topics_school_id_fkey"
-            columns: ["school_id"]
-            isOneToOne: false
-            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -2806,6 +2806,7 @@ export type Database = {
           is_active: boolean
           name: string
           school_id: string
+          school_year_id: string
           updated_at: string
         }
         Insert: {
@@ -2815,6 +2816,7 @@ export type Database = {
           is_active?: boolean
           name: string
           school_id: string
+          school_year_id: string
           updated_at?: string
         }
         Update: {
@@ -2824,9 +2826,18 @@ export type Database = {
           is_active?: boolean
           name?: string
           school_id?: string
+          school_year_id?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "payment_plans_school_year_id_fkey"
+            columns: ["school_year_id"]
+            isOneToOne: false
+            referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_reports: {
         Row: {
@@ -5331,6 +5342,15 @@ export type Database = {
         Args: { algorithm: string; secret: string; signables: string }
         Returns: string
       }
+      copy_payment_plans_to_year: {
+        Args: {
+          _from_year_id: string
+          _plan_ids?: string[]
+          _school_id: string
+          _to_year_id: string
+        }
+        Returns: number
+      }
       create_missing_student_concept_balances_for_assignment: {
         Args: { _student_payment_plan_id: string }
         Returns: undefined
@@ -5572,12 +5592,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5601,11 +5621,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5626,11 +5646,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5651,11 +5671,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -5668,11 +5688,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

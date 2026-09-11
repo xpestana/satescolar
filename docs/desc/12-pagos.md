@@ -142,9 +142,43 @@ y **debe respetarse al generar/imprimir la factura**.
 ## Configuración de Pagos (`/pagos/configuracion`)
 Pantalla `PaymentConfig` ("Configuración de Pagos") con **4 pestañas**:
 - **Conceptos** (`payment_concepts`) — conceptos de cobro (matrícula, mensualidad, etc.).
-- **Planes** (`payment_plans` + `payment_plan_concepts`) — planes que agrupan conceptos.
+- **Planes** (`payment_plans` + `payment_plan_concepts`) — planes que agrupan conceptos, **por año
+  escolar** (ver abajo). UI en `src/components/payments/PaymentPlansTab.tsx`,
+  `PlanConceptsDialog.tsx` y `CopyPaymentPlansDialog.tsx`.
 - **Métodos de Pago** — métodos disponibles (ver `PaymentMethodsTab`).
 - **Configuraciones** — ajustes generales de facturación (ligado a `useBillingMode`).
+
+### Planes por año escolar
+Cada año tiene **sus propios planes y precios**: un mismo nombre ("Plan Base") puede costar 75 USD en
+2025-2026 y otra cantidad —o en otra moneda— en 2026-2027 sin que un año toque al otro.
+
+- **Modelo:** `payment_plans.school_year_id` (NOT NULL). Monto, moneda, descuento y vencimiento viven
+  en `payment_plan_concepts`, que cuelga del plan y por lo tanto del año. `payment_concepts` es solo
+  el **catálogo** (nombre + tipo); su monto/moneda son la sugerencia al agregarlo a un plan.
+- **Pestaña Planes** tiene el selector de año compartido (`useSchoolYearSelection`) y el botón
+  **"Copiar de otro año"**, que llama al RPC `copy_payment_plans_to_year(_school_id, _from_year_id,
+  _to_year_id, _plan_ids)` (SECURITY INVOKER, respeta la RLS). Copia planes + cuotas y **omite** los
+  que ya existen con el mismo nombre en el año destino. Flujo al pasar de año: elegir 2026-2027 →
+  copiar de 2025-2026 → ajustar montos/moneda.
+- **Qué recalcula editar una cuota del plan:** el trigger `trg_sync_balances_on_payment_plan_concept`
+  → `sync_unpaid_balances_for_plan_concept` actualiza las cuotas **sin pagos** (`paid_amount = 0`) de
+  ese plan —o sea, solo de ese año—. Si cambió la **moneda**, la cuota pasa a la nueva moneda con la
+  tasa vigente de `exchange_rates`. Las cuotas ya abonadas conservan su precio.
+- **Asignar un plan** (Registro de Pagos, inscripción) solo ofrece los planes del año; el trigger
+  `trg_student_plan_matches_year` rechaza asignar un plan de otro año, y
+  `trg_prevent_assigned_payment_plan_year_change` impide mover de año un plan ya asignado.
+- **Borrado protegido:** `payment_items.plan_concept_id` y `concept_exonerations.plan_concept_id`
+  son `ON DELETE RESTRICT`. Borrar un concepto, una cuota del plan o un plan que ya tiene cobros o
+  exoneraciones **falla** (mensaje: *"desactívelo en lugar de borrarlo"*, `friendlyPaymentConfigError`
+  en `src/lib/paymentConfigErrors.ts`); las cuotas pendientes sin pago sí se eliminan.
+> 🐞 Corregido (migración `20260911120000_payment_plans_per_school_year.sql`): los planes eran
+> compartidos entre años. Editar el precio de una cuota reescribía las cuotas sin pago de **todos**
+> los años (en MLK, 715 cuotas pendientes de 2025-2026), cambiar la moneda dejaba montos con la
+> moneda vieja, agregar un concepto creaba la cuota a estudiantes de años pasados, y borrar un
+> concepto/plan borraba en cascada líneas de facturas y exoneraciones. **Backfill:** cada plan quedó
+> en el año más antiguo en que estaba asignado (MLK: los 4 en 2025-2026) y se clonó para los años
+> posteriores donde ya se usaba ("Plan Base" en 2026-2027, cuyo único estudiante se movió a la copia;
+> sus 15 cuotas no tenían pagos).
 
 ## Morosidad (`/pagos/morosos` + `/pagos/morosidad`)
 - **Cálculo de morosos:** RPCs autoritativos (mismo criterio en UI y en la edge function):
@@ -528,6 +562,8 @@ y `payment_concepts` (existían solo índices únicos sobre `id`), e índices po
 - Al asignar un plan (`student_payment_plans`) se generan los balances por concepto
   (ver funciones `create_missing_student_concept_balances_*`,
   `rebuild_student_concept_balances_for_active_year`).
+- **Planes por año:** cada plan es de un año escolar; editar sus cuotas solo recalcula las cuotas
+  sin pagos de ese año (ver **Planes por año escolar**).
 - **Descuento del plan aplicado al ledger:** el `discount_type`/`discount_value` del
   `payment_plan_concepts` se descuenta al **sembrar** el balance, no en la UI. Las funciones
   generadoras usan el helper SQL `discounted_plan_concept_amount(amount, type, value)` para
