@@ -31,7 +31,7 @@ const MESSAGES: Record<Exclude<GradesGateReason, "ok">, GradesGateMessage> = {
     variant: "destructive",
   },
   blocked_by_school: {
-    title: "Acceso bloqueado por el colegio",
+    title: "Acceso a las notas bloqueado por el colegio",
     description:
       "El colegio bloqueó temporalmente la consulta de notas y boletas de este estudiante. " +
       "Comuníquese con la institución para más información.",

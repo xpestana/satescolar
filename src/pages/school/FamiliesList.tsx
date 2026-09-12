@@ -32,7 +32,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Eye, Users, UserPlus, Info, Trash2, GraduationCap, UserCheck, KeyRound, Search, ChevronDown, X, UsersRound, Mail } from "lucide-react";
+import { Eye, Users, UserPlus, Info, Trash2, GraduationCap, UserCheck, KeyRound, Search, ChevronDown, X, UsersRound, Mail, Lock } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
@@ -40,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AddFamilyModal } from "@/components/families/AddFamilyModal";
 import { ViewFamilyModal } from "@/components/families/ViewFamilyModal";
 import { ChangePasswordModal } from "@/components/families/ChangePasswordModal";
+import FamilyGradeAccessDialog from "@/components/families/FamilyGradeAccessDialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface FamilyWithEmail {
@@ -54,6 +55,7 @@ interface FamilyWithEmail {
   hasMembers?: boolean;
   representativeNames?: string[];
   studentNames?: string[];
+  students?: { id: string; name: string }[];
   repsCount: number;
   studentsCount: number;
 }
@@ -84,6 +86,7 @@ export default function FamiliesList() {
   const [filters, setFilters] = useState<SearchFilters>({ name: "", email: "", status: "all" });
   const [resendDialogOpen, setResendDialogOpen] = useState(false);
   const [resendFamily, setResendFamily] = useState<FamilyWithEmail | null>(null);
+  const [gradeAccessFamily, setGradeAccessFamily] = useState<FamilyWithEmail | null>(null);
 
   // Global counters - independent of search/pagination
   const { data: globalCounts } = useQuery({
@@ -190,7 +193,7 @@ export default function FamiliesList() {
       const [emailsRes, repsRes, studentsRes] = await Promise.all([
         supabase.functions.invoke("get-user-emails", { body: { userIds } }),
         supabase.from("representatives").select("family_id, form_data").in("family_id", familyIds),
-        supabase.from("students").select("family_id, form_data").in("family_id", familyIds),
+        supabase.from("students").select("id, family_id, form_data").in("family_id", familyIds),
       ]);
 
       const emails = emailsRes.data?.emails || {};
@@ -225,6 +228,7 @@ export default function FamiliesList() {
             hasMembers: reps.length > 0 || students.length > 0,
             representativeNames: reps.map((r: any) => getNameFromFormData(r.form_data)),
             studentNames: students.map((s: any) => getNameFromFormData(s.form_data)),
+            students: students.map((s: any) => ({ id: s.id, name: getNameFromFormData(s.form_data) })),
             repsCount: reps.length,
             studentsCount: students.length,
           };
@@ -525,6 +529,21 @@ export default function FamiliesList() {
                             </TooltipTrigger>
                             <TooltipContent>Reenviar correo de bienvenida</TooltipContent>
                           </Tooltip>
+                          {family.studentsCount > 0 && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => setGradeAccessFamily(family)}
+                                >
+                                  <Lock className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Acceso a notas y boletas</TooltipContent>
+                            </Tooltip>
+                          )}
                           {!family.hasMembers && (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -655,6 +674,16 @@ export default function FamiliesList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {gradeAccessFamily && (
+        <FamilyGradeAccessDialog
+          open={!!gradeAccessFamily}
+          onOpenChange={(open) => !open && setGradeAccessFamily(null)}
+          schoolId={schoolId}
+          familyName={getFamilyName(gradeAccessFamily)}
+          students={gradeAccessFamily.students || []}
+        />
+      )}
 
       {passwordFamily && (
         <ChangePasswordModal

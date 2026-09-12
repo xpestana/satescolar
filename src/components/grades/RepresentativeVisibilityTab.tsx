@@ -154,7 +154,7 @@ export default function RepresentativeVisibilityTab({
         <CardHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
-              <CardTitle>Bloqueo por estudiante</CardTitle>
+              <CardTitle>Bloqueo de notas y boletas por estudiante</CardTitle>
               <CardDescription>
                 Todos los estudiantes inscritos en {yearRange} · el bloqueo aplica a todos los años
                 escolares y momentos

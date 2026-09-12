@@ -34,7 +34,8 @@ pestaña activa:
 
 - **Estudiantes** — interruptor de **bloqueo de notas y boletas** para el representante
   (`StudentGradeAccessToggle` sobre `student_grade_access`). El mismo bloqueo se opera desde la
-  ficha de la familia y desde `/notas/consulta` → pestaña "Visibilidad para Representantes";
+  ficha de la familia, desde la lista de familias (ícono de candado → `FamilyGradeAccessDialog`)
+  y desde `/notas/consulta` → pestaña "Visibilidad para Representantes";
   ver [09-notas](09-notas-y-boletas.md).
 - **Representantes** — marcar como representante principal (`is_primary`).
 

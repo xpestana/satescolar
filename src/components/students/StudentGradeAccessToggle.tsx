@@ -30,8 +30,8 @@ interface StudentGradeAccessToggleProps {
   variant?: "icon" | "switch";
 }
 
-const BLOCK_TITLE = "Bloquear notas y boletas";
-const UNBLOCK_TITLE = "Permitir notas y boletas";
+const BLOCK_TITLE = "Bloquear el acceso a notas y boletas";
+const UNBLOCK_TITLE = "Permitir el acceso a notas y boletas";
 
 export default function StudentGradeAccessToggle({
   studentName,
@@ -61,7 +61,7 @@ export default function StudentGradeAccessToggle({
             aria-label={label}
           />
           <span className="text-xs text-muted-foreground">
-            {isBlocked ? "Bloqueado" : "Permitido"}
+            {isBlocked ? "Notas bloqueadas" : "Notas permitidas"}
           </span>
         </div>
       ) : (
@@ -87,10 +87,13 @@ export default function StudentGradeAccessToggle({
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Bloquear el acceso de {studentName}?</AlertDialogTitle>
+            <AlertDialogTitle>
+              ¿Bloquear el acceso a las notas y boletas de {studentName}?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               El representante dejará de ver las notas y no podrá descargar la boleta de este
               estudiante, en todos los años escolares y momentos, hasta que usted lo desbloquee.
+              El resto de su sesión (pagos, datos del estudiante) no se ve afectada.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -101,7 +104,7 @@ export default function StudentGradeAccessToggle({
                 setConfirmOpen(false);
               }}
             >
-              Bloquear
+              Bloquear acceso
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

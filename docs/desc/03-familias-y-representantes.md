@@ -20,6 +20,7 @@ El colegio administra el padrón de familias; el representante ve y edita su pro
 | Operación | Rol | Ruta | Permiso | Descripción |
 |---|---|---|---|---|
 | Listar familias | school | `/registros/familias` | `families.view` | Padrón de familias del colegio. |
+| Bloquear notas de un estudiante | school | `/registros/familias` (acción) | `families.view` | Candado en Acciones → `FamilyGradeAccessDialog`: lista los estudiantes de la familia y bloquea solo al elegido — ver [09-notas](09-notas-y-boletas.md). |
 | Mis representantes | representative | `/representative/representantes` | — | Representantes de la familia. |
 | Datos de la familia | representative | `/representative/datos-familia` | — | Información de la familia. |
 | Notas y boletas de un representado | representative | `/representative/estudiante/:studentId/notas` | — | Notas por momento y descarga de boleta — ver [09-notas](09-notas-y-boletas.md). |
@@ -74,7 +75,8 @@ El colegio administra el padrón de familias; el representante ve y edita su pro
 ## Archivos clave (código)
 - `src/pages/school/FamiliesList.tsx`
 - `src/pages/representative/RepresentativesList.tsx`
-- `src/components/families/...`
+- `src/components/families/...` (incluye `FamilyGradeAccessDialog.tsx`: bloqueo de notas y
+  boletas por estudiante de la familia)
 
 ## Configuración relacionada
 - El **formulario de representantes** se edita en Formularios

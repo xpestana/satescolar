@@ -65,7 +65,7 @@ export function useStudentGradeBlock(schoolId: string | null | undefined, studen
           : "Acceso a notas y boletas restablecido",
       );
     },
-    onError: () => toast.error("No se pudo actualizar el acceso"),
+    onError: () => toast.error("No se pudo actualizar el acceso a notas y boletas"),
   });
 
   return { rows, isBlocked, blockedCount, setBlocked, isLoading };

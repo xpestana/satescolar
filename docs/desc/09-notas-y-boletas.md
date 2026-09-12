@@ -180,15 +180,20 @@ Cuarta pestaña de `/notas/consulta`, **"Visibilidad para Representantes"**
 (`RepresentativeVisibilityTab`, visible con `grades.edit` o siendo owner). Dos bloques:
 
 1. **Publicación por momento** — un interruptor por momento (1, 2, 3 y Definitiva Final) sobre el
-   año escolar seleccionado en los filtros de la página → tabla `grade_visibility_settings`.
+   año escolar seleccionado → tabla `grade_visibility_settings`. Es una decisión **de todo el
+   colegio**: no depende del grado ni de la sección, así que la pestaña oculta los filtros de
+   Área / Sección / Momento y solo deja el de Año Escolar.
    **Sin fila = oculto**: la publicación es opt-in, ningún colegio empieza mostrando notas.
-2. **Bloqueo por estudiante** — interruptor por alumno de la sección seleccionada →
+2. **Bloqueo por estudiante** — interruptor por alumno sobre **todos los inscritos del año
+   escolar** (con su grado y sección, buscador por nombre, cédula o sección) →
    tabla `student_grade_access`. El bloqueo aplica a todos los años y momentos.
 
 El mismo bloqueo por estudiante se opera desde **la ficha de la familia**
-(`ViewFamilyModal`, junto al estado del estudiante) y desde **Búsqueda Avanzada**
-(`AdvancedSearch`, columna Acciones, solo en la pestaña Estudiantes). Los tres puntos comparten
-el componente `StudentGradeAccessToggle` y el hook `useStudentGradeBlock`.
+(`ViewFamilyModal`, junto al estado del estudiante), desde **Búsqueda Avanzada**
+(`AdvancedSearch`, columna Acciones, solo en la pestaña Estudiantes) y desde **la lista de
+familias** (`FamiliesList` → `FamilyGradeAccessDialog`, ícono de candado: lista los estudiantes
+de la familia para bloquear solo al que corresponda). Los cuatro puntos comparten el componente
+`StudentGradeAccessToggle` y el hook `useStudentGradeBlock`.
 
 ### El gate se aplica en RLS, no en la UI
 Los generadores de boleta son **cliente puro** (consultan Supabase desde el navegador), así que
@@ -223,7 +228,7 @@ indicadores). La UI llama al gate (`useStudentGradesAccess`) **solo para explica
 | Formato de Boletas | school | `/formatos` (pestaña Boletas) | `payments.config` | Diseño/elección del formato de boleta por nivel. |
 | Importar calificaciones | admin | `/admin/importar-calificaciones` | admin | Carga masiva de notas. |
 | Notas y boletas de mi representado | representative | `/representative/estudiante/:studentId/notas` | — | Consulta de notas y descarga de boleta. |
-| Visibilidad para representantes | school | `/notas/consulta` (pestaña) | `grades.edit` (solo UI) | Publicar/ocultar momentos y bloquear estudiantes. |
+| Visibilidad para representantes | school | `/notas/consulta` (pestaña) | `grades.edit` (solo UI) | Publicar/ocultar momentos para todo el colegio y bloquear estudiantes. |
 
 ## Rutas (frontend)
 - `/notas/consulta` (solo `school`)
@@ -319,7 +324,8 @@ que ya existía para el aula virtual.
 - `src/pages/representative/StudentGrades.tsx` (módulo del representante),
   `src/components/grades/StudentGradesPanel.tsx`, `src/components/grades/StudentBoletaDownload.tsx`
 - `src/components/grades/RepresentativeVisibilityTab.tsx` (pestaña de configuración),
-  `src/components/students/StudentGradeAccessToggle.tsx` (bloqueo por alumno, 3 puntos de entrada)
+  `src/components/students/StudentGradeAccessToggle.tsx` (bloqueo por alumno, 4 puntos de entrada),
+  `src/components/families/FamilyGradeAccessDialog.tsx` (bloqueo desde la lista de familias)
 - `src/hooks/useStudentGradesAccess.ts`, `useStudentReportCard.ts`,
   `useGradeVisibilitySettings.ts`, `useStudentGradeBlock.ts`
 - `src/lib/gradesAccess.ts` (motivo del gate → mensaje), `src/lib/gradeLevels.ts`

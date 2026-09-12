@@ -48,12 +48,16 @@ sus estudiantes; el colegio los gestiona a través de familias, inscripciones y 
 
 ## Bloqueo de notas y boletas
 El usuario escolar puede impedir que el representante vea las notas y descargue la boleta de un
-estudiante concreto. El interruptor está en **tres sitios**, todos sobre `student_grade_access`
+estudiante concreto. El interruptor está en **cuatro sitios**, todos sobre `student_grade_access`
 y con el mismo componente `StudentGradeAccessToggle`:
 
 1. Ficha de la familia (`ViewFamilyModal`), junto al selector de estado del estudiante.
 2. Búsqueda Avanzada (`/registros/busqueda-avanzada`), pestaña Estudiantes → columna Acciones.
-3. `/notas/consulta` → pestaña "Visibilidad para Representantes", como lista por sección.
+3. `/notas/consulta` → pestaña "Visibilidad para Representantes", como lista de todos los
+   estudiantes inscritos en el año escolar.
+4. Lista de familias (`/registros/familias`) → columna Acciones, ícono de candado: abre
+   `FamilyGradeAccessDialog` con los estudiantes de esa familia, porque el bloqueo se decide por
+   estudiante y no por familia (una familia puede tener varios hijos y bloquearse solo uno).
 
 El bloqueo aplica a **todos los años escolares y momentos**, se evalúa en RLS y tiene prioridad
 sobre la publicación por momento. Es independiente del `status` del estudiante
