@@ -1,25 +1,41 @@
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { useClassroomAssignments, useClassroomConfig, type ClassroomAssignment } from "@/hooks/useClassroomData";
+import { useClassroomAssignments, type ClassroomAssignment } from "@/hooks/useClassroomData";
 import { useTeacherData } from "@/hooks/useTeacherData";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Users, Settings } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { BookOpen, Settings, History } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CardGridSkeleton } from "@/components/ui/loading-skeletons";
 import { ClassroomListTutorial } from "@/components/classroom/ClassroomTutorial";
+import { GRADE_LABELS } from "@/lib/gradeLevels";
 
-const GRADE_LABELS: Record<string, string> = {
-  pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
-  i_nivel: "I Nivel", ii_nivel: "II Nivel", iii_nivel: "III Nivel",
-  primaria: "Primaria", "1_grado": "1er Grado", "2_grado": "2do Grado",
-  "3_grado": "3er Grado", "4_grado": "4to Grado", "5_grado": "5to Grado",
-  "6_grado": "6to Grado", media_general: "Media General",
-  "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
-  "4_ano": "4to Año", "5_ano": "5to Año", media_tecnica: "Media Técnica", "6_ano": "6to Año",
-};
+/**
+ * Aula Virtual of the teacher: the list of their classrooms.
+ *
+ * Like "Mis Áreas", it shows ONE school year at a time and summarises the rest in a small history
+ * (aulas, cuántas con actividades y cuántas con publicaciones), so an old year is one tap away
+ * without stacking every card of every year on screen.
+ */
+
+interface YearSummary {
+  id: string;
+  yearRange: string;
+  isActive: boolean;
+  total: number;
+  withActivities: number;
+  withPosts: number;
+}
 
 function ClassroomCard({ assignment }: { assignment: ClassroomAssignment }) {
   const navigate = useNavigate();
@@ -78,15 +94,71 @@ function ClassroomCard({ assignment }: { assignment: ClassroomAssignment }) {
 export default function ClassroomList() {
   const { isLoading: teacherLoading } = useTeacherData();
   const { data: assignments = [], isLoading } = useClassroomAssignments();
+  const [selectedYearId, setSelectedYearId] = useState<string>("");
 
   const loading = teacherLoading || isLoading;
+  const assignmentIds = useMemo(() => assignments.map((a) => a.id), [assignments]);
 
-  const grouped = assignments.reduce<Record<string, ClassroomAssignment[]>>((acc, a) => {
-    const key = a.school_year?.year_range || "Sin año";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(a);
-    return acc;
-  }, {});
+  // Qué aulas tienen contenido. Solo se pide la columna de la asignación, no las filas completas.
+  const { data: activity = { withActivities: new Set<string>(), withPosts: new Set<string>() } } =
+    useQuery({
+      queryKey: ["classroom-content-summary", assignmentIds],
+      queryFn: async () => {
+        const [activities, posts] = await Promise.all([
+          supabase.from("classroom_activities").select("assignment_id").in("assignment_id", assignmentIds),
+          supabase.from("classroom_posts").select("assignment_id").in("assignment_id", assignmentIds),
+        ]);
+        if (activities.error) throw activities.error;
+        if (posts.error) throw posts.error;
+        return {
+          withActivities: new Set((activities.data ?? []).map((r) => r.assignment_id as string)),
+          withPosts: new Set((posts.data ?? []).map((r) => r.assignment_id as string)),
+        };
+      },
+      enabled: assignmentIds.length > 0,
+    });
+
+  /** Un resumen por año escolar, el más reciente primero. */
+  const yearSummaries = useMemo<YearSummary[]>(() => {
+    const byYear = new Map<string, YearSummary>();
+    for (const a of assignments) {
+      const year = a.school_year;
+      if (!year) continue;
+      const current =
+        byYear.get(year.id) ??
+        {
+          id: year.id,
+          yearRange: year.year_range,
+          isActive: year.is_active,
+          total: 0,
+          withActivities: 0,
+          withPosts: 0,
+        };
+      current.total += 1;
+      if (activity.withActivities.has(a.id)) current.withActivities += 1;
+      if (activity.withPosts.has(a.id)) current.withPosts += 1;
+      byYear.set(year.id, current);
+    }
+    return [...byYear.values()].sort((a, b) => b.yearRange.localeCompare(a.yearRange));
+  }, [assignments, activity]);
+
+  // Por defecto el año activo; si el docente no tiene aulas allí, el más reciente que sí tenga.
+  const defaultYearId = useMemo(() => {
+    const active = yearSummaries.find((y) => y.isActive);
+    return active?.id || yearSummaries[0]?.id || "";
+  }, [yearSummaries]);
+
+  const effectiveYearId =
+    selectedYearId && yearSummaries.some((y) => y.id === selectedYearId)
+      ? selectedYearId
+      : defaultYearId;
+
+  const selectedYear = yearSummaries.find((y) => y.id === effectiveYearId);
+  const yearAssignments = useMemo(
+    () => assignments.filter((a) => a.school_year?.id === effectiveYearId),
+    [assignments, effectiveYearId],
+  );
+  const otherYears = yearSummaries.filter((y) => y.id !== effectiveYearId);
 
   return (
     <DashboardLayout>
@@ -106,20 +178,86 @@ export default function ClassroomList() {
           <p className="text-muted-foreground mt-1">No tienes materias asignadas para el aula virtual.</p>
         </div>
       ) : (
-        <div className="space-y-8">
-          {Object.entries(grouped).map(([year, items]) => (
-            <div key={year}>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                {year}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {items.map((a) => (
-                  <ClassroomCard key={a.id} assignment={a} />
+        <div className="space-y-6">
+          <div className="w-full sm:w-64">
+            <label className="text-sm font-medium text-foreground mb-1.5 block">Año Escolar</label>
+            <Select value={effectiveYearId} onValueChange={setSelectedYearId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione año escolar" />
+              </SelectTrigger>
+              <SelectContent>
+                {yearSummaries.map((y) => (
+                  <SelectItem key={y.id} value={y.id}>
+                    {y.yearRange}
+                    {y.isActive ? " (Activo)" : ""}
+                  </SelectItem>
                 ))}
-              </div>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedYear && (
+            <p className="text-sm text-muted-foreground">
+              {selectedYear.total} aula{selectedYear.total === 1 ? "" : "s"} en{" "}
+              {selectedYear.yearRange} · {selectedYear.withActivities} con actividades ·{" "}
+              {selectedYear.withPosts} con publicaciones
+            </p>
+          )}
+
+          {yearAssignments.length === 0 ? (
+            <div className="text-center py-12 border rounded-md bg-muted/20">
+              <p className="text-muted-foreground">No tiene aulas en este año escolar.</p>
             </div>
-          ))}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {yearAssignments.map((a) => (
+                <ClassroomCard key={a.id} assignment={a} />
+              ))}
+            </div>
+          )}
+
+          {otherYears.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="h-4 w-4 text-muted-foreground" />
+                  Otros años escolares
+                </CardTitle>
+                <CardDescription>
+                  Resumen de los años que no está viendo. Toque uno para abrir sus aulas.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {otherYears.map((y) => (
+                  <button
+                    key={y.id}
+                    onClick={() => setSelectedYearId(y.id)}
+                    className="w-full flex items-center justify-between gap-3 rounded-md border p-3 text-left hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-medium">{y.yearRange}</span>
+                      {y.isActive && (
+                        <Badge variant="default" className="text-xs">
+                          Activo
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                      <Badge variant="outline" className="text-xs">
+                        {y.total} aula{y.total === 1 ? "" : "s"}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {y.withActivities} con actividades
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {y.withPosts} con publicaciones
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </DashboardLayout>

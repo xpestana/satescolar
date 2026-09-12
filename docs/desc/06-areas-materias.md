@@ -28,7 +28,7 @@ plan de evaluación, notas, aula virtual y (parcialmente) asistencias referencia
 |---|---|---|---|---|
 | Áreas | school | `/registros/areas` | `subjects.view` | ABM de áreas/materias. |
 | Asignación de áreas | school | `/registros/asignacion-areas` | `subjects.manage` | Asignar áreas a docentes/secciones. |
-| Mis áreas | teacher | `/teacher/materias` | — | Áreas asignadas al docente. |
+| Mis áreas | teacher | `/teacher/materias` | — | Áreas asignadas al docente, filtradas por año escolar. |
 
 ## Rutas (frontend)
 - `/registros/areas`
@@ -48,6 +48,21 @@ plan de evaluación, notas, aula virtual y (parcialmente) asistencias referencia
   `percentage`, `description`, `display_order` (ver [09](09-notas-y-boletas.md)).
 - `gcrp_assignment_students` — estudiantes vinculados a una asignación (grupos/GCRP).
 
+## Mis Áreas del docente (`/teacher/materias`)
+`TeacherSubjects` muestra **un solo año escolar a la vez**: un selector arriba (por defecto el año
+activo; si el docente no tiene áreas allí, el más reciente que sí tenga) y un único selector de
+momento para toda la pantalla. Antes se listaban seguidas las tarjetas de **todos** los años, lo
+que obligaba a bajar mucho en cuanto el docente acumulaba años.
+
+Debajo de las tarjetas hay un **historial de los otros años** (los que no está viendo) con, por
+cada uno: cuántas áreas tiene, cuántas con plan de evaluación cargado (en cualquier momento) y
+cuántas con notas cargadas (`student_grades`). Tocar una fila cambia el año seleccionado.
+
+> El estado "con plan" de **las tarjetas** es el del momento seleccionado; el del **historial** es
+> "tiene plan en algún momento", que es lo útil para saber si ese año quedó a medias.
+> El conteo de notas se resuelve con peticiones `head` + `count` por asignación, así que el
+> historial no descarga ninguna fila de `student_grades`.
+
 ## Reglas de negocio
 - Un área puede ocultarse en planilla y/o boletín (`show_in_planilla`,
   `show_in_report_card`) y suspenderse sin borrarla (`is_suspended`).
@@ -57,7 +72,7 @@ plan de evaluación, notas, aula virtual y (parcialmente) asistencias referencia
 
 ## Archivos clave (código)
 - `src/pages/school/...` (Áreas y Asignación de Áreas) — ⏳ confirmar nombres exactos.
-- `src/pages/teacher/...` (Mis áreas).
+- `src/pages/teacher/TeacherSubjects.tsx` (Mis áreas: selector de año + historial de otros años).
 
 ## Por documentar
 - Valores posibles de `subject_type` y `evaluation_type`.

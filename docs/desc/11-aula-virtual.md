@@ -48,6 +48,17 @@ Todas las tablas cuelgan de una **asignación** (`assignment_id`, ver
 - `classroom_access_codes`, `classroom_access_log` — acceso de estudiantes al aula.
 - `classroom_notifications`, `classroom_events` — avisos y bitácora.
 
+## Lista de aulas del docente (`/teacher/aula-virtual`)
+`ClassroomList` muestra **un solo año escolar a la vez**: un selector arriba (por defecto el año
+activo; si el docente no tiene aulas allí, el más reciente que sí tenga) y solo las tarjetas de ese
+año. Antes se apilaban las tarjetas de todos los años seguidas.
+
+Debajo hay un **historial de los otros años** con, por cada uno: cuántas aulas tiene, cuántas con
+actividades (`classroom_activities`) y cuántas con publicaciones (`classroom_posts`). Tocar una
+fila cambia el año seleccionado. El resumen se resuelve con **dos** consultas que traen solo la
+columna `assignment_id`, no las filas de contenido. Mismo patrón que "Mis Áreas"
+(ver [06-areas-materias](06-areas-materias.md)).
+
 ## Reglas de negocio
 - Un aula = una **asignación** (docente × área × sección × año).
 - Una actividad puede vincularse a un ítem del plan de evaluación
@@ -55,6 +66,8 @@ Todas las tablas cuelgan de una **asignación** (`assignment_id`, ver
 - La participación de estudiantes (posts/comentarios) se habilita en `classroom_config`.
 
 ## Archivos clave (código)
+- `src/pages/teacher/ClassroomList.tsx` (lista de aulas: selector de año + historial),
+  `src/pages/teacher/ClassroomDetail.tsx`
 - `src/components/classroom/CommentsAndReactions.tsx`
 - `src/components/classroom/...`
 
