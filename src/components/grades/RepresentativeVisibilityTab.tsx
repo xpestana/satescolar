@@ -12,17 +12,21 @@ import { useGradeVisibilitySettings, VISIBILITY_MOMENTOS, MOMENTO_LABELS } from 
 import { useStudentGradeBlock } from "@/hooks/useStudentGradeBlock";
 import StudentGradeAccessToggle from "@/components/students/StudentGradeAccessToggle";
 import { studentListName } from "@/lib/studentName";
+import { GRADE_LABELS } from "@/lib/gradeLevels";
 
 /**
  * "Visibilidad para Representantes" tab of /notas/consulta.
  *
- * Two independent switches: what the school publishes for a whole school year (per momento) and
- * which individual students are blocked. Both are enforced in RLS, not only here.
+ * Both switches are school wide: what the school publishes for a whole school year (per momento)
+ * and which individual students are blocked. Neither depends on the grade / section pickers of the
+ * page, so publishing a momento applies to every section at once. Both are enforced in RLS, not
+ * only here.
  */
 
 interface EnrollmentRow {
   student_id: string;
   student: { id: string; document_id: string | null; form_data: Record<string, unknown> | null } | null;
+  section: { id: string; name: string | null; grade_level: string | null } | null;
 }
 
 interface RepresentativeVisibilityTabProps {
@@ -30,8 +34,6 @@ interface RepresentativeVisibilityTabProps {
   schoolYearId: string;
   yearRange: string;
   isActiveYear: boolean;
-  sectionId: string;
-  sectionName: string;
 }
 
 export default function RepresentativeVisibilityTab({
@@ -39,19 +41,18 @@ export default function RepresentativeVisibilityTab({
   schoolYearId,
   yearRange,
   isActiveYear,
-  sectionId,
-  sectionName,
 }: RepresentativeVisibilityTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const { isVisible, setVisibility, isLoading } = useGradeVisibilitySettings(schoolId, schoolYearId);
 
   const { data: students = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ["visibility-students", sectionId, schoolYearId, schoolId],
+    queryKey: ["visibility-students", schoolYearId, schoolId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("enrollments")
-        .select("student_id, student:student_id(id, document_id, form_data)")
-        .eq("section_id", sectionId)
+        .select(
+          "student_id, student:student_id(id, document_id, form_data), section:section_id(id, name, grade_level)",
+        )
         .eq("school_year_id", schoolYearId)
         .eq("school_id", schoolId);
       if (error) throw error;
@@ -60,10 +61,16 @@ export default function RepresentativeVisibilityTab({
           studentId: e.student_id,
           name: studentListName(e.student?.form_data),
           documentId: e.student?.document_id as string | null,
+          sectionLabel: [
+            e.section?.grade_level ? GRADE_LABELS[e.section.grade_level] || e.section.grade_level : "",
+            e.section?.name || "",
+          ]
+            .filter(Boolean)
+            .join(" · "),
         }))
         .sort((a, b) => a.name.localeCompare(b.name));
     },
-    enabled: !!sectionId && !!schoolYearId && !!schoolId,
+    enabled: !!schoolYearId && !!schoolId,
   });
 
   const studentIds = useMemo(() => students.map((s) => s.studentId), [students]);
@@ -73,7 +80,10 @@ export default function RepresentativeVisibilityTab({
     const term = searchTerm.trim().toLowerCase();
     if (!term) return students;
     return students.filter(
-      (s) => s.name.toLowerCase().includes(term) || (s.documentId || "").toLowerCase().includes(term),
+      (s) =>
+        s.name.toLowerCase().includes(term) ||
+        (s.documentId || "").toLowerCase().includes(term) ||
+        s.sectionLabel.toLowerCase().includes(term),
     );
   }, [students, searchTerm]);
 
@@ -82,10 +92,12 @@ export default function RepresentativeVisibilityTab({
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Desde aquí decide qué ven los representantes en su sesión. Un momento apagado significa
-          que <strong>no verán las notas ni podrán descargar la boleta</strong> de ese momento.
-          Los momentos empiezan apagados: se publican solo cuando usted lo indica. Además, los
-          representantes con cuotas vencidas quedan bloqueados automáticamente.
+          Desde aquí decide qué ven los representantes en su sesión. La publicación aplica a{" "}
+          <strong>todo el colegio</strong>: no depende del grado ni de la sección seleccionados
+          arriba. Un momento apagado significa que <strong>no verán las notas ni podrán descargar
+          la boleta</strong> de ese momento. Los momentos empiezan apagados: se publican solo
+          cuando usted lo indica. Además, los representantes con cuotas vencidas quedan bloqueados
+          automáticamente.
         </AlertDescription>
       </Alert>
 
@@ -94,7 +106,9 @@ export default function RepresentativeVisibilityTab({
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div>
               <CardTitle>Publicación de notas y boletas</CardTitle>
-              <CardDescription>Año escolar {yearRange}</CardDescription>
+              <CardDescription>
+                Año escolar {yearRange} · aplica a todos los grados y secciones
+              </CardDescription>
             </div>
             {!isActiveYear && (
               <Badge variant="outline" className="border-amber-500 text-amber-600">
@@ -142,7 +156,8 @@ export default function RepresentativeVisibilityTab({
             <div>
               <CardTitle>Bloqueo por estudiante</CardTitle>
               <CardDescription>
-                Sección {sectionName} · el bloqueo aplica a todos los años escolares y momentos
+                Todos los estudiantes inscritos en {yearRange} · el bloqueo aplica a todos los años
+                escolares y momentos
               </CardDescription>
             </div>
             {blockedCount > 0 && (
@@ -157,7 +172,7 @@ export default function RepresentativeVisibilityTab({
           <div className="relative max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar estudiante..."
+              placeholder="Buscar estudiante, cédula o sección..."
               className="pl-8"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -168,15 +183,21 @@ export default function RepresentativeVisibilityTab({
             <Skeleton className="h-40 w-full" />
           ) : filteredStudents.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              No hay estudiantes inscritos en esta sección.
+              {students.length === 0
+                ? "No hay estudiantes inscritos en este año escolar."
+                : "Ningún estudiante coincide con la búsqueda."}
             </p>
           ) : (
-            <div className="divide-y rounded-md border">
+            <div className="divide-y rounded-md border max-h-[32rem] overflow-y-auto">
               {filteredStudents.map((student) => (
                 <div key={student.studentId} className="flex items-center justify-between gap-3 p-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{student.name}</p>
-                    <p className="text-xs text-muted-foreground">{student.documentId || "Sin documento"}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {[student.documentId || "Sin documento", student.sectionLabel]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
                   </div>
                   <StudentGradeAccessToggle
                     variant="switch"

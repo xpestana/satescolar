@@ -306,6 +306,8 @@ export default function GradesConsultation() {
           </Popover>
         </div>
 
+        {/* La pestaña de visibilidad es de todo el colegio: solo necesita el año escolar. */}
+        {activeTab !== "visibilidad" && (
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">Área</label>
           <Popover open={openSubject} onOpenChange={setOpenSubject}>
@@ -337,6 +339,8 @@ export default function GradesConsultation() {
           </Popover>
         </div>
 
+        )}
+        {activeTab !== "visibilidad" && (
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">
             {selectedSubjectIsGcrp ? "Docente" : "Sección"}
@@ -397,6 +401,8 @@ export default function GradesConsultation() {
           )}
         </div>
 
+        )}
+        {activeTab !== "visibilidad" && (
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">Momento</label>
           <div className="flex items-center rounded-lg border bg-muted/40 p-0.5">
@@ -415,6 +421,7 @@ export default function GradesConsultation() {
             ))}
           </div>
         </div>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
@@ -981,10 +988,10 @@ export default function GradesConsultation() {
 
         {canManageVisibility && (
           <TabsContent value="visibilidad">
-            {!effectiveYear || !selectedSection ? (
+            {!effectiveYear ? (
               <div className="text-center py-12 border rounded-md bg-muted/20">
                 <p className="text-muted-foreground">
-                  Seleccione el año escolar y la sección para configurar la visibilidad.
+                  Seleccione el año escolar para configurar la visibilidad.
                 </p>
               </div>
             ) : (
@@ -993,8 +1000,6 @@ export default function GradesConsultation() {
                 schoolYearId={effectiveYear}
                 yearRange={schoolYears.find((y) => y.id === effectiveYear)?.year_range || ""}
                 isActiveYear={effectiveYear === activeYear?.id}
-                sectionId={selectedSection}
-                sectionName={sections.find((s: any) => s.id === selectedSection)?.name || ""}
               />
             )}
           </TabsContent>
