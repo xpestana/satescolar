@@ -782,7 +782,7 @@ function getPngDimensions(
 
 type DocxImageType = "png" | "jpg" | "gif" | "bmp";
 
-function detectImageType(buffer: ArrayBuffer): DocxImageType {
+export function detectImageType(buffer: ArrayBuffer): DocxImageType {
   const v = new Uint8Array(buffer);
   if (v[0] === 0x89 && v[1] === 0x50) return "png";
   if (v[0] === 0xff && v[1] === 0xd8) return "jpg";
@@ -812,7 +812,7 @@ function getJpegDimensions(
   return null;
 }
 
-function getImageDimensions(
+export function getImageDimensions(
   buffer: ArrayBuffer,
 ): { width: number; height: number } | null {
   const kind = detectImageType(buffer);

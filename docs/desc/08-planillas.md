@@ -78,6 +78,31 @@ Pantalla `EnrollmentDisplayConfig` ("Configuración de Planillas") con **3 pesta
 - `src/lib/export-utils.ts` — `downloadPlanillaInscripcion`
 - `src/components/planilla/...`, `src/components/planillas/...`
 
+## Resumen Final (`/planillas` → pestaña Resumen Final)
+Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_config`.
+- **Bachillerato (1er–6to Año):** tipo de planilla 31059 (sin mención) / 31060 (con mención),
+  observaciones, profesor, cédula y editor de nombres/siglas de materias
+  (`resumen_final_subject_overrides`).
+- **Primaria (1er–6to Grado):** planilla propia, formato **RR-DEA-06-04** (Legal largo
+  25.5 × 37 cm, Arial 10, logo MPPE nuevo). En lugar del tipo 31059/31060 se edita el
+  **Código (COD)** (por defecto `21000`, guardado en `tipo_planilla`, texto libre), más
+  observaciones, profesor y cédula. No lleva nombres de materias.
+  - Máximo **20 estudiantes por hoja** (bachillerato: 35); si hay más, la sección se divide en partes.
+    Siempre se imprimen 20 filas (las vacías con `*` / `***`). Estudiantes ordenados por cédula.
+  - Tabla 1: N°, cédula ("V 123…"), lugar de nacimiento, EF, sexo, fecha, **resultados A–E** y **P.**
+    Todas las casillas llevan `*`; el literal de la **definitiva final** (`primary_final_reports`,
+    `momento = 0`) se marca con `X`. La columna P. va siempre con `*` (pendiente de definir).
+    Fila TOTAL con el conteo por literal.
+  - Tabla 2: N°, apellidos y nombres (mismo orden). Luego docente (configurado; si está vacío,
+    el docente de la asignación principal), observaciones, fechas y firmas.
+  - Con varias partes, el **COD y la docente se comparten** en toda la sección: al guardar una parte
+    se copian a las demás. **Las observaciones son propias de cada parte.**
+  - **CDCEE** = campo "Zona Educativa" de Planillas → Datos comunes.
+- Archivos: `src/components/planillas/resumen-final/ResumenFinalTab.tsx`,
+  `src/hooks/useResumenFinalConfig.ts`, `src/lib/resumen-final-level.ts` (nivel y filas por parte),
+  `src/lib/resumen-final-docx*.ts` (bachillerato), `src/hooks/useResumenFinalPrimariaDocxData.ts`,
+  `src/lib/resumen-final-primaria.ts` y `src/lib/resumen-final-primaria-docx.ts` (primaria).
+
 ## Por documentar
 - Diferencia exacta entre `/planillas` (generación) y la config de inscripción.
 - Esquema de `enrollment_display_config` y de las secciones/firmas.

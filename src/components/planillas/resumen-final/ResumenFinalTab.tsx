@@ -13,7 +13,8 @@ import { Loader2, Users, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { useResumenFinalConfig } from "@/hooks/useResumenFinalConfig";
+import { useResumenFinalConfig, type SectionPart } from "@/hooks/useResumenFinalConfig";
+import { GRADE_LABELS } from "@/lib/buildInvoiceData";
 import { useResumenFinalSubjectOverrides } from "@/hooks/useResumenFinalSubjectOverrides";
 import {
   fetchResumenFinalDocxData,
@@ -21,33 +22,39 @@ import {
   fetchResumenFinalSubjectsForEditor,
 } from "@/hooks/useResumenFinalDocxData";
 import { generateResumenFinalDocx, downloadBlob } from "@/lib/resumen-final-docx";
+import { DEFAULT_PRIMARY_COD, isPrimaryGradeLevel } from "@/lib/resumen-final-level";
+import { fetchResumenFinalPrimariaDocxData } from "@/hooks/useResumenFinalPrimariaDocxData";
+import { generateResumenFinalPrimariaDocx } from "@/lib/resumen-final-primaria-docx";
 
-const ALL_GRADE_LABELS: Record<string, string> = {
-  pre_maternal: "Pre-Maternal",
-  maternal: "Maternal",
-  i_nivel: "I Nivel",
-  ii_nivel: "II Nivel",
-  iii_nivel: "III Nivel",
-  "1_grado": "1er Grado",
-  "2_grado": "2do Grado",
-  "3_grado": "3er Grado",
-  "4_grado": "4to Grado",
-  "5_grado": "5to Grado",
-  "6_grado": "6to Grado",
-  "1_ano": "1er Año",
-  "2_ano": "2do Año",
-  "3_ano": "3er Año",
-  "4_ano": "4to Año",
-  "5_ano": "5to Año",
-  "6_ano": "6to Año",
-};
+const gradeLabel = (gradeLevel: string) => GRADE_LABELS[gradeLevel] ?? gradeLevel;
+
+/** Clave de una sección + parte en los selectores ("<sectionId>__<parte>"). */
+const partKey = (sp: SectionPart) => `${sp.section.id}__${sp.parte}`;
+
+type BachilleratoPlanilla = "31059" | "31060";
 
 const EMPTY_FORM = {
-  tipo_planilla: "31059" as "31059" | "31060",
+  tipo_planilla: "31059" as string,
   observaciones: "",
   nombre_profesor: "",
   cedula_profesor: "",
 };
+
+type ConfigForm = typeof EMPTY_FORM;
+
+/** Campos de primaria que se comparten entre todas las partes de una sección. */
+function primarySharedFields(src: ConfigForm | null | undefined): Pick<ConfigForm, "tipo_planilla" | "nombre_profesor" | "cedula_profesor"> {
+  return {
+    tipo_planilla: src?.tipo_planilla || DEFAULT_PRIMARY_COD,
+    nombre_profesor: src?.nombre_profesor ?? "",
+    cedula_profesor: src?.cedula_profesor ?? "",
+  };
+}
+
+/** Tipo guardado de una sección de bachillerato; cualquier otro valor cae en 31059. */
+function toBachilleratoPlanilla(tipo: string | undefined): BachilleratoPlanilla {
+  return String(tipo ?? "").trim() === "31060" ? "31060" : "31059";
+}
 
 type SubjectEdit = { name: string; abbreviation: string };
 
@@ -88,8 +95,16 @@ export function ResumenFinalTab() {
   // Sync form when selection changes
   useEffect(() => {
     if (!selectedKey) return;
-    const found = sectionParts.find((sp) => `${sp.section.id}__${sp.parte}` === selectedKey);
-    setForm(found?.config ?? EMPTY_FORM);
+    const found = sectionParts.find((sp) => partKey(sp) === selectedKey);
+    if (found?.config) {
+      setForm(found.config);
+    } else if (isPrimaryGradeLevel(found?.section.grade_level)) {
+      // Parte sin configurar: hereda COD y docente de otra parte de la misma sección.
+      const sibling = sectionParts.find((sp) => sp.section.id === found?.section.id && sp.config)?.config;
+      setForm({ ...EMPTY_FORM, ...primarySharedFields(sibling) });
+    } else {
+      setForm(EMPTY_FORM);
+    }
   }, [selectedKey, sectionParts]);
 
   // Reset section selection when year changes
@@ -101,8 +116,11 @@ export function ResumenFinalTab() {
     setSubjectEdits({});
   };
 
-  // Selected section's subjects (for the override editor)
-  const selectedSectionId = selectedKey ? selectedKey.split("__")[0] : "";
+  const selectedPart = sectionParts.find((sp) => partKey(sp) === selectedKey);
+  const selectedIsPrimary = isPrimaryGradeLevel(selectedPart?.section.grade_level);
+
+  // Selected section's subjects (for the override editor; primaria no lleva nombres de materias)
+  const selectedSectionId = selectedPart && !selectedIsPrimary ? selectedPart.section.id : "";
   const { data: editorSubjects = [], isLoading: editorSubjectsLoading } = useQuery({
     queryKey: ["resumen-final-editor-subjects", schoolId, selectedYearId, selectedSectionId],
     queryFn: () => fetchResumenFinalSubjectsForEditor(schoolId!, selectedYearId, selectedSectionId),
@@ -113,7 +131,7 @@ export function ResumenFinalTab() {
   const { overridesMap, saveOverrides } = useResumenFinalSubjectOverrides(
     schoolId ?? null,
     selectedYearId,
-    form.tipo_planilla,
+    toBachilleratoPlanilla(form.tipo_planilla),
   );
 
   // Sync subject edits when subjects or overrides change (or planilla type changes)
@@ -144,43 +162,46 @@ export function ResumenFinalTab() {
     });
   };
 
+  const primaryParts = sectionParts.filter((sp) => isPrimaryGradeLevel(sp.section.grade_level));
+  const bachilleratoParts = sectionParts.filter((sp) => !isPrimaryGradeLevel(sp.section.grade_level));
+  const downloadPart = sectionParts.find((sp) => partKey(sp) === downloadKey);
+  const downloadIsPrimary = isPrimaryGradeLevel(downloadPart?.section.grade_level);
+
+  /** Genera los .docx de las partes dadas: un archivo por formato (31059 / 31060 / Primaria). */
+  const buildFiles = async (parts: SectionPart[]): Promise<{ blob: Blob; suffix: string }[]> => {
+    const bach = parts.filter((sp) => !isPrimaryGradeLevel(sp.section.grade_level));
+    const prim = parts.filter((sp) => isPrimaryGradeLevel(sp.section.grade_level));
+    const [bachData, primData] = await Promise.all([
+      Promise.all(bach.map((sp) =>
+        fetchResumenFinalDocxData(schoolId!, selectedYearId, sp.section.id, sp.parte, toBachilleratoPlanilla(sp.config?.tipo_planilla)),
+      )),
+      Promise.all(prim.map((sp) =>
+        fetchResumenFinalPrimariaDocxData(schoolId!, selectedYearId, sp.section.id, sp.parte),
+      )),
+    ]);
+    const files = bachData.length
+      ? (await generateResumenFinalDocx(bachData)).map((r) => ({ blob: r.blob, suffix: r.tipoPlanilla as string }))
+      : [];
+    if (primData.length) files.push({ blob: await generateResumenFinalPrimariaDocx(primData), suffix: "Primaria" });
+    return files;
+  };
+
   const handleDownload = async () => {
     if (!schoolId || !selectedYearId || isGenerating) return;
     setIsGenerating(true);
     try {
-      const yearLabel = schoolYears.find(y => y.id === selectedYearId)?.year_range ?? selectedYearId;
-      if (downloadKey === "all") {
-        const allData = await Promise.all(
-          sectionParts.map(sp =>
-            fetchResumenFinalDocxData(
-              schoolId,
-              selectedYearId,
-              sp.section.id,
-              sp.parte,
-              sp.config?.tipo_planilla ?? form.tipo_planilla,
-            )
-          )
-        );
-        const results = await generateResumenFinalDocx(allData);
-        for (const r of results) {
-          const suffix = results.length > 1 ? `_${r.tipoPlanilla}` : "";
-          downloadBlob(r.blob, `Resumen_Final_${yearLabel.replace(/\//g, "-")}${suffix}.docx`);
-        }
+      if (downloadPart) {
+        const [file] = await buildFiles([downloadPart]);
+        const label = gradeLabel(downloadPart.section.grade_level);
+        const filename = `Resumen_Final_${label}_${downloadPart.section.name}_P${downloadPart.parte}.docx`;
+        downloadBlob(file.blob, filename.replace(/\s+/g, "_"));
       } else {
-        const [sectionId, parteStr] = downloadKey.split("__");
-        const parte = parseInt(parteStr, 10);
-        const sp = sectionParts.find(s => s.section.id === sectionId && s.parte === parte);
-        const data = await fetchResumenFinalDocxData(
-          schoolId,
-          selectedYearId,
-          sectionId,
-          parte,
-          sp?.config?.tipo_planilla ?? form.tipo_planilla,
-        );
-        const gradeLabel = ALL_GRADE_LABELS[sp?.section.grade_level ?? ""] ?? sp?.section.grade_level ?? "";
-        const filename = `Resumen_Final_${gradeLabel}_${sp?.section.name ?? "Sec"}_P${parte}.docx`.replace(/\s+/g, "_");
-        const results = await generateResumenFinalDocx([data]);
-        downloadBlob(results[0].blob, filename);
+        const yearLabel = (schoolYears.find(y => y.id === selectedYearId)?.year_range ?? selectedYearId).replace(/\//g, "-");
+        const files = await buildFiles(sectionParts);
+        for (const f of files) {
+          const suffix = files.length > 1 ? `_${f.suffix}` : "";
+          downloadBlob(f.blob, `Resumen_Final_${yearLabel}${suffix}.docx`);
+        }
       }
       toast.success("Planilla generada y descargada");
     } catch (e: any) {
@@ -191,12 +212,23 @@ export function ResumenFinalTab() {
   };
 
   const handleSave = () => {
-    if (!selectedKey || !schoolId || !selectedYearId) return;
-    const [sectionId, parteStr] = selectedKey.split("__");
-    const parte = parseInt(parteStr, 10);
+    if (!selectedPart || !schoolId || !selectedYearId) return;
+    const { section, parte } = selectedPart;
+    const base = { school_id: schoolId, school_year_id: selectedYearId, section_id: section.id };
+    const rows = [{ ...base, parte, ...form }];
+
+    // Primaria: COD y docente se copian a las demás partes de la sección;
+    // sus observaciones se conservan.
+    if (selectedIsPrimary) {
+      const shared = primarySharedFields(form);
+      for (const sp of primaryParts) {
+        if (sp.section.id !== section.id || sp.parte === parte) continue;
+        rows.push({ ...base, parte: sp.parte, observaciones: sp.config?.observaciones ?? "", ...shared });
+      }
+    }
 
     saveConfig.mutate(
-      { school_id: schoolId, school_year_id: selectedYearId, section_id: sectionId, parte, ...form },
+      rows,
       {
         onSuccess: () => toast.success("Configuración guardada"),
         onError: (e: any) => toast.error(e.message || "Error al guardar"),
@@ -204,11 +236,11 @@ export function ResumenFinalTab() {
     );
   };
 
-  const selectedPart = sectionParts.find((sp) => `${sp.section.id}__${sp.parte}` === selectedKey);
   const configuredCount = sectionParts.filter((sp) => sp.config !== null).length;
 
-  const previewSectionId =
-    downloadKey !== "all" ? downloadKey.split("__")[0] : sectionParts[0]?.section.id ?? "";
+  const previewSectionId = downloadIsPrimary
+    ? ""
+    : (downloadPart ?? bachilleratoParts[0])?.section.id ?? "";
 
   const { data: subjectsPreview, isLoading: previewLoading } = useQuery({
     queryKey: ["resumen-final-subjects-preview", schoolId, selectedYearId, previewSectionId],
@@ -224,7 +256,7 @@ export function ResumenFinalTab() {
           <CardTitle className="text-base">Resumen Final Rendimiento Estudiantil</CardTitle>
           <CardDescription>
             Configura las observaciones, docente y tipo de planilla por sección y parte.
-            Las secciones con más de 35 alumnos se dividen automáticamente en partes.
+            Las secciones se dividen automáticamente en partes: más de 35 alumnos en bachillerato y más de 20 en primaria.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -274,8 +306,8 @@ export function ResumenFinalTab() {
                     </div>
                   )}
                   {sectionParts.map((sp) => {
-                    const key = `${sp.section.id}__${sp.parte}`;
-                    const label = ALL_GRADE_LABELS[sp.section.grade_level] ?? sp.section.grade_level;
+                    const key = partKey(sp);
+                    const label = gradeLabel(sp.section.grade_level);
                     const hasConfig = sp.config !== null;
                     return (
                       <SelectItem key={key} value={key}>
@@ -300,7 +332,7 @@ export function ResumenFinalTab() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">
-                {ALL_GRADE_LABELS[selectedPart.section.grade_level] ?? selectedPart.section.grade_level} Sección:{" "}
+                {gradeLabel(selectedPart.section.grade_level)} Sección:{" "}
                 {selectedPart.section.name}
                 {selectedPart.totalParts > 1 && ` — parte ${selectedPart.parte}`}
               </CardTitle>
@@ -313,12 +345,27 @@ export function ResumenFinalTab() {
           </CardHeader>
           <CardContent className="space-y-5">
 
-            {/* Tipo planilla */}
+            {/* Tipo planilla: primaria usa un código libre (COD), bachillerato 31059/31060 */}
+            {selectedIsPrimary ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="cod_planilla">Código (COD)</Label>
+                <Input
+                  id="cod_planilla"
+                  value={form.tipo_planilla}
+                  onChange={(e) => setForm((p) => ({ ...p, tipo_planilla: e.target.value }))}
+                  placeholder={DEFAULT_PRIMARY_COD}
+                  className="max-w-[200px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Código de la planilla de primaria. Por defecto {DEFAULT_PRIMARY_COD}.
+                </p>
+              </div>
+            ) : (
             <div className="space-y-2">
               <Label>Tipo de Planilla</Label>
               <RadioGroup
                 value={form.tipo_planilla}
-                onValueChange={(v) => setForm((p) => ({ ...p, tipo_planilla: v as "31059" | "31060" }))}
+                onValueChange={(v) => setForm((p) => ({ ...p, tipo_planilla: v }))}
                 className="flex gap-6"
               >
                 <Label
@@ -343,6 +390,7 @@ export function ResumenFinalTab() {
                 </Label>
               </RadioGroup>
             </div>
+            )}
 
             {/* Observaciones */}
             <div className="space-y-1.5">
@@ -379,6 +427,13 @@ export function ResumenFinalTab() {
               />
             </div>
 
+            {selectedIsPrimary && selectedPart.totalParts > 1 && (
+              <p className="text-xs text-muted-foreground">
+                El COD y la docente se comparten entre las {selectedPart.totalParts} partes de esta sección.
+                Las observaciones son propias de cada parte.
+              </p>
+            )}
+
             <div className="flex justify-start pt-1">
               <Button onClick={handleSave} disabled={saveConfig.isPending}>
                 {saveConfig.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
@@ -386,6 +441,7 @@ export function ResumenFinalTab() {
               </Button>
             </div>
 
+            {!selectedIsPrimary && (<>
             <Separator />
 
             {/* Subject name/abbreviation editor */}
@@ -458,6 +514,7 @@ export function ResumenFinalTab() {
                 </div>
               )}
             </div>
+            </>)}
           </CardContent>
         </Card>
       )}
@@ -489,8 +546,8 @@ export function ResumenFinalTab() {
                     Todas las secciones ({sectionParts.length} {sectionParts.length === 1 ? "planilla" : "planillas"})
                   </SelectItem>
                   {sectionParts.map((sp) => {
-                    const key = `${sp.section.id}__${sp.parte}`;
-                    const label = ALL_GRADE_LABELS[sp.section.grade_level] ?? sp.section.grade_level;
+                    const key = partKey(sp);
+                    const label = gradeLabel(sp.section.grade_level);
                     return (
                       <SelectItem key={key} value={key}>
                         {label} Sección: {sp.section.name}
@@ -501,7 +558,11 @@ export function ResumenFinalTab() {
                 </SelectContent>
               </Select>
             </div>
-            {previewLoading ? (
+            {downloadIsPrimary ? (
+              <p className="text-sm text-muted-foreground">
+                Planilla de primaria (RR-DEA-06-04): hasta 20 estudiantes por hoja, resultado según el literal final.
+              </p>
+            ) : previewLoading ? (
               <p className="text-sm text-muted-foreground">Cargando materias…</p>
             ) : subjectsPreview && subjectsPreview.count > 0 ? (
               <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
@@ -512,7 +573,7 @@ export function ResumenFinalTab() {
                       {" "}· Comp. Productivo: {subjectsPreview.productiveAbbreviations.length}
                     </span>
                   )}
-                  {downloadKey === "all" && sectionParts.length > 1 && (
+                  {downloadKey === "all" && bachilleratoParts.length > 1 && (
                     <span className="text-muted-foreground font-normal">
                       {" "}(vista de la primera sección; cada sección usa sus propias materias)
                     </span>

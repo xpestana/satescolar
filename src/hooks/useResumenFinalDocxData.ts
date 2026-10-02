@@ -94,9 +94,22 @@ type GradeRecord = {
   attendance_count: number | null;
 };
 
-function teacherName(fd: Record<string, any> | null): string {
+export function teacherName(fd: Record<string, any> | null | undefined): string {
   if (!fd) return "";
   return `${fd.primer_apellido || fd.apellido || ""} ${fd.segundo_apellido || ""} ${fd.primer_nombre || fd.nombre || ""} ${fd.segundo_nombre || ""}`.replace(/\s+/g, " ").trim().toUpperCase();
+}
+
+/** Día / mes / año de nacimiento desde `fecha_nacimiento` (YYYY-MM-DD) o los campos sueltos. */
+export function birthDateParts(fd: Record<string, unknown>): { diaNac: string; mesNac: string; anioNac: string } {
+  const parts = String(fd.fecha_nacimiento ?? "").split("-");
+  if (parts.length === 3) {
+    return { anioNac: parts[0], mesNac: parts[1], diaNac: parts[2].slice(0, 2) };
+  }
+  return {
+    diaNac: String(fd.dia_nacimiento || ""),
+    mesNac: String(fd.mes_nacimiento || ""),
+    anioNac: String(fd.anio_nacimiento || ""),
+  };
 }
 
 type AssignmentWithSubject = {
@@ -240,7 +253,7 @@ export async function fetchResumenFinalSubjectsForEditor(
 
 const CALC_PARTS = (count: number) => Math.max(1, Math.ceil(count / 35));
 
-function lugarNacimientoFromForm(
+export function lugarNacimientoFromForm(
   fd: Record<string, unknown>,
   geoCache: Record<string, string>,
 ): string {
@@ -257,7 +270,7 @@ function lugarNacimientoFromForm(
   return "";
 }
 
-function entidadFederalFromForm(
+export function entidadFederalFromForm(
   fd: Record<string, unknown>,
   geoCache: Record<string, string>,
   stateAcronymCache: Record<string, string>,
@@ -556,16 +569,7 @@ export async function fetchResumenFinalDocxData(
       grupoName = gp.grupoName.toUpperCase();
     }
 
-    let diaNac = "", mesNac = "", anioNac = "";
-    const fechaNac = fd.fecha_nacimiento as string | undefined;
-    if (fechaNac) {
-      const parts = fechaNac.split("-");
-      if (parts.length === 3) { anioNac = parts[0]; mesNac = parts[1]; diaNac = parts[2]; }
-    } else {
-      diaNac = String(fd.dia_nacimiento || "");
-      mesNac = String(fd.mes_nacimiento || "");
-      anioNac = String(fd.anio_nacimiento || "");
-    }
+    const { diaNac, mesNac, anioNac } = birthDateParts(fd);
 
     const lugarNacimiento =
       tipoPlanilla === "31060"

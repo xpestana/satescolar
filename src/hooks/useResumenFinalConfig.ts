@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import { rowsPerPartFor } from "@/lib/resumen-final-level";
 
 export interface ResumenFinalConfigRow {
   id?: string;
@@ -8,7 +9,8 @@ export interface ResumenFinalConfigRow {
   school_year_id: string;
   section_id: string;
   parte: number;
-  tipo_planilla: "31059" | "31060";
+  /** Bachillerato: "31059" | "31060". Primaria: código libre (por defecto 21000). */
+  tipo_planilla: string;
   observaciones: string;
   nombre_profesor: string;
   cedula_profesor: string;
@@ -26,8 +28,8 @@ export interface SectionPart {
   config: Omit<ResumenFinalConfigRow, "id" | "school_id" | "school_year_id" | "section_id" | "parte"> | null;
 }
 
-function calcParts(studentCount: number): number {
-  return Math.max(1, Math.ceil(studentCount / 35));
+function calcParts(studentCount: number, gradeLevel: string): number {
+  return Math.max(1, Math.ceil(studentCount / rowsPerPartFor(gradeLevel)));
 }
 
 const ALL_GRADE_ORDER = [
@@ -87,7 +89,7 @@ export function useResumenFinalConfig(schoolYearId: string) {
         const count = countMap.get(section.id) ?? 0;
         if (count === 0) continue;
 
-        const totalParts = calcParts(count);
+        const totalParts = calcParts(count, section.grade_level);
         for (let parte = 1; parte <= totalParts; parte++) {
           const raw = configMap.get(`${section.id}__${parte}`);
           result.push({
@@ -118,10 +120,12 @@ export function useResumenFinalConfig(schoolYearId: string) {
   });
 
   const saveConfig = useMutation({
-    mutationFn: async (payload: Omit<ResumenFinalConfigRow, "id">) => {
+    mutationFn: async (payload: Omit<ResumenFinalConfigRow, "id"> | Omit<ResumenFinalConfigRow, "id">[]) => {
       const { error } = await supabase
         .from("resumen_final_config")
-        .upsert(payload, { onConflict: "school_id,school_year_id,section_id,parte" });
+        .upsert(Array.isArray(payload) ? payload : [payload], {
+          onConflict: "school_id,school_year_id,section_id,parte",
+        });
       if (error) throw error;
     },
     onSuccess: () => {
