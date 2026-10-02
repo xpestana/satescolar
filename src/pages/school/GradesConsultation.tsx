@@ -22,6 +22,7 @@ import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas 
 import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
 import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES } from "@/lib/gradeLevels";
 import RepresentativeVisibilityTab from "@/components/grades/RepresentativeVisibilityTab";
+import { useGradeStudents } from "@/hooks/useGradeStudents";
 
 
 
@@ -192,38 +193,12 @@ export default function GradesConsultation() {
     enabled: assignmentIds.length > 0,
   });
 
-  // Students: regular from enrollments, GCRP from gcrp_assignment_students
-  const { data: students = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ["consult-students", selectedSection, effectiveYear, schoolId, isGcrpQuery, assignmentIds],
-    queryFn: async () => {
-      let rows: any[] = [];
-      if (isGcrpQuery && assignmentIds.length > 0) {
-        const { data } = await supabase
-          .from("gcrp_assignment_students" as any)
-          .select("student_id, student:student_id(id, document_id, form_data)")
-          .in("assignment_id", assignmentIds);
-        rows = data || [];
-      } else {
-        const { data } = await supabase
-          .from("enrollments")
-          .select("student_id, student:student_id(id, document_id, form_data)")
-          .eq("section_id", selectedSection)
-          .eq("school_year_id", effectiveYear)
-          .eq("school_id", schoolId!);
-        rows = data || [];
-      }
-      return rows.map((e: any) => {
-        const fd = e.student?.form_data as Record<string, any> | null;
-        const firstName = [fd?.primer_nombre || fd?.nombre, fd?.segundo_nombre].filter(Boolean).join(" ");
-        const lastName = [fd?.primer_apellido || fd?.apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
-        return {
-          student_id: e.student_id,
-          student_name: `${lastName} ${firstName}`.trim() || "Sin nombre",
-          document_id: e.student?.document_id,
-        };
-      }).sort((a: any, b: any) => a.student_name.localeCompare(b.student_name));
-    },
-    enabled: isGcrpQuery ? assignmentIds.length > 0 : (!!selectedSection && !!effectiveYear && !!schoolId),
+  const { data: students = [], isLoading: studentsLoading } = useGradeStudents({
+    assignmentIds,
+    isGcrp: isGcrpQuery,
+    sectionId: selectedSection,
+    schoolYearId: effectiveYear,
+    schoolId,
   });
 
   // Grades
@@ -607,7 +582,7 @@ export default function GradesConsultation() {
                                     momento: selectedMomento,
                                     students: students.map((s: any) => ({
                                       studentId: s.student_id,
-                                      studentName: s.student_name,
+                                      studentName: s.full_name,
                                       documentId: s.document_id ?? null,
                                     })),
                                   });
@@ -644,7 +619,7 @@ export default function GradesConsultation() {
                                     momento: 3,
                                     students: students.map((s: any) => ({
                                       studentId: s.student_id,
-                                      studentName: s.student_name,
+                                      studentName: s.full_name,
                                       documentId: s.document_id ?? null,
                                     })),
                                   });
@@ -684,7 +659,7 @@ export default function GradesConsultation() {
                                     momento: selectedMomento,
                                     students: students.map((s: any) => ({
                                       studentId: s.student_id,
-                                      studentName: s.student_name,
+                                      studentName: s.full_name,
                                       documentId: s.document_id ?? null,
                                     })),
                                   });
@@ -724,7 +699,7 @@ export default function GradesConsultation() {
                                     yearRange,
                                     students: students.map((s: any) => ({
                                       studentId: s.student_id,
-                                      studentName: s.student_name,
+                                      studentName: s.full_name,
                                       documentId: s.document_id ?? null,
                                     })),
                                   });
@@ -821,7 +796,7 @@ export default function GradesConsultation() {
                                             const html = await downloadBachilleratoBoleta({
                                               schoolId,
                                               studentId: s.student_id,
-                                              studentName: s.student_name,
+                                              studentName: s.full_name,
                                               documentId: s.document_id ?? null,
                                               sectionId: selectedSection,
                                               sectionName: sectionData?.name ?? "",
@@ -833,8 +808,8 @@ export default function GradesConsultation() {
                                             });
                                             await openBoletaPreview(
                                               html,
-                                              `Boleta_${s.student_name}_M${selectedMomento}.pdf`,
-                                              s.student_name,
+                                              `Boleta_${s.full_name}_M${selectedMomento}.pdf`,
+                                              s.full_name,
                                             );
                                           } finally {
                                             setDownloadingStudentId(null);
@@ -860,7 +835,7 @@ export default function GradesConsultation() {
                                             const html = await downloadBachilleratoBoletaDefinitiva({
                                               schoolId,
                                               studentId: s.student_id,
-                                              studentName: s.student_name,
+                                              studentName: s.full_name,
                                               documentId: s.document_id ?? null,
                                               sectionId: selectedSection,
                                               sectionName: sectionData?.name ?? "",
@@ -871,8 +846,8 @@ export default function GradesConsultation() {
                                             });
                                             await openBoletaPreview(
                                               html,
-                                              `Boleta_${s.student_name}_Definitiva.pdf`,
-                                              `${s.student_name} — Definitiva Final`,
+                                              `Boleta_${s.full_name}_Definitiva.pdf`,
+                                              `${s.full_name} — Definitiva Final`,
                                             );
                                           } finally {
                                             setDownloadingStudentIdFinal(null);
@@ -901,7 +876,7 @@ export default function GradesConsultation() {
                                             const html = await downloadPrimaryDescriptiveBoleta({
                                               schoolId,
                                               studentId: s.student_id,
-                                              studentName: s.student_name,
+                                              studentName: s.full_name,
                                               documentId: s.document_id ?? null,
                                               sectionId: selectedSection,
                                               sectionName: sectionData?.name ?? "",
@@ -913,8 +888,8 @@ export default function GradesConsultation() {
                                             });
                                             await openBoletaPreview(
                                               html,
-                                              `Boleta_${s.student_name}_M${selectedMomento}.pdf`,
-                                              s.student_name,
+                                              `Boleta_${s.full_name}_M${selectedMomento}.pdf`,
+                                              s.full_name,
                                             );
                                           } finally {
                                             setDownloadingStudentId(null);
@@ -940,7 +915,7 @@ export default function GradesConsultation() {
                                             const html = await downloadPrimaryDescriptiveBoleta({
                                               schoolId,
                                               studentId: s.student_id,
-                                              studentName: s.student_name,
+                                              studentName: s.full_name,
                                               documentId: s.document_id ?? null,
                                               sectionId: selectedSection,
                                               sectionName: sectionData?.name ?? "",
@@ -952,8 +927,8 @@ export default function GradesConsultation() {
                                             });
                                             await openBoletaPreview(
                                               html,
-                                              `Boleta_${s.student_name}_Definitiva.pdf`,
-                                              `${s.student_name} — Definitiva Final`,
+                                              `Boleta_${s.full_name}_Definitiva.pdf`,
+                                              `${s.full_name} — Definitiva Final`,
                                             );
                                           } finally {
                                             setDownloadingStudentIdFinal(null);

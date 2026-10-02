@@ -13,6 +13,7 @@ import PrimaryFinalReportModal from "@/components/grades/PrimaryFinalReportModal
 import PreschoolFinalReportModal from "@/components/grades/PreschoolFinalReportModal";
 import TeacherSignatureCard from "@/components/grades/TeacherSignatureCard";
 import { useTeacherData } from "@/hooks/useTeacherData";
+import type { GradeStudent } from "@/hooks/useGradeStudents";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const PRIMARY_GRADES = new Set([
@@ -38,18 +39,12 @@ interface ExtraFields {
 
 const DEFAULT_EXTRA: ExtraFields = { attendance_count: 0, absence_count: 0, final_status: "" };
 
-interface StudentRow {
-  student_id: string;
-  student_name: string;
-  document_id: string | null;
-}
-
 interface TeacherReportCardProps {
   assignmentId: string;
   schoolId: string;
   gradeLevel: string;
   momento: number;
-  students: StudentRow[];
+  students: GradeStudent[];
   sectionLabel?: string;
 }
 
@@ -324,7 +319,7 @@ export function TeacherReportCard({
                             size="sm"
                             className="h-8 w-8 p-0"
                             onClick={() => {
-                              setReportModalStudent({ id: s.student_id, name: s.student_name });
+                              setReportModalStudent({ id: s.student_id, name: s.full_name });
                               setReportModalOpen(true);
                             }}
                           >

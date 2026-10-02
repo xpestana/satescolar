@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ArrowLeft, Loader2, Check } from "lucide-react";
 import { TeacherReportCard } from "@/components/teacher/TeacherReportCard";
+import { useGradeStudents } from "@/hooks/useGradeStudents";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -38,12 +39,6 @@ interface PlanItem {
   percentage: number | null;
   display_order: number;
   momento: number;
-}
-
-interface StudentRow {
-  student_id: string;
-  student_name: string;
-  document_id: string | null;
 }
 
 export default function TeacherGrades() {
@@ -102,38 +97,12 @@ export default function TeacherGrades() {
     enabled: !!assignmentId,
   });
 
-  // Fetch enrolled students - regular: from enrollments, GCRP: from gcrp_assignment_students
-  const { data: students = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ["enrolled-students", assignmentId, isGcrp, assignment?.section?.id, assignment?.school_year?.id],
-    queryFn: async () => {
-      let rows: any[] = [];
-      if (isGcrp) {
-        const { data, error } = await supabase
-          .from("gcrp_assignment_students" as any)
-          .select("student_id, student:student_id(id, document_id, form_data)")
-          .eq("assignment_id", assignmentId!);
-        if (error) throw error;
-        rows = data || [];
-      } else {
-        const { data, error } = await supabase
-          .from("enrollments")
-          .select("student_id, student:student_id(id, document_id, form_data)")
-          .eq("section_id", assignment!.section!.id)
-          .eq("school_year_id", assignment!.school_year!.id)
-          .eq("school_id", assignment!.school_id);
-        if (error) throw error;
-        rows = data || [];
-      }
-
-      return rows.map((e: any) => {
-        const fd = e.student?.form_data as Record<string, any> | null;
-        const firstName = fd?.nombre || fd?.primer_nombre || "";
-        const lastName = fd?.apellido || fd?.primer_apellido || "";
-        const fullName = `${firstName} ${lastName}`.trim() || "Sin nombre";
-        return { student_id: e.student_id, student_name: fullName, document_id: e.student?.document_id } as StudentRow;
-      }).sort((a: StudentRow, b: StudentRow) => a.student_name.localeCompare(b.student_name));
-    },
-    enabled: isGcrp ? !!assignmentId : (!!assignment?.section?.id && !!assignment?.school_year?.id),
+  const { data: students = [], isLoading: studentsLoading } = useGradeStudents({
+    assignmentIds: assignmentId ? [assignmentId] : [],
+    isGcrp,
+    sectionId: assignment?.section?.id,
+    schoolYearId: assignment?.school_year?.id,
+    schoolId: assignment?.school_id,
   });
 
   // Fetch existing grades

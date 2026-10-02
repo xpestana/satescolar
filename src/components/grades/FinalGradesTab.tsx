@@ -16,6 +16,7 @@ import TeacherSignatureCard from "./TeacherSignatureCard";
 import PreschoolFinalReportModal from "./PreschoolFinalReportModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NUMERIC_GRADES, PRIMARY_GRADES, PRESCHOOL_GRADES } from "@/lib/gradeLevels";
+import { useGradeStudents } from "@/hooks/useGradeStudents";
 
 
 const STATUS_OPTIONS = [
@@ -174,37 +175,12 @@ export default function FinalGradesTab({
     enabled: isPreschool && assignmentIds.length > 0,
   });
 
-  const { data: students = [], isLoading: studentsLoading } = useQuery({
-    queryKey: ["final-students", selectedSection, effectiveYear, schoolId, isGcrpQuery, assignmentIds],
-    queryFn: async () => {
-      let rows: any[] = [];
-      if (isGcrpQuery && assignmentIds.length > 0) {
-        const { data } = await supabase
-          .from("gcrp_assignment_students" as any)
-          .select("student_id, student:student_id(id, document_id, form_data)")
-          .in("assignment_id", assignmentIds);
-        rows = data || [];
-      } else {
-        const { data } = await supabase
-          .from("enrollments")
-          .select("student_id, student:student_id(id, document_id, form_data)")
-          .eq("section_id", selectedSection)
-          .eq("school_year_id", effectiveYear)
-          .eq("school_id", schoolId);
-        rows = data || [];
-      }
-      return rows.map((e: any) => {
-        const fd = e.student?.form_data as Record<string, any> | null;
-        const firstName = fd?.nombre || fd?.primer_nombre || "";
-        const lastName = fd?.apellido || fd?.primer_apellido || "";
-        return {
-          student_id: e.student_id,
-          student_name: `${lastName} ${firstName}`.trim() || "Sin nombre",
-          document_id: e.student?.document_id,
-        };
-      }).sort((a: any, b: any) => a.student_name.localeCompare(b.student_name));
-    },
-    enabled: isGcrpQuery ? assignmentIds.length > 0 : (!!selectedSection && !!effectiveYear && !!schoolId),
+  const { data: students = [], isLoading: studentsLoading } = useGradeStudents({
+    assignmentIds,
+    isGcrp: isGcrpQuery,
+    sectionId: selectedSection,
+    schoolYearId: effectiveYear,
+    schoolId,
   });
 
   const { data: allPlanItems = [], isLoading: planLoading } = useQuery({
@@ -1021,7 +997,7 @@ export default function FinalGradesTab({
                   size="sm"
                   className="h-8 w-8 p-0"
                   onClick={() => {
-                    setReportModalStudent({ id: s.student_id, name: s.student_name });
+                    setReportModalStudent({ id: s.student_id, name: s.full_name });
                     setReportModalMomento(m);
                     setReportModalOpen(true);
                   }}
@@ -1147,7 +1123,7 @@ export default function FinalGradesTab({
                   size="sm"
                   className="h-8 w-8 p-0"
                   onClick={() => {
-                    setReportModalStudent({ id: s.student_id, name: s.student_name });
+                    setReportModalStudent({ id: s.student_id, name: s.full_name });
                     setReportModalMomento(m);
                     setReportModalOpen(true);
                   }}

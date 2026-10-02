@@ -117,6 +117,13 @@ Pantalla `GradesConsultation`. Filtros comunes arriba: **Año Escolar → Área 
 > `<iframe>` dentro de un modal, y la descarga real la hace el botón del modal. Por eso **toda
 > imagen debe ir inlineada como data URL**: html2canvas no dibuja URLs cross-origin.
 
+**Nombre del estudiante:** los alumnos de las tres pestañas (y de la pantalla de notas del docente)
+salen de un solo hook, `useGradeStudents`, que devuelve dos formas del nombre completo (ambos
+nombres y ambos apellidos, vía `src/lib/studentName.ts`): `student_name` = "Apellidos Nombres"
+para las tablas y el orden alfabético, y `full_name` = "Nombres Apellidos" para lo que se imprime
+en la boleta y en los modales de informe. No vuelvas a armar el nombre a mano con
+`primer_nombre`/`primer_apellido`.
+
 El **Momento** seleccionado define qué periodos entran en la boleta (Momento 1 = solo el primero;
 Momento 2 = primero y segundo; Momento 3 = los tres). **Definitiva Final** es el boletín completo
 del año escolar.
@@ -326,6 +333,7 @@ que ya existía para el aula virtual.
 - `src/components/grades/RepresentativeVisibilityTab.tsx` (pestaña de configuración),
   `src/components/students/StudentGradeAccessToggle.tsx` (bloqueo por alumno, 4 puntos de entrada),
   `src/components/families/FamilyGradeAccessDialog.tsx` (bloqueo desde la lista de familias)
+- `src/hooks/useGradeStudents.ts` (alumnos de las pantallas de notas, school y docente)
 - `src/hooks/useStudentGradesAccess.ts`, `useStudentReportCard.ts`,
   `useGradeVisibilitySettings.ts`, `useStudentGradeBlock.ts`
 - `src/lib/gradesAccess.ts` (motivo del gate → mensaje), `src/lib/gradeLevels.ts`
