@@ -105,9 +105,9 @@ const navSections: NavSection[] = [
     items: [
       { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school", permission: "emails.send" },
       { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school", permission: "planillas.config" },
-      { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school", permission: "attendance.scan" },
-      { label: "Registro de Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school", permission: "attendance.view" },
-      { label: "Dashboard Asistencia", href: "/utilidades/asistencias-dashboard", icon: BarChart2, requiredRole: "school", permission: "attendance.view" },
+      { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school", permission: "attendance.scan", module: "attendance" },
+      { label: "Registro de Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school", permission: "attendance.view", module: "attendance" },
+      { label: "Dashboard Asistencia", href: "/utilidades/asistencias-dashboard", icon: BarChart2, requiredRole: "school", permission: "attendance.view", module: "attendance" },
       { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school", permission: "classroom.supervise" },
     ],
   },
@@ -188,7 +188,7 @@ const navSections: NavSection[] = [
       { label: "Áreas", href: "/teacher/materias", icon: BookOpen, requiredRole: "teacher" },
       { label: "Aula Virtual", href: "/teacher/aula-virtual", icon: GraduationCap, requiredRole: "teacher" },
       { label: "Carnet", href: "/teacher/carnet", icon: CreditCard, requiredRole: "teacher" },
-      { label: "Asistencias", href: "/teacher/asistencias", icon: ClipboardList, requiredRole: "teacher" },
+      { label: "Asistencias", href: "/teacher/asistencias", icon: ClipboardList, requiredRole: "teacher", module: "attendance" },
     ],
   },
 ];

@@ -57,5 +57,12 @@ registro manual y dashboard analítico. El docente registra asistencia de sus á
 - `src/pages/AttendanceScan.tsx`
 - `src/components/attendance/...`
 
+## Módulo `attendance`
+- Las rutas `/utilidades/escaner-qr`, `/utilidades/asistencias`, `/utilidades/asistencias-dashboard`
+  y `/teacher/asistencias` van envueltas en `<ModuleRoute module="attendance">`.
+- `record-attendance` responde **403** `{ status: "module_inactive" }` si el colegio del token no
+  tiene el módulo. El escáner y la página pública `/attendance/scan` muestran el mensaje de error.
+- El carnet con QR sigue siendo gratis (Registro); lo que requiere el módulo es el marcaje.
+
 ## Por documentar
 - Formato del contenido del QR y anti-duplicado de marcaje.

@@ -76,7 +76,7 @@ dentro de los módulos activos.
 | 1 | BD: `school_modules`, `school_has_module`, seed, gate de notas | ✅ desplegada 2026-10-05 |
 | 2 | Núcleo frontend: catálogo, `isModuleActive`, `useSchoolModules`, `ModuleGate`, overlay WhatsApp, sidebar | ✅ (aún sin aplicar a rutas) |
 | 3 | Admin: `/admin/colegios/:id/modulos` + iconos en la lista | ✅ |
-| 4.1 | Gate Asistencias | ⏳ |
+| 4.1 | Gate Asistencias | ✅ (rutas, menú, `record-attendance` desplegada) |
 | 4.2 | Gate Aula Virtual | ⏳ |
 | 4.3 | Gate Mensajes Masivos | ⏳ |
 | 4.4 | Gate Notas/Boletas/Sábana | ⏳ |
@@ -109,4 +109,5 @@ dentro de los módulos activos.
 - Admin: `src/pages/admin/SchoolModules.tsx`, `src/components/admin/SchoolModuleRow.tsx`,
   `src/components/admin/SchoolModulesIcons.tsx`, `src/hooks/useSchoolModulesAdmin.ts`,
   `src/hooks/useAllSchoolModules.ts`, `src/lib/modules/moduleExpiry.ts` (con test).
-- (Fases siguientes) `supabase/functions/_shared/schoolModules.ts`
+- Edge Functions: `supabase/functions/_shared/schoolModules.ts` (`isSchoolModuleActive`). Ante un
+  error de BD **deja pasar**, para no bloquear a un colegio que paga; el error queda en el log.

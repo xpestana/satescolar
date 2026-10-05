@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
@@ -53,6 +54,14 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const { entity_type, entity_id, school_id, id: token_id } = tokenData;
+
+    // 1b. The school must have the attendance module active (docs/desc/19-modulos.md)
+    if (!(await isSchoolModuleActive(supabase, school_id, "attendance"))) {
+      return new Response(JSON.stringify({
+        error: "El control de asistencias no está activo en este colegio",
+        status: "module_inactive",
+      }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // 2. Anti-duplicate: only one entry per day
     const todayStr = new Date().toISOString().split("T")[0];

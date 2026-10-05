@@ -58,6 +58,7 @@ import RepStudentGrades from "./pages/representative/StudentGrades";
 
 import ClassroomSupervision from "./pages/school/ClassroomSupervision";
 import AttendanceScan from "./pages/AttendanceScan";
+import { ModuleRoute } from "@/components/modules/ModuleRoute";
 import AttendanceScanner from "./pages/school/AttendanceScanner";
 import AttendanceList from "./pages/school/AttendanceList";
 import AttendanceDashboard from "./pages/school/AttendanceDashboard";
@@ -398,13 +399,13 @@ const App = () => (
               <Route path="/teacher/aula-virtual" element={<ProtectedRoute requiredRole="teacher"><ClassroomList /></ProtectedRoute>} />
               <Route path="/teacher/aula-virtual/:assignmentId" element={<ProtectedRoute requiredRole="teacher"><ClassroomDetail /></ProtectedRoute>} />
               <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />
-              <Route path="/teacher/asistencias" element={<ProtectedRoute requiredRole="teacher"><TeacherAttendance /></ProtectedRoute>} />
+              <Route path="/teacher/asistencias" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="attendance"><TeacherAttendance /></ModuleRoute></ProtectedRoute>} />
               {/* Attendance routes */}
               <Route path="/attendance/scan/:token" element={<AttendanceScan />} />
               <Route path="/attendance/scan/:token/*" element={<AttendanceScan />} />
-              <Route path="/utilidades/escaner-qr" element={<ProtectedRoute requiredRole="school"><AttendanceScanner /></ProtectedRoute>} />
-              <Route path="/utilidades/asistencias" element={<ProtectedRoute requiredRole="school"><AttendanceList /></ProtectedRoute>} />
-              <Route path="/utilidades/asistencias-dashboard" element={<ProtectedRoute requiredRole="school"><AttendanceDashboard /></ProtectedRoute>} />
+              <Route path="/utilidades/escaner-qr" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="attendance"><AttendanceScanner /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/utilidades/asistencias" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="attendance"><AttendanceList /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/utilidades/asistencias-dashboard" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="attendance"><AttendanceDashboard /></ModuleRoute></ProtectedRoute>} />
               {/* Payment routes */}
               <Route path="/pagos" element={<ProtectedRoute requiredRole="school"><PaymentDashboard /></ProtectedRoute>} />
               <Route path="/pagos/configuracion" element={<ProtectedRoute requiredRole="school"><PaymentConfig /></ProtectedRoute>} />
