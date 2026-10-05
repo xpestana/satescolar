@@ -78,7 +78,7 @@ dentro de los módulos activos.
 | 3 | Admin: `/admin/colegios/:id/modulos` + iconos en la lista | ✅ |
 | 4.1 | Gate Asistencias | ✅ (rutas, menú, `record-attendance` desplegada) |
 | 4.2 | Gate Aula Virtual | ✅ (rutas, menú, botones y códigos del representante) |
-| 4.3 | Gate Mensajes Masivos | ⏳ |
+| 4.3 | Gate Mensajes Masivos | ✅ (ruta, menú, `send-email` desplegada) |
 | 4.4 | Gate Notas/Boletas/Sábana | ⏳ |
 | 4.5 | Gate Planillajes del Ministerio | ⏳ |
 | 4.6 | Gate Pagos | ⏳ |

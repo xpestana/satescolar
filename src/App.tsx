@@ -192,7 +192,9 @@ const App = () => (
                 path="/utilidades/correo"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <EmailSender />
+                    <ModuleRoute module="messaging">
+                      <EmailSender />
+                    </ModuleRoute>
                   </ProtectedRoute>
                 }
               />

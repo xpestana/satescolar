@@ -1,4 +1,5 @@
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
@@ -51,12 +52,24 @@ export default async function handler(req: Request): Promise<Response> {
 
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
-      .select("role")
+      .select("role, school_id")
       .eq("user_id", user.id)
       .in("role", ["admin", "school"]);
 
     if (!roleData || roleData.length === 0) {
       return new Response(JSON.stringify({ error: "Unauthorized: Admin or School only" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // School staff need the messaging module (docs/desc/19-modulos.md); admins are never gated.
+    const isAdmin = roleData.some((r) => r.role === "admin");
+    if (!isAdmin && !(await isSchoolModuleActive(supabaseAdmin, roleData[0].school_id, "messaging"))) {
+      return new Response(JSON.stringify({
+        error: "El módulo de Mensajes Masivos no está activo en este colegio",
+        status: "module_inactive",
+      }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

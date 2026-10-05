@@ -55,5 +55,12 @@ con vista previa (`src/lib/email-preview.ts`). Estas plantillas son las que usa 
 - `src/pages/school/EmailTemplatesList.tsx`, `src/pages/school/EmailTemplateEditor.tsx`
 - `src/lib/email-preview.ts`
 
+## Módulo `messaging`
+- `/utilidades/correo` va envuelta en `<ModuleRoute module="messaging">`.
+- `send-email` responde **403** `{ status: "module_inactive" }` a usuarios `school` cuyo colegio no
+  tiene el módulo. El admin (`/admin/enviar-email`) nunca se bloquea.
+- Las plantillas (`/school/configuraciones/correos`) siguen en Registro: alimentan correos
+  transaccionales (bienvenida, morosidad).
+
 ## Por documentar
 - Proveedor de envío y variables disponibles en plantillas.
