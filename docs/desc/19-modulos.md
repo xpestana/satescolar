@@ -80,7 +80,7 @@ dentro de los módulos activos.
 | 4.2 | Gate Aula Virtual | ✅ (rutas, menú, botones y códigos del representante) |
 | 4.3 | Gate Mensajes Masivos | ✅ (ruta, menú, `send-email` desplegada) |
 | 4.4 | Gate Notas/Boletas/Sábana | ✅ (rutas, menú, pestañas Sábana y Boletas, docente, representante, toggles de bloqueo) |
-| 4.5 | Gate Planillajes del Ministerio | ⏳ |
+| 4.5 | Gate Planillajes del Ministerio | ✅ (pestaña Resumen Final de `/planillas`; Constructor y Configuraciones › Datos comunes siguen gratis) |
 | 4.6 | Gate Pagos | ⏳ |
 | 5 | Endurecimiento: `school_has_module` en las políticas de escritura | ⏳ opcional |
 

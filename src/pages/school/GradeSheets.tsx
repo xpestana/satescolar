@@ -331,6 +331,7 @@ export default function GradeSheets() {
             </TabsTrigger>
             <TabsTrigger value="resumen-final" className="gap-1.5">
               <ClipboardList className="h-3.5 w-3.5" /> Resumen Final
+              <ModuleLockIcon module="ministry_forms" />
             </TabsTrigger>
             <TabsTrigger value="configuraciones" className="gap-1.5">
               <Settings2 className="h-3.5 w-3.5" /> Configuraciones
@@ -489,7 +490,9 @@ export default function GradeSheets() {
           </TabsContent>
 
           <TabsContent value="resumen-final" className="mt-4">
-            <ResumenFinalTab />
+            <ModuleGate module="ministry_forms">
+              <ResumenFinalTab />
+            </ModuleGate>
           </TabsContent>
 
           <TabsContent value="configuraciones" className="mt-4">
