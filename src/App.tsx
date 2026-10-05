@@ -390,14 +390,14 @@ const App = () => (
               <Route path="/representative/estudiante/nuevo" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
               <Route path="/representative/estudiante/:studentId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
               <Route path="/representative/estudiante/:studentId/notas" element={<ProtectedRoute requiredRole="representative"><RepStudentGrades /></ProtectedRoute>} />
-              <Route path="/representative/aula-virtual/:studentId" element={<ProtectedRoute requiredRole="representative"><ChildClassroom /></ProtectedRoute>} />
+              <Route path="/representative/aula-virtual/:studentId" element={<ProtectedRoute requiredRole="representative"><ModuleRoute module="virtual_classroom"><ChildClassroom /></ModuleRoute></ProtectedRoute>} />
               <Route path="/representative/pagos" element={<ProtectedRoute requiredRole="representative"><RepPayments /></ProtectedRoute>} />
               {/* Teacher routes */}
               <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
               <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
               <Route path="/teacher/materias/:assignmentId/notas" element={<ProtectedRoute requiredRole="teacher"><TeacherGrades /></ProtectedRoute>} />
-              <Route path="/teacher/aula-virtual" element={<ProtectedRoute requiredRole="teacher"><ClassroomList /></ProtectedRoute>} />
-              <Route path="/teacher/aula-virtual/:assignmentId" element={<ProtectedRoute requiredRole="teacher"><ClassroomDetail /></ProtectedRoute>} />
+              <Route path="/teacher/aula-virtual" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="virtual_classroom"><ClassroomList /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/teacher/aula-virtual/:assignmentId" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="virtual_classroom"><ClassroomDetail /></ModuleRoute></ProtectedRoute>} />
               <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />
               <Route path="/teacher/asistencias" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="attendance"><TeacherAttendance /></ModuleRoute></ProtectedRoute>} />
               {/* Attendance routes */}
@@ -423,7 +423,7 @@ const App = () => (
               <Route path="/formatos" element={<ProtectedRoute requiredRole="school"><FormatsConfig /></ProtectedRoute>} />
 
               <Route path="/pagos/reportes" element={<Navigate to="/pagos/registro?tab=reportes" replace />} />
-              <Route path="/school/aula-virtual/supervision" element={<ProtectedRoute requiredRole="school"><ClassroomSupervision /></ProtectedRoute>} />
+              <Route path="/school/aula-virtual/supervision" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="virtual_classroom"><ClassroomSupervision /></ModuleRoute></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
               </Routes>

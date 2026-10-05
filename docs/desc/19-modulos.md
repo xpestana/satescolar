@@ -77,7 +77,7 @@ dentro de los módulos activos.
 | 2 | Núcleo frontend: catálogo, `isModuleActive`, `useSchoolModules`, `ModuleGate`, overlay WhatsApp, sidebar | ✅ (aún sin aplicar a rutas) |
 | 3 | Admin: `/admin/colegios/:id/modulos` + iconos en la lista | ✅ |
 | 4.1 | Gate Asistencias | ✅ (rutas, menú, `record-attendance` desplegada) |
-| 4.2 | Gate Aula Virtual | ⏳ |
+| 4.2 | Gate Aula Virtual | ✅ (rutas, menú, botones y códigos del representante) |
 | 4.3 | Gate Mensajes Masivos | ⏳ |
 | 4.4 | Gate Notas/Boletas/Sábana | ⏳ |
 | 4.5 | Gate Planillajes del Ministerio | ⏳ |

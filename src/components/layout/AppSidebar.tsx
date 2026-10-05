@@ -108,7 +108,7 @@ const navSections: NavSection[] = [
       { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school", permission: "attendance.scan", module: "attendance" },
       { label: "Registro de Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school", permission: "attendance.view", module: "attendance" },
       { label: "Dashboard Asistencia", href: "/utilidades/asistencias-dashboard", icon: BarChart2, requiredRole: "school", permission: "attendance.view", module: "attendance" },
-      { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school", permission: "classroom.supervise" },
+      { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school", permission: "classroom.supervise", module: "virtual_classroom" },
     ],
   },
   {
@@ -186,7 +186,7 @@ const navSections: NavSection[] = [
     requiredRole: "teacher",
     items: [
       { label: "Áreas", href: "/teacher/materias", icon: BookOpen, requiredRole: "teacher" },
-      { label: "Aula Virtual", href: "/teacher/aula-virtual", icon: GraduationCap, requiredRole: "teacher" },
+      { label: "Aula Virtual", href: "/teacher/aula-virtual", icon: GraduationCap, requiredRole: "teacher", module: "virtual_classroom" },
       { label: "Carnet", href: "/teacher/carnet", icon: CreditCard, requiredRole: "teacher" },
       { label: "Asistencias", href: "/teacher/asistencias", icon: ClipboardList, requiredRole: "teacher", module: "attendance" },
     ],

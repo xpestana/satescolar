@@ -10,11 +10,14 @@ import { Users, GraduationCap, AlertCircle, School, BookOpen, Key, Copy, Clipboa
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
+import { useSchoolModules } from "@/hooks/useSchoolModules";
 import { toast } from "sonner";
 
 export default function RepresentativeDashboard() {
   const navigate = useNavigate();
   const { familyId, familyName, schoolId } = useRepresentativeFamily();
+  const { isActive: isModuleActive } = useSchoolModules();
+  const hasClassroom = isModuleActive("virtual_classroom");
 
   const { data: schoolYear } = useQuery({
     queryKey: ["active-school-year-rep-dash", schoolId],
@@ -69,7 +72,7 @@ export default function RepresentativeDashboard() {
         .eq("is_active", true);
       return data || [];
     },
-    enabled: !!familyId && students.length > 0,
+    enabled: !!familyId && students.length > 0 && hasClassroom,
   });
 
   const { data: enrolledCount = 0 } = useQuery({
@@ -270,7 +273,7 @@ export default function RepresentativeDashboard() {
                       </Badge>
                     </div>
                   </div>
-                  {getAccessCode(student.id) && (
+                  {hasClassroom && getAccessCode(student.id) && (
                     <div className="flex items-center gap-2 mb-3 p-2 bg-muted/50 rounded-md">
                       <Key className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                       <span className="text-xs text-muted-foreground">Código Aula:</span>
@@ -280,18 +283,22 @@ export default function RepresentativeDashboard() {
                       </Button>
                     </div>
                   )}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex gap-2">
+                    {hasClassroom && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => navigate(`/representative/aula-virtual/${student.id}`)}
+                      >
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Aula Virtual
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => navigate(`/representative/aula-virtual/${student.id}`)}
-                    >
-                      <BookOpen className="h-4 w-4 mr-2" />
-                      Aula Virtual
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                      className="flex-1"
                       onClick={() => navigate(`/representative/estudiante/${student.id}/notas`)}
                     >
                       <ClipboardList className="h-4 w-4 mr-2" />

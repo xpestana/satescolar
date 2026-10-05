@@ -73,5 +73,12 @@ columna `assignment_id`, no las filas de contenido. Mismo patrón que "Mis Área
 - `src/components/classroom/CommentsAndReactions.tsx`
 - `src/components/classroom/...`
 
+## Módulo `virtual_classroom`
+- Las rutas de docente (`/teacher/aula-virtual`, `/:assignmentId`), representante
+  (`/representative/aula-virtual/:studentId`) y supervisión (`/school/aula-virtual/supervision`) van
+  envueltas en `<ModuleRoute module="virtual_classroom">`.
+- Si el módulo está inactivo, el representante no ve el botón "Aula Virtual", el "Código Aula" ni
+  el tutorial de acceso (en el dashboard y en Mis Estudiantes).
+
 ## Por documentar
 - Modelo de contenidos del aula y relación con notas/asistencias.
