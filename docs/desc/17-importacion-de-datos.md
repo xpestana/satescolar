@@ -2,6 +2,8 @@
 
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
+>
+> 📦 **Módulo:** Registro (gratis); la importación de calificaciones es de `grades`. Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Herramientas del administrador para carga masiva de datos (registros y calificaciones) y

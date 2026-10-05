@@ -2,6 +2,8 @@
 
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
+>
+> 📦 **Módulo:** Registro (gratis). Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Buscador transversal del colegio para localizar familias, estudiantes, docentes, etc.,

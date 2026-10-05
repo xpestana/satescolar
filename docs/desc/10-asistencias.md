@@ -2,6 +2,8 @@
 
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
+>
+> 📦 **Módulo:** `attendance` (Control de Asistencias). Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Registro y consulta de asistencia de estudiantes, con escaneo por código QR (carnet),

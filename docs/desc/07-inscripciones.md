@@ -2,6 +2,8 @@
 
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
+>
+> 📦 **Módulo:** Registro (gratis); la asignación de plan de pago requiere `payments`. Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Proceso de inscripción de estudiantes al colegio (matrícula por año escolar/sección).

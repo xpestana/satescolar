@@ -61,6 +61,9 @@ Ver [`02-usuarios-y-permisos.md`](02-usuarios-y-permisos.md).
 - **Dinero en VES:** el estado de cuenta se calcula sobre `student_concept_balances`
   (no sobre `payments`); conversión con `bcv_rates`. Ver [12-pagos](12-pagos.md).
 
+- **Módulos por colegio:** además de rol y permisos, cada funcionalidad pertenece a un módulo
+  que el admin habilita por colegio (`school_modules`). Ver [19-modulos](19-modulos.md).
+
 ## Backend (Edge Functions)
 
 La lógica de servidor vive en `supabase/functions/` (Deno). Cada archivo de tema lista en
@@ -95,3 +98,4 @@ La lógica de servidor vive en `supabase/functions/` (Deno). Cada archivo de tem
 | 16 | [16-busqueda-avanzada.md](16-busqueda-avanzada.md) | Búsqueda avanzada |
 | 17 | [17-importacion-de-datos.md](17-importacion-de-datos.md) | Importación de datos |
 | 18 | [18-dashboards.md](18-dashboards.md) | Dashboards por rol |
+| 19 | [19-modulos.md](19-modulos.md) | Módulos habilitables por colegio (venta por módulos) |

@@ -2,6 +2,8 @@
 
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
+>
+> 📦 **Módulo:** `virtual_classroom` (Aula Virtual). Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Espacio del docente para gestionar su aula: contenidos, comentarios/reacciones, carga de

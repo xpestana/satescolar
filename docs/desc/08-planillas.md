@@ -2,6 +2,8 @@
 
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
+>
+> 📦 **Módulo:** mixto. Planilla de inscripción, constructor y Datos comunes: Registro. Sábana: `grades`. Resumen Final y códigos/RFRE: `ministry_forms`. Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Generación y configuración de planillas (formatos de datos/listados) del colegio.

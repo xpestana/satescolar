@@ -45,6 +45,9 @@ Para el rol `school` existe además un sistema de **permisos granulares** por pe
 - Un `school` **owner** ve todo; un sub-usuario solo ve ítems cuyos `permission_key` tenga.
 - Los permisos admiten **scope** por `grade_levels` y `school_year_ids` (`hasInScope`).
 
+- Además de rol y permisos, cada sección pertenece a un **módulo** que debe estar activo en el
+  colegio (aplica también al owner). Ver [19-modulos](19-modulos.md).
+
 ## Archivos clave (código)
 - `src/hooks/useAuth.tsx`
 - `src/hooks/usePermissions.ts`

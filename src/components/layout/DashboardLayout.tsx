@@ -7,6 +7,8 @@ import { useSidebarState } from "@/hooks/useSidebarState";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { PageLoadingSkeleton } from "@/components/ui/loading-skeletons";
 import { SIDEBAR_WIDTH } from "@/lib/layout-constants";
+import { ModuleGate } from "@/components/modules/ModuleGate";
+import { useRouteModule } from "@/components/modules/RouteModuleContext";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -28,6 +30,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { collapsed } = useSidebarState();
   const isMobile = useIsMobile();
+  const routeModule = useRouteModule();
 
   // Sticky user: keep the last known user so a transient null during a
   // Supabase token-refresh cycle doesn't unmount children and destroy forms.
@@ -66,7 +69,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         style={{ paddingRight: reserveSidebar ? SIDEBAR_WIDTH : 0 }}
       >
         <main className="h-screen overflow-y-auto pt-16 px-4 pb-6 md:px-6">
-          {children}
+          {routeModule ? <ModuleGate module={routeModule}>{children}</ModuleGate> : children}
         </main>
       </div>
     </div>

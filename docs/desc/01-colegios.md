@@ -33,5 +33,9 @@ Gestión de los colegios (tenants) de la plataforma por parte del administrador 
 ## Archivos clave (código)
 > ⏳ Por documentar (`src/pages/admin/...`).
 
+## Módulos del colegio
+Cada colegio tiene módulos habilitables (on/off + vencimiento) que gestiona el admin.
+Ver [19-modulos](19-modulos.md).
+
 ## Por documentar
 - Estructura de datos del colegio y multi-tenant.

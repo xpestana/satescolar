@@ -4450,6 +4450,44 @@ export type Database = {
           },
         ]
       }
+      school_modules: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          expires_at: string | null
+          module_key: string
+          school_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          expires_at?: string | null
+          module_key: string
+          school_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          expires_at?: string | null
+          module_key?: string
+          school_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_modules_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_payment_methods: {
         Row: {
           config: Json
@@ -5512,6 +5550,10 @@ export type Database = {
           _student_id: string
         }
         Returns: undefined
+      }
+      school_has_module: {
+        Args: { _module: string; _school_id: string }
+        Returns: boolean
       }
       sign: {
         Args: { algorithm?: string; payload: Json; secret: string }

@@ -36,7 +36,9 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { useRepresentativeFamily } from "@/hooks/useRepresentativeFamily";
 import { useSidebarState } from "@/hooks/useSidebarState";
 import { usePermissions } from "@/hooks/usePermissions";
-import { ShieldCheck, Receipt, ReceiptText } from "lucide-react";
+import { ShieldCheck, Receipt, ReceiptText, Lock } from "lucide-react";
+import { useSchoolModules } from "@/hooks/useSchoolModules";
+import type { ModuleKey } from "@/lib/modules/moduleCatalog";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -50,6 +52,8 @@ interface NavItem {
   requiredRole?: "admin" | "school" | "representative" | "teacher";
   permission?: string; // si está y el school user no es owner ni lo tiene, se oculta
   ownerOnly?: boolean;
+  /** Module the item belongs to: locked (🔒) for school staff, hidden for other roles when inactive. */
+  module?: ModuleKey;
 }
 
 interface NavSection {
@@ -195,6 +199,8 @@ export function AppSidebar() {
   const { school } = useSchoolData();
   const { familyName } = useRepresentativeFamily();
   const { isOwner, has, loading: permLoading } = usePermissions();
+  const { isActive: isModuleActive, isLoading: modulesLoading } = useSchoolModules();
+  const isItemLocked = (item: NavItem) => !!item.module && !modulesLoading && !isModuleActive(item.module);
 
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const isMobile = useIsMobile();
@@ -267,6 +273,8 @@ export function AppSidebar() {
 
             const filterByPermission = (item: NavItem) => {
               if (item.requiredRole && item.requiredRole !== userRole) return false;
+              // Modules apply to everyone (owners included); only school staff see locked items.
+              if (isItemLocked(item) && userRole !== "school") return false;
               if (userRole !== "school") return true;
               if (permLoading) return true;
               if (item.ownerOnly) return isOwner;
@@ -312,6 +320,9 @@ export function AppSidebar() {
                       >
                         <Icon className="h-4 w-4 flex-shrink-0" />
                         <span className="leading-tight line-clamp-2" style={{ fontSize: "14.5px" }}>{item.label}</span>
+                        {isItemLocked(item) && (
+                          <Lock className="ml-auto h-3 w-3 flex-shrink-0 text-muted-foreground" aria-label="Módulo no activo" />
+                        )}
                       </Link>
                     );
                   })}

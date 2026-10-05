@@ -2,6 +2,8 @@
 
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
+>
+> 📦 **Módulo:** `grades` (Notas, Boletas y Sábana). Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Carga, consulta e impresión de notas/calificaciones y generación de boletas.
