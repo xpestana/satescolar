@@ -81,7 +81,7 @@ dentro de los módulos activos.
 | 4.3 | Gate Mensajes Masivos | ✅ (ruta, menú, `send-email` desplegada) |
 | 4.4 | Gate Notas/Boletas/Sábana | ✅ (rutas, menú, pestañas Sábana y Boletas, docente, representante, toggles de bloqueo) |
 | 4.5 | Gate Planillajes del Ministerio | ✅ (pestaña Resumen Final de `/planillas`; Constructor y Configuraciones › Datos comunes siguen gratis) |
-| 4.6 | Gate Pagos | ✅ código (rutas `/pagos/*` y `/representative/pagos`, menú, pestaña Facturas, banner de morosidad, plan de pago al inscribir, funciones `send-delinquency-reminders` y `send-payroll-*`). ⚠️ Funciones **pendientes de desplegar** |
+| 4.6 | Gate Pagos | ✅ (rutas `/pagos/*` y `/representative/pagos`, menú, pestaña Facturas, banner de morosidad, plan de pago al inscribir, funciones `send-delinquency-reminders` y `send-payroll-*` desplegadas 2026-10-05) |
 | 5 | Endurecimiento: `school_has_module` en las políticas de escritura | ⏳ opcional |
 
 > ⚠️ Hasta la fase 5, el bloqueo es solo de interfaz más Edge Functions. El overlay renderiza la
