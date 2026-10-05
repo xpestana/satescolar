@@ -1,5 +1,6 @@
 import { buildDelinquencyEmailHtml, resolveSnippets, wrapWithEmailLayout } from "../_shared/email-templates.ts";
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,6 +47,12 @@ export default async function handler(req: Request): Promise<Response> {
       // daily: always send
 
       const schoolId = config.school_id;
+
+      // Reminders are part of the payments module (docs/desc/19-modulos.md).
+      if (!(await isSchoolModuleActive(supabaseAdmin, schoolId, "payments"))) {
+        console.log(`[send-delinquency-reminders] school ${schoolId} skipped: payments module inactive`);
+        continue;
+      }
 
       // Get active school year
       const { data: activeYear } = await supabaseAdmin

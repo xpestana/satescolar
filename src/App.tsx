@@ -397,7 +397,7 @@ const App = () => (
               <Route path="/representative/estudiante/:studentId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
               <Route path="/representative/estudiante/:studentId/notas" element={<ProtectedRoute requiredRole="representative"><ModuleRoute module="grades"><RepStudentGrades /></ModuleRoute></ProtectedRoute>} />
               <Route path="/representative/aula-virtual/:studentId" element={<ProtectedRoute requiredRole="representative"><ModuleRoute module="virtual_classroom"><ChildClassroom /></ModuleRoute></ProtectedRoute>} />
-              <Route path="/representative/pagos" element={<ProtectedRoute requiredRole="representative"><RepPayments /></ProtectedRoute>} />
+              <Route path="/representative/pagos" element={<ProtectedRoute requiredRole="representative"><ModuleRoute module="payments"><RepPayments /></ModuleRoute></ProtectedRoute>} />
               {/* Teacher routes */}
               <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
               <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
@@ -413,19 +413,19 @@ const App = () => (
               <Route path="/utilidades/asistencias" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="attendance"><AttendanceList /></ModuleRoute></ProtectedRoute>} />
               <Route path="/utilidades/asistencias-dashboard" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="attendance"><AttendanceDashboard /></ModuleRoute></ProtectedRoute>} />
               {/* Payment routes */}
-              <Route path="/pagos" element={<ProtectedRoute requiredRole="school"><PaymentDashboard /></ProtectedRoute>} />
-              <Route path="/pagos/configuracion" element={<ProtectedRoute requiredRole="school"><PaymentConfig /></ProtectedRoute>} />
-              <Route path="/pagos/registro" element={<ProtectedRoute requiredRole="school"><PaymentRegistration /></ProtectedRoute>} />
-              <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><StudentLedger /></ProtectedRoute>} />
-              <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><DelinquentStudents /></ProtectedRoute>} />
-              <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><DelinquencyConfig /></ProtectedRoute>} />
-              <Route path="/pagos/ingresos" element={<ProtectedRoute requiredRole="school"><IncomesReport /></ProtectedRoute>} />
-              <Route path="/pagos/reporte" element={<ProtectedRoute requiredRole="school"><PaymentsReport /></ProtectedRoute>} />
+              <Route path="/pagos" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PaymentDashboard /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/configuracion" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PaymentConfig /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/registro" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PaymentRegistration /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/estado-cuenta" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><StudentLedger /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/morosos" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><DelinquentStudents /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/morosidad" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><DelinquencyConfig /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/ingresos" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><IncomesReport /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/reporte" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PaymentsReport /></ModuleRoute></ProtectedRoute>} />
               {/* Payroll (Pagos de Nóminas) routes */}
-              <Route path="/pagos/nomina" element={<ProtectedRoute requiredRole="school"><PayrollDashboard /></ProtectedRoute>} />
-              <Route path="/pagos/nomina/registro" element={<ProtectedRoute requiredRole="school"><PayrollRegistration /></ProtectedRoute>} />
-              <Route path="/pagos/nomina/beneficiarios" element={<ProtectedRoute requiredRole="school"><PayrollBeneficiaries /></ProtectedRoute>} />
-              <Route path="/pagos/nomina/configuracion" element={<ProtectedRoute requiredRole="school"><PayrollConfig /></ProtectedRoute>} />
+              <Route path="/pagos/nomina" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollDashboard /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/nomina/registro" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollRegistration /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/nomina/beneficiarios" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollBeneficiaries /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/nomina/configuracion" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollConfig /></ModuleRoute></ProtectedRoute>} />
               <Route path="/formatos" element={<ProtectedRoute requiredRole="school"><FormatsConfig /></ProtectedRoute>} />
 
               <Route path="/pagos/reportes" element={<Navigate to="/pagos/registro?tab=reportes" replace />} />

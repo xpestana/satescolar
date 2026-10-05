@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useSchoolModules } from "@/hooks/useSchoolModules";
 import { supabase } from "@/integrations/supabase/client";
 import { isEffectivelyRequired } from "@/lib/protected-fields";
 
@@ -103,6 +104,9 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
   const [enrollmentDate, setEnrollmentDate] = useState(new Date().toISOString().split("T")[0]);
   const [observations, setObservations] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState("none");
+  // Assigning a payment plan belongs to the payments module (docs/desc/19-modulos.md).
+  const { isActive: isModuleActive } = useSchoolModules();
+  const hasPayments = isModuleActive("payments");
 
   // Grado actual y siguiente — computados aquí para usarlos en los effects
   const studentGradeKey = (() => {
@@ -143,7 +147,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       if (error) throw error;
       return data || [];
     },
-    enabled: !!schoolId && open,
+    enabled: !!schoolId && open && hasPayments,
   });
 
   // Plan actual del estudiante (si ya tiene uno asignado este año)
@@ -161,7 +165,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       if (error) throw error;
       return data?.[0] || null;
     },
-    enabled: !!student.id && !!activeYear.id && !!schoolId && open,
+    enabled: !!student.id && !!activeYear.id && !!schoolId && open && hasPayments,
   });
 
   // Pre-populate form when existing enrollment loads
@@ -324,7 +328,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
       }
 
       // Asignación opcional de plan de pago ("none" = dejar sin plan por ahora)
-      if (selectedPlanId && selectedPlanId !== "none") {
+      if (hasPayments && selectedPlanId && selectedPlanId !== "none") {
         if (currentPlan) {
           if (currentPlan.plan_id !== selectedPlanId) {
             const { error: planErr } = await supabase
@@ -533,20 +537,22 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
             </Select>
           </div>
 
-          <div>
-            <Label className="text-sm font-medium">Plan de Pago</Label>
-            <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Sin plan por ahora..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin plan por ahora</SelectItem>
-                {availablePlans.map((p: any) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {hasPayments && (
+            <div>
+              <Label className="text-sm font-medium">Plan de Pago</Label>
+              <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Sin plan por ahora..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin plan por ahora</SelectItem>
+                  {availablePlans.map((p: any) => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {hasObservationsSection && (

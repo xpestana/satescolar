@@ -1,4 +1,5 @@
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 import {
   asciiSubject,
   buildMonthlyReportHtml,
@@ -193,6 +194,11 @@ export default async function handler(req: Request): Promise<Response> {
     const results: Record<string, string> = {};
     for (const schoolId of schoolIds) {
       try {
+        // Payroll is part of the payments module (docs/desc/19-modulos.md).
+        if (!(await isSchoolModuleActive(admin, schoolId, "payments"))) {
+          results[schoolId] = "module-inactive";
+          continue;
+        }
         const r = await reportForSchool(admin, schoolId, startDate, endDate, monthLabel);
         if (r.emailed) emailsSent++;
         results[schoolId] = r.emailed ? "sent" : (r.reason ?? "skipped");

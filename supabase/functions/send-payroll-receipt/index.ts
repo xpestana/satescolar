@@ -1,4 +1,5 @@
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 import {
   asciiSubject,
   buildReceiptHtml,
@@ -88,6 +89,12 @@ export default async function handler(req: Request): Promise<Response> {
       (r: any) => r.role === "admin" || r.school_id === payment.school_id
     );
     if (!allowed) return json({ error: "No autorizado" }, 403);
+
+    // Payroll is part of the payments module (docs/desc/19-modulos.md); admins are never gated.
+    const isAdmin = (roles ?? []).some((r: any) => r.role === "admin");
+    if (!isAdmin && !(await isSchoolModuleActive(admin, payment.school_id, "payments"))) {
+      return json({ error: "El módulo de Pagos no está activo en este colegio", status: "module_inactive" }, 403);
+    }
 
     const beneficiary = payment.payroll_beneficiaries;
     const to = beneficiary?.email?.trim();

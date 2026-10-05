@@ -19,6 +19,7 @@ export default function RepresentativeDashboard() {
   const { isActive: isModuleActive } = useSchoolModules();
   const hasClassroom = isModuleActive("virtual_classroom");
   const hasGrades = isModuleActive("grades");
+  const hasPayments = isModuleActive("payments");
 
   const { data: schoolYear } = useQuery({
     queryKey: ["active-school-year-rep-dash", schoolId],
@@ -105,7 +106,7 @@ export default function RepresentativeDashboard() {
       if (error) throw error;
       return (data as any[]) || [];
     },
-    enabled: !!familyId && !!schoolId && !!schoolYear?.id && students.length > 0,
+    enabled: !!familyId && !!schoolId && !!schoolYear?.id && students.length > 0 && hasPayments,
   });
 
   const getAccessCode = (studentId: string) => accessCodes.find((c) => c.student_id === studentId);
@@ -193,7 +194,7 @@ export default function RepresentativeDashboard() {
       </Alert>
 
       {/* Pending fees alert */}
-      {delinquentBalances.length > 0 && (
+      {hasPayments && delinquentBalances.length > 0 && (
         <Alert className="border-amber-300 bg-amber-50 mb-6 cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate("/representative/pagos")}>
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <AlertDescription className="text-amber-800 flex items-center justify-between w-full">

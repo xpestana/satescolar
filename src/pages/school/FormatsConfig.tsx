@@ -23,6 +23,7 @@ export default function FormatsConfig() {
           <TabsTrigger value="facturas" className="gap-2">
             <Receipt className="h-4 w-4" />
             Formato de Facturas
+            <ModuleLockIcon module="payments" />
           </TabsTrigger>
           <TabsTrigger value="boletas" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -32,7 +33,9 @@ export default function FormatsConfig() {
         </TabsList>
 
         <TabsContent value="facturas">
-          <InvoiceFormatTab />
+          <ModuleGate module="payments">
+            <InvoiceFormatTab />
+          </ModuleGate>
         </TabsContent>
 
         <TabsContent value="boletas">
