@@ -36,6 +36,7 @@ import { Eye, Users, UserPlus, Info, Trash2, GraduationCap, UserCheck, KeyRound,
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import { useSchoolModules } from "@/hooks/useSchoolModules";
 import { useToast } from "@/hooks/use-toast";
 import { AddFamilyModal } from "@/components/families/AddFamilyModal";
 import { ViewFamilyModal } from "@/components/families/ViewFamilyModal";
@@ -87,6 +88,8 @@ export default function FamiliesList() {
   const [resendDialogOpen, setResendDialogOpen] = useState(false);
   const [resendFamily, setResendFamily] = useState<FamilyWithEmail | null>(null);
   const [gradeAccessFamily, setGradeAccessFamily] = useState<FamilyWithEmail | null>(null);
+  const { isActive: isModuleActive } = useSchoolModules();
+  const hasGrades = isModuleActive("grades");
 
   // Global counters - independent of search/pagination
   const { data: globalCounts } = useQuery({
@@ -529,7 +532,7 @@ export default function FamiliesList() {
                             </TooltipTrigger>
                             <TooltipContent>Reenviar correo de bienvenida</TooltipContent>
                           </Tooltip>
-                          {family.studentsCount > 0 && (
+                          {family.studentsCount > 0 && hasGrades && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button

@@ -292,9 +292,11 @@ export default function StudentsList() {
                         <BookOpen className="h-3 w-3 mr-1" /> Aula Virtual
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/representative/estudiante/${student.id}/notas`)}>
-                      <ClipboardList className="h-3 w-3 mr-1" /> Notas y Boletas
-                    </Button>
+                    {isModuleActive("grades") && (
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/representative/estudiante/${student.id}/notas`)}>
+                        <ClipboardList className="h-3 w-3 mr-1" /> Notas y Boletas
+                      </Button>
+                    )}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button size="sm" variant="outline">

@@ -168,7 +168,9 @@ const App = () => (
                 path="/school/configuraciones/ajustes-notas"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <GradesSettings />
+                    <ModuleRoute module="grades">
+                      <GradesSettings />
+                    </ModuleRoute>
                   </ProtectedRoute>
                 }
               />
@@ -176,7 +178,9 @@ const App = () => (
                 path="/notas/consulta"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <GradesConsultation />
+                    <ModuleRoute module="grades">
+                      <GradesConsultation />
+                    </ModuleRoute>
                   </ProtectedRoute>
                 }
               />
@@ -391,13 +395,13 @@ const App = () => (
               <Route path="/representative/representante/:representativeId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddRepresentative /></ProtectedRoute>} />
               <Route path="/representative/estudiante/nuevo" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
               <Route path="/representative/estudiante/:studentId/editar" element={<ProtectedRoute requiredRole="representative"><RepAddStudent /></ProtectedRoute>} />
-              <Route path="/representative/estudiante/:studentId/notas" element={<ProtectedRoute requiredRole="representative"><RepStudentGrades /></ProtectedRoute>} />
+              <Route path="/representative/estudiante/:studentId/notas" element={<ProtectedRoute requiredRole="representative"><ModuleRoute module="grades"><RepStudentGrades /></ModuleRoute></ProtectedRoute>} />
               <Route path="/representative/aula-virtual/:studentId" element={<ProtectedRoute requiredRole="representative"><ModuleRoute module="virtual_classroom"><ChildClassroom /></ModuleRoute></ProtectedRoute>} />
               <Route path="/representative/pagos" element={<ProtectedRoute requiredRole="representative"><RepPayments /></ProtectedRoute>} />
               {/* Teacher routes */}
               <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
               <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
-              <Route path="/teacher/materias/:assignmentId/notas" element={<ProtectedRoute requiredRole="teacher"><TeacherGrades /></ProtectedRoute>} />
+              <Route path="/teacher/materias/:assignmentId/notas" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="grades"><TeacherGrades /></ModuleRoute></ProtectedRoute>} />
               <Route path="/teacher/aula-virtual" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="virtual_classroom"><ClassroomList /></ModuleRoute></ProtectedRoute>} />
               <Route path="/teacher/aula-virtual/:assignmentId" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="virtual_classroom"><ClassroomDetail /></ModuleRoute></ProtectedRoute>} />
               <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />

@@ -13,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useSchoolModules } from "@/hooks/useSchoolModules";
 
 /**
  * Blocks / unblocks the representative's access to the grades and boleta of one student.
@@ -41,6 +42,10 @@ export default function StudentGradeAccessToggle({
   variant = "icon",
 }: StudentGradeAccessToggleProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const { isActive: isModuleActive } = useSchoolModules();
+
+  // Grade access only makes sense when the school has the grades module.
+  if (!isModuleActive("grades")) return null;
 
   const request = (nextBlocked: boolean) => {
     // Only blocking needs a confirmation; restoring access is harmless.

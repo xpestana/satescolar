@@ -122,7 +122,7 @@ const navSections: NavSection[] = [
     title: "Notas y Boletas",
     requiredRole: "school",
     items: [
-      { label: "Notas y Boletas", href: "/notas/consulta", icon: Search, requiredRole: "school", permission: "grades.view" },
+      { label: "Notas y Boletas", href: "/notas/consulta", icon: Search, requiredRole: "school", permission: "grades.view", module: "grades" },
     ],
   },
   {
@@ -148,7 +148,7 @@ const navSections: NavSection[] = [
       { label: "Años y Secciones", href: "/school/configuraciones/anos-secciones", icon: SlidersHorizontal, requiredRole: "school", permission: "settings.school" },
       { label: "Formularios", href: "/school/configuraciones/formularios", icon: FileText, requiredRole: "school", permission: "forms.config" },
       { label: "Planillas", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school", permission: "planillas.config" },
-      { label: "Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school", permission: "settings.school" },
+      { label: "Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school", permission: "settings.school", module: "grades" },
       { label: "Carnet", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school", permission: "settings.school" },
       { label: "Templates de Correo", href: "/school/configuraciones/correos", icon: Mail, requiredRole: "school", permission: "settings.school" },
       { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school", permission: "payments.config" },

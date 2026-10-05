@@ -79,7 +79,7 @@ dentro de los módulos activos.
 | 4.1 | Gate Asistencias | ✅ (rutas, menú, `record-attendance` desplegada) |
 | 4.2 | Gate Aula Virtual | ✅ (rutas, menú, botones y códigos del representante) |
 | 4.3 | Gate Mensajes Masivos | ✅ (ruta, menú, `send-email` desplegada) |
-| 4.4 | Gate Notas/Boletas/Sábana | ⏳ |
+| 4.4 | Gate Notas/Boletas/Sábana | ✅ (rutas, menú, pestañas Sábana y Boletas, docente, representante, toggles de bloqueo) |
 | 4.5 | Gate Planillajes del Ministerio | ⏳ |
 | 4.6 | Gate Pagos | ⏳ |
 | 5 | Endurecimiento: `school_has_module` en las políticas de escritura | ⏳ opcional |
@@ -93,7 +93,10 @@ dentro de los módulos activos.
   contexto y aplica `ModuleGate` solo al `<main>`, de modo que el sidebar y la barra superior
   quedan nítidos.
 - **Pestaña o bloque dentro de una página:** envolver el contenido con
-  `<ModuleGate module="grades">`.
+  `<ModuleGate module="grades">` y poner `<ModuleLockIcon module="grades" />` en su
+  `TabsTrigger` (ejemplo: Sábana en `GradeSheets.tsx`, Boletas en `FormatsConfig.tsx`).
+- **Botón o acción suelta:** ocultarla con `isActive(key)`. Por ejemplo, el docente sin `grades`
+  ve sus áreas sin plan ni "Registrar Notas", y `StudentGradeAccessToggle` no se renderiza.
 - **Menú:** agregar `module: "payments"` al ítem de `AppSidebar.tsx`. Si el módulo está
   inactivo, el personal del colegio lo ve con 🔒 y a los demás roles se les oculta.
 - En la lógica, usar `useSchoolModules().isActive(key)`. Para el admin siempre da true.
@@ -105,7 +108,7 @@ dentro de los módulos activos.
 - `src/lib/modules/salesContact.ts`: WhatsApp de ventas y mensaje prellenado (con test).
 - `src/hooks/useCurrentSchoolId.ts` (colegio según el rol) y `src/hooks/useSchoolModules.ts`.
 - `src/components/modules/`: `ModuleRoute`, `RouteModuleContext`, `ModuleGate` (con test),
-  `LockedModuleOverlay`, `moduleIcons`.
+  `LockedModuleOverlay`, `ModuleLockIcon`, `moduleIcons`.
 - Admin: `src/pages/admin/SchoolModules.tsx`, `src/components/admin/SchoolModuleRow.tsx`,
   `src/components/admin/SchoolModulesIcons.tsx`, `src/hooks/useSchoolModulesAdmin.ts`,
   `src/hooks/useAllSchoolModules.ts`, `src/lib/modules/moduleExpiry.ts` (con test).

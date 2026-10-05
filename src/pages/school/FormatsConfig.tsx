@@ -4,6 +4,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Receipt, FileText } from "lucide-react";
 import { InvoiceFormatTab } from "@/components/payments/InvoiceFormatTab";
 import { BolletasFormatTab } from "@/components/grades/BolletasFormatTab";
+import { ModuleGate } from "@/components/modules/ModuleGate";
+import { ModuleLockIcon } from "@/components/modules/ModuleLockIcon";
 
 export default function FormatsConfig() {
   return (
@@ -25,6 +27,7 @@ export default function FormatsConfig() {
           <TabsTrigger value="boletas" className="gap-2">
             <FileText className="h-4 w-4" />
             Formato de Boletas
+            <ModuleLockIcon module="grades" />
           </TabsTrigger>
         </TabsList>
 
@@ -33,7 +36,9 @@ export default function FormatsConfig() {
         </TabsContent>
 
         <TabsContent value="boletas">
-          <BolletasFormatTab />
+          <ModuleGate module="grades">
+            <BolletasFormatTab />
+          </ModuleGate>
         </TabsContent>
       </Tabs>
     </DashboardLayout>

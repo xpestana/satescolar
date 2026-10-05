@@ -18,6 +18,7 @@ export default function RepresentativeDashboard() {
   const { familyId, familyName, schoolId } = useRepresentativeFamily();
   const { isActive: isModuleActive } = useSchoolModules();
   const hasClassroom = isModuleActive("virtual_classroom");
+  const hasGrades = isModuleActive("grades");
 
   const { data: schoolYear } = useQuery({
     queryKey: ["active-school-year-rep-dash", schoolId],
@@ -295,15 +296,17 @@ export default function RepresentativeDashboard() {
                         Aula Virtual
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => navigate(`/representative/estudiante/${student.id}/notas`)}
-                    >
-                      <ClipboardList className="h-4 w-4 mr-2" />
-                      Notas
-                    </Button>
+                    {hasGrades && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => navigate(`/representative/estudiante/${student.id}/notas`)}
+                      >
+                        <ClipboardList className="h-4 w-4 mr-2" />
+                        Notas
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

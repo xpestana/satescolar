@@ -20,6 +20,7 @@ import {
 import { BookOpen, CheckCircle2, AlertCircle, FileEdit, History } from "lucide-react";
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 import { GRADE_LABELS, SECONDARY_GRADES } from "@/lib/gradeLevels";
+import { useSchoolModules } from "@/hooks/useSchoolModules";
 
 /**
  * "Mis Áreas" of the teacher.
@@ -66,6 +67,9 @@ export default function TeacherSubjects() {
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null);
   const [currentMomento, setCurrentMomento] = useState<number>(1);
   const [selectedYearId, setSelectedYearId] = useState<string>("");
+  // Plans and grade entry belong to the grades module; without it the teacher only sees their áreas.
+  const { isActive: isModuleActive } = useSchoolModules();
+  const hasGrades = isModuleActive("grades");
 
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
     queryKey: ["teacher-subjects", teacher?.id],
@@ -260,28 +264,34 @@ export default function TeacherSubjects() {
               </Select>
             </div>
 
-            <div className="flex items-center rounded-lg border bg-muted/40 p-0.5">
-              {[1, 2, 3].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setCurrentMomento(m)}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                    currentMomento === m
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Momento {m}
-                </button>
-              ))}
-            </div>
+            {hasGrades && (
+              <div className="flex items-center rounded-lg border bg-muted/40 p-0.5">
+                {[1, 2, 3].map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setCurrentMomento(m)}
+                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      currentMomento === m
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Momento {m}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {selectedYear && (
             <p className="text-sm text-muted-foreground">
               {selectedYear.total} área{selectedYear.total === 1 ? "" : "s"} en{" "}
-              {selectedYear.yearRange} · {selectedYear.withPlan} con plan ·{" "}
-              {selectedYear.withGrades} con notas cargadas
+              {selectedYear.yearRange}
+              {hasGrades && (
+                <>
+                  {" "}· {selectedYear.withPlan} con plan · {selectedYear.withGrades} con notas cargadas
+                </>
+              )}
             </p>
           )}
 
@@ -318,34 +328,36 @@ export default function TeacherSubjects() {
                         </div>
                         <BookOpen className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                       </div>
-                      <div className="flex flex-col gap-2 mt-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => setSelectedAssignment(a)}
-                        >
-                          {hasPlan ? (
-                            <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
-                          ) : (
-                            <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
-                          )}
-                          {planLabel}
-                        </Button>
-                        {hasPlan && (
+                      {hasGrades && (
+                        <div className="flex flex-col gap-2 mt-3">
                           <Button
-                            variant="default"
+                            variant="outline"
                             size="sm"
                             className="w-full"
-                            onClick={() =>
-                              navigate(`/teacher/materias/${a.id}/notas?momento=${currentMomento}`)
-                            }
+                            onClick={() => setSelectedAssignment(a)}
                           >
-                            <FileEdit className="h-4 w-4 mr-2" />
-                            Registrar Notas
+                            {hasPlan ? (
+                              <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                            )}
+                            {planLabel}
                           </Button>
-                        )}
-                      </div>
+                          {hasPlan && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="w-full"
+                              onClick={() =>
+                                navigate(`/teacher/materias/${a.id}/notas?momento=${currentMomento}`)
+                              }
+                            >
+                              <FileEdit className="h-4 w-4 mr-2" />
+                              Registrar Notas
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -383,12 +395,16 @@ export default function TeacherSubjects() {
                       <Badge variant="outline" className="text-xs">
                         {y.total} área{y.total === 1 ? "" : "s"}
                       </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {y.withPlan} con plan
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {y.withGrades} con notas
-                      </Badge>
+                      {hasGrades && (
+                        <>
+                          <Badge variant="outline" className="text-xs">
+                            {y.withPlan} con plan
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {y.withGrades} con notas
+                          </Badge>
+                        </>
+                      )}
                     </div>
                   </button>
                 ))}

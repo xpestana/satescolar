@@ -22,6 +22,8 @@ import { SabanaPreview } from "@/components/planillas/sabana/SabanaPreview";
 import { generateSabanaPdf, SECONDARY_GRADES, GRADE_LABELS, StudentRow } from "@/lib/sabana-pdf";
 import jsPDF from "jspdf";
 import { addArialFont } from "@/lib/pdf-fonts";
+import { ModuleGate } from "@/components/modules/ModuleGate";
+import { ModuleLockIcon } from "@/components/modules/ModuleLockIcon";
 
 export default function GradeSheets() {
   const { schoolId } = useSchoolId();
@@ -325,6 +327,7 @@ export default function GradeSheets() {
             </TabsTrigger>
             <TabsTrigger value="sabana" className="gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Sábana de Notas
+              <ModuleLockIcon module="grades" />
             </TabsTrigger>
             <TabsTrigger value="resumen-final" className="gap-1.5">
               <ClipboardList className="h-3.5 w-3.5" /> Resumen Final
@@ -338,147 +341,151 @@ export default function GradeSheets() {
             <DocumentBuilder />
           </TabsContent>
 
-          <TabsContent value="sabana" className="mt-4 space-y-4">
-            {/* Info banner */}
-            <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg border border-border/50">
-              <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p><span className="font-medium text-foreground">¿Cómo usar la Sábana de Notas?</span></p>
-                <ol className="list-decimal list-inside space-y-0.5 ml-1">
-                  <li>Configura la apariencia del PDF en el panel izquierdo.</li>
-                  <li>Selecciona el <strong>Año Escolar</strong> y el <strong>Momento</strong>.</li>
-                  <li>Haz clic en <Download className="h-3.5 w-3.5 inline-block align-text-bottom" /> de cada sección para descargar su PDF individual.</li>
-                  <li>Usa <strong>"Descargar Todas"</strong> para un único PDF con todas las secciones.</li>
-                </ol>
-                <p className="text-xs text-muted-foreground/80 mt-1">En la Definitiva Anual, el PDF muestra las notas de los 3 momentos junto al promedio por materia.</p>
-              </div>
-            </div>
+          <TabsContent value="sabana" className="mt-4">
+            <ModuleGate module="grades">
+              <div className="space-y-4">
+                {/* Info banner */}
+                <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg border border-border/50">
+                  <Info className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p><span className="font-medium text-foreground">¿Cómo usar la Sábana de Notas?</span></p>
+                    <ol className="list-decimal list-inside space-y-0.5 ml-1">
+                      <li>Configura la apariencia del PDF en el panel izquierdo.</li>
+                      <li>Selecciona el <strong>Año Escolar</strong> y el <strong>Momento</strong>.</li>
+                      <li>Haz clic en <Download className="h-3.5 w-3.5 inline-block align-text-bottom" /> de cada sección para descargar su PDF individual.</li>
+                      <li>Usa <strong>"Descargar Todas"</strong> para un único PDF con todas las secciones.</li>
+                    </ol>
+                    <p className="text-xs text-muted-foreground/80 mt-1">En la Definitiva Anual, el PDF muestra las notas de los 3 momentos junto al promedio por materia.</p>
+                  </div>
+                </div>
 
-            {/* Two-column layout */}
-            <div className="flex gap-5 items-start">
-              {/* ── LEFT PANEL ── */}
-              <div className="w-72 shrink-0 space-y-4">
-                {/* Config card */}
-                <SabanaConfigPanel
-                  config={sabanaConfig}
-                  onUpdate={updateConfig}
-                  onReset={resetConfig}
-                />
+                {/* Two-column layout */}
+                <div className="flex gap-5 items-start">
+                  {/* ── LEFT PANEL ── */}
+                  <div className="w-72 shrink-0 space-y-4">
+                    {/* Config card */}
+                    <SabanaConfigPanel
+                      config={sabanaConfig}
+                      onUpdate={updateConfig}
+                      onReset={resetConfig}
+                    />
 
-                {/* Filters */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <FileText className="h-4 w-4" /> Filtros
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">Año Escolar</label>
-                      <Select value={selectedYearId} onValueChange={setSelectedYearId}>
-                        <SelectTrigger className="w-full h-8 text-sm">
-                          <SelectValue placeholder="Seleccionar año" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {schoolYears?.map(y => (
-                            <SelectItem key={y.id} value={y.id}>
-                              {y.year_range} {y.is_active ? "(Activo)" : ""}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {/* Filters */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                          <FileText className="h-4 w-4" /> Filtros
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-muted-foreground">Año Escolar</label>
+                          <Select value={selectedYearId} onValueChange={setSelectedYearId}>
+                            <SelectTrigger className="w-full h-8 text-sm">
+                              <SelectValue placeholder="Seleccionar año" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {schoolYears?.map(y => (
+                                <SelectItem key={y.id} value={y.id}>
+                                  {y.year_range} {y.is_active ? "(Activo)" : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-medium text-muted-foreground">Momento</label>
-                      <Select value={selectedMomento} onValueChange={setSelectedMomento}>
-                        <SelectTrigger className="w-full h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Momento 1</SelectItem>
-                          <SelectItem value="2">Momento 2</SelectItem>
-                          <SelectItem value="3">Momento 3</SelectItem>
-                          <SelectItem value="definitiva">Definitiva Anual</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-medium text-muted-foreground">Momento</label>
+                          <Select value={selectedMomento} onValueChange={setSelectedMomento}>
+                            <SelectTrigger className="w-full h-8 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="1">Momento 1</SelectItem>
+                              <SelectItem value="2">Momento 2</SelectItem>
+                              <SelectItem value="3">Momento 3</SelectItem>
+                              <SelectItem value="definitiva">Definitiva Anual</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                {/* Section list */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <Users className="h-4 w-4" /> Secciones
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 p-3 pt-0">
-                    {sectionsLoading ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-10 w-full" />
-                      ))
-                    ) : !sectionsData?.length ? (
-                      <p className="text-xs text-muted-foreground text-center py-4">
-                        No hay secciones con alumnos inscritos.
-                      </p>
-                    ) : (
-                      <>
-                        {sectionsData.map(section => (
-                          <div
-                            key={section.id}
-                            className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-muted/50 transition-colors"
-                          >
-                            <div>
-                              <p className="text-xs font-semibold leading-tight">
-                                {GRADE_LABELS[section.grade_level] || section.grade_level} - {section.name}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                                <Users className="h-2.5 w-2.5" />
-                                {section.studentCount} estudiantes
-                              </p>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 w-7 p-0"
-                              onClick={() => handleDownloadSection(section)}
-                              disabled={downloading === section.id}
-                              title={`Descargar ${GRADE_LABELS[section.grade_level]} - ${section.name}`}
-                            >
-                              {downloading === section.id
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <Download className="h-3.5 w-3.5" />
-                              }
-                            </Button>
-                          </div>
-                        ))}
+                    {/* Section list */}
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                          <Users className="h-4 w-4" /> Secciones
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 p-3 pt-0">
+                        {sectionsLoading ? (
+                          Array.from({ length: 3 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                          ))
+                        ) : !sectionsData?.length ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">
+                            No hay secciones con alumnos inscritos.
+                          </p>
+                        ) : (
+                          <>
+                            {sectionsData.map(section => (
+                              <div
+                                key={section.id}
+                                className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-muted/50 transition-colors"
+                              >
+                                <div>
+                                  <p className="text-xs font-semibold leading-tight">
+                                    {GRADE_LABELS[section.grade_level] || section.grade_level} - {section.name}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                    <Users className="h-2.5 w-2.5" />
+                                    {section.studentCount} estudiantes
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => handleDownloadSection(section)}
+                                  disabled={downloading === section.id}
+                                  title={`Descargar ${GRADE_LABELS[section.grade_level]} - ${section.name}`}
+                                >
+                                  {downloading === section.id
+                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    : <Download className="h-3.5 w-3.5" />
+                                  }
+                                </Button>
+                              </div>
+                            ))}
 
-                        {sectionsData.length > 0 && (
-                          <Button
-                            onClick={handleDownloadAll}
-                            disabled={downloading === "all"}
-                            className="w-full mt-1"
-                            size="sm"
-                          >
-                            {downloading === "all"
-                              ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                              : <Download className="h-4 w-4 mr-2" />
-                            }
-                            Descargar Todas
-                          </Button>
+                            {sectionsData.length > 0 && (
+                              <Button
+                                onClick={handleDownloadAll}
+                                disabled={downloading === "all"}
+                                className="w-full mt-1"
+                                size="sm"
+                              >
+                                {downloading === "all"
+                                  ? <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  : <Download className="h-4 w-4 mr-2" />
+                                }
+                                Descargar Todas
+                              </Button>
+                            )}
+                          </>
                         )}
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-              {/* ── RIGHT PANEL: Preview ── */}
-              <div className="flex-1 min-w-0">
-                <SabanaPreview config={sabanaConfig} momento={selectedMomento} />
+                  {/* ── RIGHT PANEL: Preview ── */}
+                  <div className="flex-1 min-w-0">
+                    <SabanaPreview config={sabanaConfig} momento={selectedMomento} />
+                  </div>
+                </div>
               </div>
-            </div>
+            </ModuleGate>
           </TabsContent>
 
           <TabsContent value="resumen-final" className="mt-4">
