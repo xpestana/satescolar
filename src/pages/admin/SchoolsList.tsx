@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Pencil, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, Blocks } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Pagination } from "@/components/ui/data-pagination";
 import { SchoolDetailsModal } from "@/components/admin/SchoolDetailsModal";
+import { SchoolModulesIcons } from "@/components/admin/SchoolModulesIcons";
+import { useAllSchoolModules } from "@/hooks/useAllSchoolModules";
 import { supabase } from "@/integrations/supabase/client";
 import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { toast } from "sonner";
@@ -54,6 +56,7 @@ export default function SchoolsList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const { data: modulesBySchool } = useAllSchoolModules();
 
   const fetchSchools = async () => {
     try {
@@ -170,15 +173,16 @@ export default function SchoolsList() {
               <TableHead>Teléfono</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>RIF</TableHead>
+              <TableHead>Módulos</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableSkeleton rows={6} columns={6} />
+              <TableSkeleton rows={6} columns={7} />
             ) : paginatedSchools.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {searchTerm
                     ? "No se encontraron colegios con ese criterio de búsqueda"
                     : "No hay colegios registrados. ¡Crea el primero!"}
@@ -192,6 +196,11 @@ export default function SchoolsList() {
                   <TableCell>{school.phone}</TableCell>
                   <TableCell>{school.email}</TableCell>
                   <TableCell>{school.rif}</TableCell>
+                  <TableCell>
+                    <Link to={`/admin/colegios/${school.id}/modulos`} title="Gestionar módulos">
+                      <SchoolModulesIcons states={modulesBySchool?.get(school.id)} />
+                    </Link>
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Button 
@@ -205,6 +214,11 @@ export default function SchoolsList() {
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
+                      <Link to={`/admin/colegios/${school.id}/modulos`}>
+                        <Button variant="ghost" size="icon" title="Módulos">
+                          <Blocks className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       <Link to={`/admin/colegios/${school.id}/editar`}>
                         <Button variant="ghost" size="icon" title="Editar">
                           <Pencil className="h-4 w-4" />

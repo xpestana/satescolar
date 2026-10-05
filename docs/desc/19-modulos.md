@@ -46,6 +46,21 @@ dentro de los módulos activos.
   genera planillas vacías. El admin ve una advertencia en ese caso.
 - **Asistencias ↔ Carnet:** el carnet (con QR) es gratis; escanearlo requiere `attendance`.
 
+## Gestión desde el admin (`/admin/colegios/:id/modulos`)
+- Se llega desde **Colegios**, con el botón de módulos o haciendo clic en los iconos de la
+  columna "Módulos". Esos iconos se colorean según el estado: activo, por vencer, vencido o
+  inactivo.
+- Cada módulo tiene:
+  - un **interruptor** on/off;
+  - un **"Activo hasta"** opcional (calendario), con un botón para quitar el vencimiento;
+  - un badge de estado.
+- Los cambios se guardan al momento.
+- **Vencimiento inclusivo:** el día elegido funciona completo. Se guarda como el fin de ese día en
+  hora de Venezuela (`expires_at` = día siguiente 04:00 UTC), ver `src/lib/modules/moduleExpiry.ts`.
+- Si se reactiva un módulo vencido, se quita la fecha pasada.
+- Botón **"Activar todos sin vencimiento"**, pensado para colegios nuevos.
+- Muestra una advertencia si Planillajes del Ministerio está activo sin Notas.
+
 ## Datos / Tablas (Supabase)
 - `school_modules` (`school_id`, `module_key`, `enabled`, `expires_at`, `updated_by`,
   `created_at`, `updated_at`); PK `(school_id, module_key)`. RLS: el admin gestiona y los
@@ -60,7 +75,7 @@ dentro de los módulos activos.
 | 0 | Documentación (este archivo) | ✅ |
 | 1 | BD: `school_modules`, `school_has_module`, seed, gate de notas | ✅ desplegada 2026-10-05 |
 | 2 | Núcleo frontend: catálogo, `isModuleActive`, `useSchoolModules`, `ModuleGate`, overlay WhatsApp, sidebar | ✅ (aún sin aplicar a rutas) |
-| 3 | Admin: `/admin/colegios/:id/modulos` + chips en la lista | ⏳ |
+| 3 | Admin: `/admin/colegios/:id/modulos` + iconos en la lista | ✅ |
 | 4.1 | Gate Asistencias | ⏳ |
 | 4.2 | Gate Aula Virtual | ⏳ |
 | 4.3 | Gate Mensajes Masivos | ⏳ |
@@ -91,4 +106,7 @@ dentro de los módulos activos.
 - `src/hooks/useCurrentSchoolId.ts` (colegio según el rol) y `src/hooks/useSchoolModules.ts`.
 - `src/components/modules/`: `ModuleRoute`, `RouteModuleContext`, `ModuleGate` (con test),
   `LockedModuleOverlay`, `moduleIcons`.
-- (Fases siguientes) `src/pages/admin/SchoolModules.tsx`, `supabase/functions/_shared/schoolModules.ts`
+- Admin: `src/pages/admin/SchoolModules.tsx`, `src/components/admin/SchoolModuleRow.tsx`,
+  `src/components/admin/SchoolModulesIcons.tsx`, `src/hooks/useSchoolModulesAdmin.ts`,
+  `src/hooks/useAllSchoolModules.ts`, `src/lib/modules/moduleExpiry.ts` (con test).
+- (Fases siguientes) `supabase/functions/_shared/schoolModules.ts`

@@ -32,6 +32,7 @@ import GradeSheets from "./pages/school/GradeSheets";
 import EmailSender from "./pages/school/EmailSender";
 import SchoolsList from "./pages/admin/SchoolsList";
 import SchoolForm from "./pages/admin/SchoolForm";
+import SchoolModules from "./pages/admin/SchoolModules";
 import SendEmail from "./pages/admin/SendEmail";
 import UsersList from "./pages/admin/UsersList";
 import AdminUsersList from "./pages/admin/AdminUsersList";
@@ -319,6 +320,14 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRole="admin">
                     <SchoolForm />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/colegios/:id/modulos"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <SchoolModules />
                   </ProtectedRoute>
                 }
               />
