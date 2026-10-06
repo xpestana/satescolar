@@ -9,6 +9,8 @@ interface MetricCardProps {
   icon: ReactNode;
   variant: "purple" | "orange" | "blue" | "pink" | "green" | "cyan";
   subtitle?: string;
+  /** Extra line under the value, e.g. a demo notice. */
+  footer?: ReactNode;
 }
 
 const variantStyles = {
@@ -44,7 +46,7 @@ const variantStyles = {
   },
 };
 
-export function MetricCard({ title, value, icon, variant, subtitle }: MetricCardProps) {
+export function MetricCard({ title, value, icon, variant, subtitle, footer }: MetricCardProps) {
   const styles = variantStyles[variant];
 
   return (
@@ -62,6 +64,7 @@ export function MetricCard({ title, value, icon, variant, subtitle }: MetricCard
         {subtitle && (
           <p className={cn("text-xs mt-1", styles.title)}>{subtitle}</p>
         )}
+        {footer && <div className="mt-2">{footer}</div>}
       </CardContent>
     </Card>
   );

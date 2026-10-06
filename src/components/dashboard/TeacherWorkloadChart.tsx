@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,10 +8,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface Props {
   schoolId: string | null;
   activeSchoolYearId: string | null;
+  /** When set, the chart shows sample data (the school lacks the module) and this notice. */
+  demoNotice?: ReactNode;
 }
 
-export function TeacherWorkloadChart({ schoolId, activeSchoolYearId }: Props) {
-  const { data, isLoading } = useQuery({
+/** Sample workload shown to schools without a module that uses teachers. */
+const DEMO_WORKLOAD = [
+  { name: "María González", asignaciones: 6 },
+  { name: "José Rodríguez", asignaciones: 5 },
+  { name: "Ana Martínez", asignaciones: 4 },
+  { name: "Luis Hernández", asignaciones: 4 },
+  { name: "Carmen Pérez", asignaciones: 3 },
+  { name: "Pedro Ramírez", asignaciones: 2 },
+];
+
+export function TeacherWorkloadChart({ schoolId, activeSchoolYearId, demoNotice }: Props) {
+  const isDemo = !!demoNotice;
+  const { data: realData, isLoading: realLoading } = useQuery({
     queryKey: ["chart-teacher-workload", schoolId, activeSchoolYearId],
     queryFn: async () => {
       const { data: assignments } = await supabase
@@ -49,8 +63,10 @@ export function TeacherWorkloadChart({ schoolId, activeSchoolYearId }: Props) {
 
       return Object.values(counts).sort((a, b) => b.asignaciones - a.asignaciones);
     },
-    enabled: !!schoolId && !!activeSchoolYearId,
+    enabled: !!schoolId && !!activeSchoolYearId && !isDemo,
   });
+  const data = isDemo ? DEMO_WORKLOAD : realData;
+  const isLoading = !isDemo && realLoading;
 
   return (
     <Card className="border shadow-sm">
@@ -59,6 +75,7 @@ export function TeacherWorkloadChart({ schoolId, activeSchoolYearId }: Props) {
           Carga de Trabajo por Docente
         </CardTitle>
         <p className="text-xs text-muted-foreground">Áreas asignadas en el año activo</p>
+        {demoNotice && <div className="pt-1">{demoNotice}</div>}
       </CardHeader>
       <CardContent>
         {isLoading ? (

@@ -48,8 +48,9 @@ dentro de los módulos activos.
   Áreas solo sirven si el colegio puede usar a sus docentes, así que se habilitan con **cualquiera**
   de `grades`, `virtual_classroom` o `attendance` (`TEACHING_MODULES` en
   `src/lib/modules/moduleRequirement.ts`). Si no tiene ninguno, se ven con el overlay de Notas, que
-  menciona las alternativas. Sin ellos, el dashboard del colegio omite los avisos de docentes sin
-  áreas y el gráfico de carga docente.
+  menciona las alternativas. Sin ellos, el dashboard del colegio muestra las métricas de docentes
+  y áreas y el gráfico de carga docente con **datos de ejemplo** y un enlace corto a WhatsApp
+  (`ModuleDemoNotice`), y omite los avisos de docentes sin áreas.
 - **Asistencias ↔ Carnet:** el carnet (con QR) es gratis; escanearlo requiere `attendance`.
 
 ## Gestión desde el admin (`/admin/colegios/:id/modulos`)
@@ -105,6 +106,9 @@ dentro de los módulos activos.
   ve sus áreas sin plan ni "Registrar Notas", y `StudentGradeAccessToggle` no se renderiza.
 - **Menú:** agregar `module: "payments"` al ítem de `AppSidebar.tsx`. Si el módulo está
   inactivo, el personal del colegio lo ve con 🔒 y a los demás roles se les oculta.
+- **Bloque de dashboard en demo:** en lugar de ocultarlo, mostrar datos de ejemplo y
+  `<ModuleDemoNotice module="grades" />` (etiqueta "Ejemplo" + enlace de texto a WhatsApp, sin
+  botón). No consultar los datos reales mientras está en demo.
 - **Varios módulos ("cualquiera de"):** `module` acepta una lista, por ejemplo
   `<ModuleRoute module={TEACHING_MODULES}>` o `module: TEACHING_MODULES` en el menú. El overlay
   vende el primero de la lista y nombra los demás.
@@ -119,7 +123,7 @@ dentro de los módulos activos.
 - `src/lib/modules/salesContact.ts`: WhatsApp de ventas y mensaje prellenado (con test).
 - `src/hooks/useCurrentSchoolId.ts` (colegio según el rol) y `src/hooks/useSchoolModules.ts`.
 - `src/components/modules/`: `ModuleRoute`, `RouteModuleContext`, `ModuleGate` (con test),
-  `LockedModuleOverlay`, `ModuleLockIcon`, `moduleIcons`.
+  `LockedModuleOverlay`, `ModuleLockIcon`, `ModuleDemoNotice`, `moduleIcons`.
 - Admin: `src/pages/admin/SchoolModules.tsx`, `src/components/admin/SchoolModuleRow.tsx`,
   `src/components/admin/SchoolModulesIcons.tsx`, `src/hooks/useSchoolModulesAdmin.ts`,
   `src/hooks/useAllSchoolModules.ts`, `src/lib/modules/moduleExpiry.ts` (con test).

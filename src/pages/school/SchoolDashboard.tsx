@@ -13,12 +13,19 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
 import { isRequirementMet, TEACHING_MODULES } from "@/lib/modules/moduleRequirement";
 import { useQuery } from "@tanstack/react-query";
+import { ModuleDemoNotice } from "@/components/modules/ModuleDemoNotice";
+
+/** Sample teacher/área figures shown when the school has no module that uses teachers. */
+const DEMO_METRICS = { activeTeachers: 24, totalTeachers: 26, subjects: 18, assignedSubjects: 42 };
 
 export default function SchoolDashboard() {
   const { schoolId } = useSchoolId();
   const { school } = useSchoolData();
-  const { isActive: isModuleActive } = useSchoolModules();
+  const { isActive: isModuleActive, isLoading: modulesLoading } = useSchoolModules();
   const hasTeaching = isRequirementMet(TEACHING_MODULES, isModuleActive);
+  // Without Notas, Aula Virtual or Asistencias the teacher blocks show sample data (a demo).
+  const showTeachingDemo = !modulesLoading && !hasTeaching;
+  const teachingDemoNotice = showTeachingDemo ? <ModuleDemoNotice module="grades" label="Desbloquear" /> : undefined;
 
   // Get active school year
   const { data: activeSchoolYear } = useQuery({
@@ -80,7 +87,7 @@ export default function SchoolDashboard() {
         .eq("is_suspended", false);
       return count ?? data?.length ?? 0;
     },
-    enabled: !!schoolId,
+    enabled: !!schoolId && !showTeachingDemo,
     ...freshOpts,
   });
 
@@ -94,7 +101,7 @@ export default function SchoolDashboard() {
         .eq("school_id", schoolId!);
       return count ?? data?.length ?? 0;
     },
-    enabled: !!schoolId,
+    enabled: !!schoolId && !showTeachingDemo,
     ...freshOpts,
   });
 
@@ -144,7 +151,7 @@ export default function SchoolDashboard() {
         .eq("is_suspended", false);
       return count ?? data?.length ?? 0;
     },
-    enabled: !!schoolId,
+    enabled: !!schoolId && !showTeachingDemo,
     ...freshOpts,
   });
 
@@ -160,11 +167,14 @@ export default function SchoolDashboard() {
         .eq("is_suspended", false);
       return count ?? data?.length ?? 0;
     },
-    enabled: !!schoolId && !!activeSchoolYear?.id,
+    enabled: !!schoolId && !!activeSchoolYear?.id && !showTeachingDemo,
     ...freshOpts,
   });
 
-  const loading = l1 || l2 || l3 || l4 || l5 || l6 || l7;
+  const loading = l1 || l2 || l5 || (!showTeachingDemo && (l3 || l4 || l6 || l7));
+  const teachers = showTeachingDemo
+    ? DEMO_METRICS
+    : { activeTeachers, totalTeachers, subjects: subjectsCount, assignedSubjects };
 
   return (
     <DashboardLayout>
@@ -194,10 +204,11 @@ export default function SchoolDashboard() {
           />
           <MetricCard
             title="Docentes Activos"
-            subtitle={`${totalTeachers} registrados`}
-            value={loading ? "..." : activeTeachers}
+            subtitle={`${teachers.totalTeachers} registrados`}
+            value={loading ? "..." : teachers.activeTeachers}
             icon={<UserCheck className="h-10 w-10" />}
             variant="cyan"
+            footer={teachingDemoNotice}
           />
           <MetricCard
             title="Familias"
@@ -207,9 +218,10 @@ export default function SchoolDashboard() {
           />
           <MetricCard
             title="Áreas"
-            value={loading ? "..." : subjectsCount}
+            value={loading ? "..." : teachers.subjects}
             icon={<BookOpen className="h-10 w-10" />}
             variant="purple"
+            footer={teachingDemoNotice}
           />
         </div>
 
@@ -223,15 +235,17 @@ export default function SchoolDashboard() {
           />
           <MetricCard
             title="Docentes Registrados"
-            value={loading ? "..." : totalTeachers}
+            value={loading ? "..." : teachers.totalTeachers}
             icon={<UserPlus className="h-10 w-10" />}
             variant="pink"
+            footer={teachingDemoNotice}
           />
           <MetricCard
             title="Áreas Asignadas"
-            value={loading ? "..." : assignedSubjects}
+            value={loading ? "..." : teachers.assignedSubjects}
             icon={<ClipboardList className="h-10 w-10" />}
             variant="cyan"
+            footer={teachingDemoNotice}
           />
         </div>
 
@@ -249,12 +263,18 @@ export default function SchoolDashboard() {
         </div>
 
         {/* Charts Row 2 */}
-        <div className={`grid grid-cols-1 gap-4 ${hasTeaching ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <GradeLevelDistributionChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
           <EnrollmentTypeChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
-          {hasTeaching && (
-            <TeacherWorkloadChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
-          )}
+          <TeacherWorkloadChart
+            schoolId={schoolId}
+            activeSchoolYearId={activeSchoolYear?.id ?? null}
+            demoNotice={
+              showTeachingDemo ? (
+                <ModuleDemoNotice module="grades" className="justify-start" />
+              ) : undefined
+            }
+          />
         </div>
 
       </div>
