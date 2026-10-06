@@ -605,7 +605,7 @@ export default function AdvancedSearch() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Búsqueda Avanzada" breadcrumbs={[{ label: "Registros" }, { label: "Búsqueda Avanzada" }]} />
+      <PageHeader title="Búsqueda Avanzada" breadcrumbs={[{ label: "Comunidad Escolar" }, { label: "Búsqueda Avanzada" }]} />
 
       <div className="space-y-4">
         {/* Tabs + controls */}

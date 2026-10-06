@@ -191,7 +191,7 @@ export default function PaymentsReport() {
     <DashboardLayout>
       <PageHeader
         title="Reporte de Pagos"
-        breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Reporte de Pagos" }]}
+        breadcrumbs={[{ label: "Pagos", href: "/pagos" }, { label: "Reporte de Pagos" }]}
       />
 
       <SchoolYearSelect

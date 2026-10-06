@@ -80,7 +80,7 @@ export default function DelinquencyConfig() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Configuración de Morosidad" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Configuración Morosidad" }]} />
+      <PageHeader title="Configuración de Morosidad" breadcrumbs={[{ label: "Pagos", href: "/pagos" }, { label: "Configuración Morosidad" }]} />
 
       <div className="max-w-2xl space-y-6">
         {isLoading ? <FormSkeleton fields={4} /> : (

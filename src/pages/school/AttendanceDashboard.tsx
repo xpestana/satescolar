@@ -76,7 +76,7 @@ export default function AttendanceDashboard() {
       <PageHeader
         title="Dashboard de Asistencia"
         breadcrumbs={[
-          { label: "Utilidades" },
+          { label: "Asistencias" },
           { label: "Dashboard de Asistencia" },
         ]}
         description="Monitorea la asistencia institucional con métricas y gráficos actualizados para tomar decisiones informadas."

@@ -109,7 +109,7 @@ export default function PayrollRegistration() {
     <DashboardLayout>
       <PageHeader
         title="Registro de Nómina"
-        breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Nómina", href: "/pagos/nomina" }, { label: "Registro" }]}
+        breadcrumbs={[{ label: "Nómina", href: "/pagos/nomina" }, { label: "Registro" }]}
         description="Selecciona el período y registra, aprueba y paga a cada beneficiario de la nómina."
       />
 

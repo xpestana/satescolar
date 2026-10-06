@@ -16,7 +16,7 @@ export default function PaymentConfig() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Configuración de Pagos" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Configuración" }]} />
+      <PageHeader title="Configuración de Pagos" breadcrumbs={[{ label: "Pagos", href: "/pagos" }, { label: "Configuración" }]} />
       <Tabs defaultValue="concepts" className="space-y-4">
         <TabsList>
           <TabsTrigger value="concepts" className="gap-2"><Package className="h-4 w-4" />Conceptos</TabsTrigger>

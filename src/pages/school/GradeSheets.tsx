@@ -318,7 +318,7 @@ export default function GradeSheets() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <PageHeader title="Planillas" breadcrumbs={[{ label: "Utilidades" }, { label: "Planillas" }]} />
+        <PageHeader title="Planillas" breadcrumbs={[{ label: "Académico" }, { label: "Planillas" }]} />
 
         <Tabs defaultValue="constructor" className="w-full">
           <TabsList>

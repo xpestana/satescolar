@@ -235,7 +235,7 @@ export default function AddTeacher() {
       <PageHeader
         title={`${isEditing ? "Editar" : "Agregar"} Docente`}
         breadcrumbs={[
-          { label: "Registros" },
+          { label: "Comunidad Escolar" },
           { label: "Docentes", href: "/registros/docentes" },
           { label: isEditing ? "Editar" : "Agregar" },
         ]}

@@ -180,7 +180,7 @@ export default function SubjectsList() {
     <DashboardLayout>
       <PageHeader
         title="Áreas"
-        breadcrumbs={[{ label: "Registros" }, { label: "Áreas" }]}
+        breadcrumbs={[{ label: "Académico" }, { label: "Áreas" }]}
       />
 
       <div className="space-y-4">

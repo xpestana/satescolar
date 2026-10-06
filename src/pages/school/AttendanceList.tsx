@@ -546,7 +546,7 @@ export default function AttendanceList() {
     <DashboardLayout>
       <PageHeader
         title="Asistencias"
-        breadcrumbs={[{ label: "Utilidades" }, { label: "Asistencias" }]}
+        breadcrumbs={[{ label: "Asistencias" }, { label: "Registro de Asistencias" }]}
       />
 
       <Card>

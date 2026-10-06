@@ -231,7 +231,7 @@ export default function StudentLedger() {
   if (billingMode === "family") {
     return (
       <DashboardLayout>
-        <PageHeader title="Estado de Cuenta" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Estado de Cuenta" }]} />
+        <PageHeader title="Estado de Cuenta" breadcrumbs={[{ label: "Pagos", href: "/pagos" }, { label: "Estado de Cuenta" }]} />
         {yearSelect}
         {selectedYear?.id ? (
           // key: al cambiar de año se remonta, para no arrastrar la familia abierta del año anterior
@@ -247,7 +247,7 @@ export default function StudentLedger() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Estado de Cuenta" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Estado de Cuenta" }]} />
+      <PageHeader title="Estado de Cuenta" breadcrumbs={[{ label: "Pagos", href: "/pagos" }, { label: "Estado de Cuenta" }]} />
       {yearSelect}
 
       {!selectedStudentId ? (

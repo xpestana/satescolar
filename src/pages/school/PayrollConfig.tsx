@@ -16,7 +16,7 @@ export default function PayrollConfig() {
     <DashboardLayout>
       <PageHeader
         title="Configuración de Nómina"
-        breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Nómina", href: "/pagos/nomina" }, { label: "Configuración" }]}
+        breadcrumbs={[{ label: "Nómina", href: "/pagos/nomina" }, { label: "Configuración" }]}
         description="Define los conceptos de pago y los períodos de nómina que se usarán al registrar pagos."
       />
       <Tabs defaultValue="concepts" className="w-full">

@@ -190,7 +190,7 @@ export default function UtilitiesSettings() {
     <DashboardLayout>
       <PageHeader
         title="Utilidades"
-        breadcrumbs={[{ label: "Ajustes" }, { label: "Utilidades" }]}
+        breadcrumbs={[{ label: "Ajustes del Colegio" }, { label: "Carnet" }]}
       />
 
 

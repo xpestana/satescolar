@@ -470,7 +470,7 @@ export default function TeachersList() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Docentes" breadcrumbs={[{ label: "Registros" }, { label: "Docentes" }]} />
+      <PageHeader title="Docentes" breadcrumbs={[{ label: "Comunidad Escolar" }, { label: "Docentes" }]} />
 
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">

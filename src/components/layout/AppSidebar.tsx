@@ -88,45 +88,39 @@ const navSections: NavSection[] = [
       { label: "Inicio", href: "/school/dashboard", icon: LayoutDashboard, requiredRole: "school" },
     ],
   },
+  // School: sections follow the sellable modules (docs/desc/19-modulos.md), free Registro first.
   {
-    title: "Registros",
+    title: "Comunidad Escolar",
     requiredRole: "school",
     items: [
       { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school", permission: "families.view" },
+      { label: "Inscripciones", href: "/inscripciones", icon: ClipboardCheck, requiredRole: "school", permission: "enrollments.view" },
       { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school", permission: "teachers.view", module: TEACHING_MODULES },
-      { label: "Áreas", href: "/registros/areas", icon: GraduationCap, requiredRole: "school", permission: "subjects.view", module: TEACHING_MODULES },
-      { label: "Asignación de Áreas", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school", permission: "subjects.manage", module: TEACHING_MODULES },
       { label: "Búsqueda Avanzada", href: "/registros/busqueda-avanzada", icon: Search, requiredRole: "school" },
     ],
   },
   {
-    title: "Utilidades",
+    title: "Académico",
     requiredRole: "school",
     items: [
-      { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school", permission: "emails.send", module: "messaging" },
+      { label: "Áreas", href: "/registros/areas", icon: GraduationCap, requiredRole: "school", permission: "subjects.view", module: TEACHING_MODULES },
+      { label: "Asignación de Áreas", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school", permission: "subjects.manage", module: TEACHING_MODULES },
+      { label: "Notas y Boletas", href: "/notas/consulta", icon: ClipboardList, requiredRole: "school", permission: "grades.view", module: "grades" },
       { label: "Planillas", href: "/planillas", icon: FileText, requiredRole: "school", permission: "planillas.config" },
-      { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school", permission: "attendance.scan", module: "attendance" },
-      { label: "Registro de Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school", permission: "attendance.view", module: "attendance" },
-      { label: "Dashboard Asistencia", href: "/utilidades/asistencias-dashboard", icon: BarChart2, requiredRole: "school", permission: "attendance.view", module: "attendance" },
       { label: "Supervisión Aulas", href: "/school/aula-virtual/supervision", icon: BookOpen, requiredRole: "school", permission: "classroom.supervise", module: "virtual_classroom" },
     ],
   },
   {
-    title: "Inscripciones",
+    title: "Asistencias",
     requiredRole: "school",
     items: [
-      { label: "Inscripciones", href: "/inscripciones", icon: ClipboardCheck, requiredRole: "school", permission: "enrollments.view" },
+      { label: "Escáner QR", href: "/utilidades/escaner-qr", icon: QrCode, requiredRole: "school", permission: "attendance.scan", module: "attendance" },
+      { label: "Registro de Asistencias", href: "/utilidades/asistencias", icon: ClipboardList, requiredRole: "school", permission: "attendance.view", module: "attendance" },
+      { label: "Dashboard Asistencia", href: "/utilidades/asistencias-dashboard", icon: BarChart2, requiredRole: "school", permission: "attendance.view", module: "attendance" },
     ],
   },
   {
-    title: "Notas y Boletas",
-    requiredRole: "school",
-    items: [
-      { label: "Notas y Boletas", href: "/notas/consulta", icon: Search, requiredRole: "school", permission: "grades.view", module: "grades" },
-    ],
-  },
-  {
-    title: "Administrativo",
+    title: "Pagos",
     requiredRole: "school",
     items: [
       { label: "Dashboard Pagos", href: "/pagos", icon: CreditCard, requiredRole: "school", permission: "payments.view", module: "payments" },
@@ -135,10 +129,22 @@ const navSections: NavSection[] = [
       { label: "Morosos", href: "/pagos/morosos", icon: Users, requiredRole: "school", permission: "payments.delinquency", module: "payments" },
       { label: "Ingresos", href: "/pagos/ingresos", icon: BarChart3, requiredRole: "school", permission: "payments.view", module: "payments" },
       { label: "Reporte de Pagos", href: "/pagos/reporte", icon: ReceiptText, requiredRole: "school", permission: "payments.view", module: "payments" },
+    ],
+  },
+  {
+    title: "Nómina",
+    requiredRole: "school",
+    items: [
       { label: "Nómina", href: "/pagos/nomina", icon: Wallet, requiredRole: "school", permission: "payroll.view", module: "payments" },
       { label: "Registro de Nómina", href: "/pagos/nomina/registro", icon: HandCoins, requiredRole: "school", permission: "payroll.register", module: "payments" },
       { label: "Beneficiarios", href: "/pagos/nomina/beneficiarios", icon: Users, requiredRole: "school", permission: "payroll.view", module: "payments" },
-      { label: "Config. Nómina", href: "/pagos/nomina/configuracion", icon: Settings, requiredRole: "school", permission: "payroll.config", module: "payments" },
+    ],
+  },
+  {
+    title: "Comunicación",
+    requiredRole: "school",
+    items: [
+      { label: "Gestión de Correos", href: "/utilidades/correo", icon: Mail, requiredRole: "school", permission: "emails.send", module: "messaging" },
     ],
   },
   {
@@ -147,14 +153,15 @@ const navSections: NavSection[] = [
     items: [
       { label: "Años y Secciones", href: "/school/configuraciones/anos-secciones", icon: SlidersHorizontal, requiredRole: "school", permission: "settings.school" },
       { label: "Formularios", href: "/school/configuraciones/formularios", icon: FileText, requiredRole: "school", permission: "forms.config" },
-      { label: "Planillas", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school", permission: "planillas.config" },
-      { label: "Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school", permission: "settings.school", module: "grades" },
+      { label: "Planilla de Inscripción", href: "/school/configuraciones/inscripcion-campos", icon: ClipboardCheck, requiredRole: "school", permission: "planillas.config" },
       { label: "Carnet", href: "/school/configuraciones/utilidades", icon: Wrench, requiredRole: "school", permission: "settings.school" },
-      { label: "Templates de Correo", href: "/school/configuraciones/correos", icon: Mail, requiredRole: "school", permission: "settings.school" },
-      { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school", permission: "payments.config", module: "payments" },
-      { label: "Formatos", href: "/formatos", icon: FileText, requiredRole: "school", permission: "payments.config" },
-      { label: "Config. Morosidad", href: "/pagos/morosidad", icon: Bell, requiredRole: "school", permission: "payments.delinquency", module: "payments" },
       { label: "Usuarios y Permisos", href: "/school/configuraciones/usuarios", icon: ShieldCheck, requiredRole: "school", permission: "settings.users" },
+      { label: "Templates de Correo", href: "/school/configuraciones/correos", icon: Mail, requiredRole: "school", permission: "settings.school" },
+      { label: "Notas", href: "/school/configuraciones/ajustes-notas", icon: GraduationCap, requiredRole: "school", permission: "settings.school", module: "grades" },
+      { label: "Formatos", href: "/formatos", icon: FileText, requiredRole: "school", permission: "payments.config" },
+      { label: "Config. Pagos", href: "/pagos/configuracion", icon: Settings, requiredRole: "school", permission: "payments.config", module: "payments" },
+      { label: "Config. Morosidad", href: "/pagos/morosidad", icon: Bell, requiredRole: "school", permission: "payments.delinquency", module: "payments" },
+      { label: "Config. Nómina", href: "/pagos/nomina/configuracion", icon: Settings, requiredRole: "school", permission: "payroll.config", module: "payments" },
     ],
   },
   // Representative

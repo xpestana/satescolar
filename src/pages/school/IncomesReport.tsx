@@ -179,7 +179,7 @@ export default function IncomesReport() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Ingresos" breadcrumbs={[{ label: "Administrativo" }, { label: "Ingresos" }]} />
+      <PageHeader title="Ingresos" breadcrumbs={[{ label: "Pagos" }, { label: "Ingresos" }]} />
 
       <SchoolYearSelect
         years={years}

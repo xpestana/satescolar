@@ -167,7 +167,7 @@ export default function DelinquentStudents() {
   if (billingMode === "family") {
     return (
       <DashboardLayout>
-        <PageHeader title="Familias Morosas" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Morosos" }]} />
+        <PageHeader title="Familias Morosas" breadcrumbs={[{ label: "Pagos", href: "/pagos" }, { label: "Morosos" }]} />
         {yearSelect}
         {selectedYear?.id ? (
           // key: al cambiar de ano se remonta la vista, para no arrastrar filtros ni
@@ -184,7 +184,7 @@ export default function DelinquentStudents() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Estudiantes Morosos" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Morosos" }]} />
+      <PageHeader title="Estudiantes Morosos" breadcrumbs={[{ label: "Pagos", href: "/pagos" }, { label: "Morosos" }]} />
 
       {yearSelect}
 

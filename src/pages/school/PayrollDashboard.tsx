@@ -65,7 +65,7 @@ export default function PayrollDashboard() {
     <DashboardLayout>
       <PageHeader
         title="Dashboard de Nómina"
-        breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Nómina" }]}
+        breadcrumbs={[{ label: "Nómina" }]}
         description="Indicadores de la nómina del colegio y exportación de los datos a Excel."
       />
 

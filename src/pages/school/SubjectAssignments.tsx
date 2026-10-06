@@ -453,7 +453,7 @@ export default function SubjectAssignments() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Asignación de Áreas" breadcrumbs={[{ label: "Registros" }, { label: "Asignación de Áreas" }]} />
+      <PageHeader title="Asignación de Áreas" breadcrumbs={[{ label: "Académico" }, { label: "Asignación de Áreas" }]} />
 
       <div className="space-y-4">
         <div className="flex items-end justify-between flex-wrap gap-3">

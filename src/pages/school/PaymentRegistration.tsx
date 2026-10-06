@@ -333,7 +333,7 @@ export default function PaymentRegistration() {
 
   return (
     <DashboardLayout>
-      <PageHeader title="Registro de Pagos" breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Registro de Pagos" }]} />
+      <PageHeader title="Registro de Pagos" breadcrumbs={[{ label: "Pagos", href: "/pagos" }, { label: "Registro de Pagos" }]} />
 
       {/* Main section tabs */}
       <Tabs value={mainTab} onValueChange={(v) => setSearchParams(v === "reportes" ? { tab: "reportes" } : {})} className="w-full">

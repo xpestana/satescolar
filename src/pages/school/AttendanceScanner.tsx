@@ -124,7 +124,7 @@ export default function AttendanceScanner() {
     <DashboardLayout>
       <PageHeader
         title="Escáner QR"
-        breadcrumbs={[{ label: "Utilidades" }, { label: "Escáner QR" }]}
+        breadcrumbs={[{ label: "Asistencias" }, { label: "Escáner QR" }]}
       />
 
       <div className="max-w-lg mx-auto space-y-4">

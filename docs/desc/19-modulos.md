@@ -53,6 +53,21 @@ dentro de los módulos activos.
   (`ModuleDemoNotice`), y omite los avisos de docentes sin áreas.
 - **Asistencias ↔ Carnet:** el carnet (con QR) es gratis; escanearlo requiere `attendance`.
 
+## Menú del colegio (`AppSidebar.tsx`)
+Las secciones siguen los módulos, con lo gratis primero:
+
+| Sección | Ítems | Módulo |
+|---|---|---|
+| Comunidad Escolar | Familias, Inscripciones, Docentes, Búsqueda Avanzada | Registro (Docentes: `TEACHING_MODULES`) |
+| Académico | Áreas, Asignación de Áreas, Notas y Boletas, Planillas, Supervisión Aulas | `TEACHING_MODULES`, `grades`, mixto, `virtual_classroom` |
+| Asistencias | Escáner QR, Registro de Asistencias, Dashboard Asistencia | `attendance` |
+| Pagos | Dashboard, Registro, Estado de Cuenta, Morosos, Ingresos, Reporte | `payments` |
+| Nómina | Nómina, Registro de Nómina, Beneficiarios | `payments` |
+| Comunicación | Gestión de Correos | `messaging` |
+| Ajustes del Colegio | Generales primero (Años y Secciones, Formularios, Planilla de Inscripción, Carnet, Usuarios y Permisos, Templates de Correo) y luego los de módulos (Notas, Formatos, Config. Pagos, Morosidad, Nómina) | mixto |
+
+Los breadcrumbs de cada pantalla usan el nombre de su sección.
+
 ## Gestión desde el admin (`/admin/colegios/:id/modulos`)
 - Se llega desde **Colegios**, con el botón de módulos o haciendo clic en los iconos de la
   columna "Módulos". Esos iconos se colorean según el estado: activo, por vencer, vencido o

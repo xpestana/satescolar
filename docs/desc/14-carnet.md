@@ -18,7 +18,7 @@ configuración de diseño.
 - El colegio configura el diseño del carnet (por año escolar) en `/school/configuraciones/utilidades`.
 
 ## Configuración de Carnet (`/school/configuraciones/utilidades`)
-Pantalla `UtilitiesSettings` ("Utilidades" → "Configuración de Carnet"): diseño del carnet
+Pantalla `UtilitiesSettings` (Ajustes del Colegio → "Carnet"): diseño del carnet
 guardado en `carnet_config`. Toma datos del colegio (`schools`) y del año escolar
 (`school_years`). Las imágenes (logo/fondo) se suben a S3.
 

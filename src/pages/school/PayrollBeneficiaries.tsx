@@ -47,7 +47,7 @@ export default function PayrollBeneficiaries() {
     <DashboardLayout>
       <PageHeader
         title="Beneficiarios de Nómina"
-        breadcrumbs={[{ label: "Administrativo", href: "/pagos" }, { label: "Nómina", href: "/pagos/nomina" }, { label: "Beneficiarios" }]}
+        breadcrumbs={[{ label: "Nómina", href: "/pagos/nomina" }, { label: "Beneficiarios" }]}
         description="Registra al personal y proveedores a pagar, sus datos y métodos de pago reutilizables."
       />
 

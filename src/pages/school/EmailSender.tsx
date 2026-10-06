@@ -9,7 +9,7 @@ export default function EmailSender() {
       <PageHeader
         title="Correos Electrónicos"
         breadcrumbs={[
-          { label: "Utilidades" },
+          { label: "Comunicación" },
           { label: "Correos Electrónicos" },
         ]}
       />
