@@ -69,11 +69,16 @@ type LayoutEstimateOpts = {
 // ??? p?gina (estrategia UEH: hoja virtual alta; ancho din?mico seg?n materias IV) ??
 const PAGE_H_MAX = 31660; // altura m?xima ~55.80 cm para escalar contenido
 const PAGE_H_BUFFER = 80; // margen extra al ajustar altura real de p?gina
+const WORD_PAGE_MAX = 31680; // límite de Word: 22" por lado
+// Proporción ancho/alto de la hoja oficio (Legal 8,5" × 14"). La hoja virtual se
+// lleva a esta forma para que al imprimir con "Ajustar" llene el oficio completo.
+const OFICIO_RATIO = 215.9 / 355.6;
 const cmToTwips = (cm: number) => Math.round((cm / 2.54) * 1440);
-const MARGIN_LEFT = cmToTwips(0.8); // 0.8 cm
-const MARGIN_RIGHT = cmToTwips(0.8); // 0.8 cm
-const MARGIN_TOP = cmToTwips(0.8); // 0.8 cm
-const MARGIN_BOTTOM = cmToTwips(0.8); // 0.8 cm
+// Márgenes mínimos: al escalar a oficio la impresora ya agrega su borde no imprimible.
+const MARGIN_LEFT = cmToTwips(0.3); // 0.3 cm
+const MARGIN_RIGHT = cmToTwips(0.3); // 0.3 cm
+const MARGIN_TOP = cmToTwips(0.3); // 0.3 cm
+const MARGIN_BOTTOM = cmToTwips(0.3); // 0.3 cm
 const PARA_SPACE_BEFORE = 8;
 const HDR_BLOCK_GAP = 0; // espacio logo/cabecera ? secci?n II (usar mkCompactGap)
 const ST_TABLE_GAP = 30; // espacio secci?n II ? tabla estudiantes
@@ -96,7 +101,7 @@ const IE_LINE_SPACING = 185; // interlineado secci?n II
 const IE_ROW_GAP = 34; // separaci?n vertical entre filas secci?n II
 const IE_TITLE_PAD_TOP = 6; // padding interno celda t?tulo II (no el hueco bajo logo)
 // ??? tabla III + IV (estudiantes) ? ajustar aqu? ?????????????????????
-const ST_COL_III_FIXED = 11201; // III fijo ? no cambia con materias
+const ST_COL_III_FIXED = 11201; // III base ? se ensancha solo para llegar a OFICIO_RATIO
 const IV_MATERIA_W = 450; // ancho columna materia regular
 const IV_PRODUCTIVE_W = 700; // ancho columna materia productiva (m?s ancho para encabezado)
 const IV_GP_W = 700; // columna GP
@@ -149,6 +154,17 @@ const ST_III_COLS = [
   ST_III_MES,
   ST_III_ANO,
 ];
+// Índices de III que absorben el ancho extra (Cédula, Apellidos, Nombres, Lugar).
+const ST_III_IDX_CED = 1;
+const ST_III_IDX_APE = 2;
+const ST_III_IDX_NOM = 3;
+const ST_III_IDX_LUG = 4;
+const ST_III_WIDEN_IDX = [
+  ST_III_IDX_CED,
+  ST_III_IDX_APE,
+  ST_III_IDX_NOM,
+  ST_III_IDX_LUG,
+];
 const ST_ROWS_PER_PAGE = 35;
 const ST_DATA_FONT_SIZE = BODY_DATA_SIZE; // Arial 10 ? datos desde BD en tabla III/IV
 const ST_DATA_ROW_MIN = 412; // altura m?nima fila alumno (UEH: 412)
@@ -191,6 +207,8 @@ type SheetLayout = {
   useSpanishNames: boolean;
   tipoPlanilla: "31059" | "31060";
   logoMarginLeft: number;
+  /** Altura añadida a cada fila de alumno cuando la hoja es más ancha que un oficio. */
+  stDataRowExtra: number;
   ivGpIndex?: number;
   ivGrupoIndex?: number;
 };
@@ -318,6 +336,22 @@ function computeIeDirCedRowCols(contentW: number): number[] {
   return [950, lineDir, 500, 1600, lineCed];
 }
 
+/** Reparte `extra` twips entre Cédula, Apellidos, Nombres y Lugar (proporcional a su ancho). */
+function widenIiiCols(extra: number): number[] {
+  const cols = [...ST_III_COLS];
+  const wSum = ST_III_WIDEN_IDX.reduce((a, idx) => a + cols[idx], 0);
+  let given = 0;
+  ST_III_WIDEN_IDX.forEach((idx, i) => {
+    const add =
+      i === ST_III_WIDEN_IDX.length - 1
+        ? extra - given
+        : Math.floor((extra * cols[idx]) / wSum);
+    cols[idx] += add;
+    given += add;
+  });
+  return cols;
+}
+
 function computeSheetLayout(
   data: ResumenFinalDocxData,
   variant: ResumenFinalDocxVariant,
@@ -325,8 +359,6 @@ function computeSheetLayout(
   const nRegular = data.regularSubjects.length;
   const nProductive = data.productiveSubjects.length;
   const includeGpGrupo = variant.includeGpGrupo;
-  const stIiiCols = [...ST_III_COLS];
-  const stColIii = ST_COL_III_FIXED;
   const stIvCols = [
     ...Array(nRegular).fill(IV_MATERIA_W),
     ...Array(nProductive).fill(IV_PRODUCTIVE_W),
@@ -335,46 +367,77 @@ function computeSheetLayout(
   const stColIv = stIvCols.reduce((a, b) => a + b, 0);
 
   const pageLayoutExtra = variant.pageLayoutExtra;
-  let profesoresWrapExtra = 0;
-  if (pageLayoutExtra?.profesoresWrapEstimate) {
-    const { vCols } = computeColumnWidths(
-      stColIii,
-      stColIv,
-      IV_MATERIA_W,
-      stIvCols,
-      VI_START_AFTER_IV_COLS,
-    );
-    profesoresWrapExtra = estimateProfesoresWrapExtra(
-      [...data.regularSubjects, ...data.productiveSubjects],
-      vCols[2],
-      vCols[3],
-    );
-  }
-  const estimateOpts: LayoutEstimateOpts = {
-    headerExtra: pageLayoutExtra?.headerBlockExtra ?? 0,
-    profesoresWrapExtra,
-  };
-
-  const vScale = computeVerticalScale(
-    nRegular,
-    nProductive,
-    includeGpGrupo,
-    estimateOpts,
-  );
-  const contentW = stColIii + stColIv;
-  const pageW = contentW + MARGIN_LEFT + MARGIN_RIGHT;
-  const pageH =
-    estimateContentHeightAtScale(
+  const estimateFor = (colIii: number) => {
+    let profesoresWrapExtra = 0;
+    if (pageLayoutExtra?.profesoresWrapEstimate) {
+      const { vCols } = computeColumnWidths(
+        colIii,
+        stColIv,
+        IV_MATERIA_W,
+        stIvCols,
+        VI_START_AFTER_IV_COLS,
+      );
+      profesoresWrapExtra = estimateProfesoresWrapExtra(
+        [...data.regularSubjects, ...data.productiveSubjects],
+        vCols[2],
+        vCols[3],
+      );
+    }
+    const estimateOpts: LayoutEstimateOpts = {
+      headerExtra: pageLayoutExtra?.headerBlockExtra ?? 0,
+      profesoresWrapExtra,
+    };
+    const vScale = computeVerticalScale(
       nRegular,
       nProductive,
-      vScale,
       includeGpGrupo,
       estimateOpts,
-    ) +
-    MARGIN_TOP +
-    MARGIN_BOTTOM +
-    PAGE_H_BUFFER +
-    (pageLayoutExtra?.pageBufferExtra ?? 0);
+    );
+    const pageH =
+      estimateContentHeightAtScale(
+        nRegular,
+        nProductive,
+        vScale,
+        includeGpGrupo,
+        estimateOpts,
+      ) +
+      MARGIN_TOP +
+      MARGIN_BOTTOM +
+      PAGE_H_BUFFER +
+      (pageLayoutExtra?.pageBufferExtra ?? 0);
+    return { vScale, pageH };
+  };
+
+  // Hoja más alta que un oficio → ensanchar III hasta OFICIO_RATIO. Se itera
+  // porque una columna V más ancha reduce el texto multilínea (y la altura).
+  const marginsW = MARGIN_LEFT + MARGIN_RIGHT;
+  let extraIiiW = 0;
+  let est = estimateFor(ST_COL_III_FIXED);
+  for (let i = 0; i < 3; i++) {
+    const next = Math.max(
+      0,
+      Math.round(est.pageH * OFICIO_RATIO) -
+        (ST_COL_III_FIXED + stColIv + marginsW),
+    );
+    if (next === extraIiiW) break;
+    extraIiiW = next;
+    est = estimateFor(ST_COL_III_FIXED + extraIiiW);
+  }
+
+  const { vScale } = est;
+  const stIiiCols = widenIiiCols(extraIiiW);
+  const stColIii = ST_COL_III_FIXED + extraIiiW;
+  const contentW = stColIii + stColIv;
+  const pageW = contentW + marginsW;
+
+  // Hoja más ancha que un oficio → alargar las filas de alumnos (hasta el máximo de Word).
+  let pageH = est.pageH;
+  let stDataRowExtra = 0;
+  const targetH = Math.min(WORD_PAGE_MAX, Math.round(pageW / OFICIO_RATIO));
+  if (targetH > pageH) {
+    stDataRowExtra = Math.floor((targetH - pageH) / ST_ROWS_PER_PAGE);
+    pageH += stDataRowExtra * ST_ROWS_PER_PAGE;
+  }
 
   return {
     pageW,
@@ -400,6 +463,7 @@ function computeSheetLayout(
     useSpanishNames:
       (variant.useSpanishNames ?? false) || data.tipoPlanilla === "31060",
     logoMarginLeft: variant.logoMarginLeft ?? 0,
+    stDataRowExtra,
     ...(includeGpGrupo
       ? {
           ivGpIndex: nRegular + nProductive,
@@ -1163,20 +1227,26 @@ function mkStDataRow(
   return mkStHdrRow(
     [
       mkStDataCell(ST_III_NRO, formatStNro(row.nro)),
-      mkStDataCell(ST_III_CED, formatStField(row.cedula)),
       mkStDataCell(
-        ST_III_APE,
+        layout.stIiiCols[ST_III_IDX_CED],
+        formatStField(row.cedula),
+      ),
+      mkStDataCell(
+        layout.stIiiCols[ST_III_IDX_APE],
         layout.useSpanishNames
           ? formatPlanillaStudentText(row.apellidos, true)
           : formatStField(row.apellidos),
       ),
       mkStDataCell(
-        ST_III_NOM,
+        layout.stIiiCols[ST_III_IDX_NOM],
         layout.useSpanishNames
           ? formatPlanillaStudentText(row.nombres, true)
           : formatStField(row.nombres),
       ),
-      mkStDataCell(ST_III_LUG, formatStField(row.lugarNacimiento)),
+      mkStDataCell(
+        layout.stIiiCols[ST_III_IDX_LUG],
+        formatStField(row.lugarNacimiento),
+      ),
       mkStDataCell(
         ST_III_EF,
         formatStField(row.entidadFederal, ST_EMPTY_SHORT),
@@ -1206,7 +1276,7 @@ function mkStDataRow(
       ...productiveCells,
       ...gpCells,
     ],
-    rowH(layout, ST_DATA_ROW_MIN, 280),
+    rowH(layout, ST_DATA_ROW_MIN, 280) + layout.stDataRowExtra,
   );
 }
 
@@ -1339,13 +1409,17 @@ function buildEstudiantesBlock(
       mkStHdrRow(
         [
           mkStHdrCell(ST_III_NRO, RF.NRO, { rowSpan: III_HDR_ROW_SPAN }),
-          mkStHdrCell(ST_III_CED, "", {
+          mkStHdrCell(layout.stIiiCols[ST_III_IDX_CED], "", {
             rowSpan: III_HDR_ROW_SPAN,
             multiline: RF.CEDULA_IDENTIDAD,
           }),
-          mkStHdrCell(ST_III_APE, "Apellidos", { rowSpan: III_HDR_ROW_SPAN }),
-          mkStHdrCell(ST_III_NOM, "Nombres", { rowSpan: III_HDR_ROW_SPAN }),
-          mkStHdrCell(ST_III_LUG, "", {
+          mkStHdrCell(layout.stIiiCols[ST_III_IDX_APE], "Apellidos", {
+            rowSpan: III_HDR_ROW_SPAN,
+          }),
+          mkStHdrCell(layout.stIiiCols[ST_III_IDX_NOM], "Nombres", {
+            rowSpan: III_HDR_ROW_SPAN,
+          }),
+          mkStHdrCell(layout.stIiiCols[ST_III_IDX_LUG], "", {
             rowSpan: III_HDR_ROW_SPAN,
             multiline: RF.LUGAR_NACIMIENTO,
           }),
