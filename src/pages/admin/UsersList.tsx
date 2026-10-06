@@ -54,6 +54,8 @@ import {
   type UserFilters,
   type UserRoleKey,
 } from "@/lib/userFilters";
+import { studentFullName } from "@/lib/studentName";
+import { buildPrimaryRepMap, resolveFamilySurname } from "@/lib/familyDisplayName";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -149,15 +151,18 @@ export default function UsersList() {
       });
 
       const userIds = Array.from(usersMap.keys());
+      // Only staff users get a name in `profiles`; teachers and representatives keep it in the
+      // `form_data` of their own record, so it is resolved below for them.
+      const withoutName = (u: SchoolUser | undefined) => !!u && u.full_name === "Sin nombre";
 
-      // Resolve school names for teachers
+      // Resolve school and name for teachers
       const teacherUserIds = Array.from(usersMap.values())
         .filter((u) => u.role === "teacher")
         .map((u) => u.user_id);
       if (teacherUserIds.length > 0) {
         const { data: teachersData } = await supabase
           .from("teachers")
-          .select("user_id, school_id, schools(name)")
+          .select("user_id, school_id, form_data, schools(name)")
           .in("user_id", teacherUserIds);
         teachersData?.forEach((t: any) => {
           const u = usersMap.get(t.user_id);
@@ -165,6 +170,7 @@ export default function UsersList() {
             u.school_id = t.school_id;
             u.school_name = t.schools?.name || null;
           }
+          if (withoutName(u)) u!.full_name = studentFullName(t.form_data);
         });
       }
 
@@ -175,10 +181,25 @@ export default function UsersList() {
       if (repUserIds.length > 0) {
         const { data: familiesData } = await supabase
           .from("families")
-          .select("id, user_id")
+          .select("id, user_id, father_last_name, mother_last_name")
           .in("user_id", repUserIds);
         const familyIds = familiesData?.map((f: any) => f.id) ?? [];
         if (familyIds.length > 0) {
+          // The account belongs to the family: show its primary representative, or the surname
+          const { data: repsData } = await supabase
+            .from("representatives")
+            .select("family_id, form_data, is_primary")
+            .in("family_id", familyIds);
+          const primaryRep = buildPrimaryRepMap(repsData ?? []);
+          familiesData?.forEach((f) => {
+            const u = usersMap.get(f.user_id);
+            if (!withoutName(u)) return;
+            const rep = primaryRep[f.id];
+            const repName = rep ? studentFullName(rep) : "Sin nombre";
+            const surname = resolveFamilySurname(f, rep);
+            u!.full_name = repName !== "Sin nombre" ? repName : surname ? `Familia ${surname}` : "Sin nombre";
+          });
+
           const { data: famSchools } = await supabase
             .from("family_schools")
             .select("family_id, school_id, schools(name)")
