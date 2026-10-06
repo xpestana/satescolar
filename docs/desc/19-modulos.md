@@ -89,10 +89,25 @@ dentro de los módulos activos.
 | 4.4 | Gate Notas/Boletas/Sábana | ✅ (rutas, menú, pestañas Sábana y Boletas, docente, representante, toggles de bloqueo) |
 | 4.5 | Gate Planillajes del Ministerio | ✅ (pestaña Resumen Final de `/planillas`; Constructor y Configuraciones › Datos comunes siguen gratis) |
 | 4.6 | Gate Pagos | ✅ (rutas `/pagos/*` y `/representative/pagos`, menú, pestaña Facturas, banner de morosidad, plan de pago al inscribir, funciones `send-delinquency-reminders` y `send-payroll-*` desplegadas 2026-10-05) |
-| 5 | Endurecimiento: `school_has_module` en las políticas de escritura | ⏳ opcional |
+| 5 | Endurecimiento: `school_has_module` en las políticas de escritura | ✅ desplegada 2026-10-06 (59 tablas) |
 
-> ⚠️ Hasta la fase 5, el bloqueo es solo de interfaz más Edge Functions. El overlay renderiza la
-> página real desenfocada, así que un usuario técnico podría quitarlo con DevTools.
+## Bloqueo en la base de datos (fase 5)
+- Migración `20261006120000_school_modules_write_policies.sql`: cada tabla de un módulo vendible
+  tiene dos políticas **RESTRICTIVE** para `authenticated`, `module_gate_insert` y
+  `module_gate_update`, con la condición `is_admin() OR school_has_module(school_id, <módulo>)`.
+  Se suman (AND) a las políticas existentes sin reescribirlas.
+- **No** se restringen lecturas (el overlay muestra la página real desenfocada y el colegio sigue
+  viendo su historial al vencer un módulo) ni borrados (no dan valor y algunos flujos de Registro
+  limpian filas relacionadas).
+- No les afectan: el admin, `service_role` (Edge Functions y crons) ni las funciones/triggers
+  `SECURITY DEFINER` (por ejemplo, los que crean códigos de aula y tokens de asistencia al
+  registrar personas). Las RPC `SECURITY DEFINER` que escriben tampoco pasan por estas políticas.
+- Docentes/Áreas (`TEACHING_MODULES`) siguen bloqueados solo en la interfaz: esas tablas las
+  escriben flujos de Registro.
+- Efecto: si un usuario quita el overlay con DevTools, un INSERT falla con *new row violates
+  row-level security policy "module_gate_insert"* y un UPDATE no afecta filas.
+- Para agregar una tabla nueva de un módulo, sumarla a la lista de la migración (o a una nueva
+  con el mismo patrón).
 
 ## Cómo bloquear una pantalla (frontend)
 - **Ruta completa:** en `src/App.tsx`, envolver el elemento con
