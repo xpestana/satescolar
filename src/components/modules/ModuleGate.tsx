@@ -4,11 +4,13 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
-import type { ModuleKey } from "@/lib/modules/moduleCatalog";
+import type { ModuleKey, SellableModuleKey } from "@/lib/modules/moduleCatalog";
+import { isRequirementMet, pitchedModule, requirementModules, type ModuleRequirement } from "@/lib/modules/moduleRequirement";
 import { LockedModuleOverlay } from "./LockedModuleOverlay";
 
 interface ModuleGateProps {
-  module: ModuleKey;
+  /** A module, or a list meaning "any of these". */
+  module: ModuleRequirement;
   children: ReactNode;
 }
 
@@ -26,7 +28,7 @@ export function ModuleGate({ module, children }: ModuleGateProps) {
   const { userRole } = useAuth();
   const { isLoading, isActive, getState, getStatus } = useSchoolModules();
 
-  if (module === "registration" || isActive(module)) return <>{children}</>;
+  if (isRequirementMet(module, isActive)) return <>{children}</>;
 
   if (isLoading) {
     return (
@@ -40,9 +42,12 @@ export function ModuleGate({ module, children }: ModuleGateProps) {
     return <Navigate to={ROLE_HOME[userRole]} replace />;
   }
 
-  const expiredAt = getStatus(module) === "expired" ? getState(module)?.expires_at ?? null : null;
+  const pitched = pitchedModule(module);
+  if (pitched === "registration") return <>{children}</>;
+  const alternatives = requirementModules(module).filter((key): key is SellableModuleKey => key !== pitched && key !== "registration");
+  const expiredAt = getStatus(pitched) === "expired" ? getState(pitched)?.expires_at ?? null : null;
   return (
-    <LockedModuleView module={module} expiredAt={expiredAt}>
+    <LockedModuleView module={pitched} alternatives={alternatives} expiredAt={expiredAt}>
       {children}
     </LockedModuleView>
   );
@@ -50,11 +55,12 @@ export function ModuleGate({ module, children }: ModuleGateProps) {
 
 interface LockedModuleViewProps {
   module: Exclude<ModuleKey, "registration">;
+  alternatives: SellableModuleKey[];
   expiredAt: string | null;
   children: ReactNode;
 }
 
-function LockedModuleView({ module, expiredAt, children }: LockedModuleViewProps) {
+function LockedModuleView({ module, alternatives, expiredAt, children }: LockedModuleViewProps) {
   const { school } = useSchoolData();
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -74,7 +80,7 @@ function LockedModuleView({ module, expiredAt, children }: LockedModuleViewProps
         {children}
       </div>
       <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/40 p-4">
-        <LockedModuleOverlay module={module} schoolName={school?.name} expiredAt={expiredAt} />
+        <LockedModuleOverlay module={module} alternatives={alternatives} schoolName={school?.name} expiredAt={expiredAt} />
       </div>
     </div>
   );

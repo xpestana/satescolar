@@ -9,6 +9,8 @@ import { Link } from "react-router-dom";
 interface Props {
   schoolId: string | null;
   activeSchoolYearId: string | null;
+  /** False when the school has no module that uses teachers (see TEACHING_MODULES). */
+  includeTeaching?: boolean;
 }
 
 interface PendingItem {
@@ -18,9 +20,9 @@ interface PendingItem {
   link?: string;
 }
 
-export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
+export function PendingItemsCard({ schoolId, activeSchoolYearId, includeTeaching = true }: Props) {
   const { data: items, isLoading } = useQuery({
-    queryKey: ["dashboard-pending", schoolId, activeSchoolYearId],
+    queryKey: ["dashboard-pending", schoolId, activeSchoolYearId, includeTeaching],
     queryFn: async () => {
       const pending: PendingItem[] = [];
 
@@ -55,7 +57,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
       }
 
       // 2. Teachers without assignments in active year
-      if (activeSchoolYearId) {
+      if (activeSchoolYearId && includeTeaching) {
         const [{ data: allTeachers }, { data: assignedTeachers }] = await Promise.all([
           supabase
             .from("teachers")
@@ -84,7 +86,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId }: Props) {
       }
 
       // 3. Subjects not assigned to any teacher
-      if (activeSchoolYearId) {
+      if (activeSchoolYearId && includeTeaching) {
         const [{ data: allSubjects }, { data: assignedSubjects }] = await Promise.all([
           supabase
             .from("school_subjects")

@@ -2,12 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ModuleGate } from "./ModuleGate";
+import { TEACHING_MODULES, type ModuleRequirement } from "@/lib/modules/moduleRequirement";
 
 const auth = { userRole: "school" as string };
 const modules = {
   isLoading: false,
   active: true,
   expiresAt: null as string | null,
+  /** When set, only these keys are active (overrides `active`). */
+  activeKeys: null as string[] | null,
 };
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => auth }));
@@ -15,17 +18,17 @@ vi.mock("@/hooks/useSchoolData", () => ({ useSchoolData: () => ({ school: { name
 vi.mock("@/hooks/useSchoolModules", () => ({
   useSchoolModules: () => ({
     isLoading: modules.isLoading,
-    isActive: () => modules.active,
+    isActive: (key: string) => (modules.activeKeys ? modules.activeKeys.includes(key) : modules.active),
     getState: () => ({ enabled: true, expires_at: modules.expiresAt }),
     getStatus: () => (modules.active ? "active" : modules.expiresAt ? "expired" : "disabled"),
   }),
 }));
 
-function renderGate() {
+function renderGate(module: ModuleRequirement = "payments") {
   return render(
     <MemoryRouter initialEntries={["/pagos"]}>
       <Routes>
-        <Route path="/pagos" element={<ModuleGate module="payments"><p>Contenido real</p></ModuleGate>} />
+        <Route path="/pagos" element={<ModuleGate module={module}><p>Contenido real</p></ModuleGate>} />
         <Route path="/teacher/dashboard" element={<p>Inicio docente</p>} />
         <Route path="/representative/dashboard" element={<p>Inicio representante</p>} />
       </Routes>
@@ -38,6 +41,7 @@ beforeEach(() => {
   modules.isLoading = false;
   modules.active = true;
   modules.expiresAt = null;
+  modules.activeKeys = null;
 });
 
 describe("ModuleGate", () => {
@@ -85,5 +89,19 @@ describe("ModuleGate", () => {
     renderGate();
     expect(screen.queryByText("Contenido real")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /whatsapp/i })).not.toBeInTheDocument();
+  });
+
+  it("opens an any-of requirement when one of its modules is active", () => {
+    modules.activeKeys = ["attendance"];
+    renderGate(TEACHING_MODULES);
+    expect(screen.getByText("Contenido real")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /whatsapp/i })).not.toBeInTheDocument();
+  });
+
+  it("pitches the first module and lists the alternatives when none is active", () => {
+    modules.activeKeys = ["payments"];
+    renderGate(TEACHING_MODULES);
+    expect(screen.getByText(/siguiente nivel con Notas, Boletas y Sábana/)).toBeInTheDocument();
+    expect(screen.getByText(/Aula Virtual o Control de Asistencias/)).toBeInTheDocument();
   });
 });

@@ -38,7 +38,7 @@ import { useSidebarState } from "@/hooks/useSidebarState";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ShieldCheck, Receipt, ReceiptText, Lock } from "lucide-react";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
-import type { ModuleKey } from "@/lib/modules/moduleCatalog";
+import { isRequirementMet, TEACHING_MODULES, type ModuleRequirement } from "@/lib/modules/moduleRequirement";
 import logo from "@/assets/logo.svg";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ interface NavItem {
   permission?: string; // si está y el school user no es owner ni lo tiene, se oculta
   ownerOnly?: boolean;
   /** Module the item belongs to: locked (🔒) for school staff, hidden for other roles when inactive. */
-  module?: ModuleKey;
+  module?: ModuleRequirement;
 }
 
 interface NavSection {
@@ -93,9 +93,9 @@ const navSections: NavSection[] = [
     requiredRole: "school",
     items: [
       { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school", permission: "families.view" },
-      { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school", permission: "teachers.view" },
-      { label: "Áreas", href: "/registros/areas", icon: GraduationCap, requiredRole: "school", permission: "subjects.view" },
-      { label: "Asignación de Áreas", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school", permission: "subjects.manage" },
+      { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school", permission: "teachers.view", module: TEACHING_MODULES },
+      { label: "Áreas", href: "/registros/areas", icon: GraduationCap, requiredRole: "school", permission: "subjects.view", module: TEACHING_MODULES },
+      { label: "Asignación de Áreas", href: "/registros/asignacion-areas", icon: LinkIcon, requiredRole: "school", permission: "subjects.manage", module: TEACHING_MODULES },
       { label: "Búsqueda Avanzada", href: "/registros/busqueda-avanzada", icon: Search, requiredRole: "school" },
     ],
   },
@@ -200,7 +200,8 @@ export function AppSidebar() {
   const { familyName } = useRepresentativeFamily();
   const { isOwner, has, loading: permLoading } = usePermissions();
   const { isActive: isModuleActive, isLoading: modulesLoading } = useSchoolModules();
-  const isItemLocked = (item: NavItem) => !!item.module && !modulesLoading && !isModuleActive(item.module);
+  const isItemLocked = (item: NavItem) =>
+    !!item.module && !modulesLoading && !isRequirementMet(item.module, isModuleActive);
 
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const isMobile = useIsMobile();

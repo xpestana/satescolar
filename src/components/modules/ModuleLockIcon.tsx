@@ -1,17 +1,17 @@
 import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
-import type { ModuleKey } from "@/lib/modules/moduleCatalog";
+import { isRequirementMet, type ModuleRequirement } from "@/lib/modules/moduleRequirement";
 
 interface ModuleLockIconProps {
-  module: ModuleKey;
+  module: ModuleRequirement;
   className?: string;
 }
 
 /** Small lock shown next to a tab or button whose module is not active for the school. */
 export function ModuleLockIcon({ module, className }: ModuleLockIconProps) {
   const { isLoading, isActive } = useSchoolModules();
-  if (isLoading || isActive(module)) return null;
+  if (isLoading || isRequirementMet(module, isActive)) return null;
   return (
     <Lock
       className={cn("h-3 w-3 flex-shrink-0 text-muted-foreground", className)}

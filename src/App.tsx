@@ -59,6 +59,7 @@ import RepStudentGrades from "./pages/representative/StudentGrades";
 import ClassroomSupervision from "./pages/school/ClassroomSupervision";
 import AttendanceScan from "./pages/AttendanceScan";
 import { ModuleRoute } from "@/components/modules/ModuleRoute";
+import { TEACHING_MODULES } from "@/lib/modules/moduleRequirement";
 import AttendanceScanner from "./pages/school/AttendanceScanner";
 import AttendanceList from "./pages/school/AttendanceList";
 import AttendanceDashboard from "./pages/school/AttendanceDashboard";
@@ -230,7 +231,9 @@ const App = () => (
                 path="/registros/areas"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <SubjectsList />
+                    <ModuleRoute module={TEACHING_MODULES}>
+                      <SubjectsList />
+                    </ModuleRoute>
                   </ProtectedRoute>
                 }
               />
@@ -238,7 +241,9 @@ const App = () => (
                 path="/registros/asignacion-areas"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <SubjectAssignments />
+                    <ModuleRoute module={TEACHING_MODULES}>
+                      <SubjectAssignments />
+                    </ModuleRoute>
                   </ProtectedRoute>
                 }
               />
@@ -246,7 +251,9 @@ const App = () => (
                 path="/registros/docentes"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <TeachersList />
+                    <ModuleRoute module={TEACHING_MODULES}>
+                      <TeachersList />
+                    </ModuleRoute>
                   </ProtectedRoute>
                 }
               />
@@ -254,7 +261,9 @@ const App = () => (
                 path="/registros/docentes/nuevo"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <AddTeacher />
+                    <ModuleRoute module={TEACHING_MODULES}>
+                      <AddTeacher />
+                    </ModuleRoute>
                   </ProtectedRoute>
                 }
               />
@@ -262,7 +271,9 @@ const App = () => (
                 path="/registros/docentes/:teacherId/editar"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <AddTeacher />
+                    <ModuleRoute module={TEACHING_MODULES}>
+                      <AddTeacher />
+                    </ModuleRoute>
                   </ProtectedRoute>
                 }
               />

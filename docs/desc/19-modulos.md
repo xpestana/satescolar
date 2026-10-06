@@ -24,7 +24,7 @@ dentro de los módulos activos.
 
 | Clave | Nombre | Incluye |
 |---|---|---|
-| `registration` | Registro (gratis) | Familias, estudiantes, representantes, docentes, áreas y asignación, inscripciones, búsqueda avanzada, ajustes del colegio (años, formularios, planilla de inscripción, usuarios y permisos, plantillas de correo), carnet, constructor de documentos, Datos comunes de `/planillas`. |
+| `registration` | Registro (gratis) | Familias, estudiantes, representantes, inscripciones, búsqueda avanzada, ajustes del colegio (años, formularios, planilla de inscripción, usuarios y permisos, plantillas de correo), carnet, constructor de documentos, Datos comunes de `/planillas`. |
 | `messaging` | Mensajes Masivos | `/utilidades/correo` (composer + historial); `send-email` cuando lo llama un usuario `school`. |
 | `payments` | Pagos | `/pagos/*` (incluye nómina y morosidad), pestaña Facturas de `/formatos`, `/representative/pagos` y el banner de morosidad, sección "plan de pago" al inscribir, `send-delinquency-reminders`, `send-payroll-*` y sus crons. |
 | `grades` | Notas, Boletas y Sábana | `/notas/consulta`, `ajustes-notas`, pestaña Boletas de `/formatos`, pestaña Sábana de `/planillas`, notas del docente y del representante, toggles de bloqueo de boleta. |
@@ -44,6 +44,12 @@ dentro de los módulos activos.
   plan de pago.
 - **Notas → Planillajes:** Resumen Final lee `final_grades`, así que `ministry_forms` sin `grades`
   genera planillas vacías. El admin ve una advertencia en ese caso.
+- **Docentes y Áreas → Notas, Aula Virtual o Asistencias:** Docentes, Áreas y Asignación de
+  Áreas solo sirven si el colegio puede usar a sus docentes, así que se habilitan con **cualquiera**
+  de `grades`, `virtual_classroom` o `attendance` (`TEACHING_MODULES` en
+  `src/lib/modules/moduleRequirement.ts`). Si no tiene ninguno, se ven con el overlay de Notas, que
+  menciona las alternativas. Sin ellos, el dashboard del colegio omite los avisos de docentes sin
+  áreas y el gráfico de carga docente.
 - **Asistencias ↔ Carnet:** el carnet (con QR) es gratis; escanearlo requiere `attendance`.
 
 ## Gestión desde el admin (`/admin/colegios/:id/modulos`)
@@ -99,12 +105,17 @@ dentro de los módulos activos.
   ve sus áreas sin plan ni "Registrar Notas", y `StudentGradeAccessToggle` no se renderiza.
 - **Menú:** agregar `module: "payments"` al ítem de `AppSidebar.tsx`. Si el módulo está
   inactivo, el personal del colegio lo ve con 🔒 y a los demás roles se les oculta.
-- En la lógica, usar `useSchoolModules().isActive(key)`. Para el admin siempre da true.
+- **Varios módulos ("cualquiera de"):** `module` acepta una lista, por ejemplo
+  `<ModuleRoute module={TEACHING_MODULES}>` o `module: TEACHING_MODULES` en el menú. El overlay
+  vende el primero de la lista y nombra los demás.
+- En la lógica, usar `useSchoolModules().isActive(key)` o
+  `isRequirementMet(lista, isActive)`. Para el admin siempre da true.
 
 ## Archivos clave (código)
 - `supabase/migrations/20261005120000_create_school_modules.sql`
 - `src/lib/modules/moduleCatalog.ts`: claves, nombres y textos de venta (con test).
 - `src/lib/modules/moduleStatus.ts`: `isModuleActive`, `getModuleStatus`, `daysUntilExpiry` (con test).
+- `src/lib/modules/moduleRequirement.ts`: requisitos "cualquiera de" y `TEACHING_MODULES` (con test).
 - `src/lib/modules/salesContact.ts`: WhatsApp de ventas y mensaje prellenado (con test).
 - `src/hooks/useCurrentSchoolId.ts` (colegio según el rol) y `src/hooks/useSchoolModules.ts`.
 - `src/components/modules/`: `ModuleRoute`, `RouteModuleContext`, `ModuleGate` (con test),

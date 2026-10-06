@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import type { ModuleKey } from "@/lib/modules/moduleCatalog";
+import type { ModuleRequirement } from "@/lib/modules/moduleRequirement";
 import { RouteModuleContext } from "./RouteModuleContext";
 
 interface ModuleRouteProps {
-  module: ModuleKey;
+  /** A module, or a list meaning "any of these". */
+  module: ModuleRequirement;
   children: ReactNode;
 }
 

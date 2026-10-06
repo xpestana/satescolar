@@ -97,7 +97,10 @@ export default function SchoolModules() {
           <div>
             <p className="font-semibold">Registro</p>
             <p className="text-sm text-muted-foreground">
-              Gratis y siempre activo: familias, estudiantes, docentes, áreas, inscripciones, carnet y ajustes.
+              Gratis y siempre activo: familias, estudiantes, inscripciones, carnet y ajustes.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Docentes, Áreas y Asignación de Áreas se habilitan con Notas, Aula Virtual o Control de Asistencias.
             </p>
           </div>
         </div>

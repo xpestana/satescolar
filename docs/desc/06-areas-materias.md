@@ -3,7 +3,7 @@
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
 >
-> 📦 **Módulo:** Registro (gratis). Ver [19-modulos](19-modulos.md).
+> 📦 **Módulo:** se habilita con cualquiera de `grades`, `virtual_classroom` o `attendance` (`TEACHING_MODULES`). Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Definición de las áreas (materias) del colegio y su asignación a docentes/secciones.

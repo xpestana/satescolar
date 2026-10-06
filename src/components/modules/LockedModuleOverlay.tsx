@@ -9,12 +9,14 @@ import { MODULE_ICONS } from "./moduleIcons";
 
 interface LockedModuleOverlayProps {
   module: SellableModuleKey;
+  /** Other modules that would also unlock this screen (for "any of" requirements). */
+  alternatives?: SellableModuleKey[];
   schoolName?: string | null;
   /** ISO date the module expired on; when set, the copy invites to renew. */
   expiredAt?: string | null;
 }
 
-export function LockedModuleOverlay({ module, schoolName, expiredAt }: LockedModuleOverlayProps) {
+export function LockedModuleOverlay({ module, alternatives = [], schoolName, expiredAt }: LockedModuleOverlayProps) {
   const info = MODULE_CATALOG[module];
   const Icon = MODULE_ICONS[module];
   const expired = !!expiredAt;
@@ -60,6 +62,16 @@ export function LockedModuleOverlay({ module, schoolName, expiredAt }: LockedMod
             </li>
           ))}
         </ul>
+
+        {alternatives.length > 0 && (
+          <p className="rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+            Esta sección también se habilita con{" "}
+            <span className="font-medium text-foreground">
+              {alternatives.map((key) => MODULE_CATALOG[key].name).join(" o ")}
+            </span>
+            .
+          </p>
+        )}
 
         <Button asChild size="lg" className="w-full bg-[#25D366] text-white hover:bg-[#1ebe5b]">
           <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">

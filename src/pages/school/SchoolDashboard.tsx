@@ -10,11 +10,15 @@ import { Users, UserCheck, GraduationCap, UsersRound, BookOpen, UserPlus, Clipbo
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
+import { useSchoolModules } from "@/hooks/useSchoolModules";
+import { isRequirementMet, TEACHING_MODULES } from "@/lib/modules/moduleRequirement";
 import { useQuery } from "@tanstack/react-query";
 
 export default function SchoolDashboard() {
   const { schoolId } = useSchoolId();
   const { school } = useSchoolData();
+  const { isActive: isModuleActive } = useSchoolModules();
+  const hasTeaching = isRequirementMet(TEACHING_MODULES, isModuleActive);
 
   // Get active school year
   const { data: activeSchoolYear } = useQuery({
@@ -232,7 +236,11 @@ export default function SchoolDashboard() {
         </div>
 
         {/* Pending Items */}
-        <PendingItemsCard schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+        <PendingItemsCard
+          schoolId={schoolId}
+          activeSchoolYearId={activeSchoolYear?.id ?? null}
+          includeTeaching={hasTeaching}
+        />
 
         {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -241,10 +249,12 @@ export default function SchoolDashboard() {
         </div>
 
         {/* Charts Row 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${hasTeaching ? "lg:grid-cols-3" : "lg:grid-cols-2"}`}>
           <GradeLevelDistributionChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
           <EnrollmentTypeChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
-          <TeacherWorkloadChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+          {hasTeaching && (
+            <TeacherWorkloadChart schoolId={schoolId} activeSchoolYearId={activeSchoolYear?.id ?? null} />
+          )}
         </div>
 
       </div>
