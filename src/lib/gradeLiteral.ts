@@ -13,6 +13,23 @@ export function numericToLiteralGrade(n: number): string {
   return "D";
 }
 
+/**
+ * Literal de primaria según la nota numérica (redondeada a entero):
+ * A 19–20, B 16–18, C 13–15, D 10–12, E 01–09. Vacío o fuera de 0–20 → "".
+ */
+export function primaryLiteralFromGrade(value: string | number | null | undefined): string {
+  const s = String(value ?? "").trim();
+  if (!s) return "";
+  const n = Number(s);
+  if (isNaN(n) || n < 0 || n > 20) return "";
+  const score = Math.round(n);
+  if (score >= 19) return "A";
+  if (score >= 16) return "B";
+  if (score >= 13) return "C";
+  if (score >= 10) return "D";
+  return "E";
+}
+
 export function formatBoletaGradeValue(
   n: number,
   evaluationType: string | undefined,

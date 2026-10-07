@@ -114,6 +114,23 @@ Pantalla `GradesConsultation`. Filtros comunes arriba: **Año Escolar → Área 
    En primaria descriptivo aquí también se edita la **firma del docente** del área.
 3. **Descarga de Boletas** — genera el PDF. Preescolar está "Próximamente".
 
+**Definitiva Final numérica (bachillerato y primaria):** mientras no haya una guardada, la columna
+Definitiva Final propone el promedio de los momentos 1–3 (suma entre 3; un momento sin nota cuenta
+0; 2 decimales). Si hay una guardada, se muestra esa. Si después cambian los momentos y los tres
+están completos, aparece el aviso "el promedio ya no coincide" con un botón para aplicarlo.
+Bachillerato la guarda en `final_grades` (`momento = 0`); primaria en
+`primary_final_reports.literal_numerico` (`momento = 0`), y en primaria **todavía no viene de una
+nota del docente**: las notas numéricas de los momentos se escriben a mano. Reglas puras en
+`src/lib/finalGradeAverage.ts`. "Guardar Todos" en primaria guarda también la nota numérica.
+
+**Literal de la Definitiva Final (primaria):** si no hay literal guardado, se llena con el que
+corresponde a la nota numérica de la definitiva (guardada o propuesta), con la escala
+**A 19–20, B 16–18, C 13–15, D 10–12, E 01–09** (la nota se redondea a entero antes;
+`primaryLiteralFromGrade` en `src/lib/gradeLiteral.ts`). Queda pendiente hasta que se guarde. Al
+cambiar la nota numérica de la definitiva, o al aplicar el nuevo promedio, el literal se reajusta;
+la docente puede cambiarlo a mano antes de guardar. Ese literal es el que marca la `X` en el Resumen
+Final de primaria.
+
 > Las funciones `download*Boleta` **no descargan**: devuelven el HTML de la boleta. `GradesConsultation`
 > lo pasa por `openBoletaPreview` → `htmlToPdfBlob` (html2canvas + jsPDF) → lo muestra en un
 > `<iframe>` dentro de un modal, y la descarga real la hace el botón del modal. Por eso **toda

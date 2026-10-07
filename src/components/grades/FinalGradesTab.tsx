@@ -17,6 +17,8 @@ import PreschoolFinalReportModal from "./PreschoolFinalReportModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NUMERIC_GRADES, PRIMARY_GRADES, PRESCHOOL_GRADES } from "@/lib/gradeLevels";
 import { useGradeStudents } from "@/hooks/useGradeStudents";
+import { completeMomentsAverage, isFinalGradeStale, proposeFinalGrade } from "@/lib/finalGradeAverage";
+import { primaryLiteralFromGrade } from "@/lib/gradeLiteral";
 
 
 const STATUS_OPTIONS = [
@@ -84,6 +86,8 @@ export default function FinalGradesTab({
   const [savingLiteralKeys, setSavingLiteralKeys] = useState<Set<string>>(new Set());
   /** Claves studentId-0 persistidas en esta sesión tras guardar (momento=0 en final_grades). */
   const [sessionPersistedMomento0, setSessionPersistedMomento0] = useState<Set<string>>(new Set());
+  /** Primaria: alumnos con alguna nota numérica de momento cambiada en esta sesión. */
+  const [primaryMomentEdited, setPrimaryMomentEdited] = useState<Set<string>>(new Set());
 
   const editedGradesRef = useRef(editedGrades);
   editedGradesRef.current = editedGrades;
@@ -123,7 +127,9 @@ export default function FinalGradesTab({
   });
 
   const assignment = assignments[0] || null;
-  const assignmentIds = assignments.map((a: any) => a.id);
+  // Memorizado: las cargas iniciales de primaria/preescolar dependen de él; un arreglo nuevo en cada
+  // render las volvía a ejecutar y pisaba lo que se estaba escribiendo.
+  const assignmentIds = useMemo(() => assignments.map((a: any) => a.id), [assignments]);
   const isGcrpQuery = assignment?.subject?.subject_type === "gcrp";
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = isGcrpQuery || (gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false);
@@ -301,6 +307,7 @@ export default function FinalGradesTab({
     setSavingLiteralKeys(new Set());
     setSavedKeys(new Set());
     setSessionPersistedMomento0(new Set());
+    setPrimaryMomentEdited(new Set());
     setInitialized(false);
   }, [selectedSubject, selectedSection, selectedGcrpAssignment, effectiveYear]);
 
@@ -322,12 +329,20 @@ export default function FinalGradesTab({
         const existing = primaryReports.find(
           (pr: any) => pr.student_id === s.student_id && pr.momento === m && pr.assignment_id === assignmentId
         );
+        // Definitiva sin número guardado: se propone el promedio de los momentos (como bachillerato).
+        const proposedFinal = m === 0
+          ? proposeFinalGrade([1, 2, 3].map(mo => primaryReports.find(
+              (pr: { student_id: string; momento: number; assignment_id: string }) =>
+                pr.student_id === s.student_id && pr.momento === mo && pr.assignment_id === assignmentId
+            )?.literal_numerico))
+          : "";
         if (existing) {
-          lits[key] = (existing as any).literal || "";
-          dbLits[key] = (existing as any).literal || "";
           const numVal = (existing as any).literal_numerico;
-          litsNum[key] = numVal != null ? String(numVal) : "";
+          litsNum[key] = numVal != null ? String(numVal) : proposedFinal;
           dbLitsNum[key] = numVal != null ? String(numVal) : "";
+          // Definitiva sin literal guardado: el que corresponde a su nota numérica.
+          lits[key] = (existing as any).literal || (m === 0 ? primaryLiteralFromGrade(litsNum[key]) : "");
+          dbLits[key] = (existing as any).literal || "";
           const ef: ExtraFields = {
             observation: "",
             attendance_count: (existing as any).attendance_count ?? 0,
@@ -337,9 +352,9 @@ export default function FinalGradesTab({
           extra[key] = { ...ef };
           dbExtra[key] = { ...ef };
         } else {
-          lits[key] = "";
+          lits[key] = primaryLiteralFromGrade(proposedFinal);
           dbLits[key] = "";
-          litsNum[key] = "";
+          litsNum[key] = proposedFinal;
           dbLitsNum[key] = "";
           if (m === 0) {
             let totalAtt = 0, totalAbs = 0;
@@ -499,17 +514,18 @@ export default function FinalGradesTab({
     setEditedGrades(prev => ({ ...prev, [`${studentId}-${momento}`]: value }));
   };
 
-  const calculateAnnualAverageFromMoments = useCallback((studentId: string): string | null => {
-    const vals: number[] = [];
-    for (const m of [1, 2, 3]) {
-      const v = (editedGrades[`${studentId}-${m}`] || "").trim();
-      if (!v) return null;
-      const num = Number(v);
-      if (isNaN(num)) return null;
-      vals.push(num);
-    }
-    return (vals.reduce((a, b) => a + b, 0) / 3).toFixed(2);
-  }, [editedGrades]);
+  const calculateAnnualAverageFromMoments = useCallback(
+    (studentId: string): string | null =>
+      completeMomentsAverage([1, 2, 3].map(m => editedGrades[`${studentId}-${m}`])),
+    [editedGrades],
+  );
+
+  /** Primaria: promedio de las notas numéricas de los tres momentos (null si falta alguno). */
+  const calculatePrimaryAverageFromMoments = useCallback(
+    (studentId: string): string | null =>
+      completeMomentsAverage([1, 2, 3].map(m => literalNumericos[`${studentId}-${m}`])),
+    [literalNumericos],
+  );
 
   const handleExtraChange = (key: string, field: keyof ExtraFields, value: string | number) => {
     setExtraFields(prev => ({ ...prev, [key]: { ...(prev[key] || DEFAULT_EXTRA), [field]: value } }));
@@ -521,12 +537,17 @@ export default function FinalGradesTab({
     setLiterals(prev => ({ ...prev, [`${studentId}-${momento}`]: cleaned }));
   };
 
-  const savePrimaryReport = useCallback(async (studentId: string, momento: number) => {
+  /** `overrides`: valores recién puestos que el estado todavía no refleja. */
+  const savePrimaryReport = useCallback(async (
+    studentId: string,
+    momento: number,
+    overrides: { numeric?: string; literal?: string } = {},
+  ) => {
     if (assignmentIds.length === 0) return;
     const key = `${studentId}-${momento}`;
-    const literal = literals[key] || "";
+    const literal = overrides.literal ?? literals[key] ?? "";
     const dbLiteral = dbLiterals[key] || "";
-    const litNum = literalNumericos[key] ?? "";
+    const litNum = overrides.numeric ?? literalNumericos[key] ?? "";
     const dbLitNum = dbLiteralNumericos[key] ?? "";
     const ef = extraFields[key] || DEFAULT_EXTRA;
     const dbEf = dbExtraFields[key] || DEFAULT_EXTRA;
@@ -553,9 +574,10 @@ export default function FinalGradesTab({
         final_status: ef.final_status || null,
         updated_at: new Date().toISOString(),
       };
-      await supabase
+      const { error } = await supabase
         .from("primary_final_reports" as any)
         .upsert(payload as any, { onConflict: "student_id,assignment_id,momento" });
+      if (error) throw error;
 
       setDbLiterals(prev => ({ ...prev, [key]: literal }));
       setDbLiteralNumericos(prev => ({ ...prev, [key]: litNum }));
@@ -640,10 +662,16 @@ export default function FinalGradesTab({
       cur.final_status !== db.final_status;
   }, [extraFields, dbExtraFields]);
 
+  /** Primaria: nota numérica distinta de la guardada (incluye la definitiva propuesta sin guardar). */
+  const isNumericDirty = useCallback((key: string): boolean => {
+    return (literalNumericos[key] ?? "").trim() !== (dbLiteralNumericos[key] ?? "").trim();
+  }, [literalNumericos, dbLiteralNumericos]);
+
   const isAnyDirty = useCallback((key: string): boolean => {
-    if (isPrimary || isPreschool) return isLiteralDirty(key) || isExtraDirty(key);
+    if (isPrimary) return isLiteralDirty(key) || isNumericDirty(key) || isExtraDirty(key);
+    if (isPreschool) return isLiteralDirty(key) || isExtraDirty(key);
     return isDirty(key) || isExtraDirty(key);
-  }, [isPrimary, isPreschool, isDirty, isLiteralDirty, isExtraDirty]);
+  }, [isPrimary, isPreschool, isDirty, isLiteralDirty, isNumericDirty, isExtraDirty]);
 
   const dirtyCountByMomento = useMemo(() => {
     const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
@@ -695,16 +723,29 @@ export default function FinalGradesTab({
     return count;
   }, [students, needsSave]);
 
+  /** Primaria: definitiva (nota numérica o literal) en pantalla que aún no está guardada tal cual. */
+  const isUnpersistedPrimaryDefinitiva = useCallback(
+    (key: string) =>
+      isPrimary &&
+      (((literalNumericos[key] ?? "").trim() !== "" && isNumericDirty(key)) ||
+        ((literals[key] ?? "") !== "" && isLiteralDirty(key))),
+    [isPrimary, literalNumericos, literals, isNumericDirty, isLiteralDirty],
+  );
+
   const unpersistedDefinitivaCount = useMemo(() => {
-    if (!isBachillerato) return 0;
+    if (!isBachillerato && !isPrimary) return 0;
     let count = 0;
     for (const s of students) {
       const key = `${s.student_id}-0`;
+      if (isPrimary) {
+        if (isUnpersistedPrimaryDefinitiva(key)) count++;
+        continue;
+      }
       const val = (editedGrades[key] || "").trim();
       if (val && !isMomento0Persisted(key)) count++;
     }
     return count;
-  }, [students, editedGrades, isBachillerato, isMomento0Persisted]);
+  }, [students, editedGrades, isBachillerato, isPrimary, isMomento0Persisted, isUnpersistedPrimaryDefinitiva]);
 
   const buildUpsertPayload = (studentId: string, momento: number, gradeValue: string, adjVal: number, ef: ExtraFields) => ({
     student_id: studentId,
@@ -800,6 +841,36 @@ export default function FinalGradesTab({
     await saveGrade(studentId, 0);
   }, [saveGrade]);
 
+  /** Primaria: pone en la definitiva el promedio actual de los momentos (y su literal) y lo guarda. */
+  const applyRecalculatedPrimaryFinal = useCallback(async (studentId: string, newAverage: string) => {
+    const key = `${studentId}-0`;
+    const literal = primaryLiteralFromGrade(newAverage);
+    setLiteralNumericos(prev => ({ ...prev, [key]: newAverage }));
+    setLiterals(prev => ({ ...prev, [key]: literal }));
+    await savePrimaryReport(studentId, 0, { numeric: newAverage, literal });
+  }, [savePrimaryReport]);
+
+  /**
+   * Primaria: cambiar un momento habilita el aviso de recalcular la definitiva de ese alumno.
+   * Cambiar la definitiva a mano lo retira (la docente puede poner la que quiera) y ajusta su literal.
+   */
+  const handlePrimaryNumericChange = (studentId: string, momento: number, value: string) => {
+    const key = `${studentId}-${momento}`;
+    setLiteralNumericos(prev => ({ ...prev, [key]: value }));
+    if (momento !== 0) {
+      setPrimaryMomentEdited(prev => new Set(prev).add(studentId));
+      return;
+    }
+    setPrimaryMomentEdited(prev => {
+      if (!prev.has(studentId)) return prev;
+      const next = new Set(prev);
+      next.delete(studentId);
+      return next;
+    });
+    const literal = primaryLiteralFromGrade(value);
+    if (literal) setLiterals(prev => ({ ...prev, [key]: literal }));
+  };
+
   const adjustPoint = useCallback(async (studentId: string, momento: number, delta: number) => {
     if (assignmentIds.length === 0) return;
     const key = `${studentId}-${momento}`;
@@ -847,12 +918,15 @@ export default function FinalGradesTab({
             const key = `${s.student_id}-${m}`;
             if (!needsSave(key, m)) continue;
             const ef = extraFields[key] || DEFAULT_EXTRA;
+            const litNum = (literalNumericos[key] ?? "").trim();
             upserts.push({
               student_id: s.student_id,
               assignment_id: assignmentIds[0],
               school_id: schoolId,
               momento: m,
               literal: literals[key] || "",
+              // Solo primary_final_reports tiene nota numérica.
+              ...(isPrimary ? { literal_numerico: litNum !== "" ? parseFloat(litNum) : null } : {}),
               attendance_count: ef.attendance_count,
               absence_count: ef.absence_count,
               final_status: ef.final_status || null,
@@ -861,18 +935,22 @@ export default function FinalGradesTab({
           }
         }
         if (upserts.length > 0) {
-          await supabase
+          const { error } = await supabase
             .from(tableName as any)
             .upsert(upserts as any, { onConflict: "student_id,assignment_id,momento" });
+          if (error) throw error;
         }
         const newDbLits = { ...dbLiterals };
+        const newDbLitNums = { ...dbLiteralNumericos };
         const newDbExtra = { ...dbExtraFields };
         for (const u of upserts) {
           const k = `${u.student_id}-${u.momento}`;
           newDbLits[k] = u.literal;
+          if (isPrimary) newDbLitNums[k] = (literalNumericos[k] ?? "").trim();
           newDbExtra[k] = { observation: "", attendance_count: u.attendance_count, absence_count: u.absence_count, final_status: u.final_status || "" };
         }
         setDbLiterals(newDbLits);
+        setDbLiteralNumericos(newDbLitNums);
         setDbExtraFields(newDbExtra);
         toast.success(`${upserts.length} registros guardados correctamente`);
       } else {
@@ -919,7 +997,7 @@ export default function FinalGradesTab({
     } finally {
       setSavingAll(false);
     }
-  }, [isPrimary, isPreschool, assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, needsSave, hasMissingMomentGrades, totalToSave, literals, dbLiterals]);
+  }, [isPrimary, isPreschool, assignmentIds, students, editedGrades, dbValues, adjustments, extraFields, dbAdjustments, dbExtraFields, schoolId, needsSave, hasMissingMomentGrades, totalToSave, literals, dbLiterals, literalNumericos, dbLiteralNumericos]);
 
   const filteredStudents = useMemo(() => {
     if (!searchTerm) return students;
@@ -975,9 +1053,16 @@ export default function FinalGradesTab({
     const isSaving = savingLiteralKeys.has(key);
     const isSaved = savedKeys.has(key);
     const literalDirty = isLiteralDirty(key);
+    const numericDirty = isNumericDirty(key);
     const extraDirty = isExtraDirty(key);
     const ef = extraFields[key] || DEFAULT_EXTRA;
     const literalVal = literals[key] || "";
+    const numericVal = (literalNumericos[key] ?? "").trim();
+    const recalculatedAverage = isFinal ? calculatePrimaryAverageFromMoments(s.student_id) : null;
+    // Solo tras cambiar un momento: una definitiva puesta a mano no se discute.
+    const showStaleAveragePrompt =
+      isFinal && primaryMomentEdited.has(s.student_id) && isFinalGradeStale(numericVal, recalculatedAverage);
+    const showUnpersistedWarning = isFinal && isUnpersistedPrimaryDefinitiva(key) && !showStaleAveragePrompt;
 
     // Check if report has content
     const hasReport = primaryReports.some(
@@ -1020,7 +1105,7 @@ export default function FinalGradesTab({
                 className={`h-8 w-12 text-center text-sm font-semibold uppercase ${literalDirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
                 placeholder="—"
               />
-              {(literalDirty || extraDirty) && !isSaving && !isSaved && (
+              {(literalDirty || numericDirty || extraDirty) && !isSaving && !isSaved && (
                 <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-orange-400" />
               )}
               {isSaving && (
@@ -1036,9 +1121,9 @@ export default function FinalGradesTab({
               max={20}
               step={0.01}
               value={literalNumericos[key] ?? ""}
-              onChange={(e) => setLiteralNumericos(prev => ({ ...prev, [key]: e.target.value }))}
+              onChange={(e) => handlePrimaryNumericChange(s.student_id, m, e.target.value)}
               onBlur={() => savePrimaryReport(s.student_id, m)}
-              className="h-8 w-14 text-xs text-center"
+              className={`h-8 w-16 text-xs text-center ${isFinal ? "font-semibold" : ""} ${numericDirty ? "border-orange-400 ring-1 ring-orange-300" : ""}`}
               placeholder="Núm."
               title="Literal Numérico"
             />
@@ -1048,9 +1133,44 @@ export default function FinalGradesTab({
               </TooltipTrigger>
               <TooltipContent className="max-w-[200px] text-xs">
                 <p>Literal de A a E. Se convierte automáticamente a mayúscula.</p>
+                {isFinal && (
+                  <p className="mt-1">
+                    La nota numérica de la definitiva se calcula con el promedio de los tres momentos hasta que la
+                    guarde, y el literal se llena según esa nota (A 19–20, B 16–18, C 13–15, D 10–12, E 01–09).
+                  </p>
+                )}
               </TooltipContent>
             </Tooltip>
           </div>
+
+          {showStaleAveragePrompt && recalculatedAverage && (
+            <div className="flex items-start gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-1 dark:border-amber-900 dark:bg-amber-950/30">
+              <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-amber-800 dark:text-amber-300 leading-tight">
+                Cambió las notas de los momentos y el promedio ya no coincide. Según los tres momentos actuales,
+                la definitiva debería ser <strong>{recalculatedAverage}</strong> (ahora tiene{" "}
+                <strong>{numericVal}</strong>).{" "}
+                <button
+                  type="button"
+                  onClick={() => applyRecalculatedPrimaryFinal(s.student_id, recalculatedAverage)}
+                  className="underline font-semibold text-amber-900 dark:text-amber-200 hover:text-amber-950 dark:hover:text-amber-100"
+                >
+                  Haga clic aquí para colocar el nuevo promedio
+                </button>
+                .
+              </p>
+            </div>
+          )}
+
+          {showUnpersistedWarning && (
+            <div className="flex items-start gap-1 rounded border border-red-200 bg-red-50 px-1.5 py-1 dark:border-red-900 dark:bg-red-950/30">
+              <AlertTriangle className="h-3 w-3 text-red-600 shrink-0 mt-0.5" />
+              <p className="text-[10px] text-red-700 dark:text-red-400 leading-tight">
+                Esta nota definitiva aún <strong>no está guardada</strong>. Salga del campo o use{" "}
+                <strong>Guardar Todos</strong> para que aparezca en la boleta definitiva del año escolar.
+              </p>
+            </div>
+          )}
 
           {/* Attendance & Absences */}
           <div className="grid grid-cols-2 gap-1.5">
@@ -1525,6 +1645,37 @@ export default function FinalGradesTab({
                     En la pestaña <strong>Descarga de Boletas</strong>, el momento seleccionado arriba define qué
                     periodos incluye la boleta (Momento 1 = solo el primero; Momento 2 = primero y segundo; Momento 3 =
                     los tres). La opción <strong>Definitiva Final</strong> es el boletín completo del año escolar.
+                  </li>
+                </ol>
+                {unpersistedDefinitivaCount > 0 && (
+                  <p className="text-xs font-medium text-red-700 dark:text-red-400 flex items-center gap-1 pt-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    {unpersistedDefinitivaCount} estudiante{unpersistedDefinitivaCount !== 1 ? "s" : ""} con la nota
+                    definitiva calculada pero <strong>aún sin guardar</strong>.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isPrimary && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 mb-4">
+            <div className="flex gap-2">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-2 text-sm text-blue-900 dark:text-blue-100">
+                <p className="font-semibold">Nota numérica de la Definitiva Final (Primaria)</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs text-blue-800 dark:text-blue-200">
+                  <li>
+                    Mientras no la guarde, el sistema muestra el <strong>promedio de las notas numéricas</strong> de
+                    los momentos 1, 2 y 3. Si ya hay una guardada, se muestra esa.
+                  </li>
+                  <li>
+                    El <strong>literal</strong> de la definitiva se llena según esa nota: A 19–20, B 16–18,
+                    C 13–15, D 10–12, E 01–09. Puede cambiarlo antes de guardar.
+                  </li>
+                  <li>
+                    Para guardarla, salga del campo o pulse <strong>Guardar Todos</strong>.
                   </li>
                 </ol>
                 {unpersistedDefinitivaCount > 0 && (

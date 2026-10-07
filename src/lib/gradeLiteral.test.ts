@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatResumenFinalGrade } from "./gradeLiteral";
+import { formatResumenFinalGrade, primaryLiteralFromGrade } from "./gradeLiteral";
 
 describe("formatResumenFinalGrade", () => {
   it("convierte nota numérica a literal como la boleta", () => {
@@ -44,5 +44,35 @@ describe("formatResumenFinalGrade", () => {
   it("valor no numérico deja vacío", () => {
     expect(formatResumenFinalGrade("N/A", 0, "numeric")).toBe("");
     expect(formatResumenFinalGrade("   ", 0, "numeric")).toBe("");
+  });
+});
+
+describe("primaryLiteralFromGrade", () => {
+  it("aplica la escala de primaria en los bordes de cada rango", () => {
+    expect(primaryLiteralFromGrade("20")).toBe("A");
+    expect(primaryLiteralFromGrade("19")).toBe("A");
+    expect(primaryLiteralFromGrade("18")).toBe("B");
+    expect(primaryLiteralFromGrade("16")).toBe("B");
+    expect(primaryLiteralFromGrade("15")).toBe("C");
+    expect(primaryLiteralFromGrade("13")).toBe("C");
+    expect(primaryLiteralFromGrade("12")).toBe("D");
+    expect(primaryLiteralFromGrade("10")).toBe("D");
+    expect(primaryLiteralFromGrade("9")).toBe("E");
+    expect(primaryLiteralFromGrade("1")).toBe("E");
+  });
+
+  it("redondea los decimales antes de ubicar el rango", () => {
+    expect(primaryLiteralFromGrade("18.67")).toBe("A");
+    expect(primaryLiteralFromGrade("18.33")).toBe("B");
+    expect(primaryLiteralFromGrade("9.5")).toBe("D");
+    expect(primaryLiteralFromGrade(17.67)).toBe("B");
+  });
+
+  it("sin nota válida no propone literal", () => {
+    expect(primaryLiteralFromGrade("")).toBe("");
+    expect(primaryLiteralFromGrade(null)).toBe("");
+    expect(primaryLiteralFromGrade("abc")).toBe("");
+    expect(primaryLiteralFromGrade("21")).toBe("");
+    expect(primaryLiteralFromGrade("-1")).toBe("");
   });
 });
