@@ -78,6 +78,7 @@ import { computeSubjectAreaTotals } from "@/lib/resumen-final-subject-totals";
 import { computeGpGradeAndGrupo } from "@/lib/resumen-final-gcrp";
 import { resolvePlanEstudio } from "@/lib/resumen-final-plan-estudio";
 import { formatFechaRemision } from "@/lib/resumen-final-remision";
+import { FOREIGN_ENTIDAD_FEDERAL, isBornAbroad } from "@/lib/birthCountry";
 import { formatResumenFinalGrade } from "@/lib/gradeLiteral";
 
 function gradeDisplay(
@@ -280,6 +281,9 @@ export function entidadFederalFromForm(
   geoCache: Record<string, string>,
   stateAcronymCache: Record<string, string>,
 ): string {
+  // Nacido fuera de Venezuela: siempre "EX" (su estado es texto libre del otro país y
+  // antes salían sus dos primeras letras, p. ej. "NO" de "Norte de Santander").
+  if (isBornAbroad(fd)) return FOREIGN_ENTIDAD_FEDERAL;
   // Prioridad: derivar la entidad federal del estado de nacimiento (dato geo
   // autoritativo) → acrónimo. El campo libre `entidad_federal` suele traer datos
   // viejos/errados (p.ej. "BA") y solo se usa como respaldo si no hay estado geo.

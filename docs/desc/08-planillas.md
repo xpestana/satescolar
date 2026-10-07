@@ -111,6 +111,10 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
     línea de la planilla. Vacío = no se imprime. En bachillerato su alto entra en el cálculo de la
     hoja; además la hoja nunca pasa el máximo de Word (22").
   - En primaria con varias partes, ambos son **propios de cada parte** (como las observaciones).
+- **EF (entidad federal)** (primaria y bachillerato): si `pais_nacimiento` existe y no es Venezuela,
+  siempre **`EX`** (`isBornAbroad` en `src/lib/birthCountry.ts`). Si no, la sigla del estado de
+  nacimiento (`states.acronym`); como respaldo el campo `entidad_federal` o las dos primeras letras
+  del estado. Sin país guardado se asume Venezuela, igual que el formulario.
 - **Rellenos de casillas vacías** (fila sin estudiante o dato sin registrar), iguales en primaria y
   bachillerato 31059/31060 — `PLANILLA_EMPTY` / `orPlanillaEmpty` en `src/lib/resumen-final-text.ts`:
   cédula, lugar de nacimiento, apellidos y nombres `*****`; EF, día y mes `**`; año `****`;
