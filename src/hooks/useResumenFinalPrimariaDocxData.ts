@@ -8,7 +8,9 @@ import { DEFAULT_PRIMARY_COD, PRIMARY_ROWS_PER_PART } from "@/lib/resumen-final-
 import {
   countPrimariaLiterals,
   formatPrimariaCedula,
-  normalizePrimariaLiteral,
+  pickPrimariaFinalResults,
+  type PrimariaFinalReport,
+  type PrimariaFinalResult,
   type PrimariaLiteral,
   type PrimariaLiteralTotals,
 } from "@/lib/resumen-final-primaria";
@@ -32,6 +34,8 @@ export interface PrimariaStudentRow {
   anioNac: string;
   /** Literal de la definitiva final (momento 0); "" si no tiene. */
   literal: PrimariaLiteral | "";
+  /** Nota numérica de la definitiva final (casilla P.), entera; "" si no tiene. */
+  nota: string;
 }
 
 export interface ResumenFinalPrimariaDocxData {
@@ -108,8 +112,8 @@ export async function fetchResumenFinalPrimariaDocxData(
   if (pageStudents.length === 0) throw new Error("No hay estudiantes en esta parte");
   const pageIds = pageStudents.map((s) => s.id);
 
-  // Literal de la definitiva final: primary_final_reports, momento 0. El literal se guarda en
-  // una sola asignación de la sección (no necesariamente la principal), así que se busca en todas.
+  // Literal y nota de la definitiva final: primary_final_reports, momento 0. Se guardan en una sola
+  // asignación de la sección (no necesariamente la principal), así que se busca en todas.
   const { data: assignmentsData } = await supabase
     .from("subject_teacher_assignments")
     .select("id, is_main_report, teacher:teacher_id(document_id, form_data)")
@@ -120,19 +124,16 @@ export async function fetchResumenFinalPrimariaDocxData(
   const assignments = (assignmentsData ?? []) as unknown as AssignmentRow[];
   const assignmentIds = assignments.map((a) => a.id);
 
-  const literalByStudent = new Map<string, PrimariaLiteral>();
+  let finalByStudent = new Map<string, PrimariaFinalResult>();
   if (assignmentIds.length > 0) {
     const { data: reports, error } = await supabase
       .from("primary_final_reports")
-      .select("student_id, literal")
+      .select("student_id, literal, literal_numerico")
       .eq("momento", 0)
       .in("assignment_id", assignmentIds)
       .in("student_id", pageIds);
     if (error) throw new Error(`Error al cargar literales finales: ${error.message}`);
-    for (const r of (reports ?? []) as Array<{ student_id: string; literal: string | null }>) {
-      const lit = normalizePrimariaLiteral(r.literal);
-      if (lit && !literalByStudent.has(r.student_id)) literalByStudent.set(r.student_id, lit);
-    }
+    finalByStudent = pickPrimariaFinalResults((reports ?? []) as PrimariaFinalReport[]);
   }
 
   const formDataList = pageStudents
@@ -154,7 +155,8 @@ export async function fetchResumenFinalPrimariaDocxData(
       entidadFederal: entidadFederalFromForm(fd, geoCache, stateAcronymCache),
       sexo: String(fd.sexo || fd.genero || "").toUpperCase().substring(0, 1),
       ...birthDateParts(fd),
-      literal: literalByStudent.get(s.id) ?? "",
+      literal: finalByStudent.get(s.id)?.literal ?? "",
+      nota: finalByStudent.get(s.id)?.nota ?? "",
     };
   });
 

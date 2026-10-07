@@ -30,7 +30,9 @@ import {
   primariaFechaRemision,
   primariaGradeOrdinal,
   primariaMesAnioEvaluacion,
+  sumPrimariaLiteralTotals,
 } from "@/lib/resumen-final-primaria";
+import { PLANILLA_EMPTY, isPlanillaPlaceholder, orPlanillaEmpty } from "@/lib/resumen-final-text";
 
 // ── Planilla RR-DEA-06-04 (Educación Primaria). Medidas tomadas del formato oficial (.docx) ──
 const PAGE_W = 14460; // 25.5 cm
@@ -64,9 +66,6 @@ const ROW_HDR_H = 325;
 const ROW_DATA_H = 268;
 const ROW_TOTAL_H = 381;
 const ROW_DOCENTE_H = 665;
-
-const EMPTY_TEXT = "***";
-const EMPTY_SHORT = "*";
 
 const LOGO_W_PX = 360;
 const LOGO_MAX_H_PX = 64;
@@ -126,7 +125,11 @@ function cell(start: number, text: string | string[], opts: CellOpts = {}): Tabl
     ...(span > 1 ? { columnSpan: span } : {}),
     ...(opts.rowSpan ? { rowSpan: opts.rowSpan } : {}),
     children: lines.map((l) =>
-      para([run(l, { bold: opts.bold, size: opts.size })], opts.align ?? AlignmentType.LEFT, 230),
+      para(
+        [run(l, { bold: opts.bold, size: opts.size })],
+        isPlanillaPlaceholder(l) ? AlignmentType.CENTER : (opts.align ?? AlignmentType.LEFT),
+        230,
+      ),
     ),
     verticalAlign: opts.valign ?? VerticalAlign.CENTER,
     margins: { top: 0, bottom: 0, left: 40, right: 20 },
@@ -154,11 +157,6 @@ function fixedTable(
 function pad2(v: string): string {
   const s = String(v ?? "").trim();
   return /^\d$/.test(s) ? `0${s}` : s;
-}
-
-function orEmpty(v: string, empty = EMPTY_TEXT): string {
-  const s = String(v ?? "").trim();
-  return s || empty;
 }
 
 // ── Cabecera: logo + título del formato ─────────────────────────────────────────────
@@ -413,17 +411,17 @@ function evaluacionDataRow(s: PrimariaStudentRow | null, nro: number): TableRow 
   return row(
     [
       cell(C.NRO, pad2(String(nro))),
-      cell(C.CED, s ? orEmpty(s.cedula) : EMPTY_TEXT),
-      cell(C.LUG, s ? orEmpty(s.lugarNacimiento) : EMPTY_TEXT, { span: 3 }),
-      cell(C.EF, s ? s.entidadFederal : EMPTY_SHORT, center),
-      cell(C.SEX, s ? orEmpty(s.sexo, EMPTY_SHORT) : EMPTY_SHORT, center),
-      cell(C.DIA, s ? orEmpty(pad2(s.diaNac), EMPTY_SHORT) : EMPTY_SHORT, { ...center, span: 2 }),
-      cell(C.MES, s ? orEmpty(pad2(s.mesNac), EMPTY_SHORT) : EMPTY_SHORT, center),
-      cell(C.ANO, s ? orEmpty(s.anioNac, EMPTY_SHORT) : EMPTY_SHORT, { ...center, span: 2 }),
+      cell(C.CED, orPlanillaEmpty(s?.cedula, PLANILLA_EMPTY.text)),
+      cell(C.LUG, orPlanillaEmpty(s?.lugarNacimiento, PLANILLA_EMPTY.text), { span: 3 }),
+      cell(C.EF, orPlanillaEmpty(s?.entidadFederal, PLANILLA_EMPTY.entidadFederal), center),
+      cell(C.SEX, orPlanillaEmpty(s?.sexo, PLANILLA_EMPTY.short), center),
+      cell(C.DIA, orPlanillaEmpty(pad2(s?.diaNac ?? ""), PLANILLA_EMPTY.dia), { ...center, span: 2 }),
+      cell(C.MES, orPlanillaEmpty(pad2(s?.mesNac ?? ""), PLANILLA_EMPTY.mes), center),
+      cell(C.ANO, orPlanillaEmpty(s?.anioNac, PLANILLA_EMPTY.anio), { ...center, span: 2 }),
       // Resultados: "*" por defecto; "X" en el literal de la definitiva final.
-      ...PRIMARIA_LITERALS.map((l, i) => cell(C.LIT + i, s?.literal === l ? "X" : EMPTY_SHORT, center)),
-      // P.: por ahora siempre "*".
-      cell(C.P, EMPTY_SHORT, center),
+      ...PRIMARIA_LITERALS.map((l, i) => cell(C.LIT + i, s?.literal === l ? "X" : PLANILLA_EMPTY.short, center)),
+      // P.: nota numérica de la definitiva final; "*" si no tiene.
+      cell(C.P, orPlanillaEmpty(s?.nota, PLANILLA_EMPTY.short), center),
     ],
     ROW_DATA_H,
   );
@@ -435,7 +433,7 @@ function totalRow(data: ResumenFinalPrimariaDocxData): TableRow {
     [
       cell(0, "TOTAL", { ...bold, span: C.LIT }),
       ...PRIMARIA_LITERALS.map((l, i) => cell(C.LIT + i, pad2(String(data.literalTotals[l])), bold)),
-      cell(C.P, ""),
+      cell(C.P, pad2(String(sumPrimariaLiteralTotals(data.literalTotals))), bold),
     ],
     ROW_TOTAL_H,
   );
@@ -460,8 +458,8 @@ function nombresDataRow(s: PrimariaStudentRow | null, nro: number): TableRow {
   return row(
     [
       cell(C.NRO, pad2(String(nro))),
-      cell(NAMES_APE.start, s ? orEmpty(s.apellidos) : EMPTY_TEXT, { span: NAMES_APE.span }),
-      cell(NAMES_NOM.start, s ? orEmpty(s.nombres) : EMPTY_TEXT, { span: NAMES_NOM.span }),
+      cell(NAMES_APE.start, orPlanillaEmpty(s?.apellidos, PLANILLA_EMPTY.text), { span: NAMES_APE.span }),
+      cell(NAMES_NOM.start, orPlanillaEmpty(s?.nombres, PLANILLA_EMPTY.text), { span: NAMES_NOM.span }),
     ],
     ROW_DATA_H,
   );

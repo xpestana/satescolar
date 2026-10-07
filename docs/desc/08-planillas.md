@@ -90,16 +90,23 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
   **Código (COD)** (por defecto `21000`, guardado en `tipo_planilla`, texto libre), más
   observaciones, profesor y cédula. No lleva nombres de materias.
   - Máximo **20 estudiantes por hoja** (bachillerato: 35); si hay más, la sección se divide en partes.
-    Siempre se imprimen 20 filas (las vacías con `*` / `***`). Estudiantes ordenados por cédula.
+    Siempre se imprimen 20 filas. Estudiantes ordenados por cédula.
+  - **Casillas vacías:** ver *Rellenos de casillas vacías* más abajo (iguales en bachillerato).
   - Tabla 1: N°, cédula ("V 123…"), lugar de nacimiento, EF, sexo, fecha, **resultados A–E** y **P.**
     Todas las casillas llevan `*`; el literal de la **definitiva final** (`primary_final_reports`,
-    `momento = 0`) se marca con `X`. La columna P. va siempre con `*` (pendiente de definir).
-    Fila TOTAL con el conteo por literal.
+    `momento = 0`) se marca con `X`. La columna **P.** lleva la **nota numérica de esa misma definitiva** (`literal_numerico`, redondeada a entero, "09" si tiene un dígito); sin nota, `*`. Literal y nota salen del mismo registro (`pickPrimariaFinalResults`).
+    Fila TOTAL con el conteo por literal y, en **P.**, la suma de esos conteos (`sumPrimariaLiteralTotals`).
   - Tabla 2: N°, apellidos y nombres (mismo orden). Luego docente (configurado; si está vacío,
     el docente de la asignación principal), observaciones, fechas y firmas.
   - Con varias partes, el **COD y la docente se comparten** en toda la sección: al guardar una parte
     se copian a las demás. **Las observaciones son propias de cada parte.**
   - **CDCEE** = campo "Zona Educativa" de Planillas → Datos comunes.
+- **Rellenos de casillas vacías** (fila sin estudiante o dato sin registrar), iguales en primaria y
+  bachillerato 31059/31060 — `PLANILLA_EMPTY` / `orPlanillaEmpty` en `src/lib/resumen-final-text.ts`:
+  cédula, lugar de nacimiento, apellidos y nombres `*****`; EF, día y mes `**`; año `****`;
+  sexo `*` (en primaria también resultados A–E y P. sin nota). **Los rellenos van centrados** aunque la
+  columna alinee a la izquierda cuando hay dato (`isPlanillaPlaceholder`). Las notas vacías de
+  bachillerato quedan en blanco.
 - Archivos: `src/components/planillas/resumen-final/ResumenFinalTab.tsx`,
   `src/hooks/useResumenFinalConfig.ts`, `src/lib/resumen-final-level.ts` (nivel y filas por parte),
   `src/lib/resumen-final-docx*.ts` (bachillerato), `src/hooks/useResumenFinalPrimariaDocxData.ts`,

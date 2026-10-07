@@ -19,6 +19,31 @@ export function formatPlanillaStudentText(
   return s.toUpperCase();
 }
 
+/**
+ * Relleno de las casillas vacías del Resumen Final (fila sin estudiante o dato sin registrar),
+ * según el ancho de cada campo. Igual en primaria y en bachillerato 31059/31060.
+ */
+export const PLANILLA_EMPTY = {
+  /** Cédula, lugar de nacimiento, apellidos y nombres. */
+  text: "*****",
+  entidadFederal: "**",
+  dia: "**",
+  mes: "**",
+  anio: "****",
+  /** Sexo y, en primaria, resultados A–E y P. */
+  short: "*",
+} as const;
+
+/** El valor recortado o, si está vacío, el relleno dado. */
+export function orPlanillaEmpty(value: string | null | undefined, empty: string): string {
+  return String(value ?? "").trim() || empty;
+}
+
+/** Relleno de casilla vacía ("*", "***", "*****"…): se imprime centrado. */
+export function isPlanillaPlaceholder(text: string | null | undefined): boolean {
+  return /^\*+$/.test(String(text ?? "").trim());
+}
+
 /** Formatea cada parte del nombre por separado y une con espacio. */
 export function formatPlanillaStudentNameParts(
   parts: unknown[],

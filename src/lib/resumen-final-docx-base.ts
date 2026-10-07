@@ -39,7 +39,11 @@ import {
 } from "@/lib/resumen-final-firmas";
 import { GRADE_LABELS } from "@/lib/buildInvoiceData";
 import { RF } from "@/lib/resumen-final-docx-labels";
-import { formatPlanillaStudentText } from "@/lib/resumen-final-text";
+import {
+  PLANILLA_EMPTY,
+  formatPlanillaStudentText,
+  isPlanillaPlaceholder,
+} from "@/lib/resumen-final-text";
 
 export type ResumenFinalDocxVariant = {
   /** Solo planilla 31059 (sin menci?n): columnas GP + GRUPO para GCRP. */
@@ -170,8 +174,6 @@ const ST_DATA_FONT_SIZE = BODY_DATA_SIZE; // Arial 10 ? datos desde BD en tabla 
 const ST_DATA_ROW_MIN = 412; // altura m?nima fila alumno (UEH: 412)
 const ST_DATA_CELL_PAD = 0;
 const ST_DATA_CELL_PAD_LEFT = 40; // padding izquierdo filas de datos
-const ST_EMPTY = "***";
-const ST_EMPTY_SHORT = "*"; // EF, SEXO, DIA, MES, A?O
 const W_LBL_ANO = 1580;
 const W_LBL_TIPO = 1800; // "Tipo de Evaluaci?n:" en una sola l?nea
 const W_LINE_TIPO = 700; // l?nea corta solo para "Final"
@@ -1117,7 +1119,7 @@ function mkIvMergeContinue(
 
 function formatStField(
   value: string,
-  empty = ST_EMPTY,
+  empty: string,
   useSpanishNames = false,
 ): string {
   const v = (value ?? "").trim();
@@ -1158,8 +1160,9 @@ function padStudentsPage(students: StudentDocxRow[]): StudentDocxRow[] {
 function mkStDataCell(
   w: number,
   text: string,
-  align: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.LEFT,
+  alignIfFilled: (typeof AlignmentType)[keyof typeof AlignmentType] = AlignmentType.LEFT,
 ): TableCell {
+  const align = isPlanillaPlaceholder(text) ? AlignmentType.CENTER : alignIfFilled;
   return new TableCell({
     width: { size: w, type: WidthType.DXA },
     children: [
@@ -1229,47 +1232,43 @@ function mkStDataRow(
       mkStDataCell(ST_III_NRO, formatStNro(row.nro)),
       mkStDataCell(
         layout.stIiiCols[ST_III_IDX_CED],
-        formatStField(row.cedula),
+        formatStField(row.cedula, PLANILLA_EMPTY.text),
       ),
       mkStDataCell(
         layout.stIiiCols[ST_III_IDX_APE],
-        layout.useSpanishNames
-          ? formatPlanillaStudentText(row.apellidos, true)
-          : formatStField(row.apellidos),
+        formatStField(row.apellidos, PLANILLA_EMPTY.text, layout.useSpanishNames),
       ),
       mkStDataCell(
         layout.stIiiCols[ST_III_IDX_NOM],
-        layout.useSpanishNames
-          ? formatPlanillaStudentText(row.nombres, true)
-          : formatStField(row.nombres),
+        formatStField(row.nombres, PLANILLA_EMPTY.text, layout.useSpanishNames),
       ),
       mkStDataCell(
         layout.stIiiCols[ST_III_IDX_LUG],
-        formatStField(row.lugarNacimiento),
+        formatStField(row.lugarNacimiento, PLANILLA_EMPTY.text),
       ),
       mkStDataCell(
         ST_III_EF,
-        formatStField(row.entidadFederal, ST_EMPTY_SHORT),
+        formatStField(row.entidadFederal, PLANILLA_EMPTY.entidadFederal),
         AlignmentType.CENTER,
       ),
       mkStDataCell(
         ST_III_SEX,
-        formatStField(row.sexo, ST_EMPTY_SHORT),
+        formatStField(row.sexo, PLANILLA_EMPTY.short),
         AlignmentType.CENTER,
       ),
       mkStDataCell(
         ST_III_DIA,
-        formatStField(row.diaNac, ST_EMPTY_SHORT),
+        formatStField(row.diaNac, PLANILLA_EMPTY.dia),
         AlignmentType.CENTER,
       ),
       mkStDataCell(
         ST_III_MES,
-        formatStField(row.mesNac, ST_EMPTY_SHORT),
+        formatStField(row.mesNac, PLANILLA_EMPTY.mes),
         AlignmentType.CENTER,
       ),
       mkStDataCell(
         ST_III_ANO,
-        formatStField(row.anioNac, ST_EMPTY_SHORT),
+        formatStField(row.anioNac, PLANILLA_EMPTY.anio),
         AlignmentType.CENTER,
       ),
       ...regularCells,

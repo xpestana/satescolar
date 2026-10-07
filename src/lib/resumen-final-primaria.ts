@@ -1,5 +1,7 @@
 /** Reglas puras de la planilla Resumen Final de primaria (formato RR-DEA-06-04). */
 
+import { fmtGradeNum } from "@/lib/gradeLiteral";
+
 export const PRIMARIA_LITERALS = ["A", "B", "C", "D", "E"] as const;
 export type PrimariaLiteral = (typeof PRIMARIA_LITERALS)[number];
 
@@ -20,6 +22,43 @@ export function normalizePrimariaLiteral(value: string | null | undefined): Prim
   return (PRIMARIA_LITERALS as readonly string[]).includes(v) ? (v as PrimariaLiteral) : "";
 }
 
+/**
+ * Nota de la casilla P.: la nota numérica de la definitiva final redondeada a entero, con cero
+ * delante si tiene un dígito (como la boleta: 9 → "09"). Sin nota válida (0–20) → "".
+ */
+export function formatPrimariaNota(value: string | number | null | undefined): string {
+  const s = String(value ?? "").trim();
+  if (!s) return "";
+  const n = Number(s);
+  if (isNaN(n) || n < 0 || n > 20) return "";
+  return fmtGradeNum(Math.round(n));
+}
+
+export type PrimariaFinalReport = {
+  student_id: string;
+  literal: string | null;
+  literal_numerico: number | string | null;
+};
+
+export type PrimariaFinalResult = { literal: PrimariaLiteral | ""; nota: string };
+
+/**
+ * Literal y nota de la definitiva final por estudiante. El informe puede estar en cualquier
+ * asignación de la sección: gana el primero con literal válido (literal y nota salen del mismo
+ * registro); si ninguno tiene literal, la nota del primero que la tenga.
+ */
+export function pickPrimariaFinalResults(reports: PrimariaFinalReport[]): Map<string, PrimariaFinalResult> {
+  const result = new Map<string, PrimariaFinalResult>();
+  for (const r of reports) {
+    const literal = normalizePrimariaLiteral(r.literal);
+    const nota = formatPrimariaNota(r.literal_numerico);
+    const current = result.get(r.student_id);
+    if (literal && !current?.literal) result.set(r.student_id, { literal, nota });
+    else if (!current && nota) result.set(r.student_id, { literal: "", nota });
+  }
+  return result;
+}
+
 /** Totales por literal para la fila TOTAL. */
 export function countPrimariaLiterals(literals: Array<string | null | undefined>): PrimariaLiteralTotals {
   const totals: PrimariaLiteralTotals = { A: 0, B: 0, C: 0, D: 0, E: 0 };
@@ -28,6 +67,11 @@ export function countPrimariaLiterals(literals: Array<string | null | undefined>
     if (n) totals[n] += 1;
   }
   return totals;
+}
+
+/** Casilla P. de la fila TOTAL: cuántos estudiantes tienen literal (suma de A–E). */
+export function sumPrimariaLiteralTotals(totals: PrimariaLiteralTotals): number {
+  return PRIMARIA_LITERALS.reduce((sum, l) => sum + totals[l], 0);
 }
 
 /** "2_grado" → "2°". */
