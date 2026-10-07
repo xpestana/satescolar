@@ -30,6 +30,8 @@ export const PLANILLA_EMPTY = {
   dia: "**",
   mes: "**",
   anio: "****",
+  /** Notas de las materias (y GP) en bachillerato 31059/31060. */
+  nota: "**",
   /** Sexo y, en primaria, resultados A–E y P. */
   short: "*",
 } as const;

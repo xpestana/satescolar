@@ -43,6 +43,7 @@ import {
   PLANILLA_EMPTY,
   formatPlanillaStudentText,
   isPlanillaPlaceholder,
+  orPlanillaEmpty,
 } from "@/lib/resumen-final-text";
 
 export type ResumenFinalDocxVariant = {
@@ -1203,21 +1204,16 @@ function mkStDataRow(
   isEmpty: boolean,
 ): TableRow {
   const { nRegular } = layout;
+  // Nota vacía (fila sin estudiante o materia sin nota) → "**".
+  const gradeText = (assignmentId: string) =>
+    orPlanillaEmpty(isEmpty ? "" : row.grades[assignmentId], PLANILLA_EMPTY.nota);
   const regularCells = regularSubjects.map((s, i) =>
-    mkStDataCell(
-      layout.stIvCols[i],
-      isEmpty ? "" : (row.grades[s.assignmentId] ?? ""),
-      AlignmentType.CENTER,
-    ),
+    mkStDataCell(layout.stIvCols[i], gradeText(s.assignmentId), AlignmentType.CENTER),
   );
   const productiveCells = productiveSubjects.map((s, i) =>
-    mkStDataCell(
-      layout.stIvCols[nRegular + i],
-      isEmpty ? "" : (row.grades[s.assignmentId] ?? ""),
-      AlignmentType.CENTER,
-    ),
+    mkStDataCell(layout.stIvCols[nRegular + i], gradeText(s.assignmentId), AlignmentType.CENTER),
   );
-  const gpGrade = isEmpty ? "" : row.gpGrade;
+  const gpGrade = orPlanillaEmpty(isEmpty ? "" : row.gpGrade, PLANILLA_EMPTY.nota);
   const grupoName = isEmpty ? "" : row.grupoName;
   const gpCells =
     layout.includeGpGrupo &&

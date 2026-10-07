@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeSubjectAreaTotals } from "./resumen-final-subject-totals";
+import { computeSubjectAreaTotals, type SubjectGradeRecord } from "./resumen-final-subject-totals";
 import type { StudentDocxRow, SubjectCol } from "@/hooks/useResumenFinalDocxData";
 
 const subj = (id: string, assignmentId: string, evaluationType = "numeric"): SubjectCol => ({
@@ -13,103 +13,55 @@ const subj = (id: string, assignmentId: string, evaluationType = "numeric"): Sub
   teacherCedula: "",
 });
 
-describe("computeSubjectAreaTotals", () => {
-  it("clasifica inscritos, no cursantes y aprobados por materia en la página", () => {
-    const subjects = [subj("s1", "a1"), subj("s2", "a2")];
-    const pageStudentIds = ["stu1", "stu2", "stu3"];
-    const studentRows: StudentDocxRow[] = [
-      {
-        nro: 1,
-        cedula: "",
-        apellidos: "",
-        nombres: "",
-        lugarNacimiento: "",
-        entidadFederal: "",
-        sexo: "",
-        diaNac: "",
-        mesNac: "",
-        anioNac: "",
-        grades: { a1: "12", a2: "" },
-      },
-      {
-        nro: 2,
-        cedula: "",
-        apellidos: "",
-        nombres: "",
-        lugarNacimiento: "",
-        entidadFederal: "",
-        sexo: "",
-        diaNac: "",
-        mesNac: "",
-        anioNac: "",
-        grades: { a1: "8", a2: "15" },
-      },
-      {
-        nro: 3,
-        cedula: "",
-        apellidos: "",
-        nombres: "",
-        lugarNacimiento: "",
-        entidadFederal: "",
-        sexo: "",
-        diaNac: "",
-        mesNac: "",
-        anioNac: "",
-        grades: { a1: "", a2: "11" },
-      },
-    ];
-    const gradeMap = new Map([
-      [
-        "stu1:a1",
-        {
-          student_id: "stu1",
-          assignment_id: "a1",
-          grade_value: "12",
-          adjustment_points: 0,
-          final_status: null,
-          absence_count: 2,
-          attendance_count: 10,
-        },
-      ],
-      [
-        "stu2:a1",
-        {
-          student_id: "stu2",
-          assignment_id: "a1",
-          grade_value: "8",
-          adjustment_points: 0,
-          final_status: null,
-          absence_count: 1,
-          attendance_count: 5,
-        },
-      ],
-      [
-        "stu2:a2",
-        {
-          student_id: "stu2",
-          assignment_id: "a2",
-          grade_value: "15",
-          adjustment_points: 0,
-          final_status: null,
-          absence_count: 0,
-          attendance_count: 8,
-        },
-      ],
-      [
-        "stu3:a2",
-        {
-          student_id: "stu3",
-          assignment_id: "a2",
-          grade_value: "11",
-          adjustment_points: 0,
-          final_status: null,
-          absence_count: 3,
-          attendance_count: 7,
-        },
-      ],
-    ]);
+const row = (nro: number, grades: Record<string, string>): StudentDocxRow => ({
+  nro,
+  cedula: "",
+  apellidos: "",
+  nombres: "",
+  lugarNacimiento: "",
+  entidadFederal: "",
+  sexo: "",
+  diaNac: "",
+  mesNac: "",
+  anioNac: "",
+  grades,
+  gpGrade: "",
+  grupoName: "",
+});
 
-    const totals = computeSubjectAreaTotals(pageStudentIds, studentRows, subjects, gradeMap);
+const rec = (
+  student_id: string,
+  assignment_id: string,
+  grade_value: string,
+  final_status: string | null,
+  extra: Partial<SubjectGradeRecord> = {},
+): [string, SubjectGradeRecord] => [
+  `${student_id}:${assignment_id}`,
+  {
+    student_id,
+    assignment_id,
+    grade_value,
+    adjustment_points: 0,
+    final_status,
+    absence_count: 0,
+    attendance_count: 0,
+    ...extra,
+  },
+];
+
+describe("computeSubjectAreaTotals", () => {
+  it("clasifica inscritos, no cursantes y asistencias por materia en la página", () => {
+    const totals = computeSubjectAreaTotals(
+      ["stu1", "stu2", "stu3"],
+      [row(1, { a1: "12", a2: "" }), row(2, { a1: "08", a2: "15" }), row(3, { a1: "", a2: "11" })],
+      [subj("s1", "a1"), subj("s2", "a2")],
+      new Map([
+        rec("stu1", "a1", "12", "aprobado", { absence_count: 2, attendance_count: 10 }),
+        rec("stu2", "a1", "8", "no_aprobado", { absence_count: 1, attendance_count: 5 }),
+        rec("stu2", "a2", "15", "aprobado", { attendance_count: 8 }),
+        rec("stu3", "a2", "11", "aprobado", { absence_count: 3, attendance_count: 7 }),
+      ]),
+    );
 
     expect(totals.a1).toEqual({
       inscritos: 2,
@@ -128,131 +80,46 @@ describe("computeSubjectAreaTotals", () => {
       noCursantes: 1,
     });
   });
+});
 
-  it("10 es aprobado; 9 y menos es no aprobado", () => {
-    const subjects = [subj("s1", "a1")];
-    const pageStudentIds = ["s10", "s9", "s99"];
-    const studentRows: StudentDocxRow[] = [
-      {
-        nro: 1,
-        cedula: "",
-        apellidos: "",
-        nombres: "",
-        lugarNacimiento: "",
-        entidadFederal: "",
-        sexo: "",
-        diaNac: "",
-        mesNac: "",
-        anioNac: "",
-        grades: { a1: "10" },
-      },
-      {
-        nro: 2,
-        cedula: "",
-        apellidos: "",
-        nombres: "",
-        lugarNacimiento: "",
-        entidadFederal: "",
-        sexo: "",
-        diaNac: "",
-        mesNac: "",
-        anioNac: "",
-        grades: { a1: "9" },
-      },
-      {
-        nro: 3,
-        cedula: "",
-        apellidos: "",
-        nombres: "",
-        lugarNacimiento: "",
-        entidadFederal: "",
-        sexo: "",
-        diaNac: "",
-        mesNac: "",
-        anioNac: "",
-        grades: { a1: "9.9" },
-      },
-    ];
-    const gradeMap = new Map([
-      [
-        "s10:a1",
-        {
-          student_id: "s10",
-          assignment_id: "a1",
-          grade_value: "10",
-          adjustment_points: 0,
-          final_status: null,
-          absence_count: 0,
-          attendance_count: 0,
-        },
-      ],
-      [
-        "s9:a1",
-        {
-          student_id: "s9",
-          assignment_id: "a1",
-          grade_value: "9",
-          adjustment_points: 0,
-          final_status: null,
-          absence_count: 0,
-          attendance_count: 0,
-        },
-      ],
-      [
-        "s99:a1",
-        {
-          student_id: "s99",
-          assignment_id: "a1",
-          grade_value: "9.9",
-          adjustment_points: 0,
-          final_status: null,
-          absence_count: 0,
-          attendance_count: 0,
-        },
-      ],
-    ]);
-
-    const totals = computeSubjectAreaTotals(pageStudentIds, studentRows, subjects, gradeMap);
-
+describe("computeSubjectAreaTotals — aprobados según el Estado de la definitiva", () => {
+  it("cuenta con el Estado guardado, no con la nota", () => {
+    // Nota 9 marcada Aprobado y nota 15 marcada No Aprobado: manda el Estado.
+    const totals = computeSubjectAreaTotals(
+      ["x", "y"],
+      [row(1, { a1: "09" }), row(2, { a1: "15" })],
+      [subj("s1", "a1")],
+      new Map([rec("x", "a1", "9", "aprobado"), rec("y", "a1", "15", "no_aprobado")]),
+    );
     expect(totals.a1.aprobados).toBe(1);
-    expect(totals.a1.noAprobados).toBe(2);
+    expect(totals.a1.noAprobados).toBe(1);
   });
 
-  it("nota 9 + ajuste 1 cuenta como aprobado (definitiva 10)", () => {
-    const subjects = [subj("s1", "a1")];
-    const pageStudentIds = ["s1"];
-    const studentRows: StudentDocxRow[] = [
-      {
-        nro: 1,
-        cedula: "",
-        apellidos: "",
-        nombres: "",
-        lugarNacimiento: "",
-        entidadFederal: "",
-        sexo: "",
-        diaNac: "",
-        mesNac: "",
-        anioNac: "",
-        grades: { a1: "10" },
-      },
-    ];
-    const gradeMap = new Map([
-      [
-        "s1:a1",
-        {
-          student_id: "s1",
-          assignment_id: "a1",
-          grade_value: "9",
-          adjustment_points: 1,
-          final_status: null,
-          absence_count: 0,
-          attendance_count: 0,
-        },
-      ],
-    ]);
-
-    const totals = computeSubjectAreaTotals(pageStudentIds, studentRows, subjects, gradeMap);
-    expect(totals.a1.aprobados).toBe(1);
+  it("sin Estado, No Cursante o PP no suman a Aprobados ni a No Aprobados", () => {
+    const totals = computeSubjectAreaTotals(
+      ["x", "y", "z"],
+      [row(1, { a1: "18" }), row(2, { a1: "12" }), row(3, { a1: "10" })],
+      [subj("s1", "a1")],
+      new Map([rec("x", "a1", "18", null), rec("y", "a1", "12", "no_cursante"), rec("z", "a1", "10", "pp")]),
+    );
+    expect(totals.a1.inscritos).toBe(3);
+    expect(totals.a1.aprobados).toBe(0);
     expect(totals.a1.noAprobados).toBe(0);
+  });
+
+  it("cuenta igual en materias de evaluación literal", () => {
+    const totals = computeSubjectAreaTotals(
+      ["x", "y", "z"],
+      [row(1, { a1: "A" }), row(2, { a1: "D" }), row(3, { a1: "B" })],
+      [subj("s1", "a1", "literal")],
+      new Map([
+        rec("x", "a1", "19", "aprobado"),
+        rec("y", "a1", "7", "no_aprobado"),
+        rec("z", "a1", "17", "aprobado"),
+      ]),
+    );
+    expect(totals.a1.inscritos).toBe(3);
+    expect(totals.a1.aprobados).toBe(2);
+    expect(totals.a1.noAprobados).toBe(1);
   });
 });

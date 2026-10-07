@@ -115,8 +115,13 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
   bachillerato 31059/31060 — `PLANILLA_EMPTY` / `orPlanillaEmpty` en `src/lib/resumen-final-text.ts`:
   cédula, lugar de nacimiento, apellidos y nombres `*****`; EF, día y mes `**`; año `****`;
   sexo `*` (en primaria también resultados A–E y P. sin nota). **Los rellenos van centrados** aunque la
-  columna alinee a la izquierda cuando hay dato (`isPlanillaPlaceholder`). Las notas vacías de
-  bachillerato quedan en blanco.
+  columna alinee a la izquierda cuando hay dato (`isPlanillaPlaceholder`). En bachillerato, las
+  **notas vacías** de las materias (y GP en la 31059) llevan `**`; la columna GRUPO queda en blanco.
+- **Totales por área (bachillerato):** *Aprobados* / *No Aprobados* se cuentan con el **Estado**
+  que el colegio marca en la Definitiva Final de cada materia (`final_grades.final_status`,
+  `momento = 0`: `aprobado` / `no_aprobado`), no con la nota; vale igual para materias literales.
+  Sin Estado, *No Cursante* o *PP* no suman a ninguno de los dos. Ver
+  `src/lib/resumen-final-subject-totals.ts`.
 - Archivos: `src/components/planillas/resumen-final/ResumenFinalTab.tsx`,
   `src/hooks/useResumenFinalConfig.ts`, `src/lib/resumen-final-level.ts` (nivel y filas por parte),
   `src/lib/resumen-final-docx*.ts` (bachillerato), `src/hooks/useResumenFinalPrimariaDocxData.ts`,

@@ -58,6 +58,7 @@ describe("relleno de casillas vacías", () => {
     expect(PLANILLA_EMPTY.mes).toBe("**");
     expect(PLANILLA_EMPTY.anio).toBe("****");
     expect(PLANILLA_EMPTY.short).toBe("*");
+    expect(PLANILLA_EMPTY.nota).toBe("**");
   });
 
   it("rellena solo cuando el valor está vacío", () => {

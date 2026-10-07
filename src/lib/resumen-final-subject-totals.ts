@@ -10,8 +10,6 @@ export type SubjectGradeRecord = {
   attendance_count: number | null;
 };
 
-const PASSING_GRADE = 10;
-
 const EMPTY_SUBJECT_TOTALS: SubjectAreaTotals = {
   inscritos: 0,
   inasistentes: 0,
@@ -21,18 +19,12 @@ const EMPTY_SUBJECT_TOTALS: SubjectAreaTotals = {
   noCursantes: 0,
 };
 
-/** Nota definitiva numérica (nota + ajuste) desde el registro guardado. */
-function subjectNumericFinal(g: SubjectGradeRecord | undefined): number | null {
-  if (!g || g.grade_value == null || String(g.grade_value).trim() === "") return null;
-  const nota = parseFloat(String(g.grade_value).replace(",", "."));
-  if (isNaN(nota)) return null;
-  return nota + (g.adjustment_points ?? 0);
-}
-
-/** Aprobado: 10 o más. Reprobado: 9 o menos. */
-function isAprobado(finalGrade: number): boolean {
-  return finalGrade >= PASSING_GRADE;
-}
+/**
+ * Estado final de la materia que el colegio marca en la Definitiva Final (`final_grades.final_status`,
+ * momento 0). Aprobados y No Aprobados se cuentan con él, no con la nota. Sin estado = no se cuenta.
+ */
+const STATUS_APROBADO = "aprobado";
+const STATUS_NO_APROBADO = "no_aprobado";
 
 export function computeSubjectAreaTotals(
   pageStudentIds: string[],
@@ -67,18 +59,9 @@ export function computeSubjectAreaTotals(
         totals.asistentes += g.attendance_count ?? 0;
       }
 
-      if (subj.evaluationType !== "literal") {
-        const num =
-          subjectNumericFinal(g) ??
-          (() => {
-            const parsed = parseFloat(display.replace(",", "."));
-            return isNaN(parsed) ? null : parsed;
-          })();
-        if (num !== null) {
-          if (isAprobado(num)) totals.aprobados++;
-          else totals.noAprobados++;
-        }
-      }
+      const status = (g?.final_status ?? "").trim();
+      if (status === STATUS_APROBADO) totals.aprobados++;
+      else if (status === STATUS_NO_APROBADO) totals.noAprobados++;
     }
   }
 
