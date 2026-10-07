@@ -27,7 +27,6 @@ import { detectImageType, getImageDimensions } from "@/lib/resumen-final-docx-ba
 import { PRIMARY_ROWS_PER_PART } from "@/lib/resumen-final-level";
 import {
   PRIMARIA_LITERALS,
-  primariaFechaRemision,
   primariaGradeOrdinal,
   primariaMesAnioEvaluacion,
   sumPrimariaLiteralTotals,
@@ -511,7 +510,7 @@ function firmasRows(data: ResumenFinalPrimariaDocxData): TableRow[] {
 
   return [
     sigRow([
-      cell(0, `VI. Fecha de Remisión:  ${primariaFechaRemision(data.yearRange)}`, { ...bold, span: 4 }),
+      cell(0, `VI. Fecha de Remisión:  ${data.fechaRemision}`, { ...bold, span: 4 }),
       cell(4, "VII. Fecha de Recepción:", { ...bold, span: 14 }),
     ]),
     sigRow([
@@ -557,6 +556,19 @@ function gap(before: number): Paragraph {
   });
 }
 
+/** Número de registro centrado debajo de la última línea de la planilla; nada si está vacío. */
+function buildNumeroRegistro(numeroRegistro: string): Paragraph[] {
+  const text = numeroRegistro.trim();
+  if (!text) return [];
+  return [
+    new Paragraph({
+      children: [run(text)],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 60, after: 0, line: 230, lineRule: "exact" as const },
+    }),
+  ];
+}
+
 async function loadLogo(): Promise<ArrayBuffer | null> {
   try {
     const res = await fetch(logoMppeNuevo);
@@ -599,6 +611,7 @@ export async function generateResumenFinalPrimariaDocx(
         buildResumenTitle(),
         gap(60),
         buildMainTable(data),
+        ...buildNumeroRegistro(data.numeroRegistro),
       ],
     })),
   });

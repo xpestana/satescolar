@@ -25,7 +25,6 @@ export type BuildFirmasDeps = {
     opts?: { bold?: boolean; rowSpan?: number },
   ) => TableCell;
   mkSigSealCell: (w: number, text: string, rowSpan: number) => TableCell;
-  remisionDateFromYearRange: (yearRange: string) => string;
   bordersGrid: ITableBordersOptions;
 };
 
@@ -35,7 +34,6 @@ export function buildFirmasBlock(
   deps: BuildFirmasDeps,
 ): Table {
   const h = data.schoolHeader;
-  const remision = deps.remisionDateFromYearRange(data.yearRange);
   const director = (h.director ?? "").toUpperCase();
   const cedulaDir = h.cedula_director ?? "";
   const c1 = Math.round(tableW * 0.22);
@@ -52,7 +50,7 @@ export function buildFirmasBlock(
     rows: [
       deps.mkStHdrRow(
         [
-          deps.mkSigCell(cols[0], `VIII. Fecha de Remisión: ${remision}`, {
+          deps.mkSigCell(cols[0], `VIII. Fecha de Remisión: ${data.fechaRemision}`, {
             bold: true,
           }),
           deps.mkSigSealCell(cols[1], SELLO_INSTITUCION, 7),

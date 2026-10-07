@@ -13,7 +13,7 @@ import { Loader2, Users, FileDown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import { useResumenFinalConfig, type SectionPart } from "@/hooks/useResumenFinalConfig";
+import { useResumenFinalConfig, type SectionPart, type SectionPartConfig } from "@/hooks/useResumenFinalConfig";
 import { GRADE_LABELS } from "@/lib/buildInvoiceData";
 import { useResumenFinalSubjectOverrides } from "@/hooks/useResumenFinalSubjectOverrides";
 import {
@@ -25,6 +25,7 @@ import { generateResumenFinalDocx, downloadBlob } from "@/lib/resumen-final-docx
 import { DEFAULT_PRIMARY_COD, isPrimaryGradeLevel } from "@/lib/resumen-final-level";
 import { fetchResumenFinalPrimariaDocxData } from "@/hooks/useResumenFinalPrimariaDocxData";
 import { generateResumenFinalPrimariaDocx } from "@/lib/resumen-final-primaria-docx";
+import { defaultFechaRemisionIso, isoToPlanillaDate } from "@/lib/resumen-final-remision";
 
 const gradeLabel = (gradeLevel: string) => GRADE_LABELS[gradeLevel] ?? gradeLevel;
 
@@ -33,14 +34,26 @@ const partKey = (sp: SectionPart) => `${sp.section.id}__${sp.parte}`;
 
 type BachilleratoPlanilla = "31059" | "31060";
 
-const EMPTY_FORM = {
-  tipo_planilla: "31059" as string,
+type ConfigForm = SectionPartConfig;
+
+const EMPTY_FORM: ConfigForm = {
+  tipo_planilla: "31059",
   observaciones: "",
   nombre_profesor: "",
   cedula_profesor: "",
+  // "" = la de por defecto (31-07 del año de cierre).
+  fecha_remision: "",
+  numero_registro: "",
 };
 
-type ConfigForm = typeof EMPTY_FORM;
+/** Campos propios de cada parte (no se comparten entre partes de primaria). */
+function partOwnFields(src: ConfigForm | null | undefined) {
+  return {
+    observaciones: src?.observaciones ?? "",
+    fecha_remision: src?.fecha_remision || null,
+    numero_registro: src?.numero_registro?.trim() ?? "",
+  };
+}
 
 /** Campos de primaria que se comparten entre todas las partes de una sección. */
 function primarySharedFields(src: ConfigForm | null | undefined): Pick<ConfigForm, "tipo_planilla" | "nombre_profesor" | "cedula_profesor"> {
@@ -117,6 +130,7 @@ export function ResumenFinalTab() {
   };
 
   const selectedPart = sectionParts.find((sp) => partKey(sp) === selectedKey);
+  const selectedYearRange = schoolYears.find((y) => y.id === selectedYearId)?.year_range ?? "";
   const selectedIsPrimary = isPrimaryGradeLevel(selectedPart?.section.grade_level);
 
   // Selected section's subjects (for the override editor; primaria no lleva nombres de materias)
@@ -215,7 +229,7 @@ export function ResumenFinalTab() {
     if (!selectedPart || !schoolId || !selectedYearId) return;
     const { section, parte } = selectedPart;
     const base = { school_id: schoolId, school_year_id: selectedYearId, section_id: section.id };
-    const rows = [{ ...base, parte, ...form }];
+    const rows = [{ ...base, parte, ...form, ...partOwnFields(form) }];
 
     // Primaria: COD y docente se copian a las demás partes de la sección;
     // sus observaciones se conservan.
@@ -223,7 +237,7 @@ export function ResumenFinalTab() {
       const shared = primarySharedFields(form);
       for (const sp of primaryParts) {
         if (sp.section.id !== section.id || sp.parte === parte) continue;
-        rows.push({ ...base, parte: sp.parte, observaciones: sp.config?.observaciones ?? "", ...shared });
+        rows.push({ ...base, parte: sp.parte, ...partOwnFields(sp.config), ...shared });
       }
     }
 
@@ -405,6 +419,48 @@ export function ResumenFinalTab() {
               />
             </div>
 
+            {/* Fecha de remisión + número de registro (propios de cada parte) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="fecha_remision">Fecha de remisión</Label>
+                <Input
+                  id="fecha_remision"
+                  type="date"
+                  value={form.fecha_remision || defaultFechaRemisionIso(selectedYearRange)}
+                  onChange={(e) => setForm((p) => ({ ...p, fecha_remision: e.target.value }))}
+                  className="max-w-[220px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Por defecto {isoToPlanillaDate(defaultFechaRemisionIso(selectedYearRange)) || "31-07 del año de cierre"}.
+                  {form.fecha_remision && (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        className="underline hover:text-foreground"
+                        onClick={() => setForm((p) => ({ ...p, fecha_remision: "" }))}
+                      >
+                        Volver a la de por defecto
+                      </button>
+                    </>
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="numero_registro">Número de registro</Label>
+                <Input
+                  id="numero_registro"
+                  value={form.numero_registro}
+                  onChange={(e) => setForm((p) => ({ ...p, numero_registro: e.target.value }))}
+                  placeholder="Ej. 01-2026"
+                  className="max-w-[220px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se imprime centrado al pie de la planilla, debajo de la última línea.
+                </p>
+              </div>
+            </div>
+
             {/* Nombre de Profesor */}
             <div className="space-y-1.5">
               <Label htmlFor="nombre_profesor" className="text-primary">Nombre de Profesor</Label>
@@ -430,7 +486,7 @@ export function ResumenFinalTab() {
             {selectedIsPrimary && selectedPart.totalParts > 1 && (
               <p className="text-xs text-muted-foreground">
                 El COD y la docente se comparten entre las {selectedPart.totalParts} partes de esta sección.
-                Las observaciones son propias de cada parte.
+                Las observaciones, la fecha de remisión y el número de registro son propios de cada parte.
               </p>
             )}
 

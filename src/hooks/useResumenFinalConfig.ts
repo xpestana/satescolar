@@ -14,6 +14,20 @@ export interface ResumenFinalConfigRow {
   observaciones: string;
   nombre_profesor: string;
   cedula_profesor: string;
+  /** ISO "YYYY-MM-DD"; null = por defecto 31-07 del año de cierre. */
+  fecha_remision: string | null;
+  /** Número de registro libre, centrado al pie de la planilla. */
+  numero_registro: string;
+}
+
+/** Campos editables de una parte. `fecha_remision` "" = la de por defecto. */
+export interface SectionPartConfig {
+  tipo_planilla: string;
+  observaciones: string;
+  nombre_profesor: string;
+  cedula_profesor: string;
+  fecha_remision: string;
+  numero_registro: string;
 }
 
 export interface SectionPart {
@@ -25,7 +39,7 @@ export interface SectionPart {
   parte: number;
   studentCount: number;
   totalParts: number;
-  config: Omit<ResumenFinalConfigRow, "id" | "school_id" | "school_year_id" | "section_id" | "parte"> | null;
+  config: SectionPartConfig | null;
 }
 
 function calcParts(studentCount: number, gradeLevel: string): number {
@@ -98,7 +112,14 @@ export function useResumenFinalConfig(schoolYearId: string) {
             studentCount: count,
             totalParts,
             config: raw
-              ? { tipo_planilla: raw.tipo_planilla, observaciones: raw.observaciones, nombre_profesor: raw.nombre_profesor, cedula_profesor: raw.cedula_profesor }
+              ? {
+                  tipo_planilla: raw.tipo_planilla,
+                  observaciones: raw.observaciones,
+                  nombre_profesor: raw.nombre_profesor,
+                  cedula_profesor: raw.cedula_profesor,
+                  fecha_remision: raw.fecha_remision ?? "",
+                  numero_registro: raw.numero_registro ?? "",
+                }
               : null,
           });
         }

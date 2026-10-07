@@ -57,6 +57,10 @@ export interface ResumenFinalDocxData {
   observaciones: string;
   nombreProfesor: string;
   cedulaProfesor: string;
+  /** Fecha de remisión ya formateada ("31-07-2026"); la de la parte o la de por defecto. */
+  fechaRemision: string;
+  /** Número de registro de la parte, centrado al pie; "" si no tiene. */
+  numeroRegistro: string;
   /** Totales por materia (key = assignmentId) para el pie "Total de Áreas de Formación". */
   subjectTotals: Record<string, SubjectAreaTotals>;
 }
@@ -73,6 +77,7 @@ export interface SubjectAreaTotals {
 import { computeSubjectAreaTotals } from "@/lib/resumen-final-subject-totals";
 import { computeGpGradeAndGrupo } from "@/lib/resumen-final-gcrp";
 import { resolvePlanEstudio } from "@/lib/resumen-final-plan-estudio";
+import { formatFechaRemision } from "@/lib/resumen-final-remision";
 import { formatResumenFinalGrade } from "@/lib/gradeLiteral";
 
 function gradeDisplay(
@@ -341,7 +346,7 @@ export async function fetchResumenFinalDocxData(
   // 3b. tipo de planilla (define layout GP/GRUPO vs productivas mezcladas)
   const { data: rfConfig } = await supabase
     .from("resumen_final_config")
-    .select("tipo_planilla, observaciones, nombre_profesor, cedula_profesor")
+    .select("tipo_planilla, observaciones, nombre_profesor, cedula_profesor, fecha_remision, numero_registro")
     .eq("school_id", schoolId)
     .eq("school_year_id", schoolYearId)
     .eq("section_id", sectionId)
@@ -628,6 +633,8 @@ export async function fetchResumenFinalDocxData(
     observaciones: rfConfig?.observaciones || "",
     nombreProfesor: rfConfig?.nombre_profesor || "",
     cedulaProfesor: rfConfig?.cedula_profesor || "",
+    fechaRemision: formatFechaRemision(rfConfig?.fecha_remision, yearData?.year_range || ""),
+    numeroRegistro: rfConfig?.numero_registro?.trim() || "",
     subjectTotals,
   };
 }

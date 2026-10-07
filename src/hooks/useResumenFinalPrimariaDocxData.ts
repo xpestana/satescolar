@@ -5,6 +5,7 @@ import {
 } from "@/lib/geo-resolve";
 import { formatPlanillaStudentNameParts, formatPlanillaStudentText } from "@/lib/resumen-final-text";
 import { DEFAULT_PRIMARY_COD, PRIMARY_ROWS_PER_PART } from "@/lib/resumen-final-level";
+import { formatFechaRemision } from "@/lib/resumen-final-remision";
 import {
   countPrimariaLiterals,
   formatPrimariaCedula,
@@ -49,6 +50,10 @@ export interface ResumenFinalPrimariaDocxData {
   /** Código (COD) de la planilla; por defecto 21000. */
   cod: string;
   observaciones: string;
+  /** Fecha de remisión ya formateada ("31-07-2026"); la de la parte o la de por defecto. */
+  fechaRemision: string;
+  /** Número de registro de la parte, centrado al pie; "" si no tiene. */
+  numeroRegistro: string;
   nombreProfesor: string;
   cedulaProfesor: string;
   students: PrimariaStudentRow[];
@@ -76,7 +81,7 @@ export async function fetchResumenFinalPrimariaDocxData(
       supabase.from("sections").select("grade_level, name").eq("id", sectionId).single(),
       supabase
         .from("resumen_final_config")
-        .select("parte, tipo_planilla, observaciones, nombre_profesor, cedula_profesor")
+        .select("parte, tipo_planilla, observaciones, nombre_profesor, cedula_profesor, fecha_remision, numero_registro")
         .eq("school_id", schoolId)
         .eq("school_year_id", schoolYearId)
         .eq("section_id", sectionId)
@@ -172,6 +177,8 @@ export async function fetchResumenFinalPrimariaDocxData(
     studentsInPage: rows.length,
     cod: shared("tipo_planilla") || DEFAULT_PRIMARY_COD,
     observaciones: rfConfig?.observaciones || "",
+    fechaRemision: formatFechaRemision(rfConfig?.fecha_remision, yearData?.year_range || ""),
+    numeroRegistro: rfConfig?.numero_registro?.trim() || "",
     nombreProfesor: shared("nombre_profesor") || teacherName(mainTeacher?.form_data),
     cedulaProfesor: shared("cedula_profesor") || formatPrimariaCedula(mainTeacher?.document_id),
     students: rows,

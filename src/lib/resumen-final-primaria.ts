@@ -91,9 +91,3 @@ export function primariaMesAnioEvaluacion(yearRange: string): string {
   const y = endYear(yearRange);
   return y ? `Julio ${y}` : "";
 }
-
-/** Fecha de remisión por defecto (igual que bachillerato): 12-07 del año de cierre. */
-export function primariaFechaRemision(yearRange: string): string {
-  const y = endYear(yearRange);
-  return y ? `12-07-${y}` : "";
-}

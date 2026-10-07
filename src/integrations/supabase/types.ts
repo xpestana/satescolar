@@ -4332,8 +4332,10 @@ export type Database = {
         Row: {
           cedula_profesor: string
           created_at: string
+          fecha_remision: string | null
           id: string
           nombre_profesor: string
+          numero_registro: string
           observaciones: string
           parte: number
           school_id: string
@@ -4345,8 +4347,10 @@ export type Database = {
         Insert: {
           cedula_profesor?: string
           created_at?: string
+          fecha_remision?: string | null
           id?: string
           nombre_profesor?: string
+          numero_registro?: string
           observaciones?: string
           parte?: number
           school_id: string
@@ -4358,8 +4362,10 @@ export type Database = {
         Update: {
           cedula_profesor?: string
           created_at?: string
+          fecha_remision?: string | null
           id?: string
           nombre_profesor?: string
+          numero_registro?: string
           observaciones?: string
           parte?: number
           school_id?: string
@@ -5498,10 +5504,17 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      is_school_family: { Args: { _school_id: string }; Returns: boolean }
       is_school_owner: {
         Args: { _school_id: string; _user_id: string }
         Returns: boolean
       }
+      is_school_staff: { Args: { _school_id: string }; Returns: boolean }
+      is_school_staff_or_teacher: {
+        Args: { _school_id: string }
+        Returns: boolean
+      }
+      is_school_teacher: { Args: { _school_id: string }; Returns: boolean }
       populate_default_primary_indicators: {
         Args: { p_school_id: string }
         Returns: undefined
@@ -5575,10 +5588,15 @@ export type Database = {
         Args: { _plan_concept_id: string }
         Returns: undefined
       }
+      teacher_can_view_student: {
+        Args: { _student_id: string }
+        Returns: boolean
+      }
       teacher_owns_assignment: {
         Args: { _assignment_id: string; _user_id: string }
         Returns: boolean
       }
+      teaches_my_children: { Args: { _teacher_id: string }; Returns: boolean }
       try_cast_double: { Args: { inp: string }; Returns: number }
       url_decode: { Args: { data: string }; Returns: string }
       url_encode: { Args: { data: string }; Returns: string }

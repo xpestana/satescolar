@@ -5,7 +5,6 @@ import {
   formatPrimariaNota,
   normalizePrimariaLiteral,
   pickPrimariaFinalResults,
-  primariaFechaRemision,
   primariaGradeOrdinal,
   primariaMesAnioEvaluacion,
   sumPrimariaLiteralTotals,
@@ -48,10 +47,9 @@ describe("countPrimariaLiterals", () => {
 });
 
 describe("textos de cabecera", () => {
-  it("formatea grado, mes de evaluación y fecha de remisión", () => {
+  it("formatea grado y mes de evaluación", () => {
     expect(primariaGradeOrdinal("2_grado")).toBe("2°");
     expect(primariaMesAnioEvaluacion("2026-2027")).toBe("Julio 2027");
-    expect(primariaFechaRemision("2026-2027")).toBe("12-07-2027");
     expect(primariaMesAnioEvaluacion("sin año")).toBe("");
   });
 });

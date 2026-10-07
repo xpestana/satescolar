@@ -101,6 +101,16 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
   - Con varias partes, el **COD y la docente se comparten** en toda la sección: al guardar una parte
     se copian a las demás. **Las observaciones son propias de cada parte.**
   - **CDCEE** = campo "Zona Educativa" de Planillas → Datos comunes.
+- **Fecha de remisión y número de registro** (primaria y bachillerato 31059/31060), por sección
+  y parte en `resumen_final_config` (`fecha_remision` date, `numero_registro` text):
+  - **Fecha de remisión:** por defecto **31-07 del año de cierre** del año escolar (2025-2026 →
+    31-07-2026); el colegio puede cambiarla en el panel de la sección. `NULL` = la de por defecto.
+    Reglas en `src/lib/resumen-final-remision.ts`. Solo aplica al Resumen Final (la *Fecha de
+    Remisión* de Datos comunes no se usa aquí).
+  - **Número de registro:** texto libre (formato habitual `01-2026`), centrado debajo de la última
+    línea de la planilla. Vacío = no se imprime. En bachillerato su alto entra en el cálculo de la
+    hoja; además la hoja nunca pasa el máximo de Word (22").
+  - En primaria con varias partes, ambos son **propios de cada parte** (como las observaciones).
 - **Rellenos de casillas vacías** (fila sin estudiante o dato sin registrar), iguales en primaria y
   bachillerato 31059/31060 — `PLANILLA_EMPTY` / `orPlanillaEmpty` en `src/lib/resumen-final-text.ts`:
   cédula, lugar de nacimiento, apellidos y nombres `*****`; EF, día y mes `**`; año `****`;

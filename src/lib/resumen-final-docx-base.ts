@@ -68,7 +68,16 @@ export type ResumenFinalDocxVariant = {
 type LayoutEstimateOpts = {
   headerExtra?: number;
   profesoresWrapExtra?: number;
+  /** Alto de la línea del número de registro bajo la planilla (0 si no hay). */
+  registroExtra?: number;
+  /** Colchón que se suma al alto de la hoja (PAGE_H_BUFFER + extra de la variante). */
+  pageBuffer?: number;
 };
+
+// Número de registro centrado debajo de la última línea (fuera de escala vertical).
+const REGISTRO_GAP = 60;
+const REGISTRO_LINE = 240;
+const REGISTRO_BLOCK_H = REGISTRO_GAP + REGISTRO_LINE;
 
 // ??? p?gina (estrategia UEH: hoja virtual alta; ancho din?mico seg?n materias IV) ??
 const PAGE_H_MAX = 31660; // altura m?xima ~55.80 cm para escalar contenido
@@ -234,6 +243,7 @@ function estimateContentHeightTwips(
   return (
     HEADER_BLOCK_ESTIMATE +
     headerExtra +
+    (opts.registroExtra ?? 0) +
     INSTITUTION_BLOCK_ESTIMATE +
     ST_TABLE_GAP +
     ST_TITLE_ROW_MIN +
@@ -255,6 +265,7 @@ function fixedLayoutHeightTwips(opts: LayoutEstimateOpts = {}): number {
   return (
     HEADER_BLOCK_ESTIMATE +
     (opts.headerExtra ?? 0) +
+    (opts.registroExtra ?? 0) +
     INSTITUTION_BLOCK_ESTIMATE +
     ST_TABLE_GAP
   );
@@ -283,7 +294,11 @@ function computeVerticalScale(
   includeGpGrupo: boolean,
   opts: LayoutEstimateOpts = {},
 ): number {
-  const usable = PAGE_H_MAX - MARGIN_TOP - MARGIN_BOTTOM;
+  // Alto útil: el de la hoja virtual, sin que hoja + colchón pasen el máximo de Word (22").
+  const usable = Math.min(
+    PAGE_H_MAX - MARGIN_TOP - MARGIN_BOTTOM,
+    WORD_PAGE_MAX - MARGIN_TOP - MARGIN_BOTTOM - (opts.pageBuffer ?? 0),
+  );
   const fixed = fixedLayoutHeightTwips(opts);
   const total = estimateContentHeightTwips(
     nRegular,
@@ -388,6 +403,8 @@ function computeSheetLayout(
     const estimateOpts: LayoutEstimateOpts = {
       headerExtra: pageLayoutExtra?.headerBlockExtra ?? 0,
       profesoresWrapExtra,
+      registroExtra: data.numeroRegistro.trim() ? REGISTRO_BLOCK_H : 0,
+      pageBuffer: PAGE_H_BUFFER + (pageLayoutExtra?.pageBufferExtra ?? 0),
     };
     const vScale = computeVerticalScale(
       nRegular,
@@ -491,12 +508,6 @@ function padTotal(n: number): string {
 
 function gradeLabelUpper(gradeLevel: string): string {
   return (GRADE_LABELS[gradeLevel] ?? gradeLevel).toUpperCase();
-}
-
-function remisionDateFromYearRange(yearRange: string): string {
-  const match = yearRange.match(/(\d{4})\s*[-?/]\s*(\d{4})/);
-  if (!match) return "";
-  return `12-07-${match[2]}`;
 }
 
 function tblFooterP(
@@ -684,7 +695,6 @@ function buildFirmasBlockLocal(
     mkStHdrRow,
     mkSigCell,
     mkSigSealCell,
-    remisionDateFromYearRange,
     bordersGrid: BORDERS_GRID,
   });
 }
@@ -1770,6 +1780,20 @@ async function buildDocumentContent(
       ? [mkCompactGap(Math.round(ST_TABLE_GAP * layout.vScale))]
       : []),
     buildEstudiantesBlock(data, layout),
+    ...buildNumeroRegistro(data.numeroRegistro),
+  ];
+}
+
+/** Número de registro centrado debajo de la última línea de la planilla; nada si está vacío. */
+function buildNumeroRegistro(numeroRegistro: string): Paragraph[] {
+  const text = numeroRegistro.trim();
+  if (!text) return [];
+  return [
+    new Paragraph({
+      children: [t(text, { size: BODY_DATA_SIZE })],
+      alignment: AlignmentType.CENTER,
+      spacing: { before: REGISTRO_GAP, after: 0, line: REGISTRO_LINE, lineRule: "exact" as const },
+    }),
   ];
 }
 
