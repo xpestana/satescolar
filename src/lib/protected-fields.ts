@@ -13,7 +13,7 @@ export const PROTECTED_FIELDS: Record<ProtectedFormType, string[]> = {
   ],
   student: [
     "tipo_documento", "documento", "cedula", "cedula_escolar",
-    "primer_nombre", "segundo_nombre", "nombres",
+    "primer_nombre", "nombres",
     "primer_apellido", "segundo_apellido", "apellidos",
     "fecha_nacimiento",
   ],
