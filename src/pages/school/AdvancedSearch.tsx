@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Pagination } from "@/components/ui/data-pagination";
@@ -75,6 +76,16 @@ const FIXED_COLUMNS_TEACHER: ColumnDef[] = [
 
 const PAGE_SIZE = 10;
 
+// grade_level enum (sections table) -> label stored in student form_data.nivel_grado
+const GRADE_LEVEL_LABELS: Record<string, string> = {
+  i_nivel: "I Nivel", ii_nivel: "II Nivel", iii_nivel: "III Nivel",
+  "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
+  "4_grado": "4to Grado", "5_grado": "5to Grado", "6_grado": "6to Grado",
+  "1_ano": "1er Año", "2_ano": "2do Año", "3_ano": "3er Año",
+  "4_ano": "4to Año", "5_ano": "5to Año", "6_ano": "6to Año",
+};
+const GRADE_LEVEL_ORDER = Object.keys(GRADE_LEVEL_LABELS);
+
 // Sortable table header cell
 function SortableHeaderCell({ col }: { col: ColumnDef }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -110,6 +121,25 @@ export default function AdvancedSearch() {
   const [viewRecord, setViewRecord] = useState<any>(null);
   const [viewFamilyId, setViewFamilyId] = useState<string | null>(null);
   const [filterPrimary, setFilterPrimary] = useState<boolean | null>(null);
+  const [gradeFilter, setGradeFilter] = useState<string>("all");
+
+  // Grade levels that have sections at this school (students only)
+  const { data: gradeOptions } = useQuery({
+    queryKey: ["adv-search-grade-levels", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sections")
+        .select("grade_level")
+        .eq("school_id", schoolId!);
+      if (error) throw error;
+      const present = new Set((data ?? []).map((s: any) => s.grade_level as string));
+      return GRADE_LEVEL_ORDER.filter((g) => present.has(g)).map((g) => ({
+        value: GRADE_LEVEL_LABELS[g],
+        label: GRADE_LEVEL_LABELS[g],
+      }));
+    },
+    enabled: !!schoolId,
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -373,7 +403,35 @@ export default function AdvancedSearch() {
     enabled: !!schoolId,
   });
 
-  // Filter
+  const getTextValue = useCallback((record: any, col: ColumnDef): string => {
+    if (col.key === "family_name") {
+      const f = record.families as any;
+      return [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "";
+    }
+    if (col.key === "family_students") {
+      const students = (record._family_students || []) as { name: string }[];
+      return students.map(s => s.name).join(", ");
+    }
+    if (col.key === "family_students_count") {
+      return String((record._family_students || []).length);
+    }
+    if (col.isFormData) {
+      const fd = (record.form_data ?? {}) as Record<string, any>;
+      const val = fd[col.key];
+      if (val && typeof val === "string" && uuidPattern.test(val) && geoCache?.[val]) {
+        return geoCache[val];
+      }
+      return val != null ? String(val) : "";
+    }
+    return record[col.key] != null ? String(record[col.key]) : "";
+  }, [geoCache]);
+
+  // Filter: the search looks at every field, independent of which columns are visible
+  const searchableColumns = useMemo(
+    () => allColumns.filter((c) => c.key !== "photo_url" && c.key !== "family_students_count"),
+    [allColumns]
+  );
+
   const filtered = useMemo(() => {
     if (!records) return [];
     let result = records;
@@ -383,31 +441,16 @@ export default function AdvancedSearch() {
       result = result.filter((r: any) => r.is_primary === filterPrimary);
     }
 
+    if (formType === "student" && gradeFilter !== "all") {
+      result = result.filter((r: any) => (r.form_data as any)?.nivel_grado === gradeFilter);
+    }
+
     if (!searchTerm.trim()) return result;
     const term = searchTerm.toLowerCase();
-    return result.filter((r: any) => {
-      const fixedVals = [r.document_id, r.email, r.phone].filter(Boolean);
-      if (formType !== "teacher") {
-        const familyName = [
-          (r.families as any)?.father_last_name,
-          (r.families as any)?.mother_last_name,
-        ]
-          .filter(Boolean)
-          .join(" ");
-        fixedVals.push(familyName);
-      }
-
-      const formData = (r.form_data ?? {}) as Record<string, any>;
-      const formVals = activeColumnKeys
-        .filter((k) => allColumns.find((c) => c.key === k)?.isFormData)
-        .map((k) => formData[k])
-        .filter(Boolean);
-
-      return [...fixedVals, ...formVals].some((v) =>
-        String(v).toLowerCase().includes(term)
-      );
-    });
-  }, [records, searchTerm, activeColumnKeys, allColumns, formType, filterPrimary]);
+    return result.filter((r: any) =>
+      searchableColumns.some((c) => getTextValue(r, c).toLowerCase().includes(term))
+    );
+  }, [records, searchTerm, searchableColumns, getTextValue, formType, filterPrimary, gradeFilter]);
 
   // Paginate
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -428,7 +471,7 @@ export default function AdvancedSearch() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [formType, searchTerm]);
+  }, [formType, searchTerm, gradeFilter]);
 
   const getCellValue = (record: any, col: ColumnDef) => {
     if (col.key === "photo_url") {
@@ -462,29 +505,6 @@ export default function AdvancedSearch() {
       return val ?? "—";
     }
     return record[col.key] ?? "—";
-  };
-
-  const getTextValue = (record: any, col: ColumnDef): string => {
-    if (col.key === "family_name") {
-      const f = record.families as any;
-      return [f?.father_last_name, f?.mother_last_name].filter(Boolean).join(" ") || "";
-    }
-    if (col.key === "family_students") {
-      const students = (record._family_students || []) as { name: string }[];
-      return students.map(s => s.name).join(", ");
-    }
-    if (col.key === "family_students_count") {
-      return String((record._family_students || []).length);
-    }
-    if (col.isFormData) {
-      const fd = (record.form_data ?? {}) as Record<string, any>;
-      const val = fd[col.key];
-      if (val && typeof val === "string" && uuidPattern.test(val) && geoCache?.[val]) {
-        return geoCache[val];
-      }
-      return val != null ? String(val) : "";
-    }
-    return record[col.key] != null ? String(record[col.key]) : "";
   };
 
   // Export helpers
@@ -650,6 +670,20 @@ export default function AdvancedSearch() {
                 No principales
               </Button>
             </div>
+          )}
+
+          {formType === "student" && (
+            <Select value={gradeFilter} onValueChange={setGradeFilter}>
+              <SelectTrigger className="h-9 w-[170px]">
+                <SelectValue placeholder="Nivel/Grado/Año" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los niveles</SelectItem>
+                {(gradeOptions ?? []).map((g) => (
+                  <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
           {/* Column visibility */}
