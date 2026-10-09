@@ -122,6 +122,45 @@ export default function AdvancedSearch() {
   const [viewFamilyId, setViewFamilyId] = useState<string | null>(null);
   const [filterPrimary, setFilterPrimary] = useState<boolean | null>(null);
   const [gradeFilter, setGradeFilter] = useState<string>("all");
+  const [yearFilter, setYearFilter] = useState<string>("all");
+
+  const { data: schoolYears = [] } = useQuery({
+    queryKey: ["school-years-all", schoolId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("school_years")
+        .select("*")
+        .eq("school_id", schoolId!)
+        .order("year_range", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!schoolId,
+  });
+
+  // Enrollments of the selected school year: student_id -> grade label of its section
+  const { data: yearEnrollments } = useQuery({
+    queryKey: ["adv-search-year-enrollments", schoolId, yearFilter],
+    queryFn: async () => {
+      const map = new Map<string, string>();
+      const pageSize = 1000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("enrollments")
+          .select("student_id, sections(grade_level)")
+          .eq("school_id", schoolId!)
+          .eq("school_year_id", yearFilter)
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        (data ?? []).forEach((e: any) =>
+          map.set(e.student_id, GRADE_LEVEL_LABELS[e.sections?.grade_level] ?? "")
+        );
+        if (!data || data.length < pageSize) break;
+      }
+      return map;
+    },
+    enabled: !!schoolId && yearFilter !== "all",
+  });
 
   // Grade levels that have sections at this school (students only)
   const { data: gradeOptions } = useQuery({
@@ -441,8 +480,17 @@ export default function AdvancedSearch() {
       result = result.filter((r: any) => r.is_primary === filterPrimary);
     }
 
-    if (formType === "student" && gradeFilter !== "all") {
-      result = result.filter((r: any) => (r.form_data as any)?.nivel_grado === gradeFilter);
+    if (formType === "student") {
+      // With a school year selected, only enrolled students and the grade comes from their section
+      if (yearFilter !== "all") {
+        if (!yearEnrollments) return [];
+        result = result.filter((r: any) => yearEnrollments.has(r.id));
+      }
+      if (gradeFilter !== "all") {
+        result = result.filter((r: any) =>
+          (yearFilter !== "all" ? yearEnrollments?.get(r.id) : (r.form_data as any)?.nivel_grado) === gradeFilter
+        );
+      }
     }
 
     if (!searchTerm.trim()) return result;
@@ -450,7 +498,7 @@ export default function AdvancedSearch() {
     return result.filter((r: any) =>
       searchableColumns.some((c) => getTextValue(r, c).toLowerCase().includes(term))
     );
-  }, [records, searchTerm, searchableColumns, getTextValue, formType, filterPrimary, gradeFilter]);
+  }, [records, searchTerm, searchableColumns, getTextValue, formType, filterPrimary, gradeFilter, yearFilter, yearEnrollments]);
 
   // Paginate
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -471,7 +519,7 @@ export default function AdvancedSearch() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [formType, searchTerm, gradeFilter]);
+  }, [formType, searchTerm, gradeFilter, yearFilter]);
 
   const getCellValue = (record: any, col: ColumnDef) => {
     if (col.key === "photo_url") {
@@ -670,6 +718,22 @@ export default function AdvancedSearch() {
                 No principales
               </Button>
             </div>
+          )}
+
+          {formType === "student" && (
+            <Select value={yearFilter} onValueChange={setYearFilter}>
+              <SelectTrigger className="h-9 w-[190px]">
+                <SelectValue placeholder="Año escolar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los años escolares</SelectItem>
+                {schoolYears.map((y: any) => (
+                  <SelectItem key={y.id} value={y.id}>
+                    {y.year_range}{y.is_active ? " (activo)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
 
           {formType === "student" && (
