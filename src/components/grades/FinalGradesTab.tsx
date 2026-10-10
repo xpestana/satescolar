@@ -33,9 +33,11 @@ interface ExtraFields {
   attendance_count: number;
   absence_count: number;
   final_status: string;
+  /** Solo Definitiva Final de bachillerato: marcado Inasistente (por defecto Asistente). */
+  final_absentee: boolean;
 }
 
-const DEFAULT_EXTRA: ExtraFields = { observation: "", attendance_count: 0, absence_count: 0, final_status: "" };
+const DEFAULT_EXTRA: ExtraFields = { observation: "", attendance_count: 0, absence_count: 0, final_status: "", final_absentee: false };
 
 interface FinalGradesTabProps {
   schoolId: string;
@@ -348,6 +350,7 @@ export default function FinalGradesTab({
             attendance_count: (existing as any).attendance_count ?? 0,
             absence_count: (existing as any).absence_count ?? 0,
             final_status: (existing as any).final_status || "",
+            final_absentee: false,
           };
           extra[key] = { ...ef };
           dbExtra[key] = { ...ef };
@@ -409,6 +412,7 @@ export default function FinalGradesTab({
             attendance_count: (existing as any).attendance_count ?? 0,
             absence_count: (existing as any).absence_count ?? 0,
             final_status: (existing as any).final_status || "",
+            final_absentee: false,
           };
           extra[key] = { ...ef };
           dbExtra[key] = { ...ef };
@@ -469,6 +473,7 @@ export default function FinalGradesTab({
             attendance_count: existing.attendance_count ?? 0,
             absence_count: existing.absence_count ?? 0,
             final_status: existing.final_status || "",
+            final_absentee: existing.is_final_absentee === true,
           };
           extra[key] = { ...ef };
           dbExtra[key] = { ...ef };
@@ -527,7 +532,7 @@ export default function FinalGradesTab({
     [literalNumericos],
   );
 
-  const handleExtraChange = (key: string, field: keyof ExtraFields, value: string | number) => {
+  const handleExtraChange = (key: string, field: keyof ExtraFields, value: string | number | boolean) => {
     setExtraFields(prev => ({ ...prev, [key]: { ...(prev[key] || DEFAULT_EXTRA), [field]: value } }));
   };
 
@@ -659,7 +664,8 @@ export default function FinalGradesTab({
     return cur.observation !== db.observation ||
       cur.attendance_count !== db.attendance_count ||
       cur.absence_count !== db.absence_count ||
-      cur.final_status !== db.final_status;
+      cur.final_status !== db.final_status ||
+      cur.final_absentee !== db.final_absentee;
   }, [extraFields, dbExtraFields]);
 
   /** Primaria: nota numérica distinta de la guardada (incluye la definitiva propuesta sin guardar). */
@@ -758,6 +764,7 @@ export default function FinalGradesTab({
     attendance_count: ef.attendance_count,
     absence_count: ef.absence_count,
     final_status: ef.final_status || null,
+    is_final_absentee: momento === 0 && ef.final_absentee,
     updated_at: new Date().toISOString(),
   });
 
@@ -778,7 +785,7 @@ export default function FinalGradesTab({
 
     const dbEf = dbExtraFieldsRef.current[key] || DEFAULT_EXTRA;
     const gradeChanged = val !== savedVal;
-    const extraChanged = ef.observation !== dbEf.observation || ef.attendance_count !== dbEf.attendance_count || ef.absence_count !== dbEf.absence_count || ef.final_status !== dbEf.final_status;
+    const extraChanged = ef.observation !== dbEf.observation || ef.attendance_count !== dbEf.attendance_count || ef.absence_count !== dbEf.absence_count || ef.final_status !== dbEf.final_status || ef.final_absentee !== dbEf.final_absentee;
     const unpersistedDefinitiva =
       momento === 0 &&
       isBachillerato &&
@@ -947,7 +954,7 @@ export default function FinalGradesTab({
           const k = `${u.student_id}-${u.momento}`;
           newDbLits[k] = u.literal;
           if (isPrimary) newDbLitNums[k] = (literalNumericos[k] ?? "").trim();
-          newDbExtra[k] = { observation: "", attendance_count: u.attendance_count, absence_count: u.absence_count, final_status: u.final_status || "" };
+          newDbExtra[k] = { observation: "", attendance_count: u.attendance_count, absence_count: u.absence_count, final_status: u.final_status || "", final_absentee: false };
         }
         setDbLiterals(newDbLits);
         setDbLiteralNumericos(newDbLitNums);
@@ -978,7 +985,7 @@ export default function FinalGradesTab({
           const k = `${u.student_id}-${u.momento}`;
           newDb[k] = u.grade_value;
           newDbAdj[k] = u.adjustment_points;
-          newDbExtra[k] = { observation: u.observation || "", attendance_count: u.attendance_count, absence_count: u.absence_count, final_status: u.final_status || "" };
+          newDbExtra[k] = { observation: u.observation || "", attendance_count: u.attendance_count, absence_count: u.absence_count, final_status: u.final_status || "", final_absentee: u.is_final_absentee === true };
         }
         setDbValues(newDb);
         setDbAdjustments(newDbAdj);
@@ -1470,55 +1477,60 @@ export default function FinalGradesTab({
             />
           </div>
 
-          {/* Attendance & Absences */}
-          <div className="grid grid-cols-2 gap-1.5">
+          {isFinal ? (
+            /* Definitiva Final: Asistente / Inasistente del estudiante en la materia (Resumen Final) */
             <div>
               <div className="flex items-center gap-1 mb-0.5">
-                <label className="text-[10px] text-muted-foreground">Asistencias</label>
-                {isFinal && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[200px] text-xs">
-                      <p>Inicializado como la suma de asistencias de los 3 momentos. Puede modificarlo libremente.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+                <label className="text-[10px] text-muted-foreground">Asistencia</label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    <p>Por defecto Asistente. Se cuenta en Asistentes o Inasistentes de la materia en el Resumen Final.</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
-              <Input
-                type="number"
-                min={0}
-                value={ef.attendance_count}
-                onChange={(e) => handleExtraChange(key, "attendance_count", Math.max(0, parseInt(e.target.value) || 0))}
-                onBlur={() => saveGrade(s.student_id, m)}
-                className="h-7 text-xs text-center"
-              />
+              <Select
+                value={ef.final_absentee ? "inasistente" : "asistente"}
+                onValueChange={(v) => { handleExtraChange(key, "final_absentee", v === "inasistente"); setTimeout(() => saveGrade(s.student_id, m), 50); }}
+              >
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asistente" className="text-xs">Asistente</SelectItem>
+                  <SelectItem value="inasistente" className="text-xs">Inasistente</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <div className="flex items-center gap-1 mb-0.5">
-                <label className="text-[10px] text-muted-foreground">Inasistencias</label>
-                {isFinal && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-2.5 w-2.5 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[200px] text-xs">
-                      <p>Inicializado como la suma de inasistencias de los 3 momentos. Puede modificarlo libremente.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
+          ) : (
+            /* Momentos 1–3: días de asistencia e inasistencia (van a la boleta) */
+            <div className="grid grid-cols-2 gap-1.5">
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-0.5 block">Asistencias</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={ef.attendance_count}
+                  onChange={(e) => handleExtraChange(key, "attendance_count", Math.max(0, parseInt(e.target.value) || 0))}
+                  onBlur={() => saveGrade(s.student_id, m)}
+                  className="h-7 text-xs text-center"
+                />
               </div>
-              <Input
-                type="number"
-                min={0}
-                value={ef.absence_count}
-                onChange={(e) => handleExtraChange(key, "absence_count", Math.max(0, parseInt(e.target.value) || 0))}
-                onBlur={() => saveGrade(s.student_id, m)}
-                className="h-7 text-xs text-center"
-              />
+              <div>
+                <label className="text-[10px] text-muted-foreground mb-0.5 block">Inasistencias</label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={ef.absence_count}
+                  onChange={(e) => handleExtraChange(key, "absence_count", Math.max(0, parseInt(e.target.value) || 0))}
+                  onBlur={() => saveGrade(s.student_id, m)}
+                  className="h-7 text-xs text-center"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Status - only for final (m===0) */}
           {isFinal && (
@@ -1640,6 +1652,11 @@ export default function FinalGradesTab({
                   <li>
                     Guardar las notas de un momento <strong>no guarda automáticamente</strong> la definitiva final.
                     Debe guardar también esa columna (salir del campo o pulsar <strong>Guardar Todos</strong>).
+                  </li>
+                  <li>
+                    En la Definitiva Final, <strong>Asistencia</strong> indica si el estudiante fue Asistente (por
+                    defecto) o Inasistente en la materia, y <strong>Estado</strong> si aprobó. Con eso se cuentan los
+                    totales por área del Resumen Final.
                   </li>
                   <li>
                     En la pestaña <strong>Descarga de Boletas</strong>, el momento seleccionado arriba define qué

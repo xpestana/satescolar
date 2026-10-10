@@ -123,6 +123,13 @@ Bachillerato la guarda en `final_grades` (`momento = 0`); primaria en
 nota del docente**: las notas numéricas de los momentos se escriben a mano. Reglas puras en
 `src/lib/finalGradeAverage.ts`. "Guardar Todos" en primaria guarda también la nota numérica.
 
+**Asistencia en la Definitiva Final (bachillerato):** en la columna Definitiva Final, en lugar de
+las casillas de días (Asistencias / Inasistencias), hay un selector **Asistente / Inasistente** por
+estudiante y materia (por defecto Asistente → `final_grades.is_final_absentee`, `momento = 0`). Se
+guarda al elegir. Con él y con el **Estado** se cuentan los totales por área del Resumen Final
+31059/31060 (ver [08-planillas](08-planillas.md)). Los momentos 1–3 conservan sus días de
+asistencia e inasistencia, que son los que usa la boleta. Primaria y preescolar no cambian.
+
 **Literal de la Definitiva Final (primaria):** si no hay literal guardado, se llena con el que
 corresponde a la nota numérica de la definitiva (guardada o propuesta), con la escala
 **A 19–20, B 16–18, C 13–15, D 10–12, E 01–09** (la nota se redondea a entero antes;

@@ -67,3 +67,46 @@ describe("FinalGradesTab — definitiva de primaria", () => {
     expect(screen.getByText(/el promedio ya no coincide/)).toBeTruthy();
   });
 });
+
+describe("FinalGradesTab — definitiva de bachillerato", () => {
+  it("la Definitiva Final lleva el selector Asistente / Inasistente en vez de los días", async () => {
+    const grade = (student_id: string, momento: number, is_final_absentee = false) => ({
+      student_id, assignment_id: "as1", momento, grade_value: "15", adjustment_points: 0,
+      observation: null, attendance_count: 0, absence_count: 0, final_status: null, is_final_absentee,
+    });
+    TABLES.subject_teacher_assignments = [{
+      id: "as1", section_id: "sec1", teacher_id: "t1",
+      section: { id: "sec1", grade_level: "1_ano" }, subject: { subject_type: "regular" },
+    }];
+    TABLES.enrollments = [
+      { student_id: "st1", student: { document_id: "V-1", form_data: { primer_nombre: "Ana", primer_apellido: "Alvarez" } } },
+      { student_id: "st2", student: { document_id: "V-2", form_data: { primer_nombre: "Luis", primer_apellido: "Zambrano" } } },
+    ];
+    TABLES.final_grades = [
+      ...[1, 2, 3, 0].map((m) => grade("st1", m)),
+      ...[1, 2, 3].map((m) => grade("st2", m)),
+      grade("st2", 0, true),
+    ];
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <FinalGradesTab schoolId="sc1" effectiveYear="y1" selectedSubject="sub1" selectedSection="sec1"
+            selectedGcrpAssignment="" selectedSubjectIsGcrp={false} sections={[]} gcrpAssignments={[]} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    // Una "Asistencia" por estudiante (definitiva) y días solo en los tres momentos.
+    await waitFor(() => expect(screen.getAllByText("Asistencia", { selector: "label" })).toHaveLength(2));
+    expect(screen.getAllByText("Asistencias", { selector: "label" })).toHaveLength(6);
+    expect(screen.getAllByText("Inasistencias", { selector: "label" })).toHaveLength(6);
+
+    // Por estudiante: selector de Asistencia y selector de Estado.
+    const combos = screen.getAllByRole("combobox");
+    expect(combos).toHaveLength(4);
+    expect(combos[0].textContent).toContain("Asistente");
+    expect(combos[2].textContent).toContain("Inasistente");
+  });
+});

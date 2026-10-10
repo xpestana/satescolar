@@ -6,8 +6,8 @@ export type SubjectGradeRecord = {
   grade_value: string | null;
   adjustment_points: number;
   final_status: string | null;
-  absence_count: number | null;
-  attendance_count: number | null;
+  /** Marcado Inasistente en la Definitiva Final; false/ausente = Asistente (por defecto). */
+  is_final_absentee?: boolean | null;
 };
 
 const EMPTY_SUBJECT_TOTALS: SubjectAreaTotals = {
@@ -20,6 +20,11 @@ const EMPTY_SUBJECT_TOTALS: SubjectAreaTotals = {
 };
 
 /**
+ * Asistentes e Inasistentes son cantidades de estudiantes: cada inscrito cuenta como Asistente
+ * salvo que el colegio lo marque Inasistente en la Definitiva Final (`is_final_absentee`). Un
+ * marcado Inasistente cuenta como inscrito aunque no tenga nota. Así Inscritos = Asistentes +
+ * Inasistentes.
+ *
  * Estado final de la materia que el colegio marca en la Definitiva Final (`final_grades.final_status`,
  * momento 0). Aprobados y No Aprobados se cuentan con él, no con la nota. Sin estado = no se cuenta.
  */
@@ -46,18 +51,17 @@ export function computeSubjectAreaTotals(
       const aid = subj.assignmentId;
       const totals = result[aid];
       const display = (row.grades[aid] ?? "").trim();
+      const g = gradeMap.get(`${sid}:${aid}`);
+      const isAbsentee = g?.is_final_absentee === true;
 
-      if (!display) {
+      if (!display && !isAbsentee) {
         totals.noCursantes++;
         continue;
       }
 
       totals.inscritos++;
-      const g = gradeMap.get(`${sid}:${aid}`);
-      if (g) {
-        totals.inasistentes += g.absence_count ?? 0;
-        totals.asistentes += g.attendance_count ?? 0;
-      }
+      if (isAbsentee) totals.inasistentes++;
+      else totals.asistentes++;
 
       const status = (g?.final_status ?? "").trim();
       if (status === STATUS_APROBADO) totals.aprobados++;

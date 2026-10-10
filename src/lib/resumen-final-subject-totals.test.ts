@@ -43,38 +43,37 @@ const rec = (
     grade_value,
     adjustment_points: 0,
     final_status,
-    absence_count: 0,
-    attendance_count: 0,
+    is_final_absentee: false,
     ...extra,
   },
 ];
 
 describe("computeSubjectAreaTotals", () => {
-  it("clasifica inscritos, no cursantes y asistencias por materia en la página", () => {
+  it("clasifica inscritos, no cursantes y aprobados por materia en la página", () => {
     const totals = computeSubjectAreaTotals(
       ["stu1", "stu2", "stu3"],
       [row(1, { a1: "12", a2: "" }), row(2, { a1: "08", a2: "15" }), row(3, { a1: "", a2: "11" })],
       [subj("s1", "a1"), subj("s2", "a2")],
       new Map([
-        rec("stu1", "a1", "12", "aprobado", { absence_count: 2, attendance_count: 10 }),
-        rec("stu2", "a1", "8", "no_aprobado", { absence_count: 1, attendance_count: 5 }),
-        rec("stu2", "a2", "15", "aprobado", { attendance_count: 8 }),
-        rec("stu3", "a2", "11", "aprobado", { absence_count: 3, attendance_count: 7 }),
+        rec("stu1", "a1", "12", "aprobado"),
+        rec("stu2", "a1", "8", "no_aprobado"),
+        rec("stu2", "a2", "15", "aprobado"),
+        rec("stu3", "a2", "11", "aprobado"),
       ]),
     );
 
     expect(totals.a1).toEqual({
       inscritos: 2,
-      inasistentes: 3,
-      asistentes: 15,
+      inasistentes: 0,
+      asistentes: 2,
       aprobados: 1,
       noAprobados: 1,
       noCursantes: 1,
     });
     expect(totals.a2).toEqual({
       inscritos: 2,
-      inasistentes: 3,
-      asistentes: 15,
+      inasistentes: 0,
+      asistentes: 2,
       aprobados: 2,
       noAprobados: 0,
       noCursantes: 1,
@@ -121,5 +120,55 @@ describe("computeSubjectAreaTotals — aprobados según el Estado de la definiti
     expect(totals.a1.inscritos).toBe(3);
     expect(totals.a1.aprobados).toBe(2);
     expect(totals.a1.noAprobados).toBe(1);
+  });
+});
+
+describe("computeSubjectAreaTotals — asistentes e inasistentes por estudiante", () => {
+  it("cada inscrito es Asistente salvo que esté marcado Inasistente", () => {
+    const totals = computeSubjectAreaTotals(
+      ["x", "y", "z"],
+      [row(1, { a1: "15" }), row(2, { a1: "12" }), row(3, { a1: "09" })],
+      [subj("s1", "a1")],
+      new Map([
+        rec("x", "a1", "15", "aprobado"),
+        rec("y", "a1", "12", "aprobado", { is_final_absentee: null }),
+        rec("z", "a1", "9", "no_aprobado", { is_final_absentee: true }),
+      ]),
+    );
+    expect(totals.a1.inscritos).toBe(3);
+    expect(totals.a1.asistentes).toBe(2);
+    expect(totals.a1.inasistentes).toBe(1);
+  });
+
+  it("un Inasistente sin nota cuenta como inscrito, no como no cursante", () => {
+    const totals = computeSubjectAreaTotals(
+      ["x", "y", "z"],
+      [row(1, { a1: "15" }), row(2, { a1: "" }), row(3, { a1: "" })],
+      [subj("s1", "a1")],
+      new Map([rec("x", "a1", "15", "aprobado"), rec("y", "a1", "", null, { is_final_absentee: true })]),
+    );
+    expect(totals.a1).toEqual({
+      inscritos: 2,
+      asistentes: 1,
+      inasistentes: 1,
+      aprobados: 1,
+      noAprobados: 0,
+      noCursantes: 1,
+    });
+  });
+
+  it("Inscritos siempre es Asistentes + Inasistentes", () => {
+    const totals = computeSubjectAreaTotals(
+      ["a", "b", "c", "d"],
+      [row(1, { a1: "18" }), row(2, { a1: "10" }), row(3, { a1: "" }), row(4, { a1: "07" })],
+      [subj("s1", "a1")],
+      new Map([
+        rec("a", "a1", "18", "aprobado"),
+        rec("b", "a1", "10", null, { is_final_absentee: true }),
+        rec("d", "a1", "7", "no_aprobado"),
+      ]),
+    );
+    expect(totals.a1.inscritos).toBe(totals.a1.asistentes + totals.a1.inasistentes);
+    expect(totals.a1.noCursantes).toBe(1);
   });
 });

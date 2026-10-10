@@ -2062,6 +2062,7 @@ export type Database = {
           final_status: string | null
           grade_value: string | null
           id: string
+          is_final_absentee: boolean
           momento: number
           observation: string | null
           school_id: string
@@ -2077,6 +2078,7 @@ export type Database = {
           final_status?: string | null
           grade_value?: string | null
           id?: string
+          is_final_absentee?: boolean
           momento?: number
           observation?: string | null
           school_id: string
@@ -2092,6 +2094,7 @@ export type Database = {
           final_status?: string | null
           grade_value?: string | null
           id?: string
+          is_final_absentee?: boolean
           momento?: number
           observation?: string | null
           school_id?: string

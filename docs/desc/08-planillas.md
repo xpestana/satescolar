@@ -124,7 +124,12 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
 - **Totales por área (bachillerato):** *Aprobados* / *No Aprobados* se cuentan con el **Estado**
   que el colegio marca en la Definitiva Final de cada materia (`final_grades.final_status`,
   `momento = 0`: `aprobado` / `no_aprobado`), no con la nota; vale igual para materias literales.
-  Sin Estado, *No Cursante* o *PP* no suman a ninguno de los dos. Ver
+  Sin Estado, *No Cursante* o *PP* no suman a ninguno de los dos (PP pendiente de definir).
+  *Asistentes* / *Inasistentes* son **cantidades de estudiantes**: cada inscrito es Asistente salvo
+  que el colegio lo marque Inasistente en la Definitiva Final de la materia
+  (`final_grades.is_final_absentee`, `momento = 0`; por defecto `false`). Un marcado Inasistente
+  cuenta como inscrito aunque no tenga nota, así **Inscritos = Asistentes + Inasistentes**. Antes se
+  sumaban los días de asistencia de cada estudiante (salían cifras como 1006). Ver
   `src/lib/resumen-final-subject-totals.ts`.
 - Archivos: `src/components/planillas/resumen-final/ResumenFinalTab.tsx`,
   `src/hooks/useResumenFinalConfig.ts`, `src/lib/resumen-final-level.ts` (nivel y filas por parte),

@@ -96,8 +96,7 @@ type GradeRecord = {
   grade_value: string | null;
   adjustment_points: number;
   final_status: string | null;
-  absence_count: number | null;
-  attendance_count: number | null;
+  is_final_absentee: boolean | null;
 };
 
 export function teacherName(fd: Record<string, any> | null | undefined): string {
@@ -471,7 +470,7 @@ export async function fetchResumenFinalDocxData(
   if (allAssignmentIds.length > 0 && pageStudentIds.length > 0) {
     const { data, error: gradesError } = await supabase
       .from("final_grades")
-      .select("student_id, assignment_id, grade_value, adjustment_points, final_status, absence_count, attendance_count")
+      .select("student_id, assignment_id, grade_value, adjustment_points, final_status, is_final_absentee")
       .eq("school_id", schoolId)
       .eq("momento", 0)
       .in("assignment_id", allAssignmentIds)
