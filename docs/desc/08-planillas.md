@@ -3,7 +3,7 @@
 > 🧭 Al implementar cambios de este tema, sigue las [Convenciones de desarrollo](CONVENTIONS.md)
 > (código en inglés, SOLID, pruebas, formato, una responsabilidad por archivo).
 >
-> 📦 **Módulo:** mixto. Planilla de inscripción, constructor y Datos comunes: Registro. Sábana: `grades`. Resumen Final y códigos/RFRE: `ministry_forms`. Ver [19-modulos](19-modulos.md).
+> 📦 **Módulo:** mixto. Planilla de inscripción, constructor y Datos comunes: Registro. Sábana: `grades`. Resumen Final, Certificación de Notas y códigos/RFRE: `ministry_forms`. Ver [19-modulos](19-modulos.md).
 
 ## Resumen
 Generación y configuración de planillas (formatos de datos/listados) del colegio.
@@ -135,6 +135,61 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
   `src/hooks/useResumenFinalConfig.ts`, `src/lib/resumen-final-level.ts` (nivel y filas por parte),
   `src/lib/resumen-final-docx*.ts` (bachillerato), `src/hooks/useResumenFinalPrimariaDocxData.ts`,
   `src/lib/resumen-final-primaria.ts` y `src/lib/resumen-final-primaria-docx.ts` (primaria).
+
+## Certificación de Notas (`/planillas` → pestaña Certificación de Notas)
+Captación de los datos de la **Certificación de Calificaciones EMG** (plan 31059, 1er–5to año) de un
+estudiante y descarga de la planilla en Word.
+
+- **Quién aparece:** cualquier estudiante con alguna inscripción en una sección de `1_ano`…`5_ano`
+  del colegio, en cualquier año escolar (activos, egresados, retirados). 6to año queda fuera.
+  Buscador por nombre o cédula, sin acentos ni mayúsculas.
+- **Los datos son propios de la certificación y no dependen de `final_grades`**: un estudiante puede
+  haber cursado años en otro plantel, así que todo se edita a mano. Un registro por estudiante en
+  `grade_certificates` (documento JSON que se guarda completo):
+  - **Instituciones donde cursó** — texto libre (denominación, localidad, E.F.), hasta 5; el N° es
+    su posición. Al quitar una, las notas que la usaban quedan sin institución.
+  - **Plan de estudio** — por año: área de formación, nota, T-E (por defecto `F`), mes, año e
+    institución. La nota en letras se calcula (`gradeInWords`). Un año sin notas muestra las **7 áreas
+    por defecto** (`DEFAULT_CERTIFICATE_SUBJECTS`) con `**`; al escribir en una pasan a ser filas reales.
+  - **Orientación y Convivencia** (literal) y **grupo GCRP** (nombre + literal), por año.
+  - **Observaciones** y **fecha de expedición** (vacía = el día en que se genere).
+- **Sincronizar notas** — trae la **definitiva final** (`final_grades`, `momento = 0`) de las
+  inscripciones del estudiante. El usuario elige qué traer; cada materia indica *Nueva*, *Actualiza*,
+  *Sin cambios* o *Sin definitiva*. Reglas (`src/lib/grade-certificate-sync.ts`):
+  - Empareja por la materia de origen (`sourceSubjectId`) y, si no, por nombre (sin acentos ni
+    mayúsculas). Lo que coincide se **pisa (nombre y nota)**; lo demás no se toca.
+  - Nota igual que el Resumen Final (`formatResumenFinalGrade`: definitiva + ajuste, entero, "09").
+    Mes `07`, año = año de cierre del año escolar (2025-2026 → 2026). Conserva el T-E ya escrito.
+  - `regular` → área; `orientacion` → literal del año; `gcrp` → grupo + literal. Quedan fuera
+    `innovacion_tecnologica_productiva`, las materias suspendidas y las de `show_in_planilla = false`.
+  - Las notas se asignan a **"mi plantel"** (`isOwnSchool`); si no está en las instituciones se crea
+    con Datos comunes (nombre, municipio, sigla del estado).
+  - En un año repetido se listan ambas inscripciones y viene marcada la más reciente.
+- **Guardado:** todo (incluida la sincronización) va a un borrador; nada llega a la base de datos
+  hasta pulsar **Guardar**. Avisa al cambiar de estudiante o cerrar con cambios pendientes.
+- **Datos de la certificación** (una vez por colegio, `planilla_general_config.grade_certificate_config`):
+  CDCEE, lugar de expedición, director(a) del CDCEE y su cédula. No tocan Datos comunes; CDCEE y lugar
+  vacíos caen en la entidad federal de Datos comunes.
+- **Datos del estudiante** (cédula, apellidos, nombres, fecha y lugar de nacimiento): se leen de la
+  ficha (`students.form_data`) y no se editan aquí; la pestaña avisa de los que faltan.
+- **Descargar Word** (botón de la barra de guardado, por estudiante): genera el `.docx` en el
+  navegador con la librería `docx`, replicando el formato oficial (hoja de 24,5 × 36,5 cm, Arial).
+  Solo se habilita **sin cambios pendientes**: imprime lo guardado.
+  - `buildCertificatePrintModel` (`src/lib/grade-certificate-print.ts`) resuelve todo a texto: rellenos
+    de asteriscos (`CERTIFICATE_EMPTY`: instituciones `********`, orientación `**********`, grupo
+    `***************`, celdas `**`), 7 áreas por defecto en los años sin notas, nota en letras, N° de
+    institución, y siempre 5 filas de instituciones (1–2 a la izquierda, 3–5 a la derecha).
+  - Cabecera, director y cédula salen de Datos comunes. **Lugar y fecha de expedición:** lugar
+    configurado (o la entidad federal) + la fecha de expedición guardada (o la de hoy, hora de Caracas).
+  - `src/lib/grade-certificate-docx.ts` solo maqueta. Con más de 22 áreas entre las tres franjas
+    (1°–2°, 3°–4°, 5°) las filas se achican (`certificateDataRowHeight`) para seguir en una hoja; con
+    11 áreas en 3°, 4° y 5° todavía cabe. Las filas vacías de un año no se imprimen.
+  - Archivo: `Certificacion_de_Notas_<APELLIDOS>_<NOMBRES>_<CEDULA>.docx`.
+- Archivos: `src/components/planillas/grade-certificate/*` (UI), `src/hooks/useGradeCertificate*.ts`,
+  `src/hooks/useCertificateStudentIdentity.ts`, `src/hooks/useOwnSchoolInstitution.ts`,
+  `src/lib/grade-certificate*.ts` (documento, sincronización, lista, identidad, impresión y Word),
+  `src/lib/grade-in-words.ts`, `src/lib/fetch-all-rows.ts`. Migración
+  `20261011120000_create_grade_certificates.sql` (RLS `is_school_staff` + gate `ministry_forms`).
 
 ## Por documentar
 - Diferencia exacta entre `/planillas` (generación) y la config de inscripción.

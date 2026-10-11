@@ -11,13 +11,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, Users, Info, Hammer, Settings2, Building2, ClipboardList } from "lucide-react";
+import { Loader2, Download, FileText, Users, Info, Hammer, Settings2, Building2, ClipboardList, ScrollText } from "lucide-react";
 import { DocumentBuilder } from "@/components/utilities/DocumentBuilder";
 import { usePlanillasConfig } from "@/hooks/usePlanillasConfig";
 import { DatosComunes } from "@/components/planillas/config/DatosComunes";
 import { useSabanaConfig } from "@/hooks/useSabanaConfig";
 import { SabanaConfigPanel } from "@/components/planillas/sabana/SabanaConfigPanel";
 import { ResumenFinalTab } from "@/components/planillas/resumen-final/ResumenFinalTab";
+import { GradeCertificateTab } from "@/components/planillas/grade-certificate/GradeCertificateTab";
 import { SabanaPreview } from "@/components/planillas/sabana/SabanaPreview";
 import { generateSabanaPdf, SECONDARY_GRADES, GRADE_LABELS, StudentRow } from "@/lib/sabana-pdf";
 import jsPDF from "jspdf";
@@ -31,6 +32,8 @@ export default function GradeSheets() {
   const [selectedYearId, setSelectedYearId] = useState<string>("");
   const [selectedMomento, setSelectedMomento] = useState<string>("1");
   const [downloading, setDownloading] = useState<string | null>(null);
+  // Once opened, the certificate tab stays mounted so an unsaved draft survives a look at another tab.
+  const [certificateTabOpened, setCertificateTabOpened] = useState(false);
   const planillasConfig = usePlanillasConfig();
   const { config: sabanaConfig, updateConfig, resetConfig } = useSabanaConfig({
     initialConfig: planillasConfig.sabanaDisplayConfig,
@@ -320,7 +323,11 @@ export default function GradeSheets() {
       <div className="space-y-6">
         <PageHeader title="Planillas" breadcrumbs={[{ label: "Académico" }, { label: "Planillas" }]} />
 
-        <Tabs defaultValue="constructor" className="w-full">
+        <Tabs
+          defaultValue="constructor"
+          className="w-full"
+          onValueChange={(tab) => tab === "certificacion-notas" && setCertificateTabOpened(true)}
+        >
           <TabsList>
             <TabsTrigger value="constructor" className="gap-1.5">
               <Hammer className="h-3.5 w-3.5" /> Constructor
@@ -331,6 +338,10 @@ export default function GradeSheets() {
             </TabsTrigger>
             <TabsTrigger value="resumen-final" className="gap-1.5">
               <ClipboardList className="h-3.5 w-3.5" /> Resumen Final
+              <ModuleLockIcon module="ministry_forms" />
+            </TabsTrigger>
+            <TabsTrigger value="certificacion-notas" className="gap-1.5">
+              <ScrollText className="h-3.5 w-3.5" /> Certificación de Notas
               <ModuleLockIcon module="ministry_forms" />
             </TabsTrigger>
             <TabsTrigger value="configuraciones" className="gap-1.5">
@@ -492,6 +503,16 @@ export default function GradeSheets() {
           <TabsContent value="resumen-final" className="mt-4">
             <ModuleGate module="ministry_forms">
               <ResumenFinalTab />
+            </ModuleGate>
+          </TabsContent>
+
+          <TabsContent
+            value="certificacion-notas"
+            forceMount={certificateTabOpened || undefined}
+            className="mt-4 data-[state=inactive]:hidden"
+          >
+            <ModuleGate module="ministry_forms">
+              <GradeCertificateTab />
             </ModuleGate>
           </TabsContent>
 

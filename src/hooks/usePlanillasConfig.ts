@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { SabanaDisplayConfig, DEFAULT_SABANA_CONFIG } from "@/hooks/useSabanaConfig";
+import { type GradeCertificateSchoolConfig, EMPTY_GRADE_CERTIFICATE_SCHOOL_CONFIG } from "@/lib/grade-certificate";
 
 export interface SchoolHeader {
   codigo_plantel: string;
@@ -49,6 +51,7 @@ export interface PlanillasConfig {
   education_codes: EducationCodes;
   rfre_config: RfreConfig;
   sabana_display_config: SabanaDisplayConfig;
+  grade_certificate_config: Partial<GradeCertificateSchoolConfig>;
 }
 
 const EMPTY_SCHOOL_HEADER: SchoolHeader = {
@@ -94,7 +97,7 @@ export function usePlanillasConfig() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("planilla_general_config")
-        .select("id, school_id, school_header, education_codes, rfre_config, sabana_display_config")
+        .select("id, school_id, school_header, education_codes, rfre_config, sabana_display_config, grade_certificate_config")
         .eq("school_id", schoolId!)
         .maybeSingle();
       if (error) throw error;
@@ -175,6 +178,30 @@ export function usePlanillasConfig() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["planillas-config", schoolId] }),
   });
 
+  const storedGradeCertificateConfig = config?.grade_certificate_config;
+  const gradeCertificateConfig = useMemo<GradeCertificateSchoolConfig>(
+    () => ({ ...EMPTY_GRADE_CERTIFICATE_SCHOOL_CONFIG, ...storedGradeCertificateConfig }),
+    [storedGradeCertificateConfig],
+  );
+
+  const saveGradeCertificateConfig = useMutation({
+    mutationFn: async (grade_certificate_config: GradeCertificateSchoolConfig) => {
+      if (config?.id) {
+        const { error } = await supabase
+          .from("planilla_general_config")
+          .update({ grade_certificate_config })
+          .eq("id", config.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("planilla_general_config")
+          .insert({ school_id: schoolId!, grade_certificate_config });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["planillas-config", schoolId] }),
+  });
+
   return {
     config,
     isLoading,
@@ -185,6 +212,8 @@ export function usePlanillasConfig() {
     saveSchoolHeader,
     saveEducationCodes,
     saveRfreConfig,
+    gradeCertificateConfig,
     saveSabanaDisplayConfig,
+    saveGradeCertificateConfig,
   };
 }

@@ -2278,6 +2278,57 @@ export type Database = {
           },
         ]
       }
+      grade_certificates: {
+        Row: {
+          created_at: string
+          id: string
+          institutions: Json
+          issue_date: string | null
+          observations: string
+          school_id: string
+          student_id: string
+          updated_at: string
+          year_records: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          institutions?: Json
+          issue_date?: string | null
+          observations?: string
+          school_id: string
+          student_id: string
+          updated_at?: string
+          year_records?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          institutions?: Json
+          issue_date?: string | null
+          observations?: string
+          school_id?: string
+          student_id?: string
+          updated_at?: string
+          year_records?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grade_certificates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grade_certificates_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grade_visibility_settings: {
         Row: {
           created_at: string
@@ -3624,6 +3675,7 @@ export type Database = {
           created_at: string
           education_codes: Json
           footer_config: Json
+          grade_certificate_config: Json
           header_config: Json
           id: string
           planilla_title: string
@@ -3638,6 +3690,7 @@ export type Database = {
           created_at?: string
           education_codes?: Json
           footer_config?: Json
+          grade_certificate_config?: Json
           header_config?: Json
           id?: string
           planilla_title?: string
@@ -3652,6 +3705,7 @@ export type Database = {
           created_at?: string
           education_codes?: Json
           footer_config?: Json
+          grade_certificate_config?: Json
           header_config?: Json
           id?: string
           planilla_title?: string

@@ -5,7 +5,7 @@
  */
 
 /** Año de cierre del año escolar ("2025-2026" → "2026"); null si no se reconoce. */
-function closingYear(yearRange: string): string | null {
+export function closingYear(yearRange: string): string | null {
   const m = String(yearRange ?? "").match(/(\d{4})\s*[-/]\s*(\d{4})/);
   return m ? m[2] : null;
 }

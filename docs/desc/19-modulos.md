@@ -28,7 +28,7 @@ dentro de los módulos activos.
 | `messaging` | Mensajes Masivos | `/utilidades/correo` (composer + historial); `send-email` cuando lo llama un usuario `school`. |
 | `payments` | Pagos | `/pagos/*` (incluye nómina y morosidad), pestaña Facturas de `/formatos`, `/representative/pagos` y el banner de morosidad, sección "plan de pago" al inscribir, `send-delinquency-reminders`, `send-payroll-*` y sus crons. |
 | `grades` | Notas, Boletas y Sábana | `/notas/consulta`, `ajustes-notas`, pestaña Boletas de `/formatos`, pestaña Sábana de `/planillas`, notas del docente y del representante, toggles de bloqueo de boleta. |
-| `ministry_forms` | Planillajes del Ministerio | Pestañas Resumen Final (31059/31060, RR-DEA-06-04) y códigos/RFRE de `/planillas`. |
+| `ministry_forms` | Planillajes del Ministerio | Pestañas Resumen Final (31059/31060, RR-DEA-06-04), Certificación de Notas (tabla `grade_certificates`) y códigos/RFRE de `/planillas`. |
 | `attendance` | Control de Asistencias | Escáner QR, registro y dashboard de asistencia, `/teacher/asistencias`, `record-attendance`, `/attendance/scan`. |
 | `virtual_classroom` | Aula Virtual | Supervisión de aulas, aula virtual del docente y del representante, códigos de aula en el dashboard del representante. |
 
