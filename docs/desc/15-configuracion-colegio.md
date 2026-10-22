@@ -63,6 +63,22 @@ Esquema de `form_fields`: `field_name`, `field_label`, `field_type` (enum `field
 `form_type`, `group_id`, `field_order`, `is_required`, `is_visible`, `options` (JSON, para
 selects), `placeholder`. Hay **campos protegidos** (siempre obligatorios, no eliminables).
 
+**Tipo de documento (`tipo_documento`, select):** las opciones viven en `form_fields.options`
+(el editor no las cambia). Por defecto: estudiantes `V`, `E`, `CE`, `P`; representantes y docentes
+`V`, `E`, `P` (`P` = pasaporte). Al guardar, el documento queda en `document_id` como
+`TIPO-NÚMERO` (p. ej. `P-DA088636`). Desde la migración `20261022120000_add_passport_document_type`
+un trigger `BEFORE INSERT` en `form_fields` agrega `P` a todo `tipo_documento` nuevo (colegios
+nuevos, constructor, importaciones), así que no depende de `create_default_form_fields`.
+
+**Formularios de un colegio nuevo:** los crea el trigger `create_default_form_fields_on_school_insert`
+(función `create_default_form_fields`): 10 grupos y 81 campos (46 de estudiante, 18 de representante,
+17 de docente) con sus opciones, más la configuración general de planillas, el bloque de firmas, las
+secciones de la planilla de inscripción y los indicadores de primaria. Restaurada en
+`20261022130000_restore_default_form_fields` (la de `20260529120000` la había dejado sin grupos ni
+`tipo_documento`).
+Planillas que normalizan el tipo: el Resumen Final de primaria imprime siempre `V` (ver
+[08-planillas](08-planillas.md)).
+
 ### Planilla de inscripción (`EnrollmentDisplayConfig`)
 Ver [08-planillas](08-planillas.md). Pestañas: **Modificaciones Generales**, **Modal de
 Inscripción**, **Planilla de Inscripción**.
