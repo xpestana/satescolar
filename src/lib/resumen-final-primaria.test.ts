@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  compareByPrimariaCedula,
   countPrimariaLiterals,
+  formatDocumentWithType,
   formatPrimariaCedula,
   formatPrimariaNota,
   normalizePrimariaLiteral,
@@ -13,15 +15,53 @@ import {
 describe("formatPrimariaCedula", () => {
   it("separa el tipo de cédula del número con un espacio", () => {
     expect(formatPrimariaCedula("V-11912910676")).toBe("V 11912910676");
-    expect(formatPrimariaCedula("e-12345678")).toBe("E 12345678");
     expect(formatPrimariaCedula("V 11488963")).toBe("V 11488963");
     expect(formatPrimariaCedula("V11488963")).toBe("V 11488963");
   });
 
-  it("devuelve vacío sin documento y deja intacto lo que no reconoce", () => {
+  it("imprime siempre V, sea cual sea el tipo guardado", () => {
+    expect(formatPrimariaCedula("CE-11912910676")).toBe("V 11912910676");
+    expect(formatPrimariaCedula("ce 11912910676")).toBe("V 11912910676");
+    expect(formatPrimariaCedula("e-12345678")).toBe("V 12345678");
+    expect(formatPrimariaCedula("P-AB123456")).toBe("V AB123456");
+    expect(formatPrimariaCedula("12345678")).toBe("V 12345678");
+  });
+
+  it("devuelve vacío sin documento", () => {
     expect(formatPrimariaCedula(null)).toBe("");
     expect(formatPrimariaCedula("  ")).toBe("");
-    expect(formatPrimariaCedula("12345678")).toBe("12345678");
+    expect(formatPrimariaCedula("CE-")).toBe("");
+  });
+});
+
+describe("formatDocumentWithType (docente)", () => {
+  it("conserva el tipo real del documento", () => {
+    expect(formatDocumentWithType("e-12345678")).toBe("E 12345678");
+    expect(formatDocumentWithType("V-10000000")).toBe("V 10000000");
+    expect(formatDocumentWithType("12345678")).toBe("12345678");
+    expect(formatDocumentWithType(null)).toBe("");
+  });
+});
+
+describe("compareByPrimariaCedula", () => {
+  const sortIds = (ids: Array<string | null>) => [...ids].sort(compareByPrimariaCedula);
+
+  it("ordena de menor a mayor por el número, sin importar el tipo", () => {
+    expect(sortIds(["V-30123456", "CE-11912910676", "E-9876543", "V-12345678"])).toEqual([
+      "E-9876543", "V-12345678", "V-30123456", "CE-11912910676",
+    ]);
+  });
+
+  it("compara el número completo aunque tenga puntos o ceros delante", () => {
+    expect(sortIds(["V-12.345.678", "V-9.000.000", "V-012345679"])).toEqual([
+      "V-9.000.000", "V-12.345.678", "V-012345679",
+    ]);
+  });
+
+  it("deja al final a quien no tiene cédula", () => {
+    expect(sortIds([null, "V-20000000", "", "CE-10000000"])).toEqual([
+      "CE-10000000", "V-20000000", null, "",
+    ]);
   });
 });
 

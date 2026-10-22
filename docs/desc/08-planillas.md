@@ -90,9 +90,14 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
   **Código (COD)** (por defecto `21000`, guardado en `tipo_planilla`, texto libre), más
   observaciones, profesor y cédula. No lleva nombres de materias.
   - Máximo **20 estudiantes por hoja** (bachillerato: 35); si hay más, la sección se divide en partes.
-    Siempre se imprimen 20 filas. Estudiantes ordenados por cédula.
+    Siempre se imprimen 20 filas. Estudiantes ordenados **de menor a mayor por el número de cédula**,
+    sin mirar el tipo ni los puntos (`compareByPrimariaCedula`); los que no tienen cédula van al final.
+    El orden se aplica antes de repartir en partes.
+  - **Tipo de documento:** la cédula del estudiante se imprime **siempre con `V`**, sea cual sea el tipo
+    guardado (CE, E, P…): `CE-11912910676` → `V 11912910676` (`formatPrimariaCedula`). Solo en esta
+    planilla; la cédula de la docente conserva su tipo real (`formatDocumentWithType`).
   - **Casillas vacías:** ver *Rellenos de casillas vacías* más abajo (iguales en bachillerato).
-  - Tabla 1: N°, cédula ("V 123…"), lugar de nacimiento, EF, sexo, fecha, **resultados A–E** y **P.**
+  - Tabla 1: N°, cédula ("V 123…", siempre V), lugar de nacimiento, EF, sexo, fecha, **resultados A–E** y **P.**
     Todas las casillas llevan `*`; el literal de la **definitiva final** (`primary_final_reports`,
     `momento = 0`) se marca con `X`. La columna **P.** lleva la **nota numérica de esa misma definitiva** (`literal_numerico`, redondeada a entero, "09" si tiene un dígito); sin nota, `*`. Literal y nota salen del mismo registro (`pickPrimariaFinalResults`).
     Fila TOTAL con el conteo por literal y, en **P.**, la suma de esos conteos (`sumPrimariaLiteralTotals`).

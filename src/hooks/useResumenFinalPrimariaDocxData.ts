@@ -7,7 +7,9 @@ import { formatPlanillaStudentNameParts, formatPlanillaStudentText } from "@/lib
 import { DEFAULT_PRIMARY_COD, PRIMARY_ROWS_PER_PART } from "@/lib/resumen-final-level";
 import { formatFechaRemision } from "@/lib/resumen-final-remision";
 import {
+  compareByPrimariaCedula,
   countPrimariaLiterals,
+  formatDocumentWithType,
   formatPrimariaCedula,
   pickPrimariaFinalResults,
   type PrimariaFinalReport,
@@ -95,7 +97,7 @@ export async function fetchResumenFinalPrimariaDocxData(
     [rfConfig, ...configs].map((c) => c?.[field]?.trim()).find(Boolean) ?? "";
   const schoolHeader = (planillaConfig?.school_header as Record<string, string>) ?? {};
 
-  // Estudiantes ordenados por cédula (menor a mayor), igual que bachillerato.
+  // Estudiantes ordenados por el número de cédula (menor a mayor), sin importar el tipo de documento.
   const { data: enrollments } = await supabase
     .from("enrollments")
     .select("student_id")
@@ -109,9 +111,7 @@ export async function fetchResumenFinalPrimariaDocxData(
     .from("students")
     .select("id, document_id, form_data")
     .in("id", enrolledIds);
-  const sorted = [...(students ?? [])].sort((a, b) =>
-    (a.document_id ?? "").localeCompare(b.document_id ?? "", undefined, { numeric: true }),
-  );
+  const sorted = [...(students ?? [])].sort((a, b) => compareByPrimariaCedula(a.document_id, b.document_id));
   const start = (parte - 1) * PRIMARY_ROWS_PER_PART;
   const pageStudents = sorted.slice(start, start + PRIMARY_ROWS_PER_PART);
   if (pageStudents.length === 0) throw new Error("No hay estudiantes en esta parte");
@@ -180,7 +180,7 @@ export async function fetchResumenFinalPrimariaDocxData(
     fechaRemision: formatFechaRemision(rfConfig?.fecha_remision, yearData?.year_range || ""),
     numeroRegistro: rfConfig?.numero_registro?.trim() || "",
     nombreProfesor: shared("nombre_profesor") || teacherName(mainTeacher?.form_data),
-    cedulaProfesor: shared("cedula_profesor") || formatPrimariaCedula(mainTeacher?.document_id),
+    cedulaProfesor: shared("cedula_profesor") || formatDocumentWithType(mainTeacher?.document_id),
     students: rows,
     literalTotals: countPrimariaLiterals(rows.map((r) => r.literal)),
   };

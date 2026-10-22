@@ -7,13 +7,54 @@ export type PrimariaLiteral = (typeof PRIMARIA_LITERALS)[number];
 
 export type PrimariaLiteralTotals = Record<PrimariaLiteral, number>;
 
-/** "V-11912910676" → "V 11912910676" (tipo de cédula + número, separados por espacio). */
+/** Tipo de documento que imprime la planilla de primaria, sea cual sea el guardado (CE, E, P…). */
+export const PRIMARIA_DOCUMENT_TYPE = "V";
+
+/** Número del documento sin su tipo: "CE-11912910676" → "11912910676"; "" si no hay. */
+function cedulaNumber(documentId: string | null | undefined): string {
+  const raw = String(documentId ?? "").trim();
+  const m = raw.match(/^[A-Za-z]+\s*[-.\s]?\s*(.*)$/);
+  return (m ? m[1] : raw).trim();
+}
+
+/**
+ * Cédula como la imprime la planilla de primaria: siempre "V" + número, separados por espacio
+ * ("CE-11912910676" → "V 11912910676", "12345678" → "V 12345678").
+ */
 export function formatPrimariaCedula(documentId: string | null | undefined): string {
+  const number = cedulaNumber(documentId);
+  return number ? `${PRIMARIA_DOCUMENT_TYPE} ${number}` : "";
+}
+
+/** Cédula con su tipo real, separado del número por espacio ("e-12345678" → "E 12345678"). Para la docente. */
+export function formatDocumentWithType(documentId: string | null | undefined): string {
   const raw = String(documentId ?? "").trim();
   if (!raw) return "";
   const m = raw.match(/^([A-Za-z]+)\s*[-.\s]?\s*(.+)$/);
   if (!m) return raw;
   return `${m[1].toUpperCase()} ${m[2].trim()}`;
+}
+
+/** Solo los dígitos del número, sin ceros a la izquierda; "" si no tiene. */
+function cedulaDigits(documentId: string | null | undefined): string {
+  return cedulaNumber(documentId).replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+}
+
+/**
+ * Orden de la planilla de primaria: de menor a mayor por el número de cédula, sin mirar el tipo
+ * (todas se imprimen como "V") ni los puntos. Las que no tienen número van al final.
+ */
+export function compareByPrimariaCedula(a: string | null | undefined, b: string | null | undefined): number {
+  const da = cedulaDigits(a);
+  const db = cedulaDigits(b);
+  if (!da || !db) {
+    if (da !== db) return da ? -1 : 1;
+  } else if (da.length !== db.length) {
+    return da.length - db.length;
+  } else if (da !== db) {
+    return da < db ? -1 : 1;
+  }
+  return String(a ?? "").localeCompare(String(b ?? ""));
 }
 
 /** Literal final normalizado (A–E) o "" si no hay uno válido. */
