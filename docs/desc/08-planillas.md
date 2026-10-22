@@ -93,11 +93,12 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
     Siempre se imprimen 20 filas. Estudiantes ordenados **de menor a mayor por el número de cédula**,
     sin mirar el tipo ni los puntos (`compareByPrimariaCedula`); los que no tienen cédula van al final.
     El orden se aplica antes de repartir en partes.
-  - **Tipo de documento:** la cédula del estudiante se imprime **siempre con `V`**, sea cual sea el tipo
-    guardado (CE, E, P…): `CE-11912910676` → `V 11912910676` (`formatPrimariaCedula`). Solo en esta
-    planilla; la cédula de la docente conserva su tipo real (`formatDocumentWithType`).
+  - **Tipo de documento:** la cédula del estudiante se imprime **con `V`** en lugar del tipo guardado
+    (CE, E o sin tipo): `CE-11912910676` → `V 11912910676` (`formatPrimariaCedula`). **Excepción: el
+    pasaporte se queda con `P`** (`P-DA088636` → `P DA088636`). Solo en esta planilla; la cédula de la
+    docente conserva su tipo real (`formatDocumentWithType`).
   - **Casillas vacías:** ver *Rellenos de casillas vacías* más abajo (iguales en bachillerato).
-  - Tabla 1: N°, cédula ("V 123…", siempre V), lugar de nacimiento, EF, sexo, fecha, **resultados A–E** y **P.**
+  - Tabla 1: N°, cédula ("V 123…"; V salvo pasaporte "P …"), lugar de nacimiento, EF, sexo, fecha, **resultados A–E** y **P.**
     Todas las casillas llevan `*`; el literal de la **definitiva final** (`primary_final_reports`,
     `momento = 0`) se marca con `X`. La columna **P.** lleva la **nota numérica de esa misma definitiva** (`literal_numerico`, redondeada a entero, "09" si tiene un dígito); sin nota, `*`. Literal y nota salen del mismo registro (`pickPrimariaFinalResults`).
     Fila TOTAL con el conteo por literal y, en **P.**, la suma de esos conteos (`sumPrimariaLiteralTotals`).
@@ -136,6 +137,10 @@ Configuración por sección + parte (partes de 35 alumnos) en `resumen_final_con
   cuenta como inscrito aunque no tenga nota, así **Inscritos = Asistentes + Inasistentes**. Antes se
   sumaban los días de asistencia de cada estudiante (salían cifras como 1006). Ver
   `src/lib/resumen-final-subject-totals.ts`.
+- **V. Profesores por Áreas (bachillerato):** la columna **Firma** lleva su ancho base (2 columnas de
+  materia) más el **15% del ancho de "Áreas de Formación"** (`FIRMA_SHARE_FROM_AREA` en
+  `src/lib/resumen-final-profesores-curso.ts`), para que quepa la firma a mano. En la 31059 un nombre
+  de área largo (p. ej. "Geografía, Historia y Soberanía Nacional") puede ocupar dos líneas.
 - Archivos: `src/components/planillas/resumen-final/ResumenFinalTab.tsx`,
   `src/hooks/useResumenFinalConfig.ts`, `src/lib/resumen-final-level.ts` (nivel y filas por parte),
   `src/lib/resumen-final-docx*.ts` (bachillerato), `src/hooks/useResumenFinalPrimariaDocxData.ts`,

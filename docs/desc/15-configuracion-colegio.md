@@ -76,8 +76,8 @@ nuevos, constructor, importaciones), así que no depende de `create_default_form
 secciones de la planilla de inscripción y los indicadores de primaria. Restaurada en
 `20261022130000_restore_default_form_fields` (la de `20260529120000` la había dejado sin grupos ni
 `tipo_documento`).
-Planillas que normalizan el tipo: el Resumen Final de primaria imprime siempre `V` (ver
-[08-planillas](08-planillas.md)).
+Planillas que normalizan el tipo: el Resumen Final de primaria imprime `V` salvo el pasaporte, que
+se queda `P` (ver [08-planillas](08-planillas.md)).
 
 ### Planilla de inscripción (`EnrollmentDisplayConfig`)
 Ver [08-planillas](08-planillas.md). Pestañas: **Modificaciones Generales**, **Modal de

@@ -180,6 +180,9 @@ export function computeViStartOffset(
   return stIvCols.slice(0, afterCols).reduce((a, b) => a + b, 0);
 }
 
+/** Parte del ancho de "Áreas de Formación" que pasa a "Firma" para que quepa la firma a mano. */
+export const FIRMA_SHARE_FROM_AREA = 0.15;
+
 /** V ocupa III + primeras N materias; VI ocupa el resto de IV (desde N+1ª materia). */
 export function computeColumnWidths(
   stColIii: number,
@@ -202,7 +205,7 @@ export function computeColumnWidths(
   const colNro = 340;
   const colSigla = 700;
   const colCedulaBase = 1500;
-  const colFirma = 2 * ivMateriaW;
+  const colFirmaBase = 2 * ivMateriaW;
   const colProfesorBase = 3600;
   const baseProfesor = colProfesorBase + Math.round(defaultOffset * 0.55);
   const baseCedula = colCedulaBase;
@@ -213,7 +216,7 @@ export function computeColumnWidths(
     colSigla -
     baseProfesor -
     baseCedula -
-    colFirma;
+    colFirmaBase;
 
   let colProfesor = baseProfesor;
   let colCedula = baseCedula;
@@ -226,6 +229,10 @@ export function computeColumnWidths(
     colCedula += share + (rem > 1 ? 1 : 0);
     colArea += share + (rem > 2 ? 1 : 0);
   }
+
+  const firmaFromArea = Math.round(colArea * FIRMA_SHARE_FROM_AREA);
+  colArea -= firmaFromArea;
+  const colFirma = colFirmaBase + firmaFromArea;
 
   const vCols = [colNro, colSigla, colArea, colProfesor, colCedula, colFirma];
   return { vCols, viW, vW, allCols: [...vCols, viW] };

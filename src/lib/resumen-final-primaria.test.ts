@@ -19,12 +19,22 @@ describe("formatPrimariaCedula", () => {
     expect(formatPrimariaCedula("V11488963")).toBe("V 11488963");
   });
 
-  it("imprime siempre V, sea cual sea el tipo guardado", () => {
+  it("imprime V en lugar del tipo guardado", () => {
     expect(formatPrimariaCedula("CE-11912910676")).toBe("V 11912910676");
     expect(formatPrimariaCedula("ce 11912910676")).toBe("V 11912910676");
     expect(formatPrimariaCedula("e-12345678")).toBe("V 12345678");
-    expect(formatPrimariaCedula("P-AB123456")).toBe("V AB123456");
     expect(formatPrimariaCedula("12345678")).toBe("V 12345678");
+  });
+
+  it("el pasaporte se queda con P", () => {
+    expect(formatPrimariaCedula("P-DA088636")).toBe("P DA088636");
+    expect(formatPrimariaCedula("p DA088636")).toBe("P DA088636");
+    expect(formatPrimariaCedula("P-")).toBe("");
+  });
+
+  it("no confunde las letras de un número sin tipo con el tipo", () => {
+    expect(formatPrimariaCedula("DA088636")).toBe("V DA088636");
+    expect(formatPrimariaCedula("V-DA088636")).toBe("V DA088636");
   });
 
   it("devuelve vacío sin documento", () => {

@@ -7,23 +7,35 @@ export type PrimariaLiteral = (typeof PRIMARIA_LITERALS)[number];
 
 export type PrimariaLiteralTotals = Record<PrimariaLiteral, number>;
 
-/** Tipo de documento que imprime la planilla de primaria, sea cual sea el guardado (CE, E, P…). */
+/** Tipo de documento que imprime la planilla de primaria en lugar del guardado (CE, E…). */
 export const PRIMARIA_DOCUMENT_TYPE = "V";
 
-/** Número del documento sin su tipo: "CE-11912910676" → "11912910676"; "" si no hay. */
-function cedulaNumber(documentId: string | null | undefined): string {
+/** Pasaporte: es el único tipo que la planilla de primaria conserva. */
+const PASSPORT_DOCUMENT_TYPE = "P";
+
+/** Tipo y número del documento: "CE-11912910676" → { type: "CE", number: "11912910676" }. */
+function splitDocument(documentId: string | null | undefined): { type: string; number: string } {
   const raw = String(documentId ?? "").trim();
-  const m = raw.match(/^[A-Za-z]+\s*[-.\s]?\s*(.*)$/);
-  return (m ? m[1] : raw).trim();
+  // Solo los tipos del formulario, seguidos de separador o de un dígito: "DA088636" no tiene tipo.
+  const m = raw.match(/^(CE|V|E|P)(?:\s*[-.\s]\s*|(?=\d)|$)(.*)$/i);
+  return m ? { type: m[1].toUpperCase(), number: m[2].trim() } : { type: "", number: raw };
+}
+
+/** Número del documento sin su tipo; "" si no hay. */
+function cedulaNumber(documentId: string | null | undefined): string {
+  return splitDocument(documentId).number;
 }
 
 /**
- * Cédula como la imprime la planilla de primaria: siempre "V" + número, separados por espacio
- * ("CE-11912910676" → "V 11912910676", "12345678" → "V 12345678").
+ * Cédula como la imprime la planilla de primaria: "V" + número, separados por espacio, sea cual sea
+ * el tipo guardado ("CE-11912910676" → "V 11912910676", "12345678" → "V 12345678"), salvo el
+ * pasaporte, que se queda con "P" ("P-DA088636" → "P DA088636").
  */
 export function formatPrimariaCedula(documentId: string | null | undefined): string {
-  const number = cedulaNumber(documentId);
-  return number ? `${PRIMARIA_DOCUMENT_TYPE} ${number}` : "";
+  const { type, number } = splitDocument(documentId);
+  if (!number) return "";
+  const printedType = type === PASSPORT_DOCUMENT_TYPE ? PASSPORT_DOCUMENT_TYPE : PRIMARIA_DOCUMENT_TYPE;
+  return `${printedType} ${number}`;
 }
 
 /** Cédula con su tipo real, separado del número por espacio ("e-12345678" → "E 12345678"). Para la docente. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assignViToRows,
   computeColumnWidths,
+  FIRMA_SHARE_FROM_AREA,
   computeViStartOffset,
   estimateProfesoresWrapExtra,
   FOOT_V_DATA_H,
@@ -109,10 +110,23 @@ describe("computeColumnWidths", () => {
     expect(nro).toBe(340);
     expect(sigla).toBe(700);
     expect(cedula).toBe(1500);
-    expect(firma).toBe(2 * IV_MATERIA_W);
     expect(profesor).toBe(3600 + Math.round(viOffset * 0.55));
-    expect(area).toBeGreaterThan(4000);
+    expect(area + firma).toBeGreaterThan(4000 + 2 * IV_MATERIA_W);
     expect(vCols.reduce((a, b) => a + b, 0)).toBe(ST_COL_III + viOffset);
+  });
+
+  it("Firma toma el 15% del ancho de Áreas de Formación", () => {
+    const { vCols } = computeColumnWidths(
+      ST_COL_III,
+      stColIv,
+      IV_MATERIA_W,
+      stIvCols,
+    );
+    const [nro, sigla, area, profesor, cedula, firma] = vCols;
+    const areaBefore = ST_COL_III + viOffset - nro - sigla - profesor - cedula - 2 * IV_MATERIA_W;
+    const moved = Math.round(areaBefore * FIRMA_SHARE_FROM_AREA);
+    expect(area).toBe(areaBefore - moved);
+    expect(firma).toBe(2 * IV_MATERIA_W + moved);
   });
 
   it("31059: VI desde la 9ª materia y reparte espacio extra en área, cédula y profesor", () => {
@@ -137,7 +151,8 @@ describe("computeColumnWidths", () => {
 
     expect(vW).toBe(ST_COL_III + viOffset31059);
     expect(viW).toBe(stColIv - viOffset31059);
-    expect(vCols[2]).toBe(base.vCols[2] + share + (rem > 2 ? 1 : 0));
+    // Área + Firma: el 15% que pasa a Firma sale del área ya ampliada.
+    expect(vCols[2] + vCols[5]).toBe(base.vCols[2] + base.vCols[5] + share + (rem > 2 ? 1 : 0));
     expect(vCols[3]).toBe(base.vCols[3] + share + (rem > 0 ? 1 : 0));
     expect(vCols[4]).toBe(base.vCols[4] + share + (rem > 1 ? 1 : 0));
     expect(vCols.reduce((a, b) => a + b, 0)).toBe(vW);
