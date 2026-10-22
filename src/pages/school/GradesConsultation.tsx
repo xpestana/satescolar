@@ -19,10 +19,11 @@ import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
 import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas, downloadBachilleratoBoletaDefinitiva, downloadAllBachilleratoBoletasDefinitiva } from "@/lib/bachilleratoBoleta";
 import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
-import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES } from "@/lib/gradeLevels";
+import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES, formatSectionLabel } from "@/lib/gradeLevels";
 import RepresentativeVisibilityTab from "@/components/grades/RepresentativeVisibilityTab";
 import PdfPreviewDialog from "@/components/grades/PdfPreviewDialog";
 import DiagnosisTab from "@/components/diagnosis/DiagnosisTab";
+import { isDiagnosisGrade } from "@/lib/diagnosisEligibility";
 import { useGradeStudents } from "@/hooks/useGradeStudents";
 import { usePdfPreview } from "@/hooks/usePdfPreview";
 
@@ -31,10 +32,9 @@ import { usePdfPreview } from "@/hooks/usePdfPreview";
 export default function GradesConsultation() {
   const { schoolId } = useSchoolId();
   const { has: hasPermission, isOwner } = usePermissions();
-  // The visibility tab decides what families see, so it follows the grade editing permission.
-  const canManageVisibility = isOwner || hasPermission("grades.edit");
-  // Correcting a teacher's diagnosis is editing grades work too; without it the tab only views/downloads.
-  const canEditDiagnosis = isOwner || hasPermission("grades.edit");
+  // Grade editing permission: it gates the visibility tab (what families see) and writing diagnoses;
+  // without it the diagnosis tab only views and downloads.
+  const canEditGrades = isOwner || hasPermission("grades.edit");
   const [activeTab, setActiveTab] = useState("consulta");
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("");
@@ -103,6 +103,10 @@ export default function GradesConsultation() {
   const selectedSubjectIsGcrp = subjects.find(s => s.id === selectedSubject)?.subject_type === "gcrp";
   // GCRP áreas are picked by teacher; the diagnosis tab ignores the área and always works by section.
   const pickGcrpTeacher = selectedSubjectIsGcrp && activeTab !== "diagnostico";
+  // The diagnosis only exists in preschool and primary.
+  const sectionOptions = activeTab === "diagnostico"
+    ? sections.filter((s) => isDiagnosisGrade(s.grade_level))
+    : sections;
 
   // For GCRP: fetch all assignments with teacher info so user can pick one
   const { data: gcrpAssignments = [] } = useQuery({
@@ -217,11 +221,10 @@ export default function GradesConsultation() {
   const loading = assignmentLoading || planLoading || studentsLoading || gradesLoading;
 
   const selectedSectionData = sections.find((s) => s.id === selectedSection);
+  const selectedSectionLabel = formatSectionLabel(selectedSectionData);
   const sectionLabel = selectedSubjectIsGcrp
     ? `GCRP — ${gcrpAssignments.find(a => a.id === selectedGcrpAssignment)?.teacherName || "Docente"}`
-    : selectedSectionData
-      ? `${GRADE_LABELS[selectedSectionData.grade_level] || selectedSectionData.grade_level} - Sección ${selectedSectionData.name}`
-      : "";
+    : selectedSectionLabel;
 
   return (
     <DashboardLayout>
@@ -345,7 +348,7 @@ export default function GradesConsultation() {
                   <CommandList>
                     <CommandEmpty>No se encontró.</CommandEmpty>
                     <CommandGroup>
-                      {sections.map((s) => (
+                      {sectionOptions.map((s) => (
                         <CommandItem key={s.id} value={`${GRADE_LABELS[s.grade_level] || s.grade_level} ${s.name}`} onSelect={() => { setSelectedSection(s.id); setOpenSection(false); }}>
                           <Check className={cn("mr-2 h-4 w-4", selectedSection === s.id ? "opacity-100" : "opacity-0")} />
                           {GRADE_LABELS[s.grade_level] || s.grade_level} - {s.name}
@@ -391,7 +394,7 @@ export default function GradesConsultation() {
             <TabsTrigger value="finales">Notas Finales y Construcción de Boletas</TabsTrigger>
             <TabsTrigger value="descarga">Descarga de Boletas</TabsTrigger>
             <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
-            {canManageVisibility && (
+            {canEditGrades && (
               <TabsTrigger value="visibilidad">Visibilidad para Representantes</TabsTrigger>
             )}
           </TabsList>
@@ -954,7 +957,13 @@ export default function GradesConsultation() {
             <div className="text-center py-12 border rounded-md bg-muted/20">
               <Search className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
               <p className="text-muted-foreground px-4">
-                Seleccione año escolar y sección para ver los diagnósticos de sus áreas.
+                Seleccione año escolar y una sección de preescolar o primaria para ver los diagnósticos.
+              </p>
+            </div>
+          ) : !isDiagnosisGrade(selectedSectionData?.grade_level) ? (
+            <div className="text-center py-12 border rounded-md bg-muted/20">
+              <p className="text-muted-foreground px-4">
+                El diagnóstico es solo para preescolar y primaria. Seleccione una sección de esos niveles.
               </p>
             </div>
           ) : (
@@ -963,17 +972,13 @@ export default function GradesConsultation() {
               schoolId={schoolId}
               schoolYearId={effectiveYear}
               sectionId={selectedSection}
-              sectionLabel={
-                selectedSectionData
-                  ? `${GRADE_LABELS[selectedSectionData.grade_level] || selectedSectionData.grade_level} - Sección ${selectedSectionData.name}`
-                  : ""
-              }
-              canEdit={canEditDiagnosis}
+              sectionLabel={selectedSectionLabel}
+              canEdit={canEditGrades}
             />
           )}
         </TabsContent>
 
-        {canManageVisibility && (
+        {canEditGrades && (
           <TabsContent value="visibilidad">
             {!effectiveYear ? (
               <div className="text-center py-12 border rounded-md bg-muted/20">

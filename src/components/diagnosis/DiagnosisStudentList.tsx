@@ -52,8 +52,10 @@ export default function DiagnosisStudentList({
   const [editorIndex, setEditorIndex] = useState<number | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
-  const doneCount = students.filter((s) => diagnoses[s.student_id]).length;
   const writtenStudents = students.filter((s) => diagnoses[s.student_id]);
+  const doneCount = writtenStudents.length;
+  /** Position in the whole list: row numbers and the editor keep it whatever the filter shows. */
+  const positionOf = useMemo(() => new Map(students.map((s, i) => [s.student_id, i])), [students]);
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -69,11 +71,7 @@ export default function DiagnosisStudentList({
   const downloadPdf = async (targets: GradeStudent[], key: string, filename: string, title: string) => {
     setDownloadingId(key);
     try {
-      const html = await buildDiagnosisDocument(
-        assignmentId,
-        targets.map((s) => ({ studentId: s.student_id, studentName: s.full_name, documentId: s.document_id })),
-      );
-      await openPreview(html, filename, title);
+      await openPreview(await buildDiagnosisDocument(assignmentId, targets), filename, title);
     } catch (e) {
       toast.error("No se pudo generar el PDF", { description: (e as Error).message });
     } finally {
@@ -87,8 +85,7 @@ export default function DiagnosisStudentList({
   const downloadAll = () =>
     downloadPdf(writtenStudents, "all", `Diagnosticos_${fileLabel}`, `${fileLabel} — Diagnósticos (${writtenStudents.length})`);
 
-  /** The editor walks the whole list in order, whatever the filter shows. */
-  const openEditor = (s: GradeStudent) => setEditorIndex(students.findIndex((x) => x.student_id === s.student_id));
+  const openEditor = (s: GradeStudent) => setEditorIndex(positionOf.get(s.student_id) ?? 0);
 
   if (studentsLoading || diagnosesLoading) {
     return (
@@ -223,9 +220,7 @@ export default function DiagnosisStudentList({
               <TableBody>
                 {visible.map((s) => (
                   <TableRow key={s.student_id}>
-                    <TableCell className="text-center text-muted-foreground">
-                      {students.findIndex((x) => x.student_id === s.student_id) + 1}
-                    </TableCell>
+                    <TableCell className="text-center text-muted-foreground">{(positionOf.get(s.student_id) ?? 0) + 1}</TableCell>
                     <TableCell className="font-medium">{s.student_name}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{s.document_id || "—"}</TableCell>
                     <TableCell>{statusBadge(!!diagnoses[s.student_id])}</TableCell>

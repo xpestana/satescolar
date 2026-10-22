@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveGradeLevelKind, gradeLabel, NUMERIC_GRADES } from "./gradeLevels";
+import { resolveGradeLevelKind, gradeLabel, formatSectionLabel, NUMERIC_GRADES } from "./gradeLevels";
 
 describe("resolveGradeLevelKind", () => {
   it("maps preschool grades", () => {
@@ -47,5 +47,12 @@ describe("NUMERIC_GRADES", () => {
     expect(NUMERIC_GRADES.has("1_ano")).toBe(true);
     expect(NUMERIC_GRADES.has("1_grado")).toBe(false);
     expect(NUMERIC_GRADES.has("i_nivel")).toBe(false);
+  });
+});
+
+describe("formatSectionLabel", () => {
+  it("joins the grade label and the section name", () => {
+    expect(formatSectionLabel({ grade_level: "4_grado", name: "U" })).toBe("4to Grado - Sección U");
+    expect(formatSectionLabel(null)).toBe("");
   });
 });

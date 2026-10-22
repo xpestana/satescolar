@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -83,8 +83,7 @@ export default function DiagnosisEditorModal({
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const saveMut = useSaveDiagnosis(assignmentId, schoolId);
 
-  const studentIds = useMemo(() => students.map((s) => s.student_id), [students]);
-  const { data: context, isLoading: contextLoading } = useDiagnosisContext(assignmentId, studentIds, open);
+  const { data: context, isLoading: contextLoading } = useDiagnosisContext(assignmentId, open);
 
   // Load the student's saved text when the student changes. Not on every refetch of `diagnoses`,
   // so saving doesn't reset the editor under the cursor.
@@ -100,13 +99,7 @@ export default function DiagnosisEditorModal({
   useEffect(() => {
     if (!open || !context || !student) return;
     const timer = setTimeout(() => {
-      setPreviewHtml(
-        composeDiagnosisDocument(
-          context,
-          [{ studentId: student.student_id, studentName: student.full_name, documentId: student.document_id }],
-          { [student.student_id]: toStored(draft) },
-        ),
-      );
+      setPreviewHtml(composeDiagnosisDocument(context, [student], { [student.student_id]: toStored(draft) }));
     }, 500);
     return () => clearTimeout(timer);
   }, [open, context, student, draft]);

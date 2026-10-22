@@ -188,11 +188,25 @@ interruptor `is_active`.
   e `is_suspended`. `teacher_signatures` permite una RLS acotada a la firma.
 
 ## Diagnóstico del estudiante (Ficha descriptiva)
-Ficha "FICHA DESCRIPTIVA DEL ESTUDIANTE (DIAGNÓSTICO)" que redacta el docente, para cualquier grado.
-Sale en PDF como la boleta: una ficha por página, Carta.
+Ficha "FICHA DESCRIPTIVA DEL ESTUDIANTE (DIAGNÓSTICO)" **solo de preescolar y primaria**, que
+redacta el **docente guía** de la sección. Sale en PDF como la boleta: una ficha por página, Carta.
 
-- **Una ficha por alumno × asignación.** Cada docente escribe la suya en su área, y la asignación
-  ya implica el año escolar. Tabla `student_diagnoses`, `UNIQUE(student_id, assignment_id)`.
+- **Quién y dónde:** una sola área por sección de preescolar o primaria lleva el diagnóstico, y la
+  redacta su docente:
+  - el área principal (`is_main_report`, la misma que firma la boleta de primaria);
+  - **si ninguna está marcada, la primera** por orden de áreas (`school_subjects.display_order`) y
+    luego por nombre.
+  - La regla vive en un solo sitio: `pickDiagnosisAssignments` / `isDiagnosisGrade`
+    (`src/lib/diagnosisEligibility.ts`).
+  - Hook `useSectionDiagnosisAssignments`, compartido por Mis Áreas, la pantalla del docente y la
+    pestaña del colegio para que las tres elijan la misma área.
+  - Secundaria, GCRP y las demás áreas (especialistas) no tienen diagnóstico.
+  - ⚠️ Si se marca como principal un área distinta de la que se venía usando, los diagnósticos ya
+    escritos quedan en la anterior y dejan de verse.
+- **Una ficha por alumno y año.** Se guarda en `student_diagnoses` contra la asignación elegida, que ya
+  implica el año escolar (`UNIQUE(student_id, assignment_id)`).
+  - La tabla admitiría una por área, pero la UI y la regla solo usan esa.
+  - La restricción está en la UI: la RLS no la exige.
 - **No depende del momento ni del plan de evaluación.**
 - **Contenido:** tres secciones en texto enriquecido (`RichTextEditor`): Fortalezas
   (`strengths`), Debilidades (`weaknesses`) y Aspectos a superar (`improvements`).
@@ -209,17 +223,17 @@ Sale en PDF como la boleta: una ficha por página, Carta.
   - Después van las firmas institucionales de `grades_config.diagnosis_signatures`, que se editan en
     **Ajustes de Notas → Firmas del Diagnóstico**. Tienen interruptor por firma y vienen sugeridas
     "Directora" y "Coordinadora Pedagógica".
-- **Docente:** botón **Diagnóstico** en cada tarjeta de Mis Áreas → `/teacher/materias/:assignmentId/diagnostico`
-  (`TeacherDiagnosis`).
+- **Docente:** botón **Diagnóstico** en la tarjeta de Mis Áreas del área que lleva el diagnóstico →
+  `/teacher/materias/:assignmentId/diagnostico` (`TeacherDiagnosis`). Si se entra por URL a otra área,
+  la pantalla lo explica en vez de mostrar la lista.
 - **Colegio:** pestaña **Diagnóstico** de `/notas/consulta` (`DiagnosisTab`). Como la Descarga de
-  Boletas, solo pide **Año + Sección**: se ocultan los filtros Área y Momento.
-  - Debajo salen como botones las áreas asignadas a esa sección (`useSectionDiagnosisAreas`), cada
-    una con su docente y "redactados/alumnos". Primero va la principal (`is_main_report`, marcada con ★),
-    que queda elegida por defecto; luego el orden de las áreas y el nombre (`orderDiagnosisAreas`).
-  - Las áreas GCRP no aparecen, porque no tienen sección.
+  Boletas, solo pide **Año + Sección**: se ocultan los filtros Área y Momento, y el selector de Sección
+  solo lista preescolar y primaria.
+  - Trabaja sobre el área que lleva el diagnóstico y muestra quién es el docente guía. Si ninguna área
+    está marcada como principal, lo dice y sugiere marcarla, pero no bloquea.
   - El colegio redacta y corrige igual que el docente: con `grades.edit` o siendo owner; si no, solo
     ve y descarga.
-  - También puede corregir la firma del docente del área elegida.
+  - También puede corregir la firma del docente guía.
 - **Representante:** no lo ve, y no tiene política RLS.
 - **UI compartida** (`src/components/diagnosis/`):
   - `DiagnosisStudentList`: progreso, buscador, filtro Pendientes/Redactados, tabla en escritorio y
@@ -322,8 +336,8 @@ indicadores). La UI llama al gate (`useStudentGradesAccess`) **solo para explica
 | Importar calificaciones | admin | `/admin/importar-calificaciones` | admin | Carga masiva de notas. |
 | Notas y boletas de mi representado | representative | `/representative/estudiante/:studentId/notas` | — | Consulta de notas y descarga de boleta. |
 | Visibilidad para representantes | school | `/notas/consulta` (pestaña) | `grades.edit` (solo UI) | Publicar/ocultar momentos para todo el colegio y bloquear estudiantes. |
-| Diagnóstico de un área | teacher | `/teacher/materias/:assignmentId/diagnostico` | rol `teacher` | Redactar la ficha diagnóstica de cada alumno y descargarla en PDF. |
-| Diagnóstico (consulta) | school | `/notas/consulta` (pestaña) | ver: `grades.view` (menú); editar: `grades.edit` | Ver, corregir y descargar las fichas diagnósticas por área y sección. |
+| Diagnóstico de la sección | teacher (guía) | `/teacher/materias/:assignmentId/diagnostico` | rol `teacher` + área principal de preescolar/primaria | Redactar la ficha diagnóstica de cada alumno y descargarla en PDF. |
+| Diagnóstico (consulta) | school | `/notas/consulta` (pestaña) | ver: `grades.view` (menú); editar: `grades.edit` | Ver, redactar, corregir y descargar las fichas diagnósticas de una sección de preescolar o primaria. |
 | Firmas del Diagnóstico | school | `/school/configuraciones/ajustes-notas` | `settings.school` | Firmas institucionales de la ficha diagnóstica. |
 
 ## Rutas (frontend)

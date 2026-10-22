@@ -9,13 +9,15 @@ import { ArrowLeft, Info } from "lucide-react";
 import DiagnosisStudentList from "@/components/diagnosis/DiagnosisStudentList";
 import TeacherSignatureCard from "@/components/grades/TeacherSignatureCard";
 import { useGradeStudents } from "@/hooks/useGradeStudents";
-import { gradeLabel } from "@/lib/gradeLevels";
+import { formatSectionLabel } from "@/lib/gradeLevels";
+import { diagnosisSectionKey, isDiagnosisGrade } from "@/lib/diagnosisEligibility";
+import { useSectionDiagnosisAssignments } from "@/hooks/useSectionDiagnosisAssignments";
 
 interface AssignmentDetail {
   id: string;
   school_id: string;
   teacher_id: string;
-  subject: { name: string; subject_type: string } | null;
+  subject: { name: string } | null;
   school_year: { id: string; year_range: string } | null;
   section: { id: string; name: string; grade_level: string } | null;
 }
@@ -32,7 +34,7 @@ export default function TeacherDiagnosis() {
         .from("subject_teacher_assignments")
         .select(`
           id, school_id, teacher_id,
-          subject:subject_id(name, subject_type),
+          subject:subject_id(name),
           school_year:school_year_id(id, year_range),
           section:section_id(id, name, grade_level)
         `)
@@ -44,18 +46,23 @@ export default function TeacherDiagnosis() {
     enabled: !!assignmentId,
   });
 
-  const isGcrp = assignment?.subject?.subject_type === "gcrp";
+  const section = assignment?.section && isDiagnosisGrade(assignment.section.grade_level) ? assignment.section : null;
+  const { data: diagnosisAssignments, isLoading: diagnosisLoading } = useSectionDiagnosisAssignments(
+    assignment?.school_id,
+    section ? [section.id] : [],
+  );
+  const hasDiagnosis =
+    !!section &&
+    diagnosisAssignments?.get(diagnosisSectionKey(section.id, assignment!.school_year?.id ?? ""))?.assignmentId === assignmentId;
   const { data: students = [], isLoading: studentsLoading } = useGradeStudents({
     assignmentIds: assignmentId ? [assignmentId] : [],
-    isGcrp,
-    sectionId: assignment?.section?.id,
+    isGcrp: false,
+    sectionId: hasDiagnosis ? assignment?.section?.id : undefined,
     schoolYearId: assignment?.school_year?.id,
     schoolId: assignment?.school_id,
   });
 
-  const sectionLabel = assignment?.section
-    ? `${gradeLabel(assignment.section.grade_level)} - Sección ${assignment.section.name}`
-    : isGcrp ? "GCRP — Estudiantes individuales" : "";
+  const sectionLabel = formatSectionLabel(assignment?.section);
 
   return (
     <DashboardLayout>
@@ -85,15 +92,23 @@ export default function TeacherDiagnosis() {
         )}
       </div>
 
-      <div className="mb-4 flex gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-100">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        <p>
-          Redacta una ficha por estudiante con sus fortalezas, debilidades y aspectos a superar.
-          Se guarda una vez por año escolar en esta área y la puedes corregir cuando quieras.
-        </p>
-      </div>
+      {assignment && !diagnosisLoading && !hasDiagnosis && (
+        <div className="rounded-md border bg-muted/20 px-4 py-12 text-center text-muted-foreground">
+          El diagnóstico es solo para preescolar y primaria, y lo redacta el docente guía de la sección.
+        </div>
+      )}
 
-      {assignment && (
+      {hasDiagnosis && (
+        <div className="mb-4 flex gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-100">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            Redacta una ficha por estudiante con sus fortalezas, debilidades y aspectos a superar.
+            Se guarda una vez por año escolar y la puedes corregir cuando quieras.
+          </p>
+        </div>
+      )}
+
+      {assignment && hasDiagnosis && (
         <div className="space-y-4">
           <TeacherSignatureCard
             teacherId={assignment.teacher_id}
@@ -106,7 +121,7 @@ export default function TeacherDiagnosis() {
             students={students}
             studentsLoading={studentsLoading}
             canEdit
-            fileLabel={`${assignment.subject?.name ?? "Area"} ${sectionLabel}`}
+            fileLabel={sectionLabel}
           />
         </div>
       )}

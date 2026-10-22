@@ -3,8 +3,6 @@ import { toast } from "sonner";
 import { DiagnosisSections } from "@/lib/diagnosisSheet";
 import { untypedSupabase } from "@/lib/untypedSupabase";
 import { studentDiagnosesKey } from "@/hooks/useStudentDiagnoses";
-import { DIAGNOSIS_COUNTS_KEY } from "@/hooks/useDiagnosisCounts";
-
 interface SaveDiagnosisInput extends DiagnosisSections {
   studentId: string;
 }
@@ -27,10 +25,7 @@ export function useSaveDiagnosis(assignmentId: string, schoolId: string) {
       );
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: studentDiagnosesKey(assignmentId) });
-      queryClient.invalidateQueries({ queryKey: [DIAGNOSIS_COUNTS_KEY] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: studentDiagnosesKey(assignmentId) }),
     onError: (e: Error) => toast.error("No se pudo guardar el diagnóstico", { description: e.message }),
   });
 }

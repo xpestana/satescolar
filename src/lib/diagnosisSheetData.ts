@@ -14,27 +14,26 @@ import diagnosisHeaderUrl from "@/assets/diagnosis-header.png";
 import diagnosisFooterUrl from "@/assets/diagnosis-footer.png";
 
 /**
- * Data side of the diagnosis sheet: everything the render needs, resolved from an assignment
- * (docente × área × sección × año). Works for the teacher and for school staff — both can read
- * the tables involved.
+ * Data side of the diagnosis sheet: everything the render needs, resolved from the section's main
+ * assignment (docente guía × sección × año). Works for the teacher and for school staff — both can
+ * read the tables involved.
  */
 
 export const DIAGNOSIS_TEACHER_CARGO = "Docente";
 
+/** The student fields a sheet prints — a `GradeStudent` fits as is. */
 export interface DiagnosisStudentRef {
-  studentId: string;
-  studentName: string;
-  documentId: string | null;
+  student_id: string;
+  full_name: string;
+  document_id: string | null;
 }
 
-interface AssignmentContext {
-  schoolId: string;
-  schoolName: string;
-  schoolYearId: string;
-  yearRange: string;
-  teacherId: string;
-  /** Null for GCRP: the grade and section then come from each student's enrolment. */
+interface AssignmentRow {
+  school_id: string;
+  teacher_id: string;
   section: { name: string; grade_level: string } | null;
+  school_year: { year_range: string } | null;
+  school: { name: string } | null;
 }
 
 let imagesPromise: Promise<DiagnosisImages> | null = null;
@@ -52,56 +51,14 @@ function loadDiagnosisImages(): Promise<DiagnosisImages> {
   return imagesPromise;
 }
 
-type SectionRef = { name: string; grade_level: string };
-
-interface AssignmentRow {
-  school_id: string;
-  school_year_id: string;
-  teacher_id: string;
-  section: SectionRef | null;
-  school_year: { year_range: string } | null;
-  school: { name: string } | null;
-}
-
-async function fetchAssignmentContext(assignmentId: string): Promise<AssignmentContext> {
+async function fetchAssignment(assignmentId: string): Promise<AssignmentRow> {
   const { data, error } = await supabase
     .from("subject_teacher_assignments")
-    .select(
-      "school_id, school_year_id, teacher_id, section:section_id(name, grade_level), school_year:school_year_id(year_range), school:school_id(name)",
-    )
+    .select("school_id, teacher_id, section:section_id(name, grade_level), school_year:school_year_id(year_range), school:school_id(name)")
     .eq("id", assignmentId)
     .single();
   if (error) throw error;
-  const row = data as unknown as AssignmentRow;
-  return {
-    schoolId: row.school_id,
-    schoolName: row.school?.name ?? "",
-    schoolYearId: row.school_year_id,
-    yearRange: row.school_year?.year_range ?? "",
-    teacherId: row.teacher_id,
-    section: row.section ?? null,
-  };
-}
-
-/** Grade and section of each student in the assignment's school year. */
-async function fetchStudentSections(
-  ctx: AssignmentContext,
-  studentIds: string[],
-): Promise<Map<string, SectionRef>> {
-  const map = new Map<string, SectionRef>();
-  if (ctx.section) {
-    studentIds.forEach((id) => map.set(id, ctx.section!));
-    return map;
-  }
-  const { data } = await supabase
-    .from("enrollments")
-    .select("student_id, section:section_id(name, grade_level)")
-    .eq("school_year_id", ctx.schoolYearId)
-    .in("student_id", studentIds);
-  ((data ?? []) as unknown as { student_id: string; section: SectionRef | null }[]).forEach((row) => {
-    if (row.section) map.set(row.student_id, row.section);
-  });
-  return map;
+  return data as unknown as AssignmentRow;
 }
 
 /**
@@ -138,43 +95,49 @@ async function fetchInstitutionalSignatures(schoolId: string): Promise<BoletinSi
     .select("diagnosis_signatures")
     .eq("school_id", schoolId)
     .maybeSingle();
-  const sigs = ((data as { diagnosis_signatures?: BoletinSignature[] } | null)?.diagnosis_signatures ?? []);
+  const sigs = (data as { diagnosis_signatures?: BoletinSignature[] } | null)?.diagnosis_signatures ?? [];
   return sigs.filter((s) => s.enabled !== false);
 }
 
-async function fetchSavedDiagnoses(assignmentId: string, studentIds: string[]) {
+async function fetchSavedDiagnoses(assignmentId: string): Promise<Map<string, DiagnosisSections>> {
   const { data, error } = await untypedSupabase
     .from("student_diagnoses")
     .select("student_id, strengths, weaknesses, improvements")
-    .eq("assignment_id", assignmentId)
-    .in("student_id", studentIds);
+    .eq("assignment_id", assignmentId);
   if (error) throw error;
   const map = new Map<string, DiagnosisSections>();
   ((data ?? []) as (DiagnosisSections & { student_id: string })[]).forEach((row) => map.set(row.student_id, row));
   return map;
 }
 
-/** Everything but the text: loaded once, then any number of sheets are composed from it. */
+/** Everything but the student rows: loaded once, then any number of sheets are composed from it. */
 export interface DiagnosisDocumentContext {
   schoolName: string;
   yearRange: string;
-  sections: Map<string, SectionRef>;
+  gradeLabel: string;
+  sectionName: string | null;
   saved: Map<string, DiagnosisSections>;
   signatures: BoletinSignature[];
   images: DiagnosisImages;
 }
 
-export async function loadDiagnosisContext(assignmentId: string, studentIds: string[]): Promise<DiagnosisDocumentContext> {
-  const ctx = await fetchAssignmentContext(assignmentId);
-  const [sections, saved, teacherSig, institutional, images] = await Promise.all([
-    fetchStudentSections(ctx, studentIds),
-    fetchSavedDiagnoses(assignmentId, studentIds),
-    fetchTeacherSignature(ctx.teacherId),
-    fetchInstitutionalSignatures(ctx.schoolId),
+export async function loadDiagnosisContext(assignmentId: string): Promise<DiagnosisDocumentContext> {
+  const assignment = await fetchAssignment(assignmentId);
+  const [saved, teacherSig, institutional, images] = await Promise.all([
+    fetchSavedDiagnoses(assignmentId),
+    fetchTeacherSignature(assignment.teacher_id),
+    fetchInstitutionalSignatures(assignment.school_id),
     loadDiagnosisImages(),
   ]);
-  const signatures = await resolveSignatureImages(teacherSig ? [teacherSig, ...institutional] : institutional);
-  return { schoolName: ctx.schoolName, yearRange: ctx.yearRange, sections, saved, signatures, images };
+  return {
+    schoolName: assignment.school?.name ?? "",
+    yearRange: assignment.school_year?.year_range ?? "",
+    gradeLabel: gradeLabel(assignment.section?.grade_level),
+    sectionName: assignment.section?.name ?? null,
+    saved,
+    signatures: await resolveSignatureImages(teacherSig ? [teacherSig, ...institutional] : institutional),
+    images,
+  };
 }
 
 /**
@@ -187,15 +150,14 @@ export function composeDiagnosisDocument(
   overrides: Record<string, DiagnosisSections> = {},
 ): string {
   const sheets: DiagnosisSheetData[] = students.map((s) => {
-    const section = context.sections.get(s.studentId);
-    const content = overrides[s.studentId] ?? context.saved.get(s.studentId);
+    const content = overrides[s.student_id] ?? context.saved.get(s.student_id);
     return {
       schoolName: context.schoolName,
       yearRange: context.yearRange,
-      studentName: s.studentName,
-      documentId: s.documentId,
-      gradeLabel: gradeLabel(section?.grade_level),
-      sectionName: section?.name ?? null,
+      studentName: s.full_name,
+      documentId: s.document_id,
+      gradeLabel: context.gradeLabel,
+      sectionName: context.sectionName,
       strengths: content?.strengths ?? "",
       weaknesses: content?.weaknesses ?? "",
       improvements: content?.improvements ?? "",
@@ -207,6 +169,5 @@ export function composeDiagnosisDocument(
 
 /** Loads the latest data and composes the document — what the PDF downloads use. */
 export async function buildDiagnosisDocument(assignmentId: string, students: DiagnosisStudentRef[]): Promise<string> {
-  const context = await loadDiagnosisContext(assignmentId, students.map((s) => s.studentId));
-  return composeDiagnosisDocument(context, students);
+  return composeDiagnosisDocument(await loadDiagnosisContext(assignmentId), students);
 }

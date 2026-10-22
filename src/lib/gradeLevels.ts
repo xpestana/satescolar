@@ -48,3 +48,8 @@ export function gradeLabel(gradeLevel: string | null | undefined): string {
   if (!gradeLevel) return "";
   return GRADE_LABELS[gradeLevel] || gradeLevel;
 }
+
+/** "4to Grado - Sección U"; empty without a section. */
+export function formatSectionLabel(section: { grade_level: string; name: string } | null | undefined): string {
+  return section ? `${gradeLabel(section.grade_level)} - Sección ${section.name}` : "";
+}

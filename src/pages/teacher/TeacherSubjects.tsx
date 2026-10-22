@@ -21,6 +21,8 @@ import { BookOpen, CheckCircle2, AlertCircle, ClipboardList, FileEdit, History }
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 import { GRADE_LABELS, SECONDARY_GRADES } from "@/lib/gradeLevels";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
+import { isDiagnosisGrade } from "@/lib/diagnosisEligibility";
+import { useSectionDiagnosisAssignments } from "@/hooks/useSectionDiagnosisAssignments";
 
 /**
  * "Mis Áreas" of the teacher.
@@ -93,6 +95,19 @@ export default function TeacherSubjects() {
   });
 
   const assignmentIds = useMemo(() => assignments.map((a) => a.id), [assignments]);
+
+  // Which of the teacher's áreas carry the diagnosis of their preschool/primary section.
+  const diagnosisSectionIds = assignments
+    .filter((a) => a.section && isDiagnosisGrade(a.section.grade_level))
+    .map((a) => a.section!.id);
+  const { data: diagnosisAssignments } = useSectionDiagnosisAssignments(
+    hasGrades ? teacher?.school_id : null,
+    diagnosisSectionIds,
+  );
+  const diagnosisAssignmentIds = useMemo(
+    () => new Set([...(diagnosisAssignments?.values() ?? [])].map((d) => d.assignmentId)),
+    [diagnosisAssignments],
+  );
 
   // Plan items of every momento: the cards need the selected momento, the history needs "has any".
   const { data: planItems = [] } = useQuery({
@@ -356,16 +371,18 @@ export default function TeacherSubjects() {
                               Registrar Notas
                             </Button>
                           )}
-                          {/* One diagnosis per student and área a year: it doesn't depend on the momento or the plan. */}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={() => navigate(`/teacher/materias/${a.id}/diagnostico`)}
-                          >
-                            <ClipboardList className="h-4 w-4 mr-2" />
-                            Diagnóstico
-                          </Button>
+                          {/* Preschool/primary main teacher only; it doesn't depend on the momento or the plan. */}
+                          {diagnosisAssignmentIds.has(a.id) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => navigate(`/teacher/materias/${a.id}/diagnostico`)}
+                            >
+                              <ClipboardList className="h-4 w-4 mr-2" />
+                              Diagnóstico
+                            </Button>
+                          )}
                         </div>
                       )}
                     </CardContent>
