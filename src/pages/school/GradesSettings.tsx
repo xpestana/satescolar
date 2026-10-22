@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { Baby, BookOpen, GraduationCap, Plus, Trash2, Settings2 } from "lucide-react";
 import { PrimaryIndicatorsModal } from "@/components/grades/PrimaryIndicatorsModal";
 import { PreschoolIndicatorsModal } from "@/components/grades/PreschoolIndicatorsModal";
+import DiagnosisSignaturesCard from "@/components/diagnosis/DiagnosisSignaturesCard";
+import type { BoletinSignature } from "@/lib/bachilleratoTemplate";
 
 interface Scale {
   id: string;
@@ -393,6 +395,17 @@ export default function GradesSettings() {
           </CardContent>
         </Card>
       </div>
+
+      {schoolId && (
+        <div className="mt-4">
+          <DiagnosisSignaturesCard
+            schoolId={schoolId}
+            saved={(config as { diagnosis_signatures?: BoletinSignature[] } | null)?.diagnosis_signatures}
+            saving={upsertConfig.isPending}
+            onSave={(sigs) => upsertConfig.mutate({ diagnosis_signatures: sigs })}
+          />
+        </div>
+      )}
 
       {schoolId && (
         <>

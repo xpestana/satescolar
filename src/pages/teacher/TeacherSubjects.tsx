@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, CheckCircle2, AlertCircle, FileEdit, History } from "lucide-react";
+import { BookOpen, CheckCircle2, AlertCircle, ClipboardList, FileEdit, History } from "lucide-react";
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 import { GRADE_LABELS, SECONDARY_GRADES } from "@/lib/gradeLevels";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
@@ -356,6 +356,16 @@ export default function TeacherSubjects() {
                               Registrar Notas
                             </Button>
                           )}
+                          {/* One diagnosis per student and área a year: it doesn't depend on the momento or the plan. */}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => navigate(`/teacher/materias/${a.id}/diagnostico`)}
+                          >
+                            <ClipboardList className="h-4 w-4 mr-2" />
+                            Diagnóstico
+                          </Button>
                         </div>
                       )}
                     </CardContent>

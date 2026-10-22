@@ -13,16 +13,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Search, Loader2, Eye, Check, ChevronsUpDown, Download, X, Info } from "lucide-react";
+import { Search, Loader2, Eye, Check, ChevronsUpDown, Download, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
 import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas, downloadBachilleratoBoletaDefinitiva, downloadAllBachilleratoBoletasDefinitiva } from "@/lib/bachilleratoBoleta";
 import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
-import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
 import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES } from "@/lib/gradeLevels";
 import RepresentativeVisibilityTab from "@/components/grades/RepresentativeVisibilityTab";
+import PdfPreviewDialog from "@/components/grades/PdfPreviewDialog";
+import DiagnosisTab from "@/components/diagnosis/DiagnosisTab";
 import { useGradeStudents } from "@/hooks/useGradeStudents";
+import { usePdfPreview } from "@/hooks/usePdfPreview";
 
 
 
@@ -31,6 +33,8 @@ export default function GradesConsultation() {
   const { has: hasPermission, isOwner } = usePermissions();
   // The visibility tab decides what families see, so it follows the grade editing permission.
   const canManageVisibility = isOwner || hasPermission("grades.edit");
+  // Correcting a teacher's diagnosis is editing grades work too; without it the tab only views/downloads.
+  const canEditDiagnosis = isOwner || hasPermission("grades.edit");
   const [activeTab, setActiveTab] = useState("consulta");
   const [selectedYear, setSelectedYear] = useState<string>("");
   const [selectedSubject, setSelectedSubject] = useState<string>("");
@@ -47,31 +51,7 @@ export default function GradesConsultation() {
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [downloadingStudentIdFinal, setDownloadingStudentIdFinal] = useState<string | null>(null);
   const [downloadingAllFinal, setDownloadingAllFinal] = useState(false);
-  const [boletaModal, setBoletaModal] = useState<
-    { blobUrl: string; filename: string; title: string } | null
-  >(null);
-
-  const openBoletaPreview = async (html: string, filename: string, title: string) => {
-    const safeName = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
-    const blob = await htmlToPdfBlob(html);
-    const blobUrl = URL.createObjectURL(blob);
-    setBoletaModal({ blobUrl, filename: safeName, title });
-  };
-
-  const closeBoletaModal = () => {
-    if (boletaModal) URL.revokeObjectURL(boletaModal.blobUrl);
-    setBoletaModal(null);
-  };
-
-  const downloadBoletaFromModal = () => {
-    if (!boletaModal) return;
-    const a = document.createElement("a");
-    a.href = boletaModal.blobUrl;
-    a.download = boletaModal.filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  };
+  const { preview: boletaPreview, openPreview: openBoletaPreview, closePreview: closeBoletaPreview } = usePdfPreview();
   // School years
   const { data: schoolYears = [] } = useQuery({
     queryKey: ["school-years", schoolId],
@@ -121,6 +101,8 @@ export default function GradesConsultation() {
   });
 
   const selectedSubjectIsGcrp = subjects.find(s => s.id === selectedSubject)?.subject_type === "gcrp";
+  // GCRP áreas are picked by teacher; the diagnosis tab ignores the área and always works by section.
+  const pickGcrpTeacher = selectedSubjectIsGcrp && activeTab !== "diagnostico";
 
   // For GCRP: fetch all assignments with teacher info so user can pick one
   const { data: gcrpAssignments = [] } = useQuery({
@@ -281,8 +263,9 @@ export default function GradesConsultation() {
           </Popover>
         </div>
 
-        {/* La pestaña de visibilidad es de todo el colegio: solo necesita el año escolar. */}
-        {activeTab !== "visibilidad" && (
+        {/* La pestaña de visibilidad es de todo el colegio: solo necesita el año escolar.
+            La de diagnóstico, como la descarga de boletas, muestra las áreas de la sección elegida. */}
+        {activeTab !== "visibilidad" && activeTab !== "diagnostico" && (
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">Área</label>
           <Popover open={openSubject} onOpenChange={setOpenSubject}>
@@ -318,9 +301,9 @@ export default function GradesConsultation() {
         {activeTab !== "visibilidad" && (
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">
-            {selectedSubjectIsGcrp ? "Docente" : "Sección"}
+            {pickGcrpTeacher ? "Docente" : "Sección"}
           </label>
-          {selectedSubjectIsGcrp ? (
+          {pickGcrpTeacher ? (
             <Popover open={openGcrpTeacher} onOpenChange={setOpenGcrpTeacher}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" aria-expanded={openGcrpTeacher} className="w-full justify-between font-normal">
@@ -377,7 +360,8 @@ export default function GradesConsultation() {
         </div>
 
         )}
-        {activeTab !== "visibilidad" && (
+        {/* El diagnóstico es uno por año escolar: no depende del momento. */}
+        {activeTab !== "visibilidad" && activeTab !== "diagnostico" && (
         <div>
           <label className="text-sm font-medium text-foreground mb-1.5 block">Momento</label>
           <div className="flex items-center rounded-lg border bg-muted/40 p-0.5">
@@ -400,14 +384,18 @@ export default function GradesConsultation() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="consulta">Consulta de Notas del Docente</TabsTrigger>
-          <TabsTrigger value="finales">Notas Finales y Construcción de Boletas</TabsTrigger>
-          <TabsTrigger value="descarga">Descarga de Boletas</TabsTrigger>
-          {canManageVisibility && (
-            <TabsTrigger value="visibilidad">Visibilidad para Representantes</TabsTrigger>
-          )}
-        </TabsList>
+        {/* On phones the long tab labels slide sideways instead of stretching the page. */}
+        <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <TabsList className="w-max justify-start">
+            <TabsTrigger value="consulta">Consulta de Notas del Docente</TabsTrigger>
+            <TabsTrigger value="finales">Notas Finales y Construcción de Boletas</TabsTrigger>
+            <TabsTrigger value="descarga">Descarga de Boletas</TabsTrigger>
+            <TabsTrigger value="diagnostico">Diagnóstico</TabsTrigger>
+            {canManageVisibility && (
+              <TabsTrigger value="visibilidad">Visibilidad para Representantes</TabsTrigger>
+            )}
+          </TabsList>
+        </div>
 
         <TabsContent value="consulta">
       {!filtersComplete ? (
@@ -961,6 +949,30 @@ export default function GradesConsultation() {
           )}
         </TabsContent>
 
+        <TabsContent value="diagnostico">
+          {!effectiveYear || !selectedSection || !schoolId ? (
+            <div className="text-center py-12 border rounded-md bg-muted/20">
+              <Search className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground px-4">
+                Seleccione año escolar y sección para ver los diagnósticos de sus áreas.
+              </p>
+            </div>
+          ) : (
+            <DiagnosisTab
+              key={`${effectiveYear}-${selectedSection}`}
+              schoolId={schoolId}
+              schoolYearId={effectiveYear}
+              sectionId={selectedSection}
+              sectionLabel={
+                selectedSectionData
+                  ? `${GRADE_LABELS[selectedSectionData.grade_level] || selectedSectionData.grade_level} - Sección ${selectedSectionData.name}`
+                  : ""
+              }
+              canEdit={canEditDiagnosis}
+            />
+          )}
+        </TabsContent>
+
         {canManageVisibility && (
           <TabsContent value="visibilidad">
             {!effectiveYear ? (
@@ -1008,34 +1020,7 @@ export default function GradesConsultation() {
         </DialogContent>
       </Dialog>
 
-      {/* Boleta PDF preview modal */}
-      <Dialog open={!!boletaModal} onOpenChange={(open) => { if (!open) closeBoletaModal(); }}>
-        <DialogContent className="max-w-5xl w-[95vw] h-[92vh] flex flex-col p-0 gap-0 [&>button]:hidden">
-          <DialogHeader className="flex flex-row items-center justify-between px-4 py-3 border-b shrink-0 space-y-0">
-            <DialogTitle className="text-sm font-semibold truncate pr-4">
-              {boletaModal?.title ?? "Boleta"}
-            </DialogTitle>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button size="sm" className="gap-1.5" onClick={downloadBoletaFromModal}>
-                <Download className="h-4 w-4" />
-                Descargar PDF
-              </Button>
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={closeBoletaModal}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden bg-neutral-100">
-            {boletaModal && (
-              <iframe
-                src={boletaModal.blobUrl}
-                className="w-full h-full border-0"
-                title="Boleta PDF"
-              />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PdfPreviewDialog preview={boletaPreview} onClose={closeBoletaPreview} />
 
     </DashboardLayout>
   );

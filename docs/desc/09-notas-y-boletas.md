@@ -187,6 +187,66 @@ interruptor `is_active`.
   `teachers` (solo hay políticas de admin y de school), y dárselo le abriría también `form_data`
   e `is_suspended`. `teacher_signatures` permite una RLS acotada a la firma.
 
+## Diagnóstico del estudiante (Ficha descriptiva)
+Ficha "FICHA DESCRIPTIVA DEL ESTUDIANTE (DIAGNÓSTICO)" que redacta el docente, para cualquier grado.
+Sale en PDF como la boleta: una ficha por página, Carta.
+
+- **Una ficha por alumno × asignación.** Cada docente escribe la suya en su área, y la asignación
+  ya implica el año escolar. Tabla `student_diagnoses`, `UNIQUE(student_id, assignment_id)`.
+- **No depende del momento ni del plan de evaluación.**
+- **Contenido:** tres secciones en texto enriquecido (`RichTextEditor`): Fortalezas
+  (`strengths`), Debilidades (`weaknesses`) y Aspectos a superar (`improvements`).
+  - Una sección vacía no se imprime; `<br>` y `&nbsp;` cuentan como vacío (`isRichTextEmpty`).
+  - Las secciones nuevas empiezan como lista de viñetas.
+- **Cabecera:** logo fijo del Ministerio + CDCE Mérida, título, nombre del colegio, año escolar, y nombre,
+  C.I./C.E., grado y sección del alumno. No lleva área. Al pie va la franja tricolor.
+  - Los dos logos son **fijos para todos los colegios**: `src/assets/diagnosis-header.png` y
+    `diagnosis-footer.png`.
+  - Son los PNG con transparencia extraídos del Word original. Los .jpg tenían fondo negro.
+- **Firmas:** primero la firma propia del docente del área (`teacher_signatures`).
+  - Si la tiene apagada (`is_active = false`), no se imprime.
+  - Si nunca la guardó, se imprime su nombre del registro con el cargo "Docente".
+  - Después van las firmas institucionales de `grades_config.diagnosis_signatures`, que se editan en
+    **Ajustes de Notas → Firmas del Diagnóstico**. Tienen interruptor por firma y vienen sugeridas
+    "Directora" y "Coordinadora Pedagógica".
+- **Docente:** botón **Diagnóstico** en cada tarjeta de Mis Áreas → `/teacher/materias/:assignmentId/diagnostico`
+  (`TeacherDiagnosis`).
+- **Colegio:** pestaña **Diagnóstico** de `/notas/consulta` (`DiagnosisTab`). Como la Descarga de
+  Boletas, solo pide **Año + Sección**: se ocultan los filtros Área y Momento.
+  - Debajo salen como botones las áreas asignadas a esa sección (`useSectionDiagnosisAreas`), cada
+    una con su docente y "redactados/alumnos". Primero va la principal (`is_main_report`, marcada con ★),
+    que queda elegida por defecto; luego el orden de las áreas y el nombre (`orderDiagnosisAreas`).
+  - Las áreas GCRP no aparecen, porque no tienen sección.
+  - El colegio redacta y corrige igual que el docente: con `grades.edit` o siendo owner; si no, solo
+    ve y descarga.
+  - También puede corregir la firma del docente del área elegida.
+- **Representante:** no lo ve, y no tiene política RLS.
+- **UI compartida** (`src/components/diagnosis/`):
+  - `DiagnosisStudentList`: progreso, buscador, filtro Pendientes/Redactados, tabla en escritorio y
+    tarjetas en el teléfono, y "Descargar todos" (solo los redactados).
+  - `DiagnosisEditorModal`: editores + vista previa en vivo, "Guardar y siguiente", Anterior/Siguiente,
+    aviso de cambios sin guardar y `Ctrl+S`. En el teléfono, pestañas Redactar / Vista previa.
+- **Vista previa en vivo:** es HTML (`DiagnosisHtmlPreview`), no PDF, en un iframe con
+  `sandbox="allow-same-origin"` (sin scripts) y escalado al ancho. Funciona en el teléfono, donde un PDF
+  dentro de un iframe muchas veces no se ve.
+- **HTML del docente:** pasa por `sanitizeRichText` (`src/lib/richTextSanitize.ts`) antes de imprimirse.
+  La vista previa escribe ese HTML en un iframe del mismo origen, así que un script o un `onerror`
+  correría en el navegador de quien abre la ficha.
+- **Código:**
+  - `src/lib/diagnosisSheet.ts`: render puro.
+  - `src/lib/diagnosisSheetData.ts`: `loadDiagnosisContext` carga una vez; `composeDiagnosisDocument`
+    compone al instante; `buildDiagnosisDocument` hace las dos cosas.
+  - Hooks: `useStudentDiagnoses`, `useSaveDiagnosis`, `useDiagnosisContext`.
+- **RLS:**
+  - Admin: `is_admin()`.
+  - Staff: `is_school_staff(school_id)`.
+  - Docente de la asignación, con `teachers.user_id = auth.uid()` y la misma `school_id` que la
+    asignación.
+  - Gate de módulo `grades` en INSERT/UPDATE.
+  - Migración `20261022140000_create_student_diagnoses.sql`.
+- **Tipos:** la tabla y la columna nueva aún no están en los tipos generados. Se consultan con
+  `untypedSupabase` (`src/lib/untypedSupabase.ts`), que se elimina al regenerar los tipos.
+
 ## Notas y boletas del representante (`/representative/estudiante/:studentId/notas`)
 Pantalla `StudentGrades`, a la que se entra desde el botón **"Notas y Boletas"** de la card de
 cada estudiante (`representative/StudentsList.tsx` y la card reducida del dashboard).
@@ -262,10 +322,14 @@ indicadores). La UI llama al gate (`useStudentGradesAccess`) **solo para explica
 | Importar calificaciones | admin | `/admin/importar-calificaciones` | admin | Carga masiva de notas. |
 | Notas y boletas de mi representado | representative | `/representative/estudiante/:studentId/notas` | — | Consulta de notas y descarga de boleta. |
 | Visibilidad para representantes | school | `/notas/consulta` (pestaña) | `grades.edit` (solo UI) | Publicar/ocultar momentos para todo el colegio y bloquear estudiantes. |
+| Diagnóstico de un área | teacher | `/teacher/materias/:assignmentId/diagnostico` | rol `teacher` | Redactar la ficha diagnóstica de cada alumno y descargarla en PDF. |
+| Diagnóstico (consulta) | school | `/notas/consulta` (pestaña) | ver: `grades.view` (menú); editar: `grades.edit` | Ver, corregir y descargar las fichas diagnósticas por área y sección. |
+| Firmas del Diagnóstico | school | `/school/configuraciones/ajustes-notas` | `settings.school` | Firmas institucionales de la ficha diagnóstica. |
 
 ## Rutas (frontend)
 - `/notas/consulta` (solo `school`)
 - `/teacher/materias/:assignmentId/notas` (solo `teacher`)
+- `/teacher/materias/:assignmentId/diagnostico` (solo `teacher`)
 - `/school/configuraciones/ajustes-notas`
 - `/formatos` (pestaña "Formato de Boletas")
 - `/admin/importar-calificaciones`
@@ -302,7 +366,10 @@ que ya existía para el aula virtual.
   `UPDATE` sobre `students` sin `WITH CHECK` ni restricción de columnas, así que podría
   desbloquearse solo. Su RLS le da al representante **solo `SELECT`**.
 - `grades_config` — config de notas por colegio: `preschool_report_type`,
-  `primary_report_type`, `use_percentage_plan`, …
+  `primary_report_type`, `use_percentage_plan`, `diagnosis_signatures` (firmas institucionales del
+  diagnóstico), …
+- `student_diagnoses` — ficha diagnóstica por alumno × asignación: `school_id`, `student_id`,
+  `assignment_id`, `strengths`, `weaknesses`, `improvements` (HTML), `updated_by`.
 - `primary_grading_scales`, `preschool_grading_scales` — escalas (sigla + descripción).
 - `evaluation_plan_items` — plan de evaluación por asignación: `momento` (lapso),
   `percentage`, `description`. Define las evaluaciones de un área.

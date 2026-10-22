@@ -30,10 +30,16 @@ const EMPTY: TeacherSignatureRow = {
  * Lets a teacher (or the school on their behalf) set the signature printed on the
  * boletas they author. One signature per teacher, reused across all their boletas.
  */
-export default function TeacherSignatureCard({ teacherId, schoolId, canEdit = true }: {
+export default function TeacherSignatureCard({
+  teacherId,
+  schoolId,
+  canEdit = true,
+  title = "Firma del docente en la boleta",
+}: {
   teacherId: string;
   schoolId: string;
   canEdit?: boolean;
+  title?: string;
 }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -100,7 +106,7 @@ export default function TeacherSignatureCard({ teacherId, schoolId, canEdit = tr
       <CardContent className="p-0">
         <div className="flex items-center gap-2 px-4 py-3 cursor-pointer select-none"
           onClick={() => setOpen((v) => !v)}>
-          <span className="text-sm font-medium flex-1">Firma del docente en la boleta</span>
+          <span className="text-sm font-medium flex-1">{title}</span>
           {form.is_active
             ? <span className="text-xs text-muted-foreground">Se imprime</span>
             : <span className="text-xs text-muted-foreground">No se imprime</span>}

@@ -49,6 +49,7 @@ import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import TeacherSubjects from "./pages/teacher/TeacherSubjects";
 import TeacherCarnet from "./pages/teacher/TeacherCarnet";
 import TeacherGrades from "./pages/teacher/TeacherGrades";
+import TeacherDiagnosis from "./pages/teacher/TeacherDiagnosis";
 import TeacherAttendance from "./pages/teacher/TeacherAttendance";
 import ClassroomList from "./pages/teacher/ClassroomList";
 import ClassroomDetail from "./pages/teacher/ClassroomDetail";
@@ -413,6 +414,7 @@ const App = () => (
               <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
               <Route path="/teacher/materias" element={<ProtectedRoute requiredRole="teacher"><TeacherSubjects /></ProtectedRoute>} />
               <Route path="/teacher/materias/:assignmentId/notas" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="grades"><TeacherGrades /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/teacher/materias/:assignmentId/diagnostico" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="grades"><TeacherDiagnosis /></ModuleRoute></ProtectedRoute>} />
               <Route path="/teacher/aula-virtual" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="virtual_classroom"><ClassroomList /></ModuleRoute></ProtectedRoute>} />
               <Route path="/teacher/aula-virtual/:assignmentId" element={<ProtectedRoute requiredRole="teacher"><ModuleRoute module="virtual_classroom"><ClassroomDetail /></ModuleRoute></ProtectedRoute>} />
               <Route path="/teacher/carnet" element={<ProtectedRoute requiredRole="teacher"><TeacherCarnet /></ProtectedRoute>} />
