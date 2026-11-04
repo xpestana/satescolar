@@ -1,7 +1,9 @@
 // Domain types for the payroll module (Pagos de Nóminas).
 // Kept framework-free so lib and hooks can share them.
 
-export type PayrollCategory = "teacher" | "admin" | "worker" | "other";
+import type { PaymentRegime, PersonType, VatWithholdingMode } from "./withholdings/types";
+
+export type PayrollCategory = "teacher" | "admin" | "worker" | "supplier" | "other";
 export type ConceptKind = "earning" | "deduction";
 export type PayrollCurrency = "VES" | "USD";
 export type PayrollPaymentStatus = "draft" | "approved" | "paid" | "voided";
@@ -19,6 +21,13 @@ export interface PayrollBeneficiary {
   phone: string | null;
   notes: string | null;
   is_active: boolean;
+  payment_regime: PaymentRegime;
+  person_type: PersonType | null;
+  tax_id: string | null;
+  fiscal_address: string | null;
+  vat_withholding_mode: VatWithholdingMode;
+  vat_exclusion_reason: string | null;
+  default_islr_concept_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +62,7 @@ export interface PayrollConcept {
   default_amount: number;
   currency: PayrollCurrency;
   is_active: boolean;
+  is_islr_taxable: boolean;
 }
 
 export interface PayrollLineItem {
@@ -84,6 +94,7 @@ export const CATEGORY_LABELS: Record<PayrollCategory, string> = {
   teacher: "Docente",
   admin: "Administrativo",
   worker: "Obrero",
+  supplier: "Proveedor",
   other: "Otros",
 };
 

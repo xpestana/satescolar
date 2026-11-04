@@ -15,12 +15,19 @@ import { usePayrollBeneficiaries } from "@/hooks/payroll/usePayrollBeneficiaries
 import { BeneficiaryFormModal } from "@/components/payroll/BeneficiaryFormModal";
 import { PayrollMethodsModal } from "@/components/payroll/PayrollMethodsModal";
 import { PayrollBeneficiaryHistoryModal } from "@/components/payroll/PayrollBeneficiaryHistoryModal";
+import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
+import { usePayrollAriRates } from "@/hooks/payroll/usePayrollAriRates";
+import { todayCaracasIso } from "@/lib/dateUtils";
 import { CATEGORY_LABELS, type PayrollBeneficiary, type PayrollCategory } from "@/lib/payroll/types";
+import { missingBeneficiaryData } from "@/lib/payroll/withholdings/beneficiaryRules";
+import { resolveRateVersion } from "@/lib/payroll/withholdings/resolveRateVersion";
 
 export default function PayrollBeneficiaries() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
   const { school } = useSchoolData();
   const { beneficiaries, isLoading } = usePayrollBeneficiaries(schoolId);
+  const { vatEnabled, islrEnabled } = usePayrollTaxConfig(schoolId);
+  const { ratesByBeneficiary } = usePayrollAriRates(schoolId);
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -36,10 +43,23 @@ export default function PayrollBeneficiaries() {
     if (categoryFilter !== "all") rows = rows.filter((b) => b.category === categoryFilter);
     if (search.trim()) {
       const q = normalize(search);
-      rows = rows.filter((b) => normalize(b.full_name).includes(q) || normalize(b.document_id ?? "").includes(q));
+      rows = rows.filter(
+        (b) =>
+          normalize(b.full_name).includes(q) ||
+          normalize(b.document_id ?? "").includes(q) ||
+          normalize(b.tax_id ?? "").includes(q)
+      );
     }
     return rows;
   }, [beneficiaries, categoryFilter, search]);
+
+  const today = todayCaracasIso();
+  const missingFor = (b: PayrollBeneficiary) =>
+    missingBeneficiaryData(b, {
+      vatEnabled,
+      islrEnabled,
+      hasAriRate: !!resolveRateVersion(ratesByBeneficiary[b.id] ?? [], today),
+    });
 
   if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
@@ -54,7 +74,7 @@ export default function PayrollBeneficiaries() {
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar por nombre o cédula..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder="Buscar por nombre, cédula o RIF..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-[200px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
@@ -76,7 +96,7 @@ export default function PayrollBeneficiaries() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
-                <TableHead>Cédula</TableHead>
+                <TableHead>Cédula/RIF</TableHead>
                 <TableHead>Categoría</TableHead>
                 <TableHead>Correo</TableHead>
                 <TableHead className="w-52">Acciones</TableHead>
@@ -88,10 +108,22 @@ export default function PayrollBeneficiaries() {
               ) : filtered.length === 0 ? (
                 <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No hay beneficiarios.</TableCell></TableRow>
               ) : (
-                filtered.map((b) => (
+                filtered.map((b) => {
+                  const missing = missingFor(b);
+                  return (
                   <TableRow key={b.id}>
-                    <TableCell className="font-medium">{b.full_name}</TableCell>
-                    <TableCell>{b.document_id || "—"}</TableCell>
+                    <TableCell className="font-medium">
+                      {b.full_name}
+                      {missing.length > 0 && (
+                        <div className="mt-1">
+                          <Badge variant="destructive" className="whitespace-nowrap" title={`Falta: ${missing.join(", ")}`}>Datos incompletos</Badge>
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {b.document_id || "—"}
+                      {b.tax_id && <div className="text-xs text-muted-foreground">{b.tax_id}</div>}
+                    </TableCell>
                     <TableCell><Badge variant="outline">{CATEGORY_LABELS[b.category]}</Badge></TableCell>
                     <TableCell className="text-sm text-muted-foreground">{b.email || "—"}</TableCell>
                     <TableCell>
@@ -108,7 +140,8 @@ export default function PayrollBeneficiaries() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               )}
             </TableBody>
           </Table>

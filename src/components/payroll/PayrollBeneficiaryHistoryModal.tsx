@@ -29,7 +29,7 @@ export function PayrollBeneficiaryHistoryModal({ open, onOpenChange, schoolId, s
       const { data, error } = await supabase
         .from("payroll_payments")
         .select(
-          "*, payroll_beneficiaries(id, full_name, document_id, category), payroll_periods(id, name, period_type), payroll_payment_methods(id, method_type, label)"
+          "*, payroll_beneficiaries(id, full_name, document_id, tax_id, category), payroll_periods(id, name, period_type), payroll_payment_methods(id, method_type, label)"
         )
         .eq("school_id", schoolId)
         .eq("beneficiary_id", beneficiary.id)
@@ -55,7 +55,7 @@ export function PayrollBeneficiaryHistoryModal({ open, onOpenChange, schoolId, s
     const receipt = buildPayrollReceiptData({
       schoolName,
       beneficiaryName: p.payroll_beneficiaries?.full_name ?? beneficiary.full_name,
-      documentId: p.payroll_beneficiaries?.document_id ?? beneficiary.document_id,
+      documentId: p.payroll_beneficiaries?.document_id ?? p.payroll_beneficiaries?.tax_id ?? beneficiary.document_id,
       category: (p.payroll_beneficiaries?.category ?? beneficiary.category) as PayrollCategory,
       periodName: p.payroll_periods?.name ?? "—",
       periodStart: "",

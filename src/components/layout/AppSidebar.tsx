@@ -138,6 +138,7 @@ const navSections: NavSection[] = [
       { label: "Nómina", href: "/pagos/nomina", icon: Wallet, requiredRole: "school", permission: "payroll.view", module: "payments" },
       { label: "Registro de Nómina", href: "/pagos/nomina/registro", icon: HandCoins, requiredRole: "school", permission: "payroll.register", module: "payments" },
       { label: "Beneficiarios", href: "/pagos/nomina/beneficiarios", icon: Users, requiredRole: "school", permission: "payroll.view", module: "payments" },
+      { label: "Retenciones", href: "/pagos/nomina/retenciones", icon: Receipt, requiredRole: "school", permission: "payroll.withholdings", module: "payments" },
     ],
   },
   {

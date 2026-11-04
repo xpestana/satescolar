@@ -11,9 +11,13 @@ import { usePayrollConcepts } from "@/hooks/payroll/usePayrollConcepts";
 import { usePayrollMethods } from "@/hooks/payroll/usePayrollMethods";
 import { usePayrollUsdRate } from "@/hooks/payroll/usePayrollUsdRate";
 import { usePayrollPayments } from "@/hooks/payroll/usePayrollPayments";
-import { calculatePayrollTotals, convertToVes, deductionsExceedEarnings } from "@/lib/payroll/calculateNet";
+import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
+import { usePayrollAriRates } from "@/hooks/payroll/usePayrollAriRates";
+import { deductionsExceedEarnings } from "@/lib/payroll/calculateNet";
 import { formatMoney } from "@/lib/payroll/buildPayrollReceiptData";
 import { METHOD_LABELS, type ConceptKind, type PayrollCurrency } from "@/lib/payroll/types";
+import { buildSalaryPaymentDraft } from "@/lib/payroll/withholdings/buildPaymentDraft";
+import { todayCaracasIso } from "@/lib/dateUtils";
 import { MethodDetails } from "@/components/payroll/MethodDetails";
 
 interface PayrollPaymentFormModalProps {
@@ -53,6 +57,8 @@ export function PayrollPaymentFormModal({
   const { methods } = usePayrollMethods(schoolId, beneficiary.id);
   const { data: usdRate = 0 } = usePayrollUsdRate(schoolId);
   const { registerPayment } = usePayrollPayments(schoolId);
+  const { islrEnabled, vatEnabled, parameters } = usePayrollTaxConfig(schoolId);
+  const { ratesByBeneficiary } = usePayrollAriRates(schoolId);
 
   const [currency, setCurrency] = useState<PayrollCurrency>("VES");
   const [exchangeRate, setExchangeRate] = useState("1");
@@ -77,23 +83,37 @@ export function PayrollPaymentFormModal({
     else setExchangeRate("1");
   }, [currency, usdRate]);
 
-  const items = useMemo(
+  const rate = Number(exchangeRate) || 0;
+
+  // Typed lines + the automatic AR-I line, when the school has ISLR on.
+  const draft = useMemo(
     () =>
-      lines
-        .filter((l) => l.amount !== "" && Number(l.amount) > 0)
-        .map((l) => ({
-          concept_id: l.concept_id,
-          description: l.description,
-          concept_kind: l.concept_kind,
-          amount: Number(l.amount),
-        })),
-    [lines]
+      buildSalaryPaymentDraft({
+        vatEnabled,
+        islrEnabled,
+        date: todayCaracasIso(),
+        parameters,
+        currency,
+        exchangeRate: rate,
+        ariRates: ratesByBeneficiary[beneficiary.id] ?? [],
+        lines: lines
+          .filter((l) => l.amount !== "" && Number(l.amount) > 0)
+          .map((l) => ({
+            concept_id: l.concept_id,
+            description: l.description,
+            concept_kind: l.concept_kind,
+            amount: Number(l.amount),
+            isTaxable: l.concept_id ? (concepts.find((c) => c.id === l.concept_id)?.is_islr_taxable ?? true) : true,
+          })),
+      }),
+    [lines, concepts, vatEnabled, islrEnabled, parameters, currency, rate, ratesByBeneficiary, beneficiary.id]
   );
 
-  const totals = calculatePayrollTotals(items);
-  const rate = Number(exchangeRate) || 0;
-  const netVes = convertToVes(totals.net, currency, rate);
+  const items = draft.items;
+  const totals = draft.totals;
+  const netVes = totals.netVes;
   const invalidDeductions = deductionsExceedEarnings(items);
+  const withholdingLine = items.find((i) => i.withholding_key);
 
   const updateLine = (key: string, patch: Partial<EditableLine>) =>
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -110,7 +130,7 @@ export function PayrollPaymentFormModal({
   };
 
   const canSubmit =
-    items.length > 0 && totals.net > 0 && !invalidDeductions && (currency === "VES" || rate > 0);
+    items.length > 0 && totals.net > 0 && !invalidDeductions && draft.errors.length === 0 && (currency === "VES" || rate > 0);
 
   const handleSubmit = () => {
     if (!canSubmit) {
@@ -126,6 +146,7 @@ export function PayrollPaymentFormModal({
         payment_method_id: methodId || null,
         notes: notes.trim() || null,
         items,
+        withholdings: draft.withholdings,
       },
       {
         onSuccess: () => {
@@ -259,6 +280,12 @@ export function PayrollPaymentFormModal({
           {/* Totals */}
           <div className="rounded-md border bg-muted/30 p-3 space-y-1 text-sm">
             <div className="flex justify-between"><span>Total asignaciones</span><span>{formatMoney(totals.gross, currency)}</span></div>
+            {withholdingLine && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{withholdingLine.description} (automática)</span>
+                <span>{formatMoney(withholdingLine.amount, currency)}</span>
+              </div>
+            )}
             <div className="flex justify-between"><span>Total deducciones</span><span>{formatMoney(totals.deductions, currency)}</span></div>
             <div className="flex justify-between font-semibold"><span>Neto a pagar</span><span>{formatMoney(totals.net, currency)}</span></div>
             {currency === "USD" && (
@@ -269,6 +296,11 @@ export function PayrollPaymentFormModal({
                 <AlertTriangle className="h-3 w-3" />Las deducciones no pueden superar las asignaciones.
               </p>
             )}
+            {draft.errors.map((message) => (
+              <p key={message} className="flex items-center gap-1 text-xs text-destructive pt-1">
+                <AlertTriangle className="h-3 w-3" />{message}
+              </p>
+            ))}
           </div>
 
           <div className="space-y-1.5">

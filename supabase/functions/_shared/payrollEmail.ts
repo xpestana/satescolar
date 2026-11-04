@@ -89,7 +89,7 @@ export function buildReceiptHtml(d: ReceiptEmailData): string {
     </div>
     <div style="border:1px solid #e5e7eb;border-top:none;padding:20px;border-radius:0 0 8px 8px">
       <p style="margin:0 0 4px"><strong>Beneficiario:</strong> ${escapeHtml(d.beneficiaryName)}</p>
-      <p style="margin:0 0 4px"><strong>Cédula:</strong> ${escapeHtml(d.documentId)}</p>
+      <p style="margin:0 0 4px"><strong>Cédula/RIF:</strong> ${escapeHtml(d.documentId)}</p>
       <p style="margin:0 0 4px"><strong>Categoría:</strong> ${escapeHtml(d.categoryLabel)}</p>
       <p style="margin:0 0 4px"><strong>Período:</strong> ${escapeHtml(d.periodName)}</p>
       <p style="margin:0 0 4px"><strong>Método de pago:</strong> ${escapeHtml(d.methodLabel)}</p>

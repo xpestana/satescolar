@@ -23,7 +23,7 @@ export interface PayrollExcelRow {
 
 export const PAYROLL_EXCEL_HEADER = [
   "Beneficiario",
-  "Cédula",
+  "Cédula/RIF",
   "Categoría",
   "Período",
   "Estado",

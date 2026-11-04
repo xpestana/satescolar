@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { calculatePayrollTotals, convertToVes } from "@/lib/payroll/calculateNet";
+import type { Json } from "@/integrations/supabase/types";
+import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
+import type { DraftDocument, DraftItem, DraftWithholding } from "@/lib/payroll/withholdings/buildPaymentDraft";
+import type { PaymentRegime } from "@/lib/payroll/withholdings/types";
 import type {
   PayrollCategory,
   PayrollCurrency,
-  PayrollLineItem,
   PayrollMethodType,
   PayrollPaymentStatus,
 } from "@/lib/payroll/types";
@@ -17,12 +19,15 @@ export interface PayrollPaymentFilters {
 export interface RegisterPaymentInput {
   period_id: string;
   beneficiary_id: string;
+  payment_kind?: PaymentRegime;
   currency: PayrollCurrency;
   exchange_rate: number;
   payment_method_id?: string | null;
   payment_date?: string | null;
   notes?: string | null;
-  items: PayrollLineItem[];
+  items: DraftItem[];
+  documents?: DraftDocument[];
+  withholdings?: DraftWithholding[];
 }
 
 /** Payment row with the embedded beneficiary / period / method used by the tables. */
@@ -31,6 +36,7 @@ export interface PayrollPaymentRow {
   school_id: string;
   period_id: string;
   beneficiary_id: string;
+  payment_kind: PaymentRegime;
   status: PayrollPaymentStatus;
   currency: PayrollCurrency;
   exchange_rate: number;
@@ -46,6 +52,7 @@ export interface PayrollPaymentRow {
     id: string;
     full_name: string;
     document_id: string | null;
+    tax_id: string | null;
     category: PayrollCategory;
   } | null;
   payroll_periods: { id: string; name: string; period_type: string } | null;
@@ -54,30 +61,15 @@ export interface PayrollPaymentRow {
     method_type: PayrollMethodType;
     label: string | null;
   } | null;
+  payroll_purchase_documents: { document_number: string }[] | null;
 }
 
 const KEY = "payroll-payments";
 const SELECT =
-  "*, payroll_beneficiaries(id, full_name, document_id, category), " +
+  "*, payroll_beneficiaries(id, full_name, document_id, tax_id, category), " +
   "payroll_periods(id, name, period_type), " +
-  "payroll_payment_methods(id, method_type, label)";
-
-async function currentUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getUser();
-  return data?.user?.id ?? null;
-}
-
-async function writeAudit(
-  schoolId: string,
-  paymentId: string,
-  action: string,
-  detail: Record<string, unknown> = {}
-) {
-  const actorId = await currentUserId();
-  await supabase
-    .from("payroll_audit_log")
-    .insert({ school_id: schoolId, payment_id: paymentId, action, actor_id: actorId, detail: detail as never });
-}
+  "payroll_payment_methods(id, method_type, label), " +
+  "payroll_purchase_documents(document_number)";
 
 export function usePayrollPayments(
   schoolId: string | null | undefined,
@@ -102,52 +94,20 @@ export function usePayrollPayments(
     },
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: [KEY, schoolId] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: [KEY, schoolId] });
+    qc.invalidateQueries({ queryKey: ["payroll-withholdings", schoolId] });
+  };
 
+  // Saved in one transaction: a failure can't leave a payment without its lines or withholdings.
   const registerPayment = useMutation({
     mutationFn: async (input: RegisterPaymentInput): Promise<string> => {
       if (!schoolId) throw new Error("Colegio no resuelto");
-      const totals = calculatePayrollTotals(input.items);
-      const netVes = convertToVes(totals.net, input.currency, input.exchange_rate);
-      const createdBy = await currentUserId();
-      if (!createdBy) throw new Error("Sesión no válida");
-
-      const { data: payment, error } = await supabase
-        .from("payroll_payments")
-        .insert({
-          school_id: schoolId,
-          period_id: input.period_id,
-          beneficiary_id: input.beneficiary_id,
-          status: "draft",
-          currency: input.currency,
-          exchange_rate: input.exchange_rate,
-          gross_amount: totals.gross,
-          deductions_amount: totals.deductions,
-          net_amount: totals.net,
-          net_amount_ves: netVes,
-          payment_method_id: input.payment_method_id ?? null,
-          payment_date: input.payment_date ?? null,
-          notes: input.notes ?? null,
-          created_by: createdBy,
-        })
-        .select("id")
-        .single();
-      if (error) throw mapPaymentError(error);
-
-      if (input.items.length > 0) {
-        const rows = input.items.map((i) => ({
-          payment_id: payment.id,
-          concept_id: i.concept_id ?? null,
-          concept_kind: i.concept_kind,
-          description: i.description ?? null,
-          amount: i.amount,
-        }));
-        const { error: itemsError } = await supabase.from("payroll_payment_items").insert(rows);
-        if (itemsError) throw itemsError;
-      }
-
-      await writeAudit(schoolId, payment.id, "created", { net: totals.net });
-      return payment.id;
+      const { data, error } = await supabase.rpc("register_payroll_payment_with_withholdings", {
+        _payload: { ...input, school_id: schoolId } as unknown as Json,
+      });
+      if (error) throw toPayrollError(error);
+      return data as string;
     },
     onSuccess: invalidate,
   });
@@ -155,14 +115,17 @@ export function usePayrollPayments(
   const approvePayment = useMutation({
     mutationFn: async (paymentId: string) => {
       if (!schoolId) throw new Error("Colegio no resuelto");
-      const actorId = await currentUserId();
+      const { data: userData } = await supabase.auth.getUser();
+      const actorId = userData?.user?.id ?? null;
       const { error } = await supabase
         .from("payroll_payments")
         .update({ status: "approved", approved_by: actorId, approved_at: new Date().toISOString() })
         .eq("id", paymentId)
         .eq("status", "draft");
-      if (error) throw error;
-      await writeAudit(schoolId, paymentId, "approved");
+      if (error) throw toPayrollError(error);
+      await supabase
+        .from("payroll_audit_log")
+        .insert({ school_id: schoolId, payment_id: paymentId, action: "approved", actor_id: actorId, detail: {} });
     },
     onSuccess: invalidate,
   });
@@ -176,19 +139,11 @@ export function usePayrollPayments(
       paymentDate?: string;
     }): Promise<{ emailSent: boolean }> => {
       if (!schoolId) throw new Error("Colegio no resuelto");
-      const actorId = await currentUserId();
-      const { error } = await supabase
-        .from("payroll_payments")
-        .update({
-          status: "paid",
-          paid_by: actorId,
-          paid_at: new Date().toISOString(),
-          payment_date: paymentDate ?? new Date().toISOString().slice(0, 10),
-        })
-        .eq("id", paymentId)
-        .eq("status", "approved");
-      if (error) throw error;
-      await writeAudit(schoolId, paymentId, "paid");
+      const { error } = await supabase.rpc("mark_payroll_payment_paid", {
+        _payment_id: paymentId,
+        _payment_date: paymentDate,
+      });
+      if (error) throw toPayrollError(error);
 
       // Best-effort receipt email; never blocks the payment being marked paid.
       let emailSent = false;
@@ -208,18 +163,11 @@ export function usePayrollPayments(
   const voidPayment = useMutation({
     mutationFn: async ({ paymentId, reason }: { paymentId: string; reason: string }) => {
       if (!schoolId) throw new Error("Colegio no resuelto");
-      const actorId = await currentUserId();
-      const { error } = await supabase
-        .from("payroll_payments")
-        .update({
-          status: "voided",
-          voided_by: actorId,
-          voided_at: new Date().toISOString(),
-          void_reason: reason,
-        })
-        .eq("id", paymentId);
-      if (error) throw error;
-      await writeAudit(schoolId, paymentId, "voided", { reason });
+      const { error } = await supabase.rpc("void_payroll_payment", {
+        _payment_id: paymentId,
+        _reason: reason,
+      });
+      if (error) throw toPayrollError(error);
     },
     onSuccess: invalidate,
   });
@@ -232,11 +180,4 @@ export function usePayrollPayments(
     markPaid,
     voidPayment,
   };
-}
-
-function mapPaymentError(error: { code?: string; message?: string }): Error {
-  if (error?.code === "23505") {
-    return new Error("Este beneficiario ya tiene un pago en este período.");
-  }
-  return new Error(error?.message ?? "Error al registrar el pago");
 }

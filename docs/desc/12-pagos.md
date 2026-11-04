@@ -749,7 +749,8 @@ permisos existente; **no** cuelga de `student_id` (tiene su propio esquema `payr
 | `payroll.view` | Ver dashboard, beneficiarios y consultas de nómina + export Excel. |
 | `payroll.register` | Elaborar pagos, beneficiarios y métodos (quien **elabora**). |
 | `payroll.approve` | Aprobar / marcar pagado / anular (quien **aprueba** → segregación de funciones). |
-| `payroll.config` | Configurar conceptos y períodos de nómina. |
+| `payroll.config` | Configurar conceptos, períodos y retenciones de nómina. |
+| `payroll.withholdings` | Gestionar comprobantes, declaraciones y enteramientos de retenciones. |
 
 El gating es el mismo del resto: `permission` en `AppSidebar.tsx`, `ProtectedRoute` (rol
 `school`) y `usePermissions().has()`. RLS acota por `school_id` (patrón del módulo de pagos).
@@ -760,7 +761,8 @@ El gating es el mismo del resto: `permission` en `AppSidebar.tsx`, `ProtectedRou
 | Dashboard de Nómina (indicadores + export Excel) | `/pagos/nomina` | `payroll.view` |
 | Registro de Nómina (selector por período: registrar→aprobar→pagar→anular) | `/pagos/nomina/registro` | `payroll.register` / `payroll.approve` |
 | Beneficiarios (alta, métodos de pago, ficha/historial + recibo PDF) | `/pagos/nomina/beneficiarios` | `payroll.view` / `payroll.register` |
-| Configuración de Nómina (conceptos + períodos) | `/pagos/nomina/configuracion` | `payroll.config` |
+| Retenciones (IVA, ISLR y comprobante anual) | `/pagos/nomina/retenciones` | `payroll.withholdings` |
+| Configuración de Nómina (conceptos, períodos y retenciones) | `/pagos/nomina/configuracion` | `payroll.config` |
 
 ### Datos / Tablas (Supabase, todas con RLS por `school_id`)
 - `payroll_beneficiaries` — beneficiario: `category` (`teacher`/`admin`/`worker`/`other`),
@@ -817,8 +819,69 @@ define qué campos guarda cada tipo de método), `src/components/payroll/MethodD
 - Multimoneda VES/USD con tasa por pago; el neto en VES sale de `net_amount * exchange_rate`.
 - Docentes se reutilizan desde `teachers` (categoría "Docente"); el resto se registra a mano.
 
+### Proveedores y retenciones de IVA e ISLR
+Las retenciones viven dentro de Nómina, sin módulo aparte. **Están apagadas por defecto y se activan
+por colegio** (IVA e ISLR por separado) en Configuración de Nómina → **Retenciones**. Con ambas
+apagadas, un colegio sigue registrando, aprobando y pagando como siempre.
+
+> ⚠️ Los valores iniciales son un punto de partida. El contador del colegio debe validarlos antes de
+> activar. Quedan pendientes los archivos reales del portal del SENIAT (hoy se exporta un Excel
+> provisional), el comprobante actual del colegio y los códigos de concepto de ISLR. Fuera de esta
+> versión: abonos parciales y notas de crédito.
+
+**Cómo se le paga** se separa de la categoría (`payroll_beneficiaries.payment_regime`):
+- **Nómina** (`payroll`): personal. Un pago por período y, con ISLR activo, retención por % de AR-I.
+- **Factura u honorarios** (`invoice`): varias facturas por período; un pago puede cubrir varias
+  facturas. La categoría **Proveedor** siempre va por aquí; un docente puede estar en cualquiera.
+
+**Beneficiarios y docentes.** Los campos obligatorios dependen del tipo y salen de una sola regla
+(`beneficiaryRules.ts`), compartida por el formulario, su validación y la insignia "Datos
+incompletos". Un docente se puede **vincular** a uno registrado o **registrar solo en Nómina**: esto
+último no crea fila en `teachers` ni cuenta de acceso, para colegios sin docentes activos o que solo
+usan Nómina. El botón "Agregar Docente" de `/registros/docentes` no cambia. Si luego se agrega el
+docente con la misma cédula, el trigger `trg_link_payroll_beneficiary_to_teacher` los vincula sin
+tocar los datos del beneficiario.
+
+**Tablas nuevas:**
+- `payroll_tax_settings` — activación y próximo consecutivo de cada comprobante.
+- `payroll_tax_parameters` — versiones (`valid_from`) de % de IVA, UT y límite de caja chica.
+- `payroll_islr_concepts` + `payroll_islr_rate_versions` — tabla de ISLR por concepto y tipo de persona.
+- `payroll_beneficiary_ari_rates` — % de AR-I por trabajador, con `valid_from`.
+- `payroll_purchase_documents` — facturas y notas de débito. No se repite la misma factura de un
+  proveedor (salvo que su pago se anule).
+- `payroll_withholdings` — cada retención con **su propia copia** de porcentaje, base, UT, tasa y
+  datos del proveedor y del colegio. Es el historial fiscal.
+
+**Reglas clave:**
+- **Los porcentajes no se sobrescriben:** cada cambio agrega una versión con fecha; solo se pueden
+  borrar las futuras. Cambiar un porcentaje no altera pagos anteriores.
+- **Si el porcentaje cambia antes de pagar**, `mark_payroll_payment_paid` rechaza el pago
+  (`WITHHOLDING_RATE_CHANGED`). Al recalcular, el pago vuelve a borrador porque cambia el neto
+  aprobado. Las excepciones hechas a mano se conservan.
+- **La retención es una línea de deducción normal** (`withholding_id`), así que neto, recibo y Excel
+  no cambian. En pagos en USD se calcula en bolívares con la tasa del pago y se deduce su equivalente.
+- **El comprobante se numera al pagar**, de forma atómica, con formato `AAAAMMSSSSSSSS`. El período
+  fiscal sale de la fecha de pago: IVA por quincena, ISLR por mes.
+- **Anular:** bloqueado si la retención ya se declaró o enteró. Un comprobante anulado no reutiliza
+  su número. El trigger `guard_payroll_withholding` impide cambiar una retención emitida.
+- **Permisos:** `payroll.withholdings` para la pantalla Retenciones; los ajustes siguen en
+  `payroll.config`. Las funciones de base de datos comprueban el permiso, no solo la pantalla.
+
+**Funciones de base de datos:** `register_payroll_payment_with_withholdings` (guarda todo en una
+transacción), `mark_payroll_payment_paid`, `recalculate_payroll_payment_withholdings`,
+`void_payroll_payment`, `set_payroll_withholdings_status`, `ensure_payroll_tax_defaults`.
+
+**Pantallas:** Registro de Nómina (pestañas Personal y Proveedores y honorarios) y
+`/pagos/nomina/retenciones` (IVA, ISLR y comprobante anual). **Edge Function:**
+`send-withholding-voucher` envía el comprobante al correo del proveedor.
+
+**Normas de referencia:** Providencia SNAT/2025/000054 (retención de IVA), Decreto 1.808 (ISLR),
+SNAT/2026/00093 (comprobantes, vigente desde el 19/04/2027) y SNAT/2026/00099 (sujetos pasivos
+especiales).
+
 ### Archivos clave (nómina)
-- `src/pages/school/PayrollDashboard.tsx`, `PayrollRegistration.tsx`, `PayrollBeneficiaries.tsx`, `PayrollConfig.tsx`
+- `src/lib/payroll/withholdings/*` (cálculos, reglas de formularios y exportación, con pruebas)
+- `src/pages/school/PayrollDashboard.tsx`, `PayrollRegistration.tsx`, `PayrollBeneficiaries.tsx`, `PayrollConfig.tsx`, `PayrollWithholdings.tsx`
 - `src/components/payroll/*` (modales de pago, beneficiario, métodos, historial; tabs de conceptos/períodos)
 - `src/hooks/payroll/*` (React Query: beneficiarios, métodos, períodos, conceptos, pagos, etc.)
 - `src/lib/payroll/*` (`calculateNet`, `buildPayrollReceiptData`, `payrollExcel`, `generatePayrollReceiptPdf`, con tests)

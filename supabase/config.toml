@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.import-grades]
 verify_jwt = false
+
+[functions.send-withholding-voucher]
+verify_jwt = false

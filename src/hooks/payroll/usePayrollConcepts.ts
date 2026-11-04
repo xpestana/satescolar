@@ -8,6 +8,7 @@ export interface ConceptInput {
   default_amount: number;
   currency: PayrollCurrency;
   is_active?: boolean;
+  is_islr_taxable?: boolean;
 }
 
 const KEY = "payroll-concepts";

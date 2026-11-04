@@ -71,6 +71,7 @@ import PayrollDashboard from "./pages/school/PayrollDashboard";
 import PayrollRegistration from "./pages/school/PayrollRegistration";
 import PayrollBeneficiaries from "./pages/school/PayrollBeneficiaries";
 import PayrollConfig from "./pages/school/PayrollConfig";
+import PayrollWithholdings from "./pages/school/PayrollWithholdings";
 import StudentLedger from "./pages/school/StudentLedger";
 import DelinquentStudents from "./pages/school/DelinquentStudents";
 import DelinquencyConfig from "./pages/school/DelinquencyConfig";
@@ -438,6 +439,7 @@ const App = () => (
               <Route path="/pagos/nomina" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollDashboard /></ModuleRoute></ProtectedRoute>} />
               <Route path="/pagos/nomina/registro" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollRegistration /></ModuleRoute></ProtectedRoute>} />
               <Route path="/pagos/nomina/beneficiarios" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollBeneficiaries /></ModuleRoute></ProtectedRoute>} />
+              <Route path="/pagos/nomina/retenciones" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollWithholdings /></ModuleRoute></ProtectedRoute>} />
               <Route path="/pagos/nomina/configuracion" element={<ProtectedRoute requiredRole="school"><ModuleRoute module="payments"><PayrollConfig /></ModuleRoute></ProtectedRoute>} />
               <Route path="/formatos" element={<ProtectedRoute requiredRole="school"><FormatsConfig /></ProtectedRoute>} />
 

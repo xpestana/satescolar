@@ -1,37 +1,26 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
-import { Search, CreditCard, CheckCircle2, DollarSign, Ban, Loader2, Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, FileText, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useToast } from "@/hooks/use-toast";
 import { ExchangeRateWidget } from "@/components/payments/ExchangeRateWidget";
 import { usePayrollBeneficiaries } from "@/hooks/payroll/usePayrollBeneficiaries";
 import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
-import { usePayrollPayments, type PayrollPaymentRow } from "@/hooks/payroll/usePayrollPayments";
-import { usePayrollDefaultMethods } from "@/hooks/payroll/usePayrollDefaultMethods";
-import { PayrollPaymentFormModal } from "@/components/payroll/PayrollPaymentFormModal";
-import { MethodDetails, CopyableField } from "@/components/payroll/MethodDetails";
-import { CATEGORY_LABELS, STATUS_LABELS, type PayrollBeneficiary, type PayrollCategory, type PayrollPaymentStatus } from "@/lib/payroll/types";
+import { PayrollStaffTab } from "@/components/payroll/PayrollStaffTab";
+import { PayrollSupplierTab } from "@/components/payroll/PayrollSupplierTab";
 
 export default function PayrollRegistration() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
   const { has } = usePermissions();
-  const { toast } = useToast();
 
   const canRegister = has("payroll.register");
   const canApprove = has("payroll.approve");
@@ -43,64 +32,6 @@ export default function PayrollRegistration() {
   const [periodOpen, setPeriodOpen] = useState(false);
   const activePeriodId = periodId || periods[0]?.id || "";
 
-  const { payments, approvePayment, markPaid, voidPayment } = usePayrollPayments(schoolId, { periodId: activePeriodId });
-  const { data: defaultMethods = {} } = usePayrollDefaultMethods(schoolId);
-
-  const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const [registerFor, setRegisterFor] = useState<PayrollBeneficiary | null>(null);
-  const [voidFor, setVoidFor] = useState<PayrollPaymentRow | null>(null);
-  const [voidReason, setVoidReason] = useState("");
-
-  const paymentByBeneficiary = useMemo(() => {
-    const map: Record<string, PayrollPaymentRow> = {};
-    for (const p of payments) {
-      // Keep the non-voided one if present, else the latest.
-      if (!map[p.beneficiary_id] || p.status !== "voided") map[p.beneficiary_id] = p;
-    }
-    return map;
-  }, [payments]);
-
-  const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-
-  const filtered = useMemo(() => {
-    let rows = beneficiaries.filter((b) => b.is_active);
-    if (categoryFilter !== "all") rows = rows.filter((b) => b.category === categoryFilter);
-    if (search.trim()) {
-      const q = normalize(search);
-      rows = rows.filter((b) => normalize(b.full_name).includes(q) || normalize(b.document_id ?? "").includes(q));
-    }
-    return rows;
-  }, [beneficiaries, categoryFilter, search]);
-
-  const badgeVariant = (s: PayrollPaymentStatus) =>
-    s === "paid" ? "default" : s === "voided" ? "destructive" : s === "approved" ? "secondary" : "outline";
-
-  const handlePay = (payment: PayrollPaymentRow) => {
-    markPaid.mutate(
-      { paymentId: payment.id },
-      {
-        onSuccess: ({ emailSent }) =>
-          toast({
-            title: "Pago marcado como pagado",
-            description: emailSent ? "Se envió el recibo por correo." : "No se pudo enviar el recibo por correo.",
-          }),
-        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-      }
-    );
-  };
-
-  const confirmVoid = () => {
-    if (!voidFor) return;
-    voidPayment.mutate(
-      { paymentId: voidFor.id, reason: voidReason.trim() || "Sin motivo" },
-      {
-        onSuccess: () => { toast({ title: "Pago anulado" }); setVoidFor(null); setVoidReason(""); },
-        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-      }
-    );
-  };
-
   if (schoolLoading || !schoolId) return <DashboardLayout><DashboardSkeleton /></DashboardLayout>;
 
   const activePeriod = periods.find((p) => p.id === activePeriodId);
@@ -110,7 +41,7 @@ export default function PayrollRegistration() {
       <PageHeader
         title="Registro de Nómina"
         breadcrumbs={[{ label: "Nómina", href: "/pagos/nomina" }, { label: "Registro" }]}
-        description="Selecciona el período y registra, aprueba y paga a cada beneficiario de la nómina."
+        description="Selecciona el período y registra, aprueba y paga al personal y a los proveedores."
       />
 
       {periodsLoading ? (
@@ -124,7 +55,7 @@ export default function PayrollRegistration() {
         </Card>
       ) : (
         <>
-          <div className="flex flex-wrap gap-3 mb-4">
+          <div className="mb-4">
             <Popover open={periodOpen} onOpenChange={setPeriodOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" aria-expanded={periodOpen} className="w-[240px] justify-between font-normal">
@@ -155,128 +86,36 @@ export default function PayrollRegistration() {
                 </Command>
               </PopoverContent>
             </Popover>
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Buscar por nombre o cédula..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[190px]"><SelectValue placeholder="Categoría" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las categorías</SelectItem>
-                {(Object.keys(CATEGORY_LABELS) as PayrollCategory[]).map((c) => (
-                  <SelectItem key={c} value={c}>{CATEGORY_LABELS[c]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Beneficiario</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead className="w-64">Método principal</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Neto (VES)</TableHead>
-                    <TableHead className="w-64">Acción</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No hay beneficiarios.</TableCell></TableRow>
-                  ) : (
-                    filtered.map((b) => {
-                      const payment = paymentByBeneficiary[b.id];
-                      const status = payment?.status;
-                      const isLive = payment && payment.status !== "voided";
-                      return (
-                        <TableRow key={b.id}>
-                          <TableCell className="font-medium">
-                            {b.full_name}
-                            <div className="text-xs text-muted-foreground">{b.document_id || "—"}</div>
-                          </TableCell>
-                          <TableCell><Badge variant="outline">{CATEGORY_LABELS[b.category]}</Badge></TableCell>
-                          <TableCell className="align-top">
-                            <div className="space-y-1">
-                              {defaultMethods[b.id] ? (
-                                <MethodDetails method={defaultMethods[b.id]} showType />
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Sin método</span>
-                              )}
-                              {b.document_id && <CopyableField label="Cédula" value={b.document_id} />}
-                              {b.phone && <CopyableField label="Teléfono" value={b.phone} />}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {isLive ? <Badge variant={badgeVariant(status!)}>{STATUS_LABELS[status!]}</Badge> : <span className="text-xs text-muted-foreground">Sin registrar</span>}
-                          </TableCell>
-                          <TableCell>
-                            {isLive ? payment!.net_amount_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 }) : "—"}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-1 flex-wrap">
-                              {!isLive && (
-                                <Button size="sm" variant="outline" disabled={!canRegister} onClick={() => setRegisterFor(b)}>
-                                  <CreditCard className="h-3 w-3 mr-1" />Registrar
-                                </Button>
-                              )}
-                              {isLive && status === "draft" && (
-                                <Button size="sm" variant="secondary" disabled={!canApprove || approvePayment.isPending} onClick={() => approvePayment.mutate(payment!.id, { onSuccess: () => toast({ title: "Pago aprobado" }), onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }) })}>
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />Aprobar
-                                </Button>
-                              )}
-                              {isLive && status === "approved" && (
-                                <Button size="sm" disabled={!canApprove || markPaid.isPending} onClick={() => handlePay(payment!)}>
-                                  {markPaid.isPending ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <DollarSign className="h-3 w-3 mr-1" />}Pagar
-                                </Button>
-                              )}
-                              {isLive && status !== "paid" && (
-                                <Button size="sm" variant="ghost" disabled={!canApprove} title="Anular" onClick={() => setVoidFor(payment!)}>
-                                  <Ban className="h-3 w-3 text-destructive" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <Tabs defaultValue="staff" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="staff" className="gap-2"><Users className="h-4 w-4" />Personal</TabsTrigger>
+              <TabsTrigger value="suppliers" className="gap-2"><FileText className="h-4 w-4" />Proveedores y honorarios</TabsTrigger>
+            </TabsList>
+            <TabsContent value="staff">
+              <PayrollStaffTab
+                schoolId={schoolId}
+                periodId={activePeriodId}
+                beneficiaries={beneficiaries}
+                canRegister={canRegister}
+                canApprove={canApprove}
+              />
+            </TabsContent>
+            <TabsContent value="suppliers">
+              <PayrollSupplierTab
+                schoolId={schoolId}
+                periodId={activePeriodId}
+                beneficiaries={beneficiaries}
+                canRegister={canRegister}
+                canApprove={canApprove}
+              />
+            </TabsContent>
+          </Tabs>
 
           <ExchangeRateWidget schoolId={schoolId} />
         </>
       )}
-
-      {registerFor && activePeriod && (
-        <PayrollPaymentFormModal
-          open={!!registerFor}
-          onOpenChange={(v) => !v && setRegisterFor(null)}
-          schoolId={schoolId}
-          periodId={activePeriod.id}
-          beneficiary={{ id: registerFor.id, full_name: registerFor.full_name }}
-        />
-      )}
-
-      <Dialog open={!!voidFor} onOpenChange={(v) => { if (!v) { setVoidFor(null); setVoidReason(""); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Anular pago</DialogTitle></DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label>Motivo de la anulación</Label>
-            <Textarea rows={3} value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Indique por qué se anula este pago" />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setVoidFor(null); setVoidReason(""); }}>Cancelar</Button>
-            <Button variant="destructive" onClick={confirmVoid} disabled={voidPayment.isPending}>
-              {voidPayment.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}Anular
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </DashboardLayout>
   );
 }

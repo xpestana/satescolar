@@ -25,6 +25,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   teacher: "Docente",
   admin: "Administrativo",
   worker: "Obrero",
+  supplier: "Proveedor",
   other: "Otros",
 };
 const METHOD_LABELS: Record<string, string> = {
@@ -73,7 +74,7 @@ export default async function handler(req: Request): Promise<Response> {
     const { data: payment, error: pErr } = await admin
       .from("payroll_payments")
       .select(
-        "*, payroll_beneficiaries(full_name, document_id, category, email), " +
+        "*, payroll_beneficiaries(full_name, document_id, tax_id, category, email), " +
           "payroll_periods(name), payroll_payment_methods(method_type, label)"
       )
       .eq("id", payment_id)
@@ -124,7 +125,7 @@ export default async function handler(req: Request): Promise<Response> {
     const data: ReceiptEmailData = {
       schoolName: school?.name ?? "SAT Escolar",
       beneficiaryName: beneficiary?.full_name ?? "—",
-      documentId: beneficiary?.document_id ?? "—",
+      documentId: beneficiary?.document_id ?? beneficiary?.tax_id ?? "—",
       categoryLabel: CATEGORY_LABELS[beneficiary?.category] ?? "—",
       periodName: payment.payroll_periods?.name ?? "—",
       currency,

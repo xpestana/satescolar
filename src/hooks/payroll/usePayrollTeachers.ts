@@ -7,6 +7,7 @@ export interface TeacherOption {
   document_id: string | null;
   email: string | null;
   phone: string | null;
+  isSuspended: boolean;
 }
 
 /** Derive a display name from the teacher's form_data (same fields the padrón uses). */
@@ -25,7 +26,7 @@ export function usePayrollTeachers(schoolId: string | null | undefined) {
     queryFn: async (): Promise<TeacherOption[]> => {
       const { data, error } = await supabase
         .from("teachers")
-        .select("id, document_id, email, phone, form_data")
+        .select("id, document_id, email, phone, form_data, is_suspended")
         .eq("school_id", schoolId as string);
       if (error) throw error;
       return (data ?? []).map((t) => ({
@@ -34,6 +35,7 @@ export function usePayrollTeachers(schoolId: string | null | undefined) {
         document_id: t.document_id,
         email: t.email,
         phone: t.phone,
+        isSuspended: t.is_suspended,
       }));
     },
   });

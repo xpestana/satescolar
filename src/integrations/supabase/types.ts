@@ -2380,6 +2380,7 @@ export type Database = {
       grades_config: {
         Row: {
           created_at: string
+          diagnosis_signatures: Json
           id: string
           preschool_report_type: string
           preschool_template: string
@@ -2392,6 +2393,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          diagnosis_signatures?: Json
           id?: string
           preschool_report_type?: string
           preschool_template?: string
@@ -2404,6 +2406,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          diagnosis_signatures?: Json
           id?: string
           preschool_report_type?: string
           preschool_template?: string
@@ -3207,48 +3210,76 @@ export type Database = {
           category: string
           created_at: string
           created_by: string | null
+          default_islr_concept_id: string | null
           document_id: string | null
           email: string | null
+          fiscal_address: string | null
           full_name: string
           id: string
           is_active: boolean
           notes: string | null
+          payment_regime: string
+          person_type: string | null
           phone: string | null
           school_id: string
+          tax_id: string | null
           teacher_id: string | null
           updated_at: string
+          vat_exclusion_reason: string | null
+          vat_withholding_mode: string
         }
         Insert: {
           category?: string
           created_at?: string
           created_by?: string | null
+          default_islr_concept_id?: string | null
           document_id?: string | null
           email?: string | null
+          fiscal_address?: string | null
           full_name: string
           id?: string
           is_active?: boolean
           notes?: string | null
+          payment_regime?: string
+          person_type?: string | null
           phone?: string | null
           school_id: string
+          tax_id?: string | null
           teacher_id?: string | null
           updated_at?: string
+          vat_exclusion_reason?: string | null
+          vat_withholding_mode?: string
         }
         Update: {
           category?: string
           created_at?: string
           created_by?: string | null
+          default_islr_concept_id?: string | null
           document_id?: string | null
           email?: string | null
+          fiscal_address?: string | null
           full_name?: string
           id?: string
           is_active?: boolean
           notes?: string | null
+          payment_regime?: string
+          person_type?: string | null
           phone?: string | null
           school_id?: string
+          tax_id?: string | null
           teacher_id?: string | null
           updated_at?: string
+          vat_exclusion_reason?: string | null
+          vat_withholding_mode?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payroll_beneficiaries_default_islr_concept_fk"
+            columns: ["default_islr_concept_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_islr_concepts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payroll_beneficiaries_school_id_fkey"
             columns: ["school_id"]
@@ -3265,6 +3296,51 @@ export type Database = {
           },
         ]
       }
+      payroll_beneficiary_ari_rates: {
+        Row: {
+          beneficiary_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          rate_pct: number
+          school_id: string
+          valid_from: string
+        }
+        Insert: {
+          beneficiary_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          rate_pct: number
+          school_id: string
+          valid_from: string
+        }
+        Update: {
+          beneficiary_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          rate_pct?: number
+          school_id?: string
+          valid_from?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_beneficiary_ari_rates_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_beneficiary_ari_rates_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_concepts: {
         Row: {
           concept_kind: string
@@ -3273,6 +3349,7 @@ export type Database = {
           default_amount: number
           id: string
           is_active: boolean
+          is_islr_taxable: boolean
           name: string
           school_id: string
           updated_at: string
@@ -3284,6 +3361,7 @@ export type Database = {
           default_amount?: number
           id?: string
           is_active?: boolean
+          is_islr_taxable?: boolean
           name: string
           school_id: string
           updated_at?: string
@@ -3295,6 +3373,7 @@ export type Database = {
           default_amount?: number
           id?: string
           is_active?: boolean
+          is_islr_taxable?: boolean
           name?: string
           school_id?: string
           updated_at?: string
@@ -3302,6 +3381,110 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "payroll_concepts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_islr_concepts: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          name: string
+          school_id: string
+          seniat_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          school_id: string
+          seniat_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          school_id?: string
+          seniat_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_islr_concepts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_islr_rate_versions: {
+        Row: {
+          base_pct: number
+          concept_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          minimum_amount: number
+          minimum_mode: string
+          person_type: string
+          rate_pct: number
+          school_id: string
+          subtrahend_amount: number
+          subtrahend_mode: string
+          valid_from: string
+        }
+        Insert: {
+          base_pct?: number
+          concept_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          minimum_amount?: number
+          minimum_mode?: string
+          person_type: string
+          rate_pct: number
+          school_id: string
+          subtrahend_amount?: number
+          subtrahend_mode?: string
+          valid_from: string
+        }
+        Update: {
+          base_pct?: number
+          concept_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          minimum_amount?: number
+          minimum_mode?: string
+          person_type?: string
+          rate_pct?: number
+          school_id?: string
+          subtrahend_amount?: number
+          subtrahend_mode?: string
+          valid_from?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_islr_rate_versions_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_islr_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_islr_rate_versions_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -3318,6 +3501,7 @@ export type Database = {
           description: string | null
           id: string
           payment_id: string
+          withholding_id: string | null
         }
         Insert: {
           amount?: number
@@ -3327,6 +3511,7 @@ export type Database = {
           description?: string | null
           id?: string
           payment_id: string
+          withholding_id?: string | null
         }
         Update: {
           amount?: number
@@ -3336,6 +3521,7 @@ export type Database = {
           description?: string | null
           id?: string
           payment_id?: string
+          withholding_id?: string | null
         }
         Relationships: [
           {
@@ -3350,6 +3536,13 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "payroll_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_payment_items_withholding_fk"
+            columns: ["withholding_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_withholdings"
             referencedColumns: ["id"]
           },
         ]
@@ -3426,6 +3619,7 @@ export type Database = {
           paid_at: string | null
           paid_by: string | null
           payment_date: string | null
+          payment_kind: string
           payment_method_id: string | null
           period_id: string
           school_id: string
@@ -3452,6 +3646,7 @@ export type Database = {
           paid_at?: string | null
           paid_by?: string | null
           payment_date?: string | null
+          payment_kind?: string
           payment_method_id?: string | null
           period_id: string
           school_id: string
@@ -3478,6 +3673,7 @@ export type Database = {
           paid_at?: string | null
           paid_by?: string | null
           payment_date?: string | null
+          payment_kind?: string
           payment_method_id?: string | null
           period_id?: string
           school_id?: string
@@ -3568,6 +3764,393 @@ export type Database = {
             columns: ["school_year_id"]
             isOneToOne: false
             referencedRelation: "school_years"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_purchase_documents: {
+        Row: {
+          beneficiary_id: string
+          control_number: string
+          created_at: string
+          document_number: string
+          document_type: string
+          exempt_amount: number
+          id: string
+          is_non_compliant: boolean
+          is_petty_cash: boolean
+          is_vat_not_itemized: boolean
+          is_voided: boolean
+          islr_concept_id: string | null
+          issue_date: string
+          payment_id: string
+          school_id: string
+          taxable_base: number
+          total_amount: number
+          vat_amount: number
+          vat_rate_pct: number
+        }
+        Insert: {
+          beneficiary_id: string
+          control_number: string
+          created_at?: string
+          document_number: string
+          document_type?: string
+          exempt_amount?: number
+          id?: string
+          is_non_compliant?: boolean
+          is_petty_cash?: boolean
+          is_vat_not_itemized?: boolean
+          is_voided?: boolean
+          islr_concept_id?: string | null
+          issue_date: string
+          payment_id: string
+          school_id: string
+          taxable_base?: number
+          total_amount?: number
+          vat_amount?: number
+          vat_rate_pct?: number
+        }
+        Update: {
+          beneficiary_id?: string
+          control_number?: string
+          created_at?: string
+          document_number?: string
+          document_type?: string
+          exempt_amount?: number
+          id?: string
+          is_non_compliant?: boolean
+          is_petty_cash?: boolean
+          is_vat_not_itemized?: boolean
+          is_voided?: boolean
+          islr_concept_id?: string | null
+          issue_date?: string
+          payment_id?: string
+          school_id?: string
+          taxable_base?: number
+          total_amount?: number
+          vat_amount?: number
+          vat_rate_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_purchase_documents_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_purchase_documents_islr_concept_id_fkey"
+            columns: ["islr_concept_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_islr_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_purchase_documents_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_purchase_documents_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_tax_parameters: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          default_vat_rate_pct: number
+          id: string
+          petty_cash_ut_limit: number
+          school_id: string
+          tax_unit_value: number
+          valid_from: string
+          vat_full_pct: number
+          vat_standard_pct: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          default_vat_rate_pct?: number
+          id?: string
+          petty_cash_ut_limit?: number
+          school_id: string
+          tax_unit_value: number
+          valid_from: string
+          vat_full_pct?: number
+          vat_standard_pct?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          default_vat_rate_pct?: number
+          id?: string
+          petty_cash_ut_limit?: number
+          school_id?: string
+          tax_unit_value?: number
+          valid_from?: string
+          vat_full_pct?: number
+          vat_standard_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_tax_parameters_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_tax_settings: {
+        Row: {
+          created_at: string
+          islr_agent_enabled: boolean
+          next_islr_voucher_seq: number
+          next_vat_voucher_seq: number
+          rates_validated_at: string | null
+          rates_validated_by: string | null
+          school_id: string
+          updated_at: string
+          vat_agent_enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          islr_agent_enabled?: boolean
+          next_islr_voucher_seq?: number
+          next_vat_voucher_seq?: number
+          rates_validated_at?: string | null
+          rates_validated_by?: string | null
+          school_id: string
+          updated_at?: string
+          vat_agent_enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          islr_agent_enabled?: boolean
+          next_islr_voucher_seq?: number
+          next_vat_voucher_seq?: number
+          rates_validated_at?: string | null
+          rates_validated_by?: string | null
+          school_id?: string
+          updated_at?: string
+          vat_agent_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_tax_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_withholdings: {
+        Row: {
+          agent_snapshot: Json
+          ari_rate_id: string | null
+          base_pct: number
+          base_ves: number
+          beneficiary_id: string
+          beneficiary_snapshot: Json
+          created_at: string
+          created_by: string | null
+          declaration_ref: string | null
+          declared_at: string | null
+          delivered_at: string | null
+          document_id: string | null
+          exchange_rate: number
+          fiscal_period_end: string | null
+          fiscal_period_start: string | null
+          id: string
+          is_override: boolean
+          islr_concept_id: string | null
+          islr_concept_name: string | null
+          islr_rate_version_id: string | null
+          islr_seniat_code: string | null
+          issued_at: string | null
+          minimum_ves: number
+          no_withholding_reason: string | null
+          override_reason: string | null
+          parameters_version_id: string | null
+          payment_id: string
+          person_type: string | null
+          rate_pct: number
+          remittance_ref: string | null
+          remitted_at: string | null
+          school_id: string
+          source: string
+          status: string
+          subtrahend_ves: number
+          tax_amount_ves: number
+          tax_type: string
+          tax_unit_value: number | null
+          updated_at: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+          voucher_number: string | null
+          withheld_amount: number
+          withheld_ves: number
+        }
+        Insert: {
+          agent_snapshot?: Json
+          ari_rate_id?: string | null
+          base_pct?: number
+          base_ves?: number
+          beneficiary_id: string
+          beneficiary_snapshot?: Json
+          created_at?: string
+          created_by?: string | null
+          declaration_ref?: string | null
+          declared_at?: string | null
+          delivered_at?: string | null
+          document_id?: string | null
+          exchange_rate?: number
+          fiscal_period_end?: string | null
+          fiscal_period_start?: string | null
+          id?: string
+          is_override?: boolean
+          islr_concept_id?: string | null
+          islr_concept_name?: string | null
+          islr_rate_version_id?: string | null
+          islr_seniat_code?: string | null
+          issued_at?: string | null
+          minimum_ves?: number
+          no_withholding_reason?: string | null
+          override_reason?: string | null
+          parameters_version_id?: string | null
+          payment_id: string
+          person_type?: string | null
+          rate_pct?: number
+          remittance_ref?: string | null
+          remitted_at?: string | null
+          school_id: string
+          source: string
+          status?: string
+          subtrahend_ves?: number
+          tax_amount_ves?: number
+          tax_type: string
+          tax_unit_value?: number | null
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          voucher_number?: string | null
+          withheld_amount?: number
+          withheld_ves?: number
+        }
+        Update: {
+          agent_snapshot?: Json
+          ari_rate_id?: string | null
+          base_pct?: number
+          base_ves?: number
+          beneficiary_id?: string
+          beneficiary_snapshot?: Json
+          created_at?: string
+          created_by?: string | null
+          declaration_ref?: string | null
+          declared_at?: string | null
+          delivered_at?: string | null
+          document_id?: string | null
+          exchange_rate?: number
+          fiscal_period_end?: string | null
+          fiscal_period_start?: string | null
+          id?: string
+          is_override?: boolean
+          islr_concept_id?: string | null
+          islr_concept_name?: string | null
+          islr_rate_version_id?: string | null
+          islr_seniat_code?: string | null
+          issued_at?: string | null
+          minimum_ves?: number
+          no_withholding_reason?: string | null
+          override_reason?: string | null
+          parameters_version_id?: string | null
+          payment_id?: string
+          person_type?: string | null
+          rate_pct?: number
+          remittance_ref?: string | null
+          remitted_at?: string | null
+          school_id?: string
+          source?: string
+          status?: string
+          subtrahend_ves?: number
+          tax_amount_ves?: number
+          tax_type?: string
+          tax_unit_value?: number | null
+          updated_at?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+          voucher_number?: string | null
+          withheld_amount?: number
+          withheld_ves?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_withholdings_ari_rate_id_fkey"
+            columns: ["ari_rate_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_beneficiary_ari_rates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_withholdings_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_withholdings_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_purchase_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_withholdings_islr_concept_id_fkey"
+            columns: ["islr_concept_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_islr_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_withholdings_islr_rate_version_id_fkey"
+            columns: ["islr_rate_version_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_islr_rate_versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_withholdings_parameters_version_id_fkey"
+            columns: ["parameters_version_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_tax_parameters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_withholdings_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_withholdings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
             referencedColumns: ["id"]
           },
         ]
@@ -4979,6 +5562,67 @@ export type Database = {
           },
         ]
       }
+      student_diagnoses: {
+        Row: {
+          assignment_id: string
+          created_at: string
+          id: string
+          improvements: string
+          school_id: string
+          strengths: string
+          student_id: string
+          updated_at: string
+          updated_by: string | null
+          weaknesses: string
+        }
+        Insert: {
+          assignment_id: string
+          created_at?: string
+          id?: string
+          improvements?: string
+          school_id: string
+          strengths?: string
+          student_id: string
+          updated_at?: string
+          updated_by?: string | null
+          weaknesses?: string
+        }
+        Update: {
+          assignment_id?: string
+          created_at?: string
+          id?: string
+          improvements?: string
+          school_id?: string
+          strengths?: string
+          student_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          weaknesses?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_diagnoses_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "subject_teacher_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_diagnoses_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_diagnoses_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       student_grade_access: {
         Row: {
           created_at: string
@@ -5495,6 +6139,10 @@ export type Database = {
         Args: { _concept_id: string; _to_year_id: string }
         Returns: string
       }
+      ensure_payroll_tax_defaults: {
+        Args: { _school_id: string }
+        Returns: undefined
+      }
       get_all_balances_for_family: {
         Args: {
           _family_id: string
@@ -5572,6 +6220,14 @@ export type Database = {
         Returns: boolean
       }
       is_school_teacher: { Args: { _school_id: string }; Returns: boolean }
+      mark_payroll_payment_paid: {
+        Args: { _payment_date?: string; _payment_id: string }
+        Returns: undefined
+      }
+      payroll_can: {
+        Args: { _key: string; _school_id: string }
+        Returns: boolean
+      }
       populate_default_primary_indicators: {
         Args: { p_school_id: string }
         Returns: undefined
@@ -5580,7 +6236,15 @@ export type Database = {
         Args: never
         Returns: number
       }
+      recalculate_payroll_payment_withholdings: {
+        Args: { _payload: Json; _payment_id: string }
+        Returns: undefined
+      }
       record_login: { Args: never; Returns: undefined }
+      register_payroll_payment_with_withholdings: {
+        Args: { _payload: Json }
+        Returns: string
+      }
       representative_can_view_grades: {
         Args: { _momento: number; _school_year_id: string; _student_id: string }
         Returns: boolean
@@ -5624,6 +6288,16 @@ export type Database = {
       school_has_module: {
         Args: { _module: string; _school_id: string }
         Returns: boolean
+      }
+      set_payroll_withholdings_status: {
+        Args: {
+          _date: string
+          _reference: string
+          _school_id: string
+          _status: string
+          _withholding_ids: string[]
+        }
+        Returns: number
       }
       sign: {
         Args: { algorithm?: string; payload: Json; secret: string }
@@ -5682,6 +6356,23 @@ export type Database = {
           payload: Json
           valid: boolean
         }[]
+      }
+      void_payroll_payment: {
+        Args: { _payment_id: string; _reason: string }
+        Returns: undefined
+      }
+      with_passport_document_type: {
+        Args: { _form_type: string; _options: Json }
+        Returns: Json
+      }
+      write_payroll_payment_lines: {
+        Args: {
+          _documents_by_key: Json
+          _items: Json
+          _payment: Database["public"]["Tables"]["payroll_payments"]["Row"]
+          _withholdings: Json
+        }
+        Returns: undefined
       }
     }
     Enums: {

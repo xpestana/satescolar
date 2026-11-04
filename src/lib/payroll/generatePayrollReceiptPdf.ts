@@ -23,7 +23,7 @@ export function generatePayrollReceiptPdf(data: PayrollReceiptData): jsPDF {
   doc.setFont("helvetica", "normal");
   const infoLines = [
     `Beneficiario: ${data.beneficiaryName}`,
-    `Cédula: ${data.documentId}`,
+    `Cédula/RIF: ${data.documentId}`,
     `Categoría: ${data.categoryLabel}`,
     `Período: ${data.periodName} (${data.periodRange})`,
     `Método de pago: ${data.methodLabel}`,

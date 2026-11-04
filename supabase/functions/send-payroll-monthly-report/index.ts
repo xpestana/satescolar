@@ -24,6 +24,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   teacher: "Docente",
   admin: "Administrativo",
   worker: "Obrero",
+  supplier: "Proveedor",
   other: "Otros",
 };
 const METHOD_LABELS: Record<string, string> = {
