@@ -15,6 +15,9 @@ import { toast } from "sonner";
 import { ArrowLeft, Loader2, Check } from "lucide-react";
 import { TeacherReportCard } from "@/components/teacher/TeacherReportCard";
 import { useGradeStudents } from "@/hooks/useGradeStudents";
+import { countFilledGrades, gradeKey, isAcceptedGradeInput, studentGradeValues, type GradeChange } from "@/lib/gradeEntry";
+import { MobileStudentGradeCards } from "@/components/teacher/grades/MobileStudentGradeCards";
+import { StudentGradesDialog } from "@/components/teacher/grades/StudentGradesDialog";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -53,6 +56,8 @@ export default function TeacherGrades() {
   const [grades, setGrades] = useState<Record<string, string>>({});
   const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
   const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
+  // Phone: student whose grades are open in the dialog.
+  const [dialogIndex, setDialogIndex] = useState<number | null>(null);
 
   // Fetch assignment details
   const { data: assignment, isLoading: assignmentLoading } = useQuery({
@@ -130,15 +135,43 @@ export default function TeacherGrades() {
     setGrades(map);
   }, [existingGradesData]);
 
-  const gradeKey = (studentId: string, planItemId: string) => `${studentId}-${planItemId}`;
-
   const handleGradeChange = (studentId: string, planItemId: string, value: string) => {
-    if (isNumeric) {
-      // Allow empty or numbers 1-20
-      if (value !== "" && (isNaN(Number(value)) || Number(value) < 1 || Number(value) > 20)) return;
-    }
+    if (!isAcceptedGradeInput(value, isNumeric)) return;
     setGrades((prev) => ({ ...prev, [gradeKey(studentId, planItemId)]: value }));
   };
+
+  /** Writes one grade: upsert when it has a value, delete when it was cleared. */
+  const persistGrade = useCallback(async (studentId: string, planItemId: string, value: string | undefined) => {
+    if (!assignmentId || !assignment) return;
+    if (value && value.trim() !== "") {
+      const { error } = await supabase
+        .from("student_grades" as any)
+        .upsert({
+          student_id: studentId,
+          evaluation_plan_item_id: planItemId,
+          assignment_id: assignmentId,
+          school_id: assignment.school_id,
+          grade_value: value.trim(),
+          updated_at: new Date().toISOString(),
+        } as any, { onConflict: "student_id,evaluation_plan_item_id" });
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("student_grades" as any)
+        .delete()
+        .eq("student_id", studentId)
+        .eq("evaluation_plan_item_id", planItemId);
+      if (error) throw error;
+    }
+  }, [assignmentId, assignment]);
+
+  /** Phone dialog: saves the changed grades of one student and reflects them in the sheet. */
+  const saveStudentGrades = useCallback(async (studentId: string, changes: GradeChange[]) => {
+    for (const change of changes) {
+      await persistGrade(studentId, change.planItemId, change.value);
+      setGrades((prev) => ({ ...prev, [gradeKey(studentId, change.planItemId)]: change.value }));
+    }
+  }, [persistGrade]);
 
   const saveGrade = useCallback(async (studentId: string, planItemId: string) => {
     if (!assignmentId || !assignment) return;
@@ -147,25 +180,7 @@ export default function TeacherGrades() {
 
     setSavingKeys((prev) => new Set(prev).add(key));
     try {
-      if (val && val.trim() !== "") {
-        const { error } = await supabase
-          .from("student_grades" as any)
-          .upsert({
-            student_id: studentId,
-            evaluation_plan_item_id: planItemId,
-            assignment_id: assignmentId,
-            school_id: assignment.school_id,
-            grade_value: val.trim(),
-            updated_at: new Date().toISOString(),
-          } as any, { onConflict: "student_id,evaluation_plan_item_id" });
-        if (error) throw error;
-      } else {
-        await supabase
-          .from("student_grades" as any)
-          .delete()
-          .eq("student_id", studentId)
-          .eq("evaluation_plan_item_id", planItemId);
-      }
+      await persistGrade(studentId, planItemId, val);
       setSavedKeys((prev) => {
         const next = new Set(prev).add(key);
         setTimeout(() => setSavedKeys((p) => { const n = new Set(p); n.delete(key); return n; }), 1500);
@@ -176,9 +191,13 @@ export default function TeacherGrades() {
     } finally {
       setSavingKeys((prev) => { const next = new Set(prev); next.delete(key); return next; });
     }
-  }, [assignmentId, assignment, grades]);
+  }, [assignmentId, assignment, grades, persistGrade]);
 
-  const loading = assignmentLoading || planLoading || studentsLoading || gradesLoading;
+  const planItemIds = planItems.map((pi) => pi.id);
+  const filledFor = (studentId: string) =>
+    countFilledGrades(studentGradeValues(grades, studentId, planItemIds), planItemIds);
+
+  const loading =assignmentLoading || planLoading || studentsLoading || gradesLoading;
 
   return (
     <DashboardLayout>
@@ -231,7 +250,35 @@ export default function TeacherGrades() {
           <p className="text-muted-foreground">No hay estudiantes inscritos en esta sección y año escolar.</p>
         </div>
       ) : (
-        <div className="rounded-md border overflow-x-auto">
+        <>
+        {/* Phone: one card per student; the grades are entered in a dialog */}
+        <div className="md:hidden">
+          <MobileStudentGradeCards
+            students={students}
+            onOpen={setDialogIndex}
+            actionLabel={(s) => (filledFor(s.student_id) > 0 ? "Editar notas" : "Agregar nota")}
+            renderStatus={(s) => {
+              const filled = filledFor(s.student_id);
+              const tone = filled === planItemIds.length
+                ? "border-emerald-300 text-emerald-700"
+                : filled > 0 ? "border-amber-300 text-amber-700" : "text-muted-foreground";
+              return <Badge variant="outline" className={tone}>{filled}/{planItemIds.length} notas</Badge>;
+            }}
+          />
+          <StudentGradesDialog
+            students={students}
+            index={dialogIndex}
+            onIndexChange={setDialogIndex}
+            planItems={planItems}
+            grades={grades}
+            numeric={isNumeric}
+            momento={momento}
+            onSave={saveStudentGrades}
+          />
+        </div>
+
+        {/* Desktop: the full sheet */}
+        <div className="hidden rounded-md border overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -294,6 +341,7 @@ export default function TeacherGrades() {
             </TableBody>
           </Table>
         </div>
+        </>
       )}
 
       {/* Report Card for primary/preschool */}

@@ -409,7 +409,7 @@ export default function PreschoolFinalReportModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="w-[96vw] max-w-none h-[96vh] max-h-none flex flex-col p-4">
+      <DialogContent className="w-screen max-w-none h-[100dvh] max-h-none flex flex-col p-3 md:w-[96vw] md:h-[96vh] md:p-4">
         <DialogHeader className="shrink-0">
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             Informe — {studentName}
@@ -420,7 +420,7 @@ export default function PreschoolFinalReportModal({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-y-auto md:overflow-visible">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="border rounded-md p-3 space-y-3">
                 <Skeleton className="h-5 w-32" />
@@ -431,10 +431,10 @@ export default function PreschoolFinalReportModal({
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-y-auto md:overflow-visible">
 
             {/* Left column: Componentes (top) + Observaciones del Momento (bottom) */}
-            <div className="flex flex-col gap-2 min-h-0">
+            <div className="flex flex-col gap-2 min-h-0 h-[85dvh] md:h-auto">
 
               {/* Top: Componentes — descriptivo o indicadores */}
               <div className={cn(
@@ -601,7 +601,7 @@ export default function PreschoolFinalReportModal({
             </div>
 
             {/* Right column: Vista Previa (top) + Notas del Docente (bottom) */}
-            <div className="flex flex-col gap-2 min-h-0">
+            <div className="flex flex-col gap-2 min-h-0 h-[85dvh] md:h-auto">
 
               {/* Top: Vista Previa */}
               <div className={cn(

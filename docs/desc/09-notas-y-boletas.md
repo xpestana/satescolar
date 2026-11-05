@@ -187,6 +187,27 @@ interruptor `is_active`.
   `teachers` (solo hay políticas de admin y de school), y dárselo le abriría también `form_data`
   e `is_suspended`. `teacher_signatures` permite una RLS acotada a la firma.
 
+## Notas del docente en el teléfono
+En `/teacher/materias/:assignmentId/notas`, por debajo de `md` (768px), las dos tablas anchas se
+ocultan y cada alumno sale como una tarjeta con nombre, cédula y un botón. En escritorio no cambia nada.
+Las columnas fijas de nombre y cédula ocupaban 300px y tapaban las notas.
+
+- **Plan de evaluación** (los 3 niveles): botón **Agregar nota** / **Editar notas** y la insignia
+  "n/N notas". Abre `StudentGradesDialog`, con un campo por cada evaluación del momento:
+  - bachillerato y GCRP: numérico del 1 al 20;
+  - primaria y preescolar: texto libre.
+- **Boleta** (solo primaria y preescolar): abre `ReportCardEntryDialog`, con el literal A–E,
+  asistencias, inasistencias, estado y un acceso al informe descriptivo.
+- **Guardado:** las dos ventanas guardan al pasar a otro alumno (Anterior / Siguiente,
+  "Guardar y siguiente") o al cerrar, igual que la tabla guarda al salir de la celda. Si falla, la
+  ventana no se cierra.
+- **Reglas comunes:** la tabla y la ventana comparten las reglas de `src/lib/gradeEntry.ts`
+  (rango 1–20, qué cambió).
+- **Informe en el teléfono:** `PrimaryFinalReportModal` y `PreschoolFinalReportModal` apilan sus dos
+  columnas en el teléfono. La vista previa en PDF dentro del iframe puede no verse en algunos
+  teléfonos.
+- **Código:** `src/components/teacher/grades/`.
+
 ## Diagnóstico del estudiante (Ficha descriptiva)
 Ficha "FICHA DESCRIPTIVA DEL ESTUDIANTE (DIAGNÓSTICO)" **solo de preescolar y primaria**, que
 redacta el **docente guía** de la sección. Sale en PDF como la boleta: una ficha por página, Carta.

@@ -15,6 +15,8 @@ import TeacherSignatureCard from "@/components/grades/TeacherSignatureCard";
 import { useTeacherData } from "@/hooks/useTeacherData";
 import type { GradeStudent } from "@/hooks/useGradeStudents";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MobileStudentGradeCards } from "@/components/teacher/grades/MobileStudentGradeCards";
+import { ReportCardEntryDialog, type ReportCardEntry } from "@/components/teacher/grades/ReportCardEntryDialog";
 
 const PRIMARY_GRADES = new Set([
   "1_grado", "2_grado", "3_grado", "4_grado", "5_grado", "6_grado",
@@ -73,6 +75,8 @@ export function TeacherReportCard({
   // Report modal
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportModalStudent, setReportModalStudent] = useState<{ id: string; name: string } | null>(null);
+  // Phone: student whose report-card fields are open in the dialog.
+  const [entryIndex, setEntryIndex] = useState<number | null>(null);
 
   // Grades config
   const { data: gradesConfig } = useQuery({
@@ -164,31 +168,48 @@ export function TeacherReportCard({
 
   const totalDirty = useMemo(() => students.filter(s => isDirty(s.student_id)).length, [students, isDirty]);
 
+  /** Upserts one student's report-card row and marks it as saved. Throws when it fails. */
+  const persistReport = useCallback(async (studentId: string, literal: string, ef: ExtraFields) => {
+    const payload = {
+      student_id: studentId,
+      assignment_id: assignmentId,
+      school_id: schoolId,
+      momento,
+      literal,
+      attendance_count: ef.attendance_count,
+      absence_count: ef.absence_count,
+      final_status: ef.final_status || null,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase
+      .from(tableName as any)
+      .upsert(payload as any, { onConflict: "student_id,assignment_id,momento" });
+    if (error) throw error;
+
+    setDbLiterals(prev => ({ ...prev, [studentId]: literal }));
+    setDbExtraFields(prev => ({ ...prev, [studentId]: { ...ef } }));
+  }, [assignmentId, schoolId, momento, tableName]);
+
+  // Phone dialog: what was last saved, and saving a whole entry at once.
+  const savedEntry = useCallback((studentId: string): ReportCardEntry => ({
+    literal: dbLiterals[studentId] || "",
+    ...(dbExtraFields[studentId] || DEFAULT_EXTRA),
+  }), [dbLiterals, dbExtraFields]);
+
+  const saveEntry = useCallback(async (studentId: string, entry: ReportCardEntry) => {
+    const { literal, ...ef } = entry;
+    await persistReport(studentId, literal, ef);
+    setLiterals(prev => ({ ...prev, [studentId]: literal }));
+    setExtraFields(prev => ({ ...prev, [studentId]: { ...ef } }));
+  }, [persistReport]);
+
   const saveReport = useCallback(async (studentId: string) => {
     const key = studentId;
     if (!isDirty(key)) return;
 
     setSavingKeys(prev => new Set(prev).add(key));
     try {
-      const literal = literals[key] || "";
-      const ef = extraFields[key] || DEFAULT_EXTRA;
-      const payload = {
-        student_id: studentId,
-        assignment_id: assignmentId,
-        school_id: schoolId,
-        momento,
-        literal,
-        attendance_count: ef.attendance_count,
-        absence_count: ef.absence_count,
-        final_status: ef.final_status || null,
-        updated_at: new Date().toISOString(),
-      };
-      await supabase
-        .from(tableName as any)
-        .upsert(payload as any, { onConflict: "student_id,assignment_id,momento" });
-
-      setDbLiterals(prev => ({ ...prev, [key]: literal }));
-      setDbExtraFields(prev => ({ ...prev, [key]: { ...ef } }));
+      await persistReport(key, literals[key] || "", extraFields[key] || DEFAULT_EXTRA);
 
       setSavedKeys(prev => {
         const next = new Set(prev).add(key);
@@ -200,7 +221,7 @@ export function TeacherReportCard({
     } finally {
       setSavingKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
-  }, [literals, extraFields, dbLiterals, dbExtraFields, assignmentId, schoolId, momento, tableName, isDirty]);
+  }, [literals, extraFields, isDirty, persistReport]);
 
   const saveAll = useCallback(async () => {
     if (totalDirty === 0) return;
@@ -265,8 +286,8 @@ export function TeacherReportCard({
   return (
     <TooltipProvider>
       <div className="mt-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
            <h3 className="text-base font-semibold text-foreground">
               Boleta {sectionLabel ? `— ${sectionLabel}` : (isPrimary ? "de Primaria" : "de Preescolar")}
             </h3>
@@ -284,7 +305,44 @@ export function TeacherReportCard({
           <TeacherSignatureCard teacherId={teacher.id} schoolId={schoolId} />
         )}
 
-        <div className="rounded-md border overflow-x-auto">
+        {/* Phone: one card per student; the report-card fields are entered in a dialog */}
+        <div className="md:hidden">
+          <MobileStudentGradeCards
+            students={students}
+            onOpen={setEntryIndex}
+            actionLabel={(s) => (hasReport(s.student_id) || dbLiterals[s.student_id] ? "Editar boleta" : "Agregar nota")}
+            renderStatus={(s) => {
+              const literal = dbLiterals[s.student_id];
+              const report = hasReport(s.student_id);
+              return (
+                <div className="flex items-center gap-1">
+                  {report && <FileText className="h-4 w-4 text-primary" aria-label="Con informe" />}
+                  <Badge variant="outline" className={literal ? "border-emerald-300 text-emerald-700" : "text-muted-foreground"}>
+                    {literal ? `Literal ${literal}` : "Sin literal"}
+                  </Badge>
+                </div>
+              );
+            }}
+          />
+          <ReportCardEntryDialog
+            students={students}
+            index={entryIndex}
+            onIndexChange={setEntryIndex}
+            momento={momento}
+            levelLabel={isPrimary ? "Primaria" : "Preescolar"}
+            statusOptions={STATUS_OPTIONS}
+            savedEntry={savedEntry}
+            hasReport={hasReport}
+            onSave={saveEntry}
+            onOpenReport={(s) => {
+              setReportModalStudent({ id: s.student_id, name: s.full_name });
+              setReportModalOpen(true);
+            }}
+          />
+        </div>
+
+        {/* Desktop: the full table */}
+        <div className="hidden rounded-md border overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
