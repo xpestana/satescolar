@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { usePayrollConcepts } from "@/hooks/payroll/usePayrollConcepts";
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
+import { usePayrollContributionConfig } from "@/hooks/payroll/usePayrollContributionConfig";
 import { PayrollGuide } from "@/components/payroll/PayrollGuide";
 import { conceptsGuide } from "@/components/payroll/payrollGuides";
 import type { ConceptKind, PayrollCurrency } from "@/lib/payroll/types";
@@ -19,6 +20,14 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
   const { toast } = useToast();
   const { concepts, isLoading, saveConcept, deleteConcept } = usePayrollConcepts(schoolId);
   const { islrEnabled } = usePayrollTaxConfig(schoolId);
+  const { enabled: contributionsEnabled } = usePayrollContributionConfig(schoolId);
+  const columns = 4 + (islrEnabled ? 1 : 0) + (contributionsEnabled ? 1 : 0);
+  const showError = (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" });
+  const saveFlag = (c: (typeof concepts)[number], patch: { is_islr_taxable?: boolean; is_contribution_base?: boolean }) =>
+    saveConcept.mutate(
+      { id: c.id, name: c.name, concept_kind: c.concept_kind, default_amount: c.default_amount, currency: c.currency, ...patch },
+      { onError: showError }
+    );
 
   const [name, setName] = useState("");
   const [kind, setKind] = useState<ConceptKind>("earning");
@@ -45,7 +54,7 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
 
   return (
     <div className="space-y-4">
-      <PayrollGuide guide={conceptsGuide({ islrEnabled })} className="mb-0" />
+      <PayrollGuide guide={conceptsGuide({ islrEnabled, contributionsEnabled })} className="mb-0" />
 
       <Card>
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
@@ -91,14 +100,15 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
                 <TableHead>Tipo</TableHead>
                 <TableHead>Monto</TableHead>
                 {islrEnabled && <TableHead>Base del AR-I</TableHead>}
+                {contributionsEnabled && <TableHead>Parafiscales</TableHead>}
                 <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={islrEnabled ? 5 : 4} className="text-center py-6 text-muted-foreground">Cargando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={columns} className="text-center py-6 text-muted-foreground">Cargando...</TableCell></TableRow>
               ) : concepts.length === 0 ? (
-                <TableRow><TableCell colSpan={islrEnabled ? 5 : 4} className="text-center py-6 text-muted-foreground">No hay conceptos configurados.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={columns} className="text-center py-6 text-muted-foreground">No hay conceptos configurados.</TableCell></TableRow>
               ) : (
                 concepts.map((c) => (
                   <TableRow key={c.id}>
@@ -115,12 +125,18 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
                           <Switch
                             aria-label={`${c.name} forma parte de la base del AR-I`}
                             checked={c.is_islr_taxable}
-                            onCheckedChange={(checked) =>
-                              saveConcept.mutate(
-                                { id: c.id, name: c.name, concept_kind: c.concept_kind, default_amount: c.default_amount, currency: c.currency, is_islr_taxable: checked },
-                                { onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }) }
-                              )
-                            }
+                            onCheckedChange={(checked) => saveFlag(c, { is_islr_taxable: checked })}
+                          />
+                        )}
+                      </TableCell>
+                    )}
+                    {contributionsEnabled && (
+                      <TableCell>
+                        {c.concept_kind === "earning" && (
+                          <Switch
+                            aria-label={`${c.name} forma parte de la base de los parafiscales`}
+                            checked={c.is_contribution_base}
+                            onCheckedChange={(checked) => saveFlag(c, { is_contribution_base: checked })}
                           />
                         )}
                       </TableCell>

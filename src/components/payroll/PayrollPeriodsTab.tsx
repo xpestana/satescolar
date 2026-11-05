@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
@@ -15,12 +16,13 @@ import type { PayrollPeriodType } from "@/lib/payroll/types";
 
 export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
   const { toast } = useToast();
-  const { periods, isLoading, savePeriod, deletePeriod } = usePayrollPeriods(schoolId);
+  const { periods, isLoading, savePeriod, setApplyDeductions, deletePeriod } = usePayrollPeriods(schoolId);
 
   const [name, setName] = useState("");
   const [type, setType] = useState<PayrollPeriodType>("monthly");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [applyDeductions, setApplyDeductionsInput] = useState(true);
 
   const handleAdd = () => {
     if (!name.trim() || !start || !end) {
@@ -32,13 +34,14 @@ export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
       return;
     }
     savePeriod.mutate(
-      { name: name.trim(), period_type: type, start_date: start, end_date: end },
+      { name: name.trim(), period_type: type, start_date: start, end_date: end, apply_deductions: applyDeductions },
       {
         onSuccess: () => {
           toast({ title: "Período guardado" });
           setName("");
           setStart("");
           setEnd("");
+          setApplyDeductionsInput(true);
         },
         onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
       }
@@ -80,6 +83,21 @@ export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
               {savePeriod.isPending ? <Loader2 className="animate-spin h-4 w-4" /> : <Plus className="h-4 w-4" />}
             </Button>
           </div>
+          <div className="md:col-span-5 flex items-start gap-3 rounded-md border bg-muted/30 p-3">
+            <Switch
+              id="period-apply-deductions"
+              checked={applyDeductions}
+              onCheckedChange={setApplyDeductionsInput}
+            />
+            <div className="space-y-0.5">
+              <Label htmlFor="period-apply-deductions" className="text-sm">Descontar retenciones y deducciones</Label>
+              <p className="text-xs text-muted-foreground">
+                {applyDeductions
+                  ? "Los sueldos de este período descuentan el ISLR (AR-I) y los parafiscales, calculados sobre todo el mes."
+                  : "Los sueldos de este período se pagan completos. Se descontarán en el período de este mes que sí descuenta."}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -91,21 +109,38 @@ export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
                 <TableHead>Período</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Rango</TableHead>
+                <TableHead>Descuenta</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="w-16"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">Cargando...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">Cargando...</TableCell></TableRow>
               ) : periods.length === 0 ? (
-                <TableRow><TableCell colSpan={5} className="text-center py-6 text-muted-foreground">No hay períodos configurados.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">No hay períodos configurados.</TableCell></TableRow>
               ) : (
                 periods.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">{p.name}</TableCell>
                     <TableCell>{p.period_type === "biweekly" ? "Quincenal" : "Mensual"}</TableCell>
                     <TableCell className="text-sm">{fmt(p.start_date)} — {fmt(p.end_date)}</TableCell>
+                    <TableCell>
+                      <Switch
+                        aria-label={`${p.name} descuenta retenciones y deducciones`}
+                        checked={p.apply_deductions}
+                        disabled={setApplyDeductions.isPending}
+                        onCheckedChange={(checked) =>
+                          setApplyDeductions.mutate(
+                            { id: p.id, applyDeductions: checked },
+                            {
+                              onSuccess: () => toast({ title: checked ? "El período descontará" : "El período se pagará completo" }),
+                              onError: (e: Error) => toast({ title: "No se pudo cambiar", description: e.message, variant: "destructive" }),
+                            }
+                          )
+                        }
+                      />
+                    </TableCell>
                     <TableCell><Badge variant={p.status === "open" ? "outline" : "secondary"}>{p.status === "open" ? "Abierto" : "Cerrado"}</Badge></TableCell>
                     <TableCell>
                       <Button size="icon" variant="ghost" onClick={() => deletePeriod.mutate(p.id, { onSuccess: () => toast({ title: "Período eliminado" }), onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }) })}>

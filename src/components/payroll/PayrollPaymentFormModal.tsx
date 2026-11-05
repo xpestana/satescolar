@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Loader2, Plus, Trash2, AlertTriangle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePayrollConcepts } from "@/hooks/payroll/usePayrollConcepts";
 import { usePayrollMethods } from "@/hooks/payroll/usePayrollMethods";
@@ -13,10 +13,14 @@ import { usePayrollUsdRate } from "@/hooks/payroll/usePayrollUsdRate";
 import { usePayrollPayments } from "@/hooks/payroll/usePayrollPayments";
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
 import { usePayrollAriRates } from "@/hooks/payroll/usePayrollAriRates";
+import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
+import { usePayrollContributionConfig } from "@/hooks/payroll/usePayrollContributionConfig";
+import { usePayrollMonthPayments } from "@/hooks/payroll/usePayrollMonthPayments";
+import { lineFlags, splitMonthPayments } from "@/lib/payroll/contributions/monthBase";
 import { deductionsExceedEarnings } from "@/lib/payroll/calculateNet";
 import { formatMoney } from "@/lib/payroll/buildPayrollReceiptData";
 import { METHOD_LABELS, type ConceptKind, type PayrollCurrency } from "@/lib/payroll/types";
-import { buildSalaryPaymentDraft } from "@/lib/payroll/withholdings/buildPaymentDraft";
+import { buildSalaryPaymentDraft, type MonthBaseSummary } from "@/lib/payroll/withholdings/buildPaymentDraft";
 import { todayCaracasIso } from "@/lib/dateUtils";
 import { MethodDetails } from "@/components/payroll/MethodDetails";
 
@@ -59,6 +63,15 @@ export function PayrollPaymentFormModal({
   const { registerPayment } = usePayrollPayments(schoolId);
   const { islrEnabled, vatEnabled, parameters } = usePayrollTaxConfig(schoolId);
   const { ratesByBeneficiary } = usePayrollAriRates(schoolId);
+  const { periods } = usePayrollPeriods(schoolId);
+  const { enabled: contributionsEnabled, parameters: contributionParameters } = usePayrollContributionConfig(schoolId);
+  const period = periods.find((p) => p.id === periodId);
+  const applyDeductions = period?.apply_deductions ?? true;
+  const monthQuery = usePayrollMonthPayments(beneficiary.id, period?.end_date, open);
+  const month = useMemo(
+    () => splitMonthPayments(monthQuery.data ?? [], period?.end_date ?? "", concepts),
+    [monthQuery.data, period?.end_date, concepts]
+  );
 
   const [currency, setCurrency] = useState<PayrollCurrency>("VES");
   const [exchangeRate, setExchangeRate] = useState("1");
@@ -85,7 +98,8 @@ export function PayrollPaymentFormModal({
 
   const rate = Number(exchangeRate) || 0;
 
-  // Typed lines + the automatic AR-I line, when the school has ISLR on.
+  // Typed lines + the automatic AR-I and contribution lines. In a discounting period they cover
+  // the whole month, adding the worker's earlier payments of the month.
   const draft = useMemo(
     () =>
       buildSalaryPaymentDraft({
@@ -96,6 +110,11 @@ export function PayrollPaymentFormModal({
         currency,
         exchangeRate: rate,
         ariRates: ratesByBeneficiary[beneficiary.id] ?? [],
+        applyDeductions,
+        monthDate: period?.end_date,
+        priorPayments: month.prior,
+        contributionsEnabled,
+        contributionParameters,
         lines: lines
           .filter((l) => l.amount !== "" && Number(l.amount) > 0)
           .map((l) => ({
@@ -103,17 +122,21 @@ export function PayrollPaymentFormModal({
             description: l.description,
             concept_kind: l.concept_kind,
             amount: Number(l.amount),
-            isTaxable: l.concept_id ? (concepts.find((c) => c.id === l.concept_id)?.is_islr_taxable ?? true) : true,
+            ...lineFlags(l.concept_id, concepts),
           })),
       }),
-    [lines, concepts, vatEnabled, islrEnabled, parameters, currency, rate, ratesByBeneficiary, beneficiary.id]
+    [
+      lines, concepts, vatEnabled, islrEnabled, parameters, currency, rate, ratesByBeneficiary, beneficiary.id,
+      applyDeductions, period?.end_date, month.prior, contributionsEnabled, contributionParameters,
+    ]
   );
 
   const items = draft.items;
   const totals = draft.totals;
   const netVes = totals.netVes;
   const invalidDeductions = deductionsExceedEarnings(items);
-  const withholdingLine = items.find((i) => i.withholding_key);
+  const automaticLines = items.filter((i) => i.withholding_key || i.contribution_key);
+  const monthLoading = !period || monthQuery.isLoading;
 
   const updateLine = (key: string, patch: Partial<EditableLine>) =>
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -130,7 +153,13 @@ export function PayrollPaymentFormModal({
   };
 
   const canSubmit =
-    items.length > 0 && totals.net > 0 && !invalidDeductions && draft.errors.length === 0 && (currency === "VES" || rate > 0);
+    items.length > 0 &&
+    totals.net > 0 &&
+    !invalidDeductions &&
+    draft.errors.length === 0 &&
+    !monthLoading &&
+    !monthQuery.isError &&
+    (currency === "VES" || rate > 0);
 
   const handleSubmit = () => {
     if (!canSubmit) {
@@ -147,13 +176,19 @@ export function PayrollPaymentFormModal({
         notes: notes.trim() || null,
         items,
         withholdings: draft.withholdings,
+        contributions: draft.contributions,
+        month_base_payment_ids: draft.monthBasePaymentIds,
       },
       {
         onSuccess: () => {
           toast({ title: "Pago registrado en borrador", description: "Queda pendiente de aprobación." });
           onOpenChange(false);
         },
-        onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+        onError: (e: Error) => {
+          // Another payment of the month changed meanwhile: reload them so the bases are current.
+          monthQuery.refetch();
+          toast({ title: "Error", description: e.message, variant: "destructive" });
+        },
       }
     );
   };
@@ -277,15 +312,22 @@ export function PayrollPaymentFormModal({
             ))}
           </div>
 
+          <MonthNotes
+            applyDeductions={applyDeductions}
+            periodName={period?.name}
+            monthBase={draft.monthBase}
+            laterDiscounting={month.laterDiscounting}
+          />
+
           {/* Totals */}
           <div className="rounded-md border bg-muted/30 p-3 space-y-1 text-sm">
             <div className="flex justify-between"><span>Total asignaciones</span><span>{formatMoney(totals.gross, currency)}</span></div>
-            {withholdingLine && (
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{withholdingLine.description} (automática)</span>
-                <span>{formatMoney(withholdingLine.amount, currency)}</span>
+            {automaticLines.map((line) => (
+              <div key={line.withholding_key ?? line.contribution_key} className="flex justify-between text-xs text-muted-foreground">
+                <span>{line.description} (automática)</span>
+                <span>{formatMoney(line.amount, currency)}</span>
               </div>
-            )}
+            ))}
             <div className="flex justify-between"><span>Total deducciones</span><span>{formatMoney(totals.deductions, currency)}</span></div>
             <div className="flex justify-between font-semibold"><span>Neto a pagar</span><span>{formatMoney(totals.net, currency)}</span></div>
             {currency === "USD" && (
@@ -294,6 +336,11 @@ export function PayrollPaymentFormModal({
             {invalidDeductions && (
               <p className="flex items-center gap-1 text-xs text-destructive pt-1">
                 <AlertTriangle className="h-3 w-3" />Las deducciones no pueden superar las asignaciones.
+              </p>
+            )}
+            {monthQuery.isError && (
+              <p className="flex items-center gap-1 text-xs text-destructive pt-1">
+                <AlertTriangle className="h-3 w-3" />No se pudieron leer los pagos de este mes del trabajador.
               </p>
             )}
             {draft.errors.map((message) => (
@@ -318,5 +365,60 @@ export function PayrollPaymentFormModal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface MonthNotesProps {
+  applyDeductions: boolean;
+  periodName?: string;
+  monthBase: MonthBaseSummary | null;
+  laterDiscounting: { id: string; label: string; status: string }[];
+}
+
+/** Explains what this period discounts and which payments of the month it adds up. */
+function MonthNotes({ applyDeductions, periodName, monthBase, laterDiscounting }: MonthNotesProps) {
+  const prior = monthBase?.prior ?? [];
+  return (
+    <>
+      {!applyDeductions && (
+        <div className="flex gap-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100">
+          <Info className="h-4 w-4 shrink-0" />
+          <p>
+            {periodName ? `"${periodName}"` : "Este período"} no descuenta retenciones ni parafiscales: se paga completo.
+            Se descontarán en el período del mes que sí descuenta, sumando este pago.
+          </p>
+        </div>
+      )}
+      {applyDeductions && prior.length > 0 && monthBase && (
+        <div className="rounded-md border p-3 text-xs space-y-1">
+          <p className="font-medium">Base del mes</p>
+          {prior.map((p) => (
+            <div key={p.id} className="flex justify-between gap-3 text-muted-foreground">
+              <span className="truncate">{p.label}{p.applyDeductions ? " (ya descontó)" : ""}</span>
+              <span>{formatMoney(p.contributionBaseVes, "VES")}</span>
+            </div>
+          ))}
+          <div className="flex justify-between gap-3 text-muted-foreground">
+            <span>Este pago</span>
+            <span>{formatMoney(monthBase.ownContributionVes, "VES")}</span>
+          </div>
+          <div className="flex justify-between gap-3 font-medium border-t pt-1">
+            <span>Total del mes</span>
+            <span>{formatMoney(monthBase.contributionBaseVes, "VES")}</span>
+          </div>
+          {monthBase.islrBaseVes !== monthBase.contributionBaseVes && (
+            <p className="text-muted-foreground">Base del AR-I: {formatMoney(monthBase.islrBaseVes, "VES")}.</p>
+          )}
+        </div>
+      )}
+      {laterDiscounting.map((p) => (
+        <p key={p.id} className="flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
+          <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+          {p.status === "paid"
+            ? `"${p.label}" ya está pagado y se calculó sin este pago, así que este monto no entrará en sus retenciones del mes.`
+            : `"${p.label}" se calculó sin este pago. Al pagarlo se pedirá recalcularlo para sumar este monto.`}
+        </p>
+      ))}
+    </>
   );
 }

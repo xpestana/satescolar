@@ -52,6 +52,8 @@ export interface PayrollPeriod {
   end_date: string;
   status: "open" | "closed";
   school_year_id: string | null;
+  /** Whether its salary payments discount withholdings and contributions. */
+  apply_deductions: boolean;
 }
 
 export interface PayrollConcept {
@@ -63,6 +65,8 @@ export interface PayrollConcept {
   currency: PayrollCurrency;
   is_active: boolean;
   is_islr_taxable: boolean;
+  /** Whether it counts for IVSS, paro forzoso and FAOV. */
+  is_contribution_base: boolean;
 }
 
 export interface PayrollLineItem {

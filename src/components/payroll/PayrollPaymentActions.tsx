@@ -29,6 +29,7 @@ export function PayrollPaymentActions({ schoolId, payment, canApprove, allowVoid
   const [voidOpen, setVoidOpen] = useState(false);
   const [voidReason, setVoidReason] = useState("");
   const [recalculateOpen, setRecalculateOpen] = useState(false);
+  const [recalculateReason, setRecalculateReason] = useState("");
   const [payOpen, setPayOpen] = useState(false);
   const [payReference, setPayReference] = useState("");
   const [payDate, setPayDate] = useState(todayCaracasIso());
@@ -67,6 +68,7 @@ export function PayrollPaymentActions({ schoolId, payment, canApprove, allowVoid
           // A percentage changed after this payment was registered: never adjust it silently.
           if ((e as Error & { code?: string }).code === "WITHHOLDING_RATE_CHANGED") {
             setPayOpen(false);
+            setRecalculateReason(e.message);
             setRecalculateOpen(true);
           } else showError(e);
         },
@@ -209,10 +211,11 @@ export function PayrollPaymentActions({ schoolId, payment, canApprove, allowVoid
       <Dialog open={recalculateOpen} onOpenChange={setRecalculateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Cambiaron los porcentajes</DialogTitle>
+            <DialogTitle>Hay que recalcular este pago</DialogTitle>
             <DialogDescription>
-              Este pago se registró con porcentajes que ya no están vigentes. Al recalcularlo puede cambiar el neto, así
-              que volverá a borrador y deberá aprobarse otra vez.
+              {recalculateReason ? `${recalculateReason}. ` : ""}
+              Al recalcularlo se usan los porcentajes vigentes y los pagos del mes de hoy. Puede cambiar el neto, así que
+              volverá a borrador y deberá aprobarse otra vez.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

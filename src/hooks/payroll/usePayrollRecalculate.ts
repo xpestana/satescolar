@@ -4,25 +4,30 @@ import type { Json } from "@/integrations/supabase/types";
 import { todayCaracasIso } from "@/lib/dateUtils";
 import { buildSalaryPaymentDraft, buildSupplierPaymentDraft } from "@/lib/payroll/withholdings/buildPaymentDraft";
 import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
-import type { ConceptKind, PayrollBeneficiary, PayrollConcept } from "@/lib/payroll/types";
+import type { ConceptKind, PayrollBeneficiary } from "@/lib/payroll/types";
+import { lineFlags, splitMonthPayments } from "@/lib/payroll/contributions/monthBase";
 import type { PayrollPaymentRow } from "@/hooks/payroll/usePayrollPayments";
 import { usePayrollAriRates } from "@/hooks/payroll/usePayrollAriRates";
 import { usePayrollConcepts } from "@/hooks/payroll/usePayrollConcepts";
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
+import { usePayrollContributionConfig } from "@/hooks/payroll/usePayrollContributionConfig";
+import { fetchMonthPayments } from "@/hooks/payroll/usePayrollMonthPayments";
 
 /**
- * Re-applies the rates in force today to an unpaid payment. The payment goes back to draft,
- * because its net may change and it was approved with another amount.
+ * Re-applies the rates in force today to an unpaid payment, and for salaries re-reads the
+ * worker's earlier payments of the month. The payment goes back to draft, because its net may
+ * change and it was approved with another amount.
  */
 export function usePayrollRecalculate(schoolId: string | null | undefined) {
   const qc = useQueryClient();
   const { vatEnabled, islrEnabled, parameters, concepts: islrConcepts, rates } = usePayrollTaxConfig(schoolId);
   const { ratesByBeneficiary } = usePayrollAriRates(schoolId);
   const { concepts } = usePayrollConcepts(schoolId);
+  const { enabled: contributionsEnabled, parameters: contributionParameters } = usePayrollContributionConfig(schoolId);
 
   return useMutation({
     mutationFn: async (payment: PayrollPaymentRow) => {
-      const [beneficiaryResult, itemsResult, documentsResult, overridesResult] = await Promise.all([
+      const [beneficiaryResult, itemsResult, documentsResult, overridesResult, periodResult] = await Promise.all([
         supabase.from("payroll_beneficiaries").select("*").eq("id", payment.beneficiary_id).single(),
         supabase.from("payroll_payment_items").select("*").eq("payment_id", payment.id),
         supabase.from("payroll_purchase_documents").select("*").eq("payment_id", payment.id),
@@ -31,8 +36,10 @@ export function usePayrollRecalculate(schoolId: string | null | undefined) {
           .select("document_id, tax_type, rate_pct, override_reason")
           .eq("payment_id", payment.id)
           .eq("is_override", true),
+        supabase.from("payroll_periods").select("id, end_date, apply_deductions").eq("id", payment.period_id).single(),
       ]);
-      const failed = beneficiaryResult.error ?? itemsResult.error ?? documentsResult.error ?? overridesResult.error;
+      const failed =
+        beneficiaryResult.error ?? itemsResult.error ?? documentsResult.error ?? overridesResult.error ?? periodResult.error;
       if (failed) throw toPayrollError(failed);
 
       // One-off percentages were decided by hand, so they survive a recalculation.
@@ -43,6 +50,11 @@ export function usePayrollRecalculate(schoolId: string | null | undefined) {
 
       const beneficiary = beneficiaryResult.data as unknown as PayrollBeneficiary;
       const context = { vatEnabled, islrEnabled, date: todayCaracasIso(), parameters };
+      const period = periodResult.data;
+      const month =
+        payment.payment_kind === "invoice"
+          ? null
+          : splitMonthPayments(await fetchMonthPayments(payment.beneficiary_id, period.end_date, payment.id), period.end_date, concepts);
 
       const draft =
         payment.payment_kind === "invoice"
@@ -79,14 +91,19 @@ export function usePayrollRecalculate(schoolId: string | null | undefined) {
               currency: payment.currency,
               exchangeRate: payment.exchange_rate,
               ariRates: ratesByBeneficiary[payment.beneficiary_id] ?? [],
+              applyDeductions: period.apply_deductions,
+              monthDate: period.end_date,
+              priorPayments: month?.prior ?? [],
+              contributionsEnabled,
+              contributionParameters,
               lines: (itemsResult.data ?? [])
-                .filter((i) => !i.withholding_id)
+                .filter((i) => !i.withholding_id && !i.contribution_id)
                 .map((i) => ({
                   concept_id: i.concept_id,
                   concept_kind: i.concept_kind as ConceptKind,
                   description: i.description,
                   amount: i.amount,
-                  isTaxable: isLineTaxable(i.concept_id, concepts),
+                  ...lineFlags(i.concept_id, concepts),
                 })),
             });
 
@@ -94,18 +111,19 @@ export function usePayrollRecalculate(schoolId: string | null | undefined) {
 
       const { error } = await supabase.rpc("recalculate_payroll_payment_withholdings", {
         _payment_id: payment.id,
-        _payload: { items: draft.items, withholdings: draft.withholdings } as unknown as Json,
+        _payload: {
+          items: draft.items,
+          withholdings: draft.withholdings,
+          contributions: draft.contributions,
+          month_base_payment_ids: draft.monthBasePaymentIds,
+        } as unknown as Json,
       });
       if (error) throw toPayrollError(error);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payroll-payments", schoolId] });
       qc.invalidateQueries({ queryKey: ["payroll-withholdings", schoolId] });
+      qc.invalidateQueries({ queryKey: ["payroll-month-payments"] });
     },
   });
-}
-
-function isLineTaxable(conceptId: string | null, concepts: PayrollConcept[]): boolean {
-  if (!conceptId) return true;
-  return concepts.find((c) => c.id === conceptId)?.is_islr_taxable ?? true;
 }

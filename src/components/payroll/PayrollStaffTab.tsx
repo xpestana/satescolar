@@ -10,6 +10,7 @@ import { usePayrollAriRates } from "@/hooks/payroll/usePayrollAriRates";
 import { usePayrollDefaultMethods } from "@/hooks/payroll/usePayrollDefaultMethods";
 import { usePayrollPayments, type PayrollPaymentRow } from "@/hooks/payroll/usePayrollPayments";
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
+import { usePayrollContributionConfig } from "@/hooks/payroll/usePayrollContributionConfig";
 import { MethodDetails, CopyableField } from "@/components/payroll/MethodDetails";
 import { PayrollPaymentActions } from "@/components/payroll/PayrollPaymentActions";
 import { PayrollGuide } from "@/components/payroll/PayrollGuide";
@@ -38,6 +39,7 @@ export function PayrollStaffTab({ schoolId, periodId, beneficiaries, canRegister
   const { payments } = usePayrollPayments(schoolId, { periodId });
   const { data: defaultMethods = {} } = usePayrollDefaultMethods(schoolId);
   const { vatEnabled, islrEnabled } = usePayrollTaxConfig(schoolId);
+  const { enabled: contributionsEnabled } = usePayrollContributionConfig(schoolId);
   const { ratesByBeneficiary } = usePayrollAriRates(schoolId);
 
   const [search, setSearch] = useState("");
@@ -78,7 +80,7 @@ export function PayrollStaffTab({ schoolId, periodId, beneficiaries, canRegister
 
   return (
     <>
-      <PayrollGuide guide={staffGuide({ vatEnabled, islrEnabled })} />
+      <PayrollGuide guide={staffGuide({ vatEnabled, islrEnabled, contributionsEnabled })} />
 
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px]">

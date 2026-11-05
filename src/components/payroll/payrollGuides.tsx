@@ -7,6 +7,8 @@ import type { PayrollGuideContent } from "@/components/payroll/PayrollGuide";
 export interface GuideOptions {
   vatEnabled: boolean;
   islrEnabled: boolean;
+  /** IVSS, paro forzoso and FAOV discounted from salaries. */
+  contributionsEnabled?: boolean;
 }
 
 const B = ({ children }: { children: ReactNode }) => <strong className="font-medium text-foreground">{children}</strong>;
@@ -72,12 +74,17 @@ export function staffGuide(options: GuideOptions): PayrollGuideContent {
       <>Elige el <B>período</B> en el selector de arriba.</>,
       <>Pulsa <B>Registrar</B> junto a cada persona y agrega sus asignaciones y deducciones.</>,
       ...when(options.islrEnabled, <>La retención de <B>AR-I</B> se agrega sola, según el porcentaje de su ficha.</>),
+      ...when(!!options.contributionsEnabled, <>Los <B>parafiscales</B> (IVSS, paro forzoso y FAOV) también se agregan solos.</>),
       <>Revisa el neto y pulsa <B>Registrar pago</B>. Queda en <B>Borrador</B>.</>,
       <>Pulsa <B>Aprobar</B> y, cuando hayas hecho la transferencia, <B>Pagar</B>.</>,
     ],
     notes: [
       <><B>Pagar</B> deja constancia en el sistema y envía el recibo si la persona tiene correo. No mueve dinero: la transferencia la haces en tu banco.</>,
       <>Puedes anular un pago con el ícono rojo, indicando el motivo, mientras no esté pagado.</>,
+      ...when(
+        options.islrEnabled || !!options.contributionsEnabled,
+        <>Si el período <B>no descuenta</B>, el sueldo se paga completo. El período del mismo mes que sí descuenta suma lo pagado antes y descuenta todo el mes. Registra primero la 1ra quincena y luego la 2da.</>
+      ),
       ...when(withholds, <>Si aparece <B>Complete en Beneficiarios</B>, a esa persona le falta un dato obligatorio y no se le puede registrar el pago.</>),
     ],
   };
@@ -108,7 +115,7 @@ export function supplierGuide(options: GuideOptions): PayrollGuideContent {
   };
 }
 
-export function conceptsGuide(options: { islrEnabled: boolean }): PayrollGuideContent {
+export function conceptsGuide(options: { islrEnabled: boolean; contributionsEnabled?: boolean }): PayrollGuideContent {
   return {
     id: "concepts",
     title: "¿Para qué sirven los conceptos?",
@@ -117,7 +124,13 @@ export function conceptsGuide(options: { islrEnabled: boolean }): PayrollGuideCo
       <>Si suele ser el mismo monto, escríbelo en <B>Monto por defecto</B>.</>,
       <>Los usarás al registrar los pagos del personal.</>,
     ],
-    notes: when(options.islrEnabled, <>Solo las asignaciones con <B>Base del AR-I</B> encendido entran en el cálculo de esa retención.</>),
+    notes: [
+      ...when(options.islrEnabled, <>Solo las asignaciones con <B>Base del AR-I</B> encendido entran en el cálculo de esa retención.</>),
+      ...when(
+        !!options.contributionsEnabled,
+        <>Solo las asignaciones con <B>Parafiscales</B> encendido entran en la base del IVSS, el paro forzoso y el FAOV. Apágalo, por ejemplo, en el bono de alimentación.</>
+      ),
+    ],
   };
 }
 
@@ -127,9 +140,14 @@ export function periodsGuide(): PayrollGuideContent {
     title: "¿Para qué sirven los períodos?",
     steps: [
       <>Crea un período por cada nómina, con su nombre, tipo (<B>Mensual</B> o <B>Quincenal</B>) y fechas.</>,
+      <>Decide si el período <B>descuenta retenciones y deducciones</B>. Si el colegio descuenta todo en la 2da quincena, apágalo en la 1ra y déjalo encendido en la 2da.</>,
       <>Al registrar los pagos, elige el período al que pertenecen.</>,
     ],
-    notes: [<>El período organiza la nómina. Las retenciones se agrupan por la fecha de pago, no por este período.</>],
+    notes: [
+      <>El período que descuenta calcula el ISLR y los parafiscales sobre todo el mes: suma los pagos de ese mes en los períodos que terminan antes.</>,
+      <>Solo puedes cambiar si un período descuenta mientras no tenga pagos. Las retenciones de proveedores se descuentan siempre.</>,
+      <>Las retenciones se agrupan por la fecha de pago, no por este período.</>,
+    ],
   };
 }
 
@@ -148,6 +166,26 @@ export function withholdingsConfigGuide(configured: boolean): PayrollGuideConten
     ],
     notes: [
       <>Estos valores son solo de este colegio. Si el SENIAT cambia la unidad tributaria o un porcentaje, hay que actualizarlo aquí.</>,
+      <>Los pagos ya registrados conservan los valores con los que se calcularon.</>,
+    ],
+  };
+}
+
+export function contributionsConfigGuide(configured: boolean): PayrollGuideContent {
+  return {
+    id: "contributions-config",
+    title: "¿Cómo configurar los parafiscales?",
+    steps: [
+      ...when(!configured, <>Pulsa <B>Configurar parafiscales</B> para cargar los valores iniciales. Seguirán apagados.</>),
+      <>Revisa con el contador el <B>salario mínimo</B> y, por cada aporte, el porcentaje, el tope y la forma de cálculo.</>,
+      <>Para cambiar un valor, escríbelo, indica desde qué fecha aplica y pulsa <B>Guardar nueva versión</B>.</>,
+      <>Cuando todo esté revisado, pulsa <B>Marcar como validados por el contador</B>.</>,
+      <>Enciende <B>Descontar parafiscales</B>. Se agregan solos a los sueldos de los períodos que descuentan.</>,
+    ],
+    notes: [
+      <><B>Semanal × lunes:</B> salario del mes × 12 ÷ 52 × % × lunes del mes. <B>Sobre el mes:</B> salario del mes × %.</>,
+      <>El <B>tope</B> se cuenta en salarios mínimos sobre el salario del mes. Con 0 no hay tope.</>,
+      <>Solo se descuenta la parte del trabajador. Los aportes del patrono no se calculan aquí.</>,
       <>Los pagos ya registrados conservan los valores con los que se calcularon.</>,
     ],
   };

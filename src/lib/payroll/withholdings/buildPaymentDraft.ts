@@ -4,6 +4,14 @@
 
 import { calculatePayrollTotals, convertToVes, round2 } from "../calculateNet";
 import type { PayrollCurrency, PayrollLineItem } from "../types";
+import { calculateContributions } from "../contributions/calculateContributions";
+import type { PriorPayment } from "../contributions/monthBase";
+import {
+  CONTRIBUTION_LABELS,
+  type ContributionKind,
+  type ContributionMethod,
+  type ContributionParameters,
+} from "../contributions/types";
 import { calculateAriWithholding } from "./calculateAriWithholding";
 import { calculateIslrWithholding } from "./calculateIslrWithholding";
 import { calculateVatWithholding } from "./calculateVatWithholding";
@@ -52,6 +60,35 @@ export interface DraftWithholding {
 
 export interface DraftItem extends PayrollLineItem {
   withholding_key?: string | null;
+  contribution_key?: string | null;
+}
+
+export interface DraftContribution {
+  key: string;
+  kind: ContributionKind;
+  method: ContributionMethod;
+  month_base_ves: number;
+  capped_base_ves: number;
+  cap_wages: number;
+  minimum_wage_ves: number;
+  rate_pct: number;
+  mondays: number | null;
+  month_total_ves: number;
+  previously_deducted_ves: number;
+  amount_ves: number;
+  amount: number;
+  parameters_version_id: string;
+}
+
+/** How a discounting salary payment built its bases from the month. */
+export interface MonthBaseSummary {
+  /** This payment's own earnings, in VES. */
+  ownIslrVes: number;
+  ownContributionVes: number;
+  /** Earlier payments of the month that were summed. */
+  prior: PriorPayment[];
+  islrBaseVes: number;
+  contributionBaseVes: number;
 }
 
 export interface DraftDocumentInput {
@@ -80,8 +117,12 @@ export interface PaymentDraft {
   items: DraftItem[];
   documents: DraftDocument[];
   withholdings: DraftWithholding[];
+  contributions: DraftContribution[];
   totals: { gross: number; deductions: number; net: number; netVes: number; withheldVes: number };
   errors: string[];
+  /** Salary payments in a discounting period: the earlier payments of the month it summed. */
+  monthBasePaymentIds: string[] | null;
+  monthBase: MonthBaseSummary | null;
 }
 
 interface TaxContext {
@@ -103,13 +144,19 @@ function finish(
   withholdings: DraftWithholding[],
   currency: PayrollCurrency,
   rate: number,
-  errors: string[]
+  errors: string[],
+  salary: Pick<PaymentDraft, "contributions" | "monthBasePaymentIds" | "monthBase"> = {
+    contributions: [],
+    monthBasePaymentIds: null,
+    monthBase: null,
+  }
 ): PaymentDraft {
   const totals = calculatePayrollTotals(items);
   return {
     items,
     documents,
     withholdings,
+    ...salary,
     totals: {
       ...totals,
       netVes: convertToVes(totals.net, currency, rate),
@@ -281,6 +328,8 @@ export function buildSupplierPaymentDraft(input: SupplierDraftInput): PaymentDra
 export interface SalaryLine extends PayrollLineItem {
   /** Whether it counts for the AR-I base. Lines without a concept count by default. */
   isTaxable: boolean;
+  /** Whether it counts for contributions. Lines without a concept count by default. */
+  isContributionBase?: boolean;
 }
 
 export interface SalaryDraftInput extends TaxContext {
@@ -288,14 +337,57 @@ export interface SalaryDraftInput extends TaxContext {
   exchangeRate: number;
   lines: SalaryLine[];
   ariRates: AriRate[];
+  /** The period's choice. When false the payment is paid in full: no AR-I, no contributions. */
+  applyDeductions?: boolean;
+  /** The period's end; sets the month that is summed. Defaults to the payment date. */
+  monthDate?: string;
+  /** Earlier live payments of the worker in the same month. */
+  priorPayments?: PriorPayment[];
+  contributionsEnabled?: boolean;
+  contributionParameters?: ContributionParameters[];
 }
 
-/** A salary payment: the typed lines plus the automatic AR-I line when ISLR is on. */
+const pctLabel = (pct: number) => `${String(pct).replace(".", ",")} %`;
+
+/**
+ * A salary payment: the typed lines plus the automatic AR-I and contribution lines.
+ * In a discounting period the bases cover the whole month: earlier payments of the month that
+ * didn't discount are added to the AR-I base, and contributions discount what the month owes
+ * minus what earlier payments already discounted.
+ */
 export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
   const { currency, exchangeRate: rate } = input;
   const errors: string[] = [];
-  const items: DraftItem[] = input.lines.map(({ isTaxable: _isTaxable, ...line }) => line);
+  const items: DraftItem[] = input.lines.map(({ isTaxable: _t, isContributionBase: _c, ...line }) => line);
   const withholdings: DraftWithholding[] = [];
+  const contributions: DraftContribution[] = [];
+  const applyDeductions = input.applyDeductions ?? true;
+
+  if (!applyDeductions) {
+    return finish(items, [], withholdings, currency, rate, errors, {
+      contributions,
+      monthBasePaymentIds: null,
+      monthBase: null,
+    });
+  }
+
+  const prior = input.priorPayments ?? [];
+  const earnings = input.lines.filter((l) => l.concept_kind === "earning");
+  const ownIslrVes = round2(
+    convertToVes(earnings.filter((l) => l.isTaxable).reduce((sum, l) => sum + Math.max(0, l.amount || 0), 0), currency, rate)
+  );
+  const ownContributionVes = round2(
+    convertToVes(
+      earnings.filter((l) => l.isContributionBase ?? true).reduce((sum, l) => sum + Math.max(0, l.amount || 0), 0),
+      currency,
+      rate
+    )
+  );
+  // AR-I is a flat %, so only what wasn't discounted yet is added.
+  const islrBaseVes = round2(ownIslrVes + prior.filter((p) => !p.applyDeductions).reduce((s, p) => s + p.islrBaseVes, 0));
+  // Contributions have caps, so the whole month is summed and what was already discounted subtracted.
+  const contributionBaseVes = round2(ownContributionVes + prior.reduce((s, p) => s + p.contributionBaseVes, 0));
+  const monthBase: MonthBaseSummary = { ownIslrVes, ownContributionVes, prior, islrBaseVes, contributionBaseVes };
 
   if (input.islrEnabled) {
     const parameters = resolveRateVersion(input.parameters, input.date);
@@ -303,13 +395,7 @@ export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
     if (!ari) {
       errors.push("Este trabajador no tiene un % de AR-I vigente. Regístrelo en su ficha.");
     } else {
-      const taxable = input.lines
-        .filter((l) => l.concept_kind === "earning" && l.isTaxable)
-        .reduce((sum, l) => sum + Math.max(0, l.amount || 0), 0);
-      const result = calculateAriWithholding({
-        taxableEarningsVes: convertToVes(taxable, currency, rate),
-        ariPct: ari.rate_pct,
-      });
+      const result = calculateAriWithholding({ taxableEarningsVes: islrBaseVes, ariPct: ari.rate_pct });
       const withheldAmount = currencyAmount(result.withheldVes, currency, rate);
       withholdings.push({
         key: "salary:islr",
@@ -340,7 +426,7 @@ export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
         items.push({
           concept_id: null,
           concept_kind: "deduction",
-          description: `Retención ISLR (AR-I ${result.appliedPct} %)`,
+          description: `Retención ISLR (AR-I ${pctLabel(result.appliedPct)})`,
           amount: withheldAmount,
           withholding_key: "salary:islr",
         });
@@ -348,5 +434,60 @@ export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
     }
   }
 
-  return finish(items, [], withholdings, currency, rate, errors);
+  if (input.contributionsEnabled) {
+    const parameters = resolveRateVersion(input.contributionParameters ?? [], input.date);
+    if (!parameters) {
+      errors.push("No hay valores de parafiscales vigentes para la fecha del pago. Revíselos en Configuración.");
+    } else {
+      const deducted: Partial<Record<ContributionKind, number>> = {};
+      for (const p of prior) {
+        for (const [kind, amount] of Object.entries(p.deductedContributionsVes) as [ContributionKind, number][]) {
+          deducted[kind] = round2((deducted[kind] ?? 0) + amount);
+        }
+      }
+      const monthDate = input.monthDate ?? input.date;
+      for (const result of calculateContributions({
+        monthBaseVes: contributionBaseVes,
+        monthDate,
+        parameters,
+        previouslyDeductedVes: deducted,
+      })) {
+        if (result.amountVes <= 0) continue;
+        const key = `contribution:${result.kind}`;
+        const amount = currencyAmount(result.amountVes, currency, rate);
+        contributions.push({
+          key,
+          kind: result.kind,
+          method: result.method,
+          month_base_ves: result.monthBaseVes,
+          capped_base_ves: result.cappedBaseVes,
+          cap_wages: result.capWages,
+          minimum_wage_ves: result.minimumWageVes,
+          rate_pct: result.ratePct,
+          mondays: result.mondays,
+          month_total_ves: result.monthTotalVes,
+          previously_deducted_ves: result.previouslyDeductedVes,
+          amount_ves: result.amountVes,
+          amount,
+          parameters_version_id: parameters.id,
+        });
+        items.push({
+          concept_id: null,
+          concept_kind: "deduction",
+          description:
+            `${CONTRIBUTION_LABELS[result.kind]} ${pctLabel(result.ratePct)}` +
+            (result.mondays !== null ? ` (${result.mondays} lunes)` : ""),
+          amount,
+          contribution_key: key,
+        });
+      }
+    }
+  }
+
+  return finish(items, [], withholdings, currency, rate, errors, {
+    contributions,
+    monthBasePaymentIds: prior.map((p) => p.id),
+    monthBase,
+  });
 }
+

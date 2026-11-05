@@ -762,7 +762,7 @@ El gating es el mismo del resto: `permission` en `AppSidebar.tsx`, `ProtectedRou
 | Registro de Nómina (selector por período: registrar→aprobar→pagar→anular) | `/pagos/nomina/registro` | `payroll.register` / `payroll.approve` |
 | Beneficiarios (alta, métodos de pago, ficha/historial + recibo PDF) | `/pagos/nomina/beneficiarios` | `payroll.view` / `payroll.register` |
 | Retenciones (IVA, ISLR y comprobante anual) | `/pagos/nomina/retenciones` | `payroll.withholdings` |
-| Configuración de Nómina (conceptos, períodos y retenciones) | `/pagos/nomina/configuracion` | `payroll.config` |
+| Configuración de Nómina (conceptos, períodos, retenciones y parafiscales) | `/pagos/nomina/configuracion` | `payroll.config` |
 
 ### Datos / Tablas (Supabase, todas con RLS por `school_id`)
 - `payroll_beneficiaries` — beneficiario: `category` (`teacher`/`admin`/`worker`/`other`),
@@ -874,6 +874,45 @@ hasta 100 caracteres) y la fecha del pago (hoy por defecto, nunca futura). Lo va
 `mark_payroll_payment_paid(_payment_id, _reference, _payment_date)`; la referencia queda en
 `payroll_payments.payment_reference` y sale en las listas, el historial, el recibo (PDF y correo) y el
 Excel. Si el beneficiario no tiene correo, el aviso lo dice en vez de dar el recibo por enviado.
+
+### Descuento por período y parafiscales
+Cada período decide si sus **sueldos** descuentan (`payroll_periods.apply_deductions`, casilla
+"Descontar retenciones y deducciones"; por defecto sí). Así un colegio que paga por quincena puede
+pagar la 1ra completa y descontar todo en la 2da. Las retenciones de **proveedores** se descuentan
+siempre, sin importar el período.
+
+- **Período que no descuenta:** el sueldo va completo, sin AR-I ni parafiscales. La base de datos
+  rechaza un pago así con retenciones o parafiscales.
+- **Período que descuenta:** suma los pagos vivos del mismo trabajador en los períodos del mismo mes
+  (por `end_date`) que terminan antes. El AR-I se calcula sobre lo suyo más lo de los períodos que no
+  descontaron. Los parafiscales calculan lo que debe el mes completo y restan lo ya descontado en ese
+  mes, así los topes aplican al mes.
+- **Pagos del mes que cambian:** el pago guarda qué pagos sumó (`payroll_payments.month_base_payment_ids`).
+  Si después se registra o anula otro pago anterior del mes, `mark_payroll_payment_paid` pide
+  recalcular (`WITHHOLDING_RATE_CHANGED`), y registrar con una lista vieja da `MONTH_BASE_CHANGED`. El
+  formulario avisa si un pago posterior del mes ya se calculó sin el que se está registrando.
+- **Bloqueo:** el trigger `guard_payroll_period_deductions` no deja cambiar si un período descuenta, ni
+  pasarlo a otro mes, mientras tenga pagos vivos.
+
+**Parafiscales (IVSS, paro forzoso / RPE y FAOV, parte del trabajador).** Apagados por defecto, se
+activan por colegio en Configuración de Nómina → **Parafiscales**, aparte de las retenciones del
+SENIAT. Cada aporte se descuenta como una línea de deducción (`payroll_payment_items.contribution_id`),
+así que sale en el recibo, el correo y el Excel.
+
+- `payroll_contribution_settings` — activación y validación por el contador.
+- `payroll_contribution_parameters` — versiones (`valid_from`) del salario mínimo y, por aporte, %,
+  tope en salarios mínimos (0 = sin tope) y forma de cálculo: `mondays` = salario del mes × 12 ÷ 52 ×
+  % × lunes del mes; `monthly` = salario del mes × %. Valores iniciales **por validar**: salario mínimo
+  130 Bs; IVSS 4 % tope 5, lunes; paro forzoso 0,5 % tope 10, lunes; FAOV 1 % sin tope, mes.
+- `payroll_contributions` — lo descontado en cada pago con su copia del cálculo (base del mes, base con
+  tope, lunes, total del mes, lo ya descontado y la versión usada). Base para reportes de IVSS y FAOV.
+- `payroll_concepts.is_contribution_base` — si la asignación entra en la base (apagar, por ejemplo, en
+  el bono de alimentación).
+- Si cambian los valores antes de pagar, `mark_payroll_payment_paid` pide recalcular.
+- Fuera de esta versión: aportes del patrono y archivos para TIUNA y BANAVIH.
+
+Cálculo en `src/lib/payroll/contributions/*` (`calculateContributions`, `monthBase`) y
+`buildSalaryPaymentDraft`; migración `20261105130000_payroll_period_deductions_contributions.sql`.
 
 **Instrucciones en pantalla.** Cada pantalla y pestaña de Nómina tiene un recuadro con sus pasos
 (`PayrollGuide`; textos en `payrollGuides.tsx`). Se adaptan a lo que el colegio tiene activo, y cada

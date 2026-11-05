@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
 import type { PayrollPeriod, PayrollPeriodType } from "@/lib/payroll/types";
 
 export interface PeriodInput {
@@ -7,6 +8,7 @@ export interface PeriodInput {
   period_type: PayrollPeriodType;
   start_date: string;
   end_date: string;
+  apply_deductions: boolean;
   status?: "open" | "closed";
   school_year_id?: string | null;
 }
@@ -40,13 +42,25 @@ export function usePayrollPeriods(schoolId: string | null | undefined) {
           .from("payroll_periods")
           .update({ ...input, updated_at: new Date().toISOString() })
           .eq("id", id);
-        if (error) throw error;
+        if (error) throw toPayrollError(error);
       } else {
         const { error } = await supabase
           .from("payroll_periods")
           .insert({ ...input, school_id: schoolId });
-        if (error) throw error;
+        if (error) throw toPayrollError(error);
       }
+    },
+    onSuccess: invalidate,
+  });
+
+  /** Blocked by the database once the period has live payments. */
+  const setApplyDeductions = useMutation({
+    mutationFn: async ({ id, applyDeductions }: { id: string; applyDeductions: boolean }) => {
+      const { error } = await supabase
+        .from("payroll_periods")
+        .update({ apply_deductions: applyDeductions, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw toPayrollError(error);
     },
     onSuccess: invalidate,
   });
@@ -63,6 +77,7 @@ export function usePayrollPeriods(schoolId: string | null | undefined) {
     periods: query.data ?? [],
     isLoading: query.isLoading,
     savePeriod,
+    setApplyDeductions,
     deletePeriod,
   };
 }

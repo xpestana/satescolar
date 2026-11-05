@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
-import type { DraftDocument, DraftItem, DraftWithholding } from "@/lib/payroll/withholdings/buildPaymentDraft";
+import type { DraftContribution, DraftDocument, DraftItem, DraftWithholding } from "@/lib/payroll/withholdings/buildPaymentDraft";
 import type { PaymentRegime } from "@/lib/payroll/withholdings/types";
 import type {
   PayrollCategory,
@@ -30,6 +30,9 @@ export interface RegisterPaymentInput {
   items: DraftItem[];
   documents?: DraftDocument[];
   withholdings?: DraftWithholding[];
+  contributions?: DraftContribution[];
+  /** Earlier payments of the month summed by a discounting salary payment. */
+  month_base_payment_ids?: string[] | null;
 }
 
 /** Payment row with the embedded beneficiary / period / method used by the tables. */
@@ -100,6 +103,7 @@ export function usePayrollPayments(
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: [KEY, schoolId] });
     qc.invalidateQueries({ queryKey: ["payroll-withholdings", schoolId] });
+    qc.invalidateQueries({ queryKey: ["payroll-month-payments"] });
   };
 
   // Saved in one transaction: a failure can't leave a payment without its lines or withholdings.

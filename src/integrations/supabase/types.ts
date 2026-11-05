@@ -3349,6 +3349,7 @@ export type Database = {
           default_amount: number
           id: string
           is_active: boolean
+          is_contribution_base: boolean
           is_islr_taxable: boolean
           name: string
           school_id: string
@@ -3361,6 +3362,7 @@ export type Database = {
           default_amount?: number
           id?: string
           is_active?: boolean
+          is_contribution_base?: boolean
           is_islr_taxable?: boolean
           name: string
           school_id: string
@@ -3373,6 +3375,7 @@ export type Database = {
           default_amount?: number
           id?: string
           is_active?: boolean
+          is_contribution_base?: boolean
           is_islr_taxable?: boolean
           name?: string
           school_id?: string
@@ -3381,6 +3384,201 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "payroll_concepts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_contribution_parameters: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          faov_cap_wages: number
+          faov_method: string
+          faov_pct: number
+          id: string
+          ivss_cap_wages: number
+          ivss_method: string
+          ivss_pct: number
+          minimum_wage_ves: number
+          rpe_cap_wages: number
+          rpe_method: string
+          rpe_pct: number
+          school_id: string
+          valid_from: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          faov_cap_wages?: number
+          faov_method?: string
+          faov_pct?: number
+          id?: string
+          ivss_cap_wages?: number
+          ivss_method?: string
+          ivss_pct?: number
+          minimum_wage_ves: number
+          rpe_cap_wages?: number
+          rpe_method?: string
+          rpe_pct?: number
+          school_id: string
+          valid_from: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          faov_cap_wages?: number
+          faov_method?: string
+          faov_pct?: number
+          id?: string
+          ivss_cap_wages?: number
+          ivss_method?: string
+          ivss_pct?: number
+          minimum_wage_ves?: number
+          rpe_cap_wages?: number
+          rpe_method?: string
+          rpe_pct?: number
+          school_id?: string
+          valid_from?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_contribution_parameters_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_contribution_settings: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          rates_validated_at: string | null
+          rates_validated_by: string | null
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          rates_validated_at?: string | null
+          rates_validated_by?: string | null
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          rates_validated_at?: string | null
+          rates_validated_by?: string | null
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_contribution_settings_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_contributions: {
+        Row: {
+          amount: number
+          amount_ves: number
+          beneficiary_id: string
+          cap_wages: number
+          capped_base_ves: number
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          method: string
+          minimum_wage_ves: number
+          mondays: number | null
+          month_base_ves: number
+          month_start: string
+          month_total_ves: number
+          parameters_version_id: string | null
+          payment_id: string
+          previously_deducted_ves: number
+          rate_pct: number
+          school_id: string
+        }
+        Insert: {
+          amount?: number
+          amount_ves?: number
+          beneficiary_id: string
+          cap_wages?: number
+          capped_base_ves?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          method: string
+          minimum_wage_ves?: number
+          mondays?: number | null
+          month_base_ves?: number
+          month_start: string
+          month_total_ves?: number
+          parameters_version_id?: string | null
+          payment_id: string
+          previously_deducted_ves?: number
+          rate_pct?: number
+          school_id: string
+        }
+        Update: {
+          amount?: number
+          amount_ves?: number
+          beneficiary_id?: string
+          cap_wages?: number
+          capped_base_ves?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          method?: string
+          minimum_wage_ves?: number
+          mondays?: number | null
+          month_base_ves?: number
+          month_start?: string
+          month_total_ves?: number
+          parameters_version_id?: string | null
+          payment_id?: string
+          previously_deducted_ves?: number
+          rate_pct?: number
+          school_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_contributions_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_contributions_parameters_version_id_fkey"
+            columns: ["parameters_version_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_contribution_parameters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_contributions_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_contributions_school_id_fkey"
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
@@ -3497,6 +3695,7 @@ export type Database = {
           amount: number
           concept_id: string | null
           concept_kind: string
+          contribution_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -3507,6 +3706,7 @@ export type Database = {
           amount?: number
           concept_id?: string | null
           concept_kind?: string
+          contribution_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -3517,6 +3717,7 @@ export type Database = {
           amount?: number
           concept_id?: string | null
           concept_kind?: string
+          contribution_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -3529,6 +3730,13 @@ export type Database = {
             columns: ["concept_id"]
             isOneToOne: false
             referencedRelation: "payroll_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_payment_items_contribution_fk"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_contributions"
             referencedColumns: ["id"]
           },
           {
@@ -3613,6 +3821,7 @@ export type Database = {
           exchange_rate: number
           gross_amount: number
           id: string
+          month_base_payment_ids: string[] | null
           net_amount: number
           net_amount_ves: number
           notes: string | null
@@ -3641,6 +3850,7 @@ export type Database = {
           exchange_rate?: number
           gross_amount?: number
           id?: string
+          month_base_payment_ids?: string[] | null
           net_amount?: number
           net_amount_ves?: number
           notes?: string | null
@@ -3669,6 +3879,7 @@ export type Database = {
           exchange_rate?: number
           gross_amount?: number
           id?: string
+          month_base_payment_ids?: string[] | null
           net_amount?: number
           net_amount_ves?: number
           notes?: string | null
@@ -3719,6 +3930,7 @@ export type Database = {
       }
       payroll_periods: {
         Row: {
+          apply_deductions: boolean
           created_at: string
           end_date: string
           id: string
@@ -3731,6 +3943,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          apply_deductions?: boolean
           created_at?: string
           end_date: string
           id?: string
@@ -3743,6 +3956,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          apply_deductions?: boolean
           created_at?: string
           end_date?: string
           id?: string
