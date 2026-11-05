@@ -66,6 +66,7 @@ export function PayrollBeneficiaryHistoryModal({ open, onOpenChange, schoolId, s
       methodType: (p.payroll_payment_methods?.method_type ?? null) as PayrollMethodType | null,
       methodLabel: p.payroll_payment_methods?.label ?? null,
       paymentDate: p.payment_date,
+      paymentReference: p.payment_reference,
       notes: p.notes,
     });
     downloadPayrollReceiptPdf(receipt, `recibo-${beneficiary.full_name}-${p.payroll_periods?.name ?? ""}`);
@@ -105,7 +106,12 @@ export function PayrollBeneficiaryHistoryModal({ open, onOpenChange, schoolId, s
               payments.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>{p.payroll_periods?.name ?? "—"}</TableCell>
-                  <TableCell><Badge variant={badgeVariant(p.status)}>{STATUS_LABELS[p.status]}</Badge></TableCell>
+                  <TableCell>
+                    <Badge variant={badgeVariant(p.status)}>{STATUS_LABELS[p.status]}</Badge>
+                    {p.status === "paid" && p.payment_reference && (
+                            <div className="text-xs text-muted-foreground">Ref. {p.payment_reference}</div>
+                          )}
+                  </TableCell>
                   <TableCell>{p.net_amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })} {p.currency}</TableCell>
                   <TableCell>{p.net_amount_ves.toLocaleString("es-VE", { minimumFractionDigits: 2 })}</TableCell>
                   <TableCell>

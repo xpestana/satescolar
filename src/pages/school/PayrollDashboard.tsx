@@ -56,6 +56,7 @@ export default function PayrollDashboard() {
       netVes: p.net_amount_ves,
       methodLabel: p.payroll_payment_methods?.label ?? (p.payroll_payment_methods ? METHOD_LABELS[p.payroll_payment_methods.method_type] : null),
       paymentDate: p.payment_date,
+      paymentReference: p.payment_reference,
     }));
     const periodName = periodId === "all" ? "todos" : periods.find((p) => p.id === periodId)?.name ?? "periodo";
     exportPayrollExcel(rows, `nomina-${(school?.name ?? "colegio")}-${periodName}`.replace(/\s+/g, "-"));

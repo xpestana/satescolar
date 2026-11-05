@@ -24,6 +24,7 @@ export interface ReceiptEmailData {
   netVes: number;
   methodLabel: string;
   paymentDate: string;
+  paymentReference: string;
   notes: string;
 }
 
@@ -93,7 +94,8 @@ export function buildReceiptHtml(d: ReceiptEmailData): string {
       <p style="margin:0 0 4px"><strong>Categoría:</strong> ${escapeHtml(d.categoryLabel)}</p>
       <p style="margin:0 0 4px"><strong>Período:</strong> ${escapeHtml(d.periodName)}</p>
       <p style="margin:0 0 4px"><strong>Método de pago:</strong> ${escapeHtml(d.methodLabel)}</p>
-      <p style="margin:0 0 12px"><strong>Fecha de pago:</strong> ${escapeHtml(d.paymentDate)}</p>
+      <p style="margin:0 0 4px"><strong>Fecha de pago:</strong> ${escapeHtml(d.paymentDate)}</p>
+      <p style="margin:0 0 12px"><strong>Referencia:</strong> ${escapeHtml(d.paymentReference)}</p>
 
       <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px">
         <thead><tr><th style="text-align:left;padding:6px 8px;background:#f3f4f6">Asignaciones</th><th style="text-align:right;padding:6px 8px;background:#f3f4f6">Monto</th></tr></thead>

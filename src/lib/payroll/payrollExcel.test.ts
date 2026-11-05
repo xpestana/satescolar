@@ -32,6 +32,14 @@ describe("buildPayrollExcelRows", () => {
     expect(aoa[3][9]).toBe(1400);
   });
 
+  it("incluye la referencia del pago, con guion si falta", () => {
+    const aoa = buildPayrollExcelRows([row({ paymentReference: " 000123 " }), row()]);
+    expect(aoa[0][12]).toBe("Referencia");
+    expect(aoa[1][12]).toBe("000123");
+    expect(aoa[2][12]).toBe("—");
+    expect(aoa[3]).toHaveLength(aoa[0].length);
+  });
+
   it("excluye anulados del total", () => {
     const aoa = buildPayrollExcelRows([row({ netVes: 900 }), row({ status: "voided", netVes: 500 })]);
     expect(aoa[3][9]).toBe(900);

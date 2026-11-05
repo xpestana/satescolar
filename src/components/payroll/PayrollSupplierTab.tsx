@@ -133,7 +133,12 @@ export function PayrollSupplierTab({ schoolId, periodId, beneficiaries, canRegis
                         <Badge variant="outline">{CATEGORY_LABELS[p.payroll_beneficiaries.category]}</Badge>
                       )}
                     </TableCell>
-                    <TableCell><Badge variant={statusVariant(p.status)}>{STATUS_LABELS[p.status]}</Badge></TableCell>
+                    <TableCell>
+                      <Badge variant={statusVariant(p.status)}>{STATUS_LABELS[p.status]}</Badge>
+                      {p.status === "paid" && p.payment_reference && (
+                            <div className="text-xs text-muted-foreground">Ref. {p.payment_reference}</div>
+                          )}
+                    </TableCell>
                     <TableCell className="text-right whitespace-nowrap">{p.currency} {money(p.gross_amount)}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">{p.currency} {money(p.deductions_amount)}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">{money(p.net_amount_ves)}</TableCell>

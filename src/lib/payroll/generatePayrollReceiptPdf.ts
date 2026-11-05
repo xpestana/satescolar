@@ -28,6 +28,7 @@ export function generatePayrollReceiptPdf(data: PayrollReceiptData): jsPDF {
     `Período: ${data.periodName} (${data.periodRange})`,
     `Método de pago: ${data.methodLabel}`,
     `Fecha de pago: ${data.paymentDateFormatted}`,
+    `Referencia: ${data.paymentReference}`,
   ];
   infoLines.forEach((line) => {
     doc.text(line, marginX, y);

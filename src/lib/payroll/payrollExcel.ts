@@ -19,6 +19,7 @@ export interface PayrollExcelRow {
   netVes: number;
   methodLabel: string | null;
   paymentDate: string | null;
+  paymentReference?: string | null;
 }
 
 export const PAYROLL_EXCEL_HEADER = [
@@ -34,6 +35,7 @@ export const PAYROLL_EXCEL_HEADER = [
   "Neto (VES)",
   "Método",
   "Fecha de pago",
+  "Referencia",
 ];
 
 type Cell = string | number;
@@ -53,6 +55,7 @@ export function buildPayrollExcelRows(rows: PayrollExcelRow[]): Cell[][] {
     round2(r.netVes),
     r.methodLabel || "—",
     r.paymentDate || "—",
+    r.paymentReference?.trim() || "—",
   ]);
 
   // Totals only count non-voided payments, summed in VES (the common currency).
@@ -60,7 +63,7 @@ export function buildPayrollExcelRows(rows: PayrollExcelRow[]): Cell[][] {
     .filter((r) => r.status !== "voided")
     .reduce((sum, r) => sum + (Number.isFinite(r.netVes) ? r.netVes : 0), 0);
 
-  const totalsRow: Cell[] = ["TOTAL (VES)", "", "", "", "", "", "", "", "", round2(totalVes), "", ""];
+  const totalsRow: Cell[] = ["TOTAL (VES)", "", "", "", "", "", "", "", "", round2(totalVes), "", "", ""];
 
   return [PAYROLL_EXCEL_HEADER, ...body, totalsRow];
 }

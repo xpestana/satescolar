@@ -11,6 +11,8 @@ import type {
   PayrollPaymentStatus,
 } from "@/lib/payroll/types";
 
+export type ReceiptSkipReason = "no-email" | "error";
+
 export interface PayrollPaymentFilters {
   periodId?: string;
   status?: string;
@@ -46,6 +48,7 @@ export interface PayrollPaymentRow {
   net_amount_ves: number;
   payment_method_id: string | null;
   payment_date: string | null;
+  payment_reference: string | null;
   notes: string | null;
   created_at: string;
   payroll_beneficiaries: {
@@ -133,29 +136,34 @@ export function usePayrollPayments(
   const markPaid = useMutation({
     mutationFn: async ({
       paymentId,
+      reference,
       paymentDate,
     }: {
       paymentId: string;
+      /** Bank reference of the transfer; required to mark the payment paid. */
+      reference: string;
       paymentDate?: string;
-    }): Promise<{ emailSent: boolean }> => {
+    }): Promise<{ emailSent: boolean; reason: ReceiptSkipReason | null }> => {
       if (!schoolId) throw new Error("Colegio no resuelto");
       const { error } = await supabase.rpc("mark_payroll_payment_paid", {
         _payment_id: paymentId,
+        _reference: reference,
         _payment_date: paymentDate,
       });
       if (error) throw toPayrollError(error);
 
-      // Best-effort receipt email; never blocks the payment being marked paid.
-      let emailSent = false;
+      // Best-effort receipt email; never blocks the payment being marked paid. The function answers
+      // emailSent: false (not an error) when the beneficiary has no email.
       try {
-        const { error: fnError } = await supabase.functions.invoke("send-payroll-receipt", {
+        const { data, error: fnError } = await supabase.functions.invoke("send-payroll-receipt", {
           body: { payment_id: paymentId },
         });
-        emailSent = !fnError;
+        if (fnError) return { emailSent: false, reason: "error" };
+        if (data?.emailSent === true) return { emailSent: true, reason: null };
+        return { emailSent: false, reason: data?.reason === "beneficiary-without-email" ? "no-email" : "error" };
       } catch {
-        emailSent = false;
+        return { emailSent: false, reason: "error" };
       }
-      return { emailSent };
     },
     onSuccess: invalidate,
   });

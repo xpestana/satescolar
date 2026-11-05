@@ -869,6 +869,12 @@ tocar los datos del beneficiario.
 - **Datos del colegio:** los comprobantes salen con el nombre, RIF y dirección de `schools`. Ajustes
   los muestra, y no deja activar un impuesto si falta el RIF o la dirección.
 
+**Pagar exige referencia.** Al pulsar Pagar se piden la referencia de la transferencia (obligatoria,
+hasta 100 caracteres) y la fecha del pago (hoy por defecto, nunca futura). Lo valida también
+`mark_payroll_payment_paid(_payment_id, _reference, _payment_date)`; la referencia queda en
+`payroll_payments.payment_reference` y sale en las listas, el historial, el recibo (PDF y correo) y el
+Excel. Si el beneficiario no tiene correo, el aviso lo dice en vez de dar el recibo por enviado.
+
 **Instrucciones en pantalla.** Cada pantalla y pestaña de Nómina tiene un recuadro con sus pasos
 (`PayrollGuide`; textos en `payrollGuides.tsx`). Se adaptan a lo que el colegio tiene activo, y cada
 persona puede ocultarlos: la preferencia queda en su navegador.

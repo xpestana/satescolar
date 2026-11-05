@@ -61,6 +61,7 @@ describe("buildPayrollReceiptData", () => {
     expect(data.documentId).toBe("—");
     expect(data.methodLabel).toBe("—");
     expect(data.paymentDateFormatted).toBe("—");
+    expect(data.paymentReference).toBe("—");
   });
 });
 

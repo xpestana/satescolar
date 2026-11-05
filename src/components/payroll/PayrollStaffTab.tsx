@@ -137,7 +137,12 @@ export function PayrollStaffTab({ schoolId, periodId, beneficiaries, canRegister
                       </TableCell>
                       <TableCell>
                         {isLive ? (
-                          <Badge variant={statusVariant(payment.status)}>{STATUS_LABELS[payment.status]}</Badge>
+                          <>
+                            <Badge variant={statusVariant(payment.status)}>{STATUS_LABELS[payment.status]}</Badge>
+                            {payment.status === "paid" && payment.payment_reference && (
+                            <div className="text-xs text-muted-foreground">Ref. {payment.payment_reference}</div>
+                          )}
+                          </>
                         ) : (
                           <span className="text-xs text-muted-foreground">Sin registrar</span>
                         )}

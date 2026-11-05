@@ -140,6 +140,7 @@ export default async function handler(req: Request): Promise<Response> {
         ? payment.payroll_payment_methods.label || METHOD_LABELS[payment.payroll_payment_methods.method_type] || "—"
         : "—",
       paymentDate: formatDate(payment.payment_date),
+      paymentReference: payment.payment_reference?.trim() || "—",
       notes: payment.notes ?? "",
     };
 

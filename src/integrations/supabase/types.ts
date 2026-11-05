@@ -3621,6 +3621,7 @@ export type Database = {
           payment_date: string | null
           payment_kind: string
           payment_method_id: string | null
+          payment_reference: string | null
           period_id: string
           school_id: string
           status: string
@@ -3648,6 +3649,7 @@ export type Database = {
           payment_date?: string | null
           payment_kind?: string
           payment_method_id?: string | null
+          payment_reference?: string | null
           period_id: string
           school_id: string
           status?: string
@@ -3675,6 +3677,7 @@ export type Database = {
           payment_date?: string | null
           payment_kind?: string
           payment_method_id?: string | null
+          payment_reference?: string | null
           period_id?: string
           school_id?: string
           status?: string
@@ -6221,7 +6224,7 @@ export type Database = {
       }
       is_school_teacher: { Args: { _school_id: string }; Returns: boolean }
       mark_payroll_payment_paid: {
-        Args: { _payment_date?: string; _payment_id: string }
+        Args: { _payment_date?: string; _payment_id: string; _reference: string }
         Returns: undefined
       }
       payroll_can: {

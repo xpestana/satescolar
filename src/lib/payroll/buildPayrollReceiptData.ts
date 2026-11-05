@@ -25,6 +25,8 @@ export interface PayrollReceiptInput {
   methodType: PayrollMethodType | null;
   methodLabel: string | null;
   paymentDate: string | null;
+  /** Bank reference given when the payment was marked paid. */
+  paymentReference?: string | null;
   notes: string | null;
 }
 
@@ -50,6 +52,7 @@ export interface PayrollReceiptData {
   exchangeRateFormatted: string;
   methodLabel: string;
   paymentDateFormatted: string;
+  paymentReference: string;
   notes: string;
 }
 
@@ -103,6 +106,7 @@ export function buildPayrollReceiptData(input: PayrollReceiptInput): PayrollRece
       ? input.methodLabel?.trim() || METHOD_LABELS[input.methodType]
       : "—",
     paymentDateFormatted: formatDate(input.paymentDate),
+    paymentReference: input.paymentReference?.trim() || "—",
     notes: input.notes?.trim() || "",
   };
 }
