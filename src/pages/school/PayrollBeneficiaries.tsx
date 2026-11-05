@@ -15,6 +15,8 @@ import { usePayrollBeneficiaries } from "@/hooks/payroll/usePayrollBeneficiaries
 import { BeneficiaryFormModal } from "@/components/payroll/BeneficiaryFormModal";
 import { PayrollMethodsModal } from "@/components/payroll/PayrollMethodsModal";
 import { PayrollBeneficiaryHistoryModal } from "@/components/payroll/PayrollBeneficiaryHistoryModal";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { beneficiariesGuide } from "@/components/payroll/payrollGuides";
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
 import { usePayrollAriRates } from "@/hooks/payroll/usePayrollAriRates";
 import { todayCaracasIso } from "@/lib/dateUtils";
@@ -70,6 +72,8 @@ export default function PayrollBeneficiaries() {
         breadcrumbs={[{ label: "Nómina", href: "/pagos/nomina" }, { label: "Beneficiarios" }]}
         description="Registra al personal y proveedores a pagar, sus datos y métodos de pago reutilizables."
       />
+
+      <PayrollGuide guide={beneficiariesGuide({ vatEnabled, islrEnabled })} />
 
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px]">

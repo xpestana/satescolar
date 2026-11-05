@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { usePayrollConcepts } from "@/hooks/payroll/usePayrollConcepts";
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { conceptsGuide } from "@/components/payroll/payrollGuides";
 import type { ConceptKind, PayrollCurrency } from "@/lib/payroll/types";
 
 export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
@@ -43,6 +45,8 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
 
   return (
     <div className="space-y-4">
+      <PayrollGuide guide={conceptsGuide({ islrEnabled })} className="mb-0" />
+
       <Card>
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
           <div className="space-y-1.5 md:col-span-2">

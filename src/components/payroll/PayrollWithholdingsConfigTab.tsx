@@ -11,6 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
 import { IslrRatesCard } from "@/components/payroll/IslrRatesCard";
 import { WithholdingParametersCard } from "@/components/payroll/WithholdingParametersCard";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { withholdingsConfigGuide } from "@/components/payroll/payrollGuides";
+import { useSchoolFiscalData } from "@/hooks/payroll/useSchoolFiscalData";
 import { formatDateOnly } from "@/lib/dateUtils";
 
 type Tax = "vat" | "islr";
@@ -32,6 +35,7 @@ const TAX_COPY: Record<Tax, { label: string; on: string; off: string }> = {
 export function PayrollWithholdingsConfigTab({ schoolId }: { schoolId: string }) {
   const { toast } = useToast();
   const { settings, vatEnabled, islrEnabled, isLoading, ensureDefaults, updateSettings, markRatesValidated } = usePayrollTaxConfig(schoolId);
+  const { data: fiscal, isLoading: fiscalLoading } = useSchoolFiscalData(schoolId);
   const [confirmTax, setConfirmTax] = useState<Tax | null>(null);
   const [nextVat, setNextVat] = useState("1");
   const [nextIslr, setNextIslr] = useState("1");
@@ -50,24 +54,33 @@ export function PayrollWithholdingsConfigTab({ schoolId }: { schoolId: string })
 
   if (!settings) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Retenciones de IVA e ISLR</CardTitle>
-          <CardDescription>
-            Para colegios que son agentes de retención. Se cargan unos valores iniciales que el contador debe revisar,
-            y seguirán apagadas hasta que las active.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => ensureDefaults.mutate(undefined, { onError: showError })} disabled={ensureDefaults.isPending}>
-            {ensureDefaults.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}Configurar retenciones
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <PayrollGuide guide={withholdingsConfigGuide(false)} className="mb-0" />
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Retenciones de IVA e ISLR</CardTitle>
+            <CardDescription>
+              Para colegios que son agentes de retención. Se cargan unos valores iniciales que el contador debe revisar,
+              y seguirán apagadas hasta que las active.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => ensureDefaults.mutate(undefined, { onError: showError })} disabled={ensureDefaults.isPending}>
+              {ensureDefaults.isPending && <Loader2 className="animate-spin h-4 w-4 mr-1" />}Configurar retenciones
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   const isOn = (tax: Tax) => (tax === "vat" ? vatEnabled : islrEnabled);
+  const missingFiscal = [
+    ...(fiscal?.rif?.trim() ? [] : ["RIF"]),
+    ...(fiscal?.address?.trim() ? [] : ["dirección fiscal"]),
+  ];
+  // Vouchers carry the school's fiscal data, so a tax can't be turned on without it.
+  const blockActivation = (tax: Tax) => !isOn(tax) && (fiscalLoading || missingFiscal.length > 0);
 
   const confirmToggle = () => {
     if (!confirmTax) return;
@@ -104,6 +117,8 @@ export function PayrollWithholdingsConfigTab({ schoolId }: { schoolId: string })
 
   return (
     <div className="space-y-4">
+      <PayrollGuide guide={withholdingsConfigGuide(true)} className="mb-0" />
+
       {!settings.rates_validated_at ? (
         <Alert>
           <AlertTriangle className="h-4 w-4" />
@@ -122,10 +137,24 @@ export function PayrollWithholdingsConfigTab({ schoolId }: { schoolId: string })
       <Card>
         <CardHeader><CardTitle className="text-base">Activación</CardTitle></CardHeader>
         <CardContent className="space-y-3">
+          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+            <p className="text-xs text-muted-foreground mb-1">Agente de retención en los comprobantes de este colegio</p>
+            <p className="font-medium">{fiscal?.name ?? "—"} · RIF {fiscal?.rif?.trim() || "—"}</p>
+            <p className="text-muted-foreground">{fiscal?.address?.trim() || "—"}</p>
+          </div>
+          {!fiscalLoading && missingFiscal.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Faltan datos del colegio</AlertTitle>
+              <AlertDescription>
+                Falta: {missingFiscal.join(" y ")}. Pídele al administrador del sistema que lo complete para poder activar las retenciones.
+              </AlertDescription>
+            </Alert>
+          )}
           {(["vat", "islr"] as Tax[]).map((tax) => (
             <div key={tax} className="flex items-center justify-between gap-3">
               <Label htmlFor={`toggle-${tax}`}>Retener {TAX_COPY[tax].label}</Label>
-              <Switch id={`toggle-${tax}`} checked={isOn(tax)} onCheckedChange={() => setConfirmTax(tax)} />
+              <Switch id={`toggle-${tax}`} checked={isOn(tax)} disabled={blockActivation(tax)} onCheckedChange={() => setConfirmTax(tax)} />
             </div>
           ))}
         </CardContent>

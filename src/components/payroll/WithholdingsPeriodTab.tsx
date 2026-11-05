@@ -10,6 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, FileSpreadsheet, Loader2, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { withholdingsPeriodGuide } from "@/components/payroll/payrollGuides";
 import { usePayrollWithholdings } from "@/hooks/payroll/usePayrollWithholdings";
 import { formatDateOnly, todayCaracasIso } from "@/lib/dateUtils";
 import { formatMoney } from "@/lib/payroll/buildPayrollReceiptData";
@@ -74,6 +76,8 @@ export function WithholdingsPeriodTab({ schoolId, taxType }: WithholdingsPeriodT
 
   return (
     <div className="space-y-4">
+      <PayrollGuide guide={withholdingsPeriodGuide(taxType)} className="mb-0" />
+
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs">{taxType === "vat" ? "Quincena" : "Mes"}</Label>

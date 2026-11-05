@@ -12,6 +12,8 @@ import { usePayrollPayments, type PayrollPaymentRow } from "@/hooks/payroll/useP
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
 import { MethodDetails, CopyableField } from "@/components/payroll/MethodDetails";
 import { PayrollPaymentActions } from "@/components/payroll/PayrollPaymentActions";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { staffGuide } from "@/components/payroll/payrollGuides";
 import { PayrollPaymentFormModal } from "@/components/payroll/PayrollPaymentFormModal";
 import { todayCaracasIso } from "@/lib/dateUtils";
 import { CATEGORY_LABELS, STATUS_LABELS, type PayrollBeneficiary, type PayrollCategory, type PayrollPaymentStatus } from "@/lib/payroll/types";
@@ -76,6 +78,8 @@ export function PayrollStaffTab({ schoolId, periodId, beneficiaries, canRegister
 
   return (
     <>
+      <PayrollGuide guide={staffGuide({ vatEnabled, islrEnabled })} />
+
       <div className="flex flex-wrap gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -8,9 +8,12 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { ChevronsUpDown, FileText, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePayrollPayments } from "@/hooks/payroll/usePayrollPayments";
+import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
 import { BeneficiaryFormModal } from "@/components/payroll/BeneficiaryFormModal";
 import { PayrollPaymentActions } from "@/components/payroll/PayrollPaymentActions";
 import { SupplierPaymentFormModal } from "@/components/payroll/SupplierPaymentFormModal";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { supplierGuide } from "@/components/payroll/payrollGuides";
 import { CATEGORY_LABELS, STATUS_LABELS, type PayrollBeneficiary, type PayrollPaymentStatus } from "@/lib/payroll/types";
 
 interface PayrollSupplierTabProps {
@@ -30,6 +33,7 @@ const money = (value: number) => value.toLocaleString("es-VE", { minimumFraction
 export function PayrollSupplierTab({ schoolId, periodId, beneficiaries, canRegister, canApprove }: PayrollSupplierTabProps) {
   const qc = useQueryClient();
   const { payments } = usePayrollPayments(schoolId, { periodId });
+  const { vatEnabled, islrEnabled } = usePayrollTaxConfig(schoolId);
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [newSupplierOpen, setNewSupplierOpen] = useState(false);
@@ -54,6 +58,8 @@ export function PayrollSupplierTab({ schoolId, periodId, beneficiaries, canRegis
 
   return (
     <>
+      <PayrollGuide guide={supplierGuide({ vatEnabled, islrEnabled })} />
+
       <div className="flex flex-wrap gap-3 mb-4">
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>

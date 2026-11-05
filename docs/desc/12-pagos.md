@@ -866,6 +866,12 @@ tocar los datos del beneficiario.
   su número. El trigger `guard_payroll_withholding` impide cambiar una retención emitida.
 - **Permisos:** `payroll.withholdings` para la pantalla Retenciones; los ajustes siguen en
   `payroll.config`. Las funciones de base de datos comprueban el permiso, no solo la pantalla.
+- **Datos del colegio:** los comprobantes salen con el nombre, RIF y dirección de `schools`. Ajustes
+  los muestra, y no deja activar un impuesto si falta el RIF o la dirección.
+
+**Instrucciones en pantalla.** Cada pantalla y pestaña de Nómina tiene un recuadro con sus pasos
+(`PayrollGuide`; textos en `payrollGuides.tsx`). Se adaptan a lo que el colegio tiene activo, y cada
+persona puede ocultarlos: la preferencia queda en su navegador.
 
 **Funciones de base de datos:** `register_payroll_payment_with_withholdings` (guarda todo en una
 transacción), `mark_payroll_payment_paid`, `recalculate_payroll_payment_withholdings`,

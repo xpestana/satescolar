@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { periodsGuide } from "@/components/payroll/payrollGuides";
 import type { PayrollPeriodType } from "@/lib/payroll/types";
 
 export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
@@ -47,6 +49,8 @@ export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
 
   return (
     <div className="space-y-4">
+      <PayrollGuide guide={periodsGuide()} className="mb-0" />
+
       <Card>
         <CardContent className="p-4 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
           <div className="space-y-1.5 md:col-span-2">

@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Download } from "lucide-react";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { annualCertificatesGuide } from "@/components/payroll/payrollGuides";
 import { usePayrollSalaryWithholdings } from "@/hooks/payroll/usePayrollWithholdings";
 import { todayCaracasIso } from "@/lib/dateUtils";
 import { formatMoney } from "@/lib/payroll/buildPayrollReceiptData";
@@ -28,6 +30,8 @@ export function AnnualCertificatesTab({ schoolId }: { schoolId: string }) {
 
   return (
     <div className="space-y-4">
+      <PayrollGuide guide={annualCertificatesGuide()} className="mb-0" />
+
       <div className="space-y-1.5 w-40">
         <Label className="text-xs">Año</Label>
         <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>

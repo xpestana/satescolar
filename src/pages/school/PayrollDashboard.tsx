@@ -12,6 +12,9 @@ import { useSchoolData } from "@/hooks/useSchoolData";
 import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
 import { usePayrollBeneficiaries } from "@/hooks/payroll/usePayrollBeneficiaries";
 import { usePayrollPayments } from "@/hooks/payroll/usePayrollPayments";
+import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
+import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { overviewGuide } from "@/components/payroll/payrollGuides";
 import { exportPayrollExcel, type PayrollExcelRow } from "@/lib/payroll/payrollExcel";
 import { CATEGORY_LABELS, METHOD_LABELS, type PayrollCategory } from "@/lib/payroll/types";
 
@@ -20,6 +23,7 @@ export default function PayrollDashboard() {
   const { school } = useSchoolData();
   const { periods } = usePayrollPeriods(schoolId);
   const { beneficiaries } = usePayrollBeneficiaries(schoolId);
+  const { vatEnabled, islrEnabled } = usePayrollTaxConfig(schoolId);
 
   const [periodId, setPeriodId] = useState<string>("all");
   const { payments } = usePayrollPayments(schoolId, periodId !== "all" ? { periodId } : {});
@@ -68,6 +72,8 @@ export default function PayrollDashboard() {
         breadcrumbs={[{ label: "Nómina" }]}
         description="Indicadores de la nómina del colegio y exportación de los datos a Excel."
       />
+
+      <PayrollGuide guide={overviewGuide({ vatEnabled, islrEnabled })} />
 
       <div className="flex flex-wrap gap-3 mb-4 items-center">
         <Select value={periodId} onValueChange={setPeriodId}>
