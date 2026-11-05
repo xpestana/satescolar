@@ -36,12 +36,16 @@ export function generatePayrollReceiptPdf(data: PayrollReceiptData): jsPDF {
   });
 
   y += 2;
+  // Payments in dollars show each line in bolívares too: that is what adds up to the transfer.
+  const isUsd = data.currency !== "VES";
+  const row = (line: { description: string; amountFormatted: string; amountVesFormatted: string }, kind: string) =>
+    isUsd ? [line.description, kind, line.amountFormatted, line.amountVesFormatted] : [line.description, kind, line.amountFormatted];
   autoTable(doc, {
     startY: y,
-    head: [["Concepto", "Tipo", `Monto (${data.currency})`]],
+    head: [isUsd ? ["Concepto", "Tipo", `Monto (${data.currency})`, "Monto (VES)"] : ["Concepto", "Tipo", `Monto (${data.currency})`]],
     body: [
-      ...data.earnings.map((e) => [e.description, "Asignación", e.amountFormatted]),
-      ...data.deductions.map((d) => [d.description, "Deducción", d.amountFormatted]),
+      ...data.earnings.map((e) => row(e, "Asignación")),
+      ...data.deductions.map((d) => row(d, "Deducción")),
     ],
     theme: "striped",
     headStyles: { fillColor: [37, 99, 235] },
@@ -66,6 +70,12 @@ export function generatePayrollReceiptPdf(data: PayrollReceiptData): jsPDF {
 
   if (data.currency !== "VES") {
     doc.text(`Tasa aplicada: ${data.exchangeRateFormatted} VES/USD`, marginX, ty);
+    ty += 6;
+    doc.text("Asignaciones en VES:", marginX, ty);
+    doc.text(data.grossVesFormatted, 120, ty);
+    ty += 6;
+    doc.text("Deducciones en VES:", marginX, ty);
+    doc.text(data.deductionsVesFormatted, 120, ty);
     ty += 6;
     doc.setFont("helvetica", "bold");
     doc.text("Equivalente en VES:", marginX, ty);

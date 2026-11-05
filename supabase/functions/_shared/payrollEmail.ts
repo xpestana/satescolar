@@ -6,6 +6,8 @@ export type Currency = "VES" | "USD";
 export interface ReceiptLine {
   description: string;
   amount: number;
+  /** Payments in dollars: the line in bolívares, as the school adds it up. */
+  amountVes?: number;
 }
 
 export interface ReceiptEmailData {
@@ -66,20 +68,34 @@ export function money(amount: number, currency: Currency = "VES"): string {
 }
 
 function rows(lines: ReceiptLine[], currency: Currency): string {
-  if (lines.length === 0) return `<tr><td colspan="2" style="padding:6px 8px;color:#888">—</td></tr>`;
+  const usd = currency !== "VES";
+  if (lines.length === 0) return `<tr><td colspan="${usd ? 3 : 2}" style="padding:6px 8px;color:#888">—</td></tr>`;
   return lines
     .map(
       (l) =>
         `<tr><td style="padding:6px 8px;border-bottom:1px solid #eee">${escapeHtml(l.description)}</td>` +
-        `<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${money(l.amount, currency)}</td></tr>`
+        `<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${money(l.amount, currency)}</td>` +
+        (usd ? `<td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${money(l.amountVes ?? 0, "VES")}</td>` : "") +
+        `</tr>`
     )
     .join("");
 }
 
+function head(title: string, currency: Currency): string {
+  const th = `padding:6px 8px;background:#f3f4f6`;
+  return currency !== "VES"
+    ? `<tr><th style="text-align:left;${th}">${title}</th><th style="text-align:right;${th}">Monto (${currency})</th><th style="text-align:right;${th}">Monto (VES)</th></tr>`
+    : `<tr><th style="text-align:left;${th}">${title}</th><th style="text-align:right;${th}">Monto</th></tr>`;
+}
+
+const sumVes = (lines: ReceiptLine[]) => Math.round(lines.reduce((s, l) => s + (l.amountVes ?? 0), 0) * 100) / 100;
+
 export function buildReceiptHtml(d: ReceiptEmailData): string {
   const usdBlock =
     d.currency !== "VES"
-      ? `<tr><td style="padding:6px 8px">Tasa aplicada</td><td style="padding:6px 8px;text-align:right">${d.exchangeRate.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES/USD</td></tr>
+      ? `<tr><td style="padding:6px 8px">Tasa aplicada</td><td style="padding:6px 8px;text-align:right">${d.exchangeRate.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 })} VES/USD</td></tr>
+         <tr><td style="padding:6px 8px">Asignaciones en VES</td><td style="padding:6px 8px;text-align:right">${money(sumVes(d.earnings), "VES")}</td></tr>
+         <tr><td style="padding:6px 8px">Deducciones en VES</td><td style="padding:6px 8px;text-align:right">${money(sumVes(d.deductions), "VES")}</td></tr>
          <tr><td style="padding:6px 8px;font-weight:bold">Equivalente en VES</td><td style="padding:6px 8px;text-align:right;font-weight:bold">${money(d.netVes, "VES")}</td></tr>`
       : "";
   return `
@@ -98,11 +114,11 @@ export function buildReceiptHtml(d: ReceiptEmailData): string {
       <p style="margin:0 0 12px"><strong>Referencia:</strong> ${escapeHtml(d.paymentReference)}</p>
 
       <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px">
-        <thead><tr><th style="text-align:left;padding:6px 8px;background:#f3f4f6">Asignaciones</th><th style="text-align:right;padding:6px 8px;background:#f3f4f6">Monto</th></tr></thead>
+        <thead>${head("Asignaciones", d.currency)}</thead>
         <tbody>${rows(d.earnings, d.currency)}</tbody>
       </table>
       <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:12px">
-        <thead><tr><th style="text-align:left;padding:6px 8px;background:#f3f4f6">Deducciones</th><th style="text-align:right;padding:6px 8px;background:#f3f4f6">Monto</th></tr></thead>
+        <thead>${head("Deducciones", d.currency)}</thead>
         <tbody>${rows(d.deductions, d.currency)}</tbody>
       </table>
 

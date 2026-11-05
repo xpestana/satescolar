@@ -2,7 +2,7 @@
 // No React, no DB — just mapping + formatting so it is fully testable and reusable by
 // both the client PDF and the Edge Function email.
 
-import { calculatePayrollTotals } from "./calculateNet";
+import { calculatePayrollTotals, round2 } from "./calculateNet";
 import {
   CATEGORY_LABELS,
   METHOD_LABELS,
@@ -33,6 +33,8 @@ export interface PayrollReceiptInput {
 export interface PayrollReceiptLine {
   description: string;
   amountFormatted: string;
+  /** Payments in dollars: the line in bolívares, as the school adds it up. Empty in bolívares. */
+  amountVesFormatted: string;
 }
 
 export interface PayrollReceiptData {
@@ -47,6 +49,8 @@ export interface PayrollReceiptData {
   deductions: PayrollReceiptLine[];
   grossFormatted: string;
   deductionsFormatted: string;
+  grossVesFormatted: string;
+  deductionsVesFormatted: string;
   netFormatted: string;
   netVesFormatted: string;
   exchangeRateFormatted: string;
@@ -72,16 +76,28 @@ function formatDate(value: string | null): string {
   return d.toLocaleDateString("es-VE", { day: "2-digit", month: "long", year: "numeric" });
 }
 
+/** Exchange rates keep up to 4 decimals (the BCV publishes more than the 2 usually shown). */
+export function formatRate(rate: number): string {
+  return rate.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+}
+
 export function buildPayrollReceiptData(input: PayrollReceiptInput): PayrollReceiptData {
   const totals = calculatePayrollTotals(input.items);
-  const netVes =
-    input.currency === "VES"
-      ? totals.net
-      : totals.net * (input.exchangeRate > 0 ? input.exchangeRate : 0);
+  const rate = input.exchangeRate > 0 ? input.exchangeRate : 0;
+  const isUsd = input.currency !== "VES";
+  // Lines saved with their bolívares add up exactly; older lines are converted.
+  const lineVes = (item: PayrollLineItem) =>
+    !isUsd ? Number(item.amount) || 0 : item.amount_ves != null ? Number(item.amount_ves) : round2((Number(item.amount) || 0) * rate);
+  const sumVes = (kind: "earning" | "deduction") =>
+    round2(input.items.filter((i) => i.concept_kind === kind).reduce((sum, i) => sum + lineVes(i), 0));
+  const grossVes = sumVes("earning");
+  const deductionsVes = sumVes("deduction");
+  const netVes = Math.max(0, round2(grossVes - deductionsVes));
 
   const toLine = (item: PayrollLineItem): PayrollReceiptLine => ({
     description: item.description?.trim() || "Concepto",
     amountFormatted: formatMoney(item.amount, input.currency),
+    amountVesFormatted: isUsd ? formatMoney(lineVes(item), "VES") : "",
   });
 
   return {
@@ -96,12 +112,11 @@ export function buildPayrollReceiptData(input: PayrollReceiptInput): PayrollRece
     deductions: input.items.filter((i) => i.concept_kind === "deduction").map(toLine),
     grossFormatted: formatMoney(totals.gross, input.currency),
     deductionsFormatted: formatMoney(totals.deductions, input.currency),
+    grossVesFormatted: formatMoney(grossVes, "VES"),
+    deductionsVesFormatted: formatMoney(deductionsVes, "VES"),
     netFormatted: formatMoney(totals.net, input.currency),
     netVesFormatted: formatMoney(netVes, "VES"),
-    exchangeRateFormatted:
-      input.currency === "VES"
-        ? "—"
-        : input.exchangeRate.toLocaleString("es-VE", { minimumFractionDigits: 2 }),
+    exchangeRateFormatted: input.currency === "VES" ? "—" : formatRate(input.exchangeRate),
     methodLabel: input.methodType
       ? input.methodLabel?.trim() || METHOD_LABELS[input.methodType]
       : "—",

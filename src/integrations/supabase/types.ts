@@ -3693,6 +3693,7 @@ export type Database = {
       payroll_payment_items: {
         Row: {
           amount: number
+          amount_ves: number | null
           concept_id: string | null
           concept_kind: string
           contribution_id: string | null
@@ -3704,6 +3705,7 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          amount_ves?: number | null
           concept_id?: string | null
           concept_kind?: string
           contribution_id?: string | null
@@ -3715,6 +3717,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          amount_ves?: number | null
           concept_id?: string | null
           concept_kind?: string
           contribution_id?: string | null

@@ -74,6 +74,8 @@ export interface PayrollLineItem {
   concept_kind: ConceptKind;
   description?: string | null;
   amount: number;
+  /** Exact bolívares of the line (null on lines saved before it existed). */
+  amount_ves?: number | null;
 }
 
 export interface PayrollPayment {

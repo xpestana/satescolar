@@ -61,6 +61,8 @@ export interface DraftWithholding {
 export interface DraftItem extends PayrollLineItem {
   withholding_key?: string | null;
   contribution_key?: string | null;
+  /** Exact amount in bolívares, rounded to 2 decimals. What the school actually adds up. */
+  amount_ves?: number;
 }
 
 export interface DraftContribution {
@@ -133,9 +135,21 @@ interface TaxContext {
   parameters: TaxParameters[];
 }
 
+/** 4 decimals: small deductions in dollars (30 Bs ≈ 0.0338 $) must not lose their value. */
+const round4 = (value: number) => (Number.isFinite(value) ? Math.round((value + Number.EPSILON) * 10000) / 10000 : 0);
+
+/**
+ * An amount calculated in bolívares, expressed in the payment's currency. In dollars it keeps
+ * 4 decimals; the bolívares (amount_ves) are what the totals in bolívares add up.
+ */
 function currencyAmount(ves: number, currency: PayrollCurrency, rate: number): number {
   if (currency === "VES") return round2(ves);
-  return rate > 0 ? round2(ves / rate) : 0;
+  return rate > 0 ? round4(ves / rate) : 0;
+}
+
+/** A typed line in bolívares: converted at the payment's rate and rounded to 2 decimals. */
+export function lineVes(amount: number, currency: PayrollCurrency, rate: number): number {
+  return convertToVes(Math.max(0, amount || 0), currency, rate);
 }
 
 function finish(
@@ -151,15 +165,21 @@ function finish(
     monthBase: null,
   }
 ): PaymentDraft {
-  const totals = calculatePayrollTotals(items);
+  // Lines without their bolívares yet (typed ones, invoices) are converted one by one.
+  const withVes = items.map((item) =>
+    item.amount_ves === undefined ? { ...item, amount_ves: lineVes(item.amount, currency, rate) } : item
+  );
+  const totals = calculatePayrollTotals(withVes);
+  const sumVes = (kind: "earning" | "deduction") =>
+    withVes.filter((i) => i.concept_kind === kind).reduce((sum, i) => sum + (i.amount_ves ?? 0), 0);
   return {
-    items,
+    items: withVes,
     documents,
     withholdings,
     ...salary,
     totals: {
       ...totals,
-      netVes: convertToVes(totals.net, currency, rate),
+      netVes: Math.max(0, round2(sumVes("earning") - sumVes("deduction"))),
       withheldVes: round2(withholdings.reduce((sum, w) => sum + w.withheld_ves, 0)),
     },
     errors,
@@ -260,6 +280,7 @@ export function buildSupplierPaymentDraft(input: SupplierDraftInput): PaymentDra
           concept_kind: "deduction",
           description: `Retención IVA ${result.appliedPct} % — ${doc.document_number}`,
           amount: withheldAmount,
+          amount_ves: result.withheldVes,
           withholding_key: key,
         });
       }
@@ -315,6 +336,7 @@ export function buildSupplierPaymentDraft(input: SupplierDraftInput): PaymentDra
             concept_kind: "deduction",
             description: `Retención ISLR ${result.appliedPct} % — ${doc.document_number}`,
             amount: withheldAmount,
+            amount_ves: result.withheldVes,
             withholding_key: key,
           });
         }
@@ -373,15 +395,10 @@ export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
 
   const prior = input.priorPayments ?? [];
   const earnings = input.lines.filter((l) => l.concept_kind === "earning");
-  const ownIslrVes = round2(
-    convertToVes(earnings.filter((l) => l.isTaxable).reduce((sum, l) => sum + Math.max(0, l.amount || 0), 0), currency, rate)
-  );
+  // Each line is converted and rounded on its own, as the school does on its sheet.
+  const ownIslrVes = round2(earnings.filter((l) => l.isTaxable).reduce((sum, l) => sum + lineVes(l.amount, currency, rate), 0));
   const ownContributionVes = round2(
-    convertToVes(
-      earnings.filter((l) => l.isContributionBase ?? true).reduce((sum, l) => sum + Math.max(0, l.amount || 0), 0),
-      currency,
-      rate
-    )
+    earnings.filter((l) => l.isContributionBase ?? true).reduce((sum, l) => sum + lineVes(l.amount, currency, rate), 0)
   );
   // AR-I is a flat %, so only what wasn't discounted yet is added.
   const islrBaseVes = round2(ownIslrVes + prior.filter((p) => !p.applyDeductions).reduce((s, p) => s + p.islrBaseVes, 0));
@@ -428,6 +445,7 @@ export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
           concept_kind: "deduction",
           description: `Retención ISLR (AR-I ${pctLabel(result.appliedPct)})`,
           amount: withheldAmount,
+          amount_ves: result.withheldVes,
           withholding_key: "salary:islr",
         });
       }
@@ -478,6 +496,7 @@ export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
             `${CONTRIBUTION_LABELS[result.kind]} ${pctLabel(result.ratePct)}` +
             (result.mondays !== null ? ` (${result.mondays} lunes)` : ""),
           amount,
+          amount_ves: result.amountVes,
           contribution_key: key,
         });
       }

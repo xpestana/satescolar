@@ -911,6 +911,15 @@ así que sale en el recibo, el correo y el Excel.
 - Si cambian los valores antes de pagar, `mark_payroll_payment_paid` pide recalcular.
 - Fuera de esta versión: aportes del patrono y archivos para TIUNA y BANAVIH.
 
+**Pagos en dólares que cuadran en bolívares.** Cada línea guarda su monto exacto en bolívares
+(`payroll_payment_items.amount_ves`): las líneas escritas se convierten con la tasa del pago y se
+redondean a 2 decimales; las retenciones y los parafiscales se calculan sobre esos bolívares (también
+a 2 decimales, 0,125 → 0,13) y en dólares guardan 4 decimales (30 Bs ≈ 0,0338 $). El neto en
+bolívares (`net_amount_ves`) es la suma de las líneas, no neto en $ × tasa. La tasa acepta todos los
+decimales del BCV. El recibo (PDF y correo) muestra cada línea en dólares y en bolívares. Las líneas
+anteriores, sin `amount_ves`, se convierten como antes. Migración `20261106120000_payroll_item_amount_ves.sql`;
+prueba en `src/lib/payroll/contributions/usdSheet.test.ts`.
+
 Cálculo en `src/lib/payroll/contributions/*` (`calculateContributions`, `monthBase`) y
 `buildSalaryPaymentDraft`; migración `20261105130000_payroll_period_deductions_contributions.sql`.
 

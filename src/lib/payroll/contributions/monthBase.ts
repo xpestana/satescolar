@@ -16,6 +16,7 @@ export interface MonthPaymentRow {
     concept_id: string | null;
     concept_kind: ConceptKind;
     amount: number;
+    amount_ves?: number | null;
     withholding_id: string | null;
     contribution_id: string | null;
   }[];
@@ -53,7 +54,10 @@ export function summarizePriorPayment(row: MonthPaymentRow, concepts: PayrollCon
   let contribution = 0;
   for (const item of row.items) {
     if (item.concept_kind !== "earning" || item.withholding_id || item.contribution_id) continue;
-    const amountVes = convertToVes(Math.max(0, item.amount || 0), row.currency, row.exchange_rate);
+    const amountVes =
+      item.amount_ves != null
+        ? Number(item.amount_ves)
+        : convertToVes(Math.max(0, item.amount || 0), row.currency, row.exchange_rate);
     const flags = lineFlags(item.concept_id, concepts);
     if (flags.isTaxable) islr += amountVes;
     if (flags.isContributionBase) contribution += amountVes;

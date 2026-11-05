@@ -17,7 +17,7 @@ import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
 import { usePayrollContributionConfig } from "@/hooks/payroll/usePayrollContributionConfig";
 import { usePayrollMonthPayments } from "@/hooks/payroll/usePayrollMonthPayments";
 import { lineFlags, splitMonthPayments } from "@/lib/payroll/contributions/monthBase";
-import { deductionsExceedEarnings } from "@/lib/payroll/calculateNet";
+import { deductionsExceedEarnings, round2 } from "@/lib/payroll/calculateNet";
 import { formatMoney } from "@/lib/payroll/buildPayrollReceiptData";
 import { METHOD_LABELS, type ConceptKind, type PayrollCurrency } from "@/lib/payroll/types";
 import { buildSalaryPaymentDraft, type MonthBaseSummary } from "@/lib/payroll/withholdings/buildPaymentDraft";
@@ -144,11 +144,16 @@ export function PayrollPaymentFormModal({
   const onPickConcept = (key: string, conceptId: string) => {
     const c = concepts.find((x) => x.id === conceptId);
     if (!c) return;
+    // A concept priced in the other currency is converted at the payment's rate.
+    let amount = c.default_amount || 0;
+    if (amount && c.currency !== currency) {
+      amount = rate > 0 ? round2(c.currency === "USD" ? amount * rate : amount / rate) : 0;
+    }
     updateLine(key, {
       concept_id: c.id,
       description: c.name,
       concept_kind: c.concept_kind,
-      amount: c.default_amount ? String(c.default_amount) : "",
+      amount: amount ? String(amount) : "",
     });
   };
 
@@ -217,7 +222,7 @@ export function PayrollPaymentFormModal({
               <Label className="text-xs">Tasa (VES/USD)</Label>
               <Input
                 type="number"
-                step="0.01"
+                step="any"
                 value={exchangeRate}
                 disabled={currency === "VES"}
                 onChange={(e) => setExchangeRate(e.target.value)}
@@ -325,7 +330,11 @@ export function PayrollPaymentFormModal({
             {automaticLines.map((line) => (
               <div key={line.withholding_key ?? line.contribution_key} className="flex justify-between text-xs text-muted-foreground">
                 <span>{line.description} (automática)</span>
-                <span>{formatMoney(line.amount, currency)}</span>
+                <span className="text-right">
+                  {currency === "VES"
+                    ? formatMoney(line.amount, currency)
+                    : `${formatMoney(line.amount, currency)} · ${formatMoney(line.amount_ves ?? 0, "VES")}`}
+                </span>
               </div>
             ))}
             <div className="flex justify-between"><span>Total deducciones</span><span>{formatMoney(totals.deductions, currency)}</span></div>

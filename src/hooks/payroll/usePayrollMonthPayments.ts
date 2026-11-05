@@ -21,7 +21,7 @@ export async function fetchMonthPayments(
     .select(
       "id, status, currency, exchange_rate, " +
         "payroll_periods!inner(id, name, end_date, apply_deductions), " +
-        "payroll_payment_items(concept_id, concept_kind, amount, withholding_id, contribution_id), " +
+        "payroll_payment_items(concept_id, concept_kind, amount, amount_ves, withholding_id, contribution_id), " +
         "payroll_contributions!payroll_contributions_payment_id_fkey(kind, amount_ves)"
     )
     .eq("beneficiary_id", beneficiaryId)

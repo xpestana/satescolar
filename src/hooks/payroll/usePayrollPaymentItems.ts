@@ -10,7 +10,7 @@ export function usePayrollPaymentItems(paymentId: string | null | undefined) {
     queryFn: async (): Promise<PayrollLineItem[]> => {
       const { data, error } = await supabase
         .from("payroll_payment_items")
-        .select("concept_id, concept_kind, description, amount")
+        .select("concept_id, concept_kind, description, amount, amount_ves")
         .eq("payment_id", paymentId as string)
         .order("concept_kind");
       if (error) throw error;

@@ -104,14 +104,19 @@ export default async function handler(req: Request): Promise<Response> {
     // Items -> earnings / deductions.
     const { data: items } = await admin
       .from("payroll_payment_items")
-      .select("concept_kind, description, amount")
+      .select("concept_kind, description, amount, amount_ves")
       .eq("payment_id", payment_id);
 
     const currency = (payment.currency as Currency) ?? "VES";
+    const rate = Number(payment.exchange_rate) || 0;
     const earnings: ReceiptLine[] = [];
     const deductions: ReceiptLine[] = [];
     for (const it of items ?? []) {
-      const line = { description: it.description || "Concepto", amount: Number(it.amount) || 0 };
+      const amount = Number(it.amount) || 0;
+      // Lines saved with their bolívares add up exactly; older lines are converted.
+      const amountVes =
+        currency === "VES" ? amount : it.amount_ves != null ? Number(it.amount_ves) : Math.round(amount * rate * 100) / 100;
+      const line = { description: it.description || "Concepto", amount, amountVes };
       if (it.concept_kind === "deduction") deductions.push(line);
       else earnings.push(line);
     }

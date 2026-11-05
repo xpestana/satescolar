@@ -189,7 +189,7 @@ export function SupplierPaymentFormModal({ open, onOpenChange, schoolId, periodI
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Tasa (VES/USD)</Label>
-              <Input type="number" step="0.01" value={exchangeRate} disabled={currency === "VES"} onChange={(e) => setExchangeRate(e.target.value)} />
+              <Input type="number" step="any" value={exchangeRate} disabled={currency === "VES"} onChange={(e) => setExchangeRate(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Método de pago</Label>

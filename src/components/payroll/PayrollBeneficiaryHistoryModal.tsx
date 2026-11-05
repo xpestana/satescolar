@@ -46,7 +46,7 @@ export function PayrollBeneficiaryHistoryModal({ open, onOpenChange, schoolId, s
   const downloadReceipt = async (p: PayrollPaymentRow) => {
     const { data: itemsData, error } = await supabase
       .from("payroll_payment_items")
-      .select("concept_id, concept_kind, description, amount")
+      .select("concept_id, concept_kind, description, amount, amount_ves")
       .eq("payment_id", p.id);
     if (error) {
       toast({ title: "Error al generar el recibo", description: error.message, variant: "destructive" });
