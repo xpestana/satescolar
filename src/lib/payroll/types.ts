@@ -28,6 +28,8 @@ export interface PayrollBeneficiary {
   vat_withholding_mode: VatWithholdingMode;
   vat_exclusion_reason: string | null;
   default_islr_concept_id: string | null;
+  job_title: string | null;
+  hire_date: string | null;
   created_at: string;
   updated_at: string;
 }

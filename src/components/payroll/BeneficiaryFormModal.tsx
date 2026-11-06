@@ -68,6 +68,8 @@ function initialValues(
     email: beneficiary?.email ?? "",
     phone: beneficiary?.phone ?? "",
     notes: beneficiary?.notes ?? "",
+    jobTitle: beneficiary?.job_title ?? "",
+    hireDate: beneficiary?.hire_date ?? "",
     ariRate: "",
     ariValidFrom: todayCaracasIso(),
     vatMode: beneficiary?.vat_withholding_mode ?? "standard",
@@ -340,6 +342,19 @@ export function BeneficiaryFormModal({
               <Input {...register("phone")} />
             </div>
           </div>
+
+          {!isInvoice && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="beneficiary-job-title">Cargo</Label>
+                <Input id="beneficiary-job-title" {...register("jobTitle")} placeholder="Aseadora, Mantenimiento, Docente..." />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="beneficiary-hire-date">Fecha de ingreso</Label>
+                <Input id="beneficiary-hire-date" type="date" max={todayCaracasIso()} {...register("hireDate")} />
+              </div>
+            </div>
+          )}
 
           {rules.ariRate !== "hidden" && (
             <div className="space-y-2 rounded-md border bg-muted/30 p-3">

@@ -24,6 +24,8 @@ export const beneficiaryFormBaseSchema = z.object({
   email: z.string(),
   phone: z.string(),
   notes: z.string(),
+  jobTitle: z.string().default(""),
+  hireDate: z.string().default(""),
   ariRate: z.string(),
   ariValidFrom: z.string(),
   vatMode: z.enum(["standard", "full", "excluded"]),
@@ -108,6 +110,9 @@ export interface BeneficiaryPayload {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  /** Staff paid by payroll: shown on the payroll sheet. */
+  job_title: string | null;
+  hire_date: string | null;
   vat_withholding_mode: VatWithholdingMode;
   vat_exclusion_reason: string | null;
   default_islr_concept_id: string | null;
@@ -139,6 +144,8 @@ export function toBeneficiaryPayload(values: BeneficiaryFormValues, ctx: Benefic
     email: text(values.email),
     phone: text(values.phone),
     notes: text(values.notes),
+    job_title: isInvoice ? null : text(values.jobTitle ?? ""),
+    hire_date: isInvoice ? null : values.hireDate || null,
     vat_withholding_mode: vatMode,
     vat_exclusion_reason: vatMode === "excluded" ? text(values.vatExclusionReason) : null,
     default_islr_concept_id:

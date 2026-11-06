@@ -3215,8 +3215,10 @@ export type Database = {
           email: string | null
           fiscal_address: string | null
           full_name: string
+          hire_date: string | null
           id: string
           is_active: boolean
+          job_title: string | null
           notes: string | null
           payment_regime: string
           person_type: string | null
@@ -3239,6 +3241,7 @@ export type Database = {
           full_name: string
           id?: string
           is_active?: boolean
+          job_title?: string | null
           notes?: string | null
           payment_regime?: string
           person_type?: string | null
@@ -3259,8 +3262,10 @@ export type Database = {
           email?: string | null
           fiscal_address?: string | null
           full_name?: string
+          hire_date?: string | null
           id?: string
           is_active?: boolean
+          job_title?: string | null
           notes?: string | null
           payment_regime?: string
           person_type?: string | null

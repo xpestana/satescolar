@@ -52,8 +52,32 @@ export interface WithholdingRow {
   payroll_purchase_documents: WithholdingDocument | null;
 }
 
+/** One row of the voucher's table, in bolívares. */
+export interface VoucherOperation {
+  date: string;
+  /** Invoice number; empty for a debit note, whose number goes in debitNoteNumber. */
+  invoiceNumber: string;
+  debitNoteNumber: string;
+  controlNumber: string;
+  transactionType: string;
+  totalVes: number;
+  exemptVes: number;
+  baseVes: number;
+  vatRatePct: number;
+  taxVes: number;
+  /** ISLR: the SENIAT code of the concept, or its name when it has none. */
+  conceptCode: string;
+  ratePct: number;
+  subtrahendVes: number;
+  withheldVes: number;
+}
+
 export interface VoucherData {
   title: string;
+  taxType: TaxType;
+  fiscalYear: string;
+  fiscalMonth: string;
+  operation: VoucherOperation;
   voucherNumber: string;
   issueDate: string;
   deliveryDate: string;
@@ -72,6 +96,9 @@ export interface VoucherData {
 }
 
 const dash = (value: string | null | undefined) => value?.trim() || "—";
+
+/** dd/mm/aaaa, as vouchers print dates. */
+const voucherDate = (iso: string | null | undefined) => (iso && /^d{4}-d{2}-d{2}/.test(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "—");
 
 export function buildWithholdingVoucherData(row: WithholdingRow): VoucherData {
   const doc = row.payroll_purchase_documents;
@@ -92,10 +119,33 @@ export function buildWithholdingVoucherData(row: WithholdingRow): VoucherData {
           ...(row.subtrahend_ves > 0 ? [{ label: "Sustraendo", amount: row.subtrahend_ves }] : []),
         ];
 
+  const isDebitNote = doc?.document_type === "debit_note";
+  const operation: VoucherOperation = {
+    date: voucherDate(doc?.issue_date),
+    invoiceNumber: isDebitNote ? "" : dash(doc?.document_number),
+    debitNoteNumber: isDebitNote ? dash(doc?.document_number) : "",
+    controlNumber: dash(doc?.control_number),
+    transactionType: isDebitNote ? "02-Nota de débito" : "01-Factura",
+    totalVes: toVes(doc?.total_amount),
+    exemptVes: toVes(doc?.exempt_amount),
+    baseVes: row.base_ves,
+    vatRatePct: doc?.vat_rate_pct ?? 0,
+    taxVes: row.tax_amount_ves,
+    conceptCode: row.islr_seniat_code?.trim() || row.islr_concept_name?.trim() || "—",
+    ratePct: row.rate_pct,
+    subtrahendVes: row.subtrahend_ves,
+    withheldVes: row.withheld_ves,
+  };
+  const fiscalDate = row.fiscal_period_start ?? row.issued_at?.slice(0, 10) ?? "";
+
   return {
     title: `Comprobante de retención de ${TAX_TYPE_LABELS[row.tax_type]}`,
+    taxType: row.tax_type,
+    fiscalYear: fiscalDate.slice(0, 4) || "—",
+    fiscalMonth: fiscalDate.slice(5, 7) || "—",
+    operation,
     voucherNumber: dash(row.voucher_number),
-    issueDate: row.issued_at ? formatDateOnly(row.issued_at.slice(0, 10)) : "—",
+    issueDate: voucherDate(row.issued_at),
     deliveryDate: row.delivered_at ? formatDateOnly(row.delivered_at.slice(0, 10)) : "—",
     fiscalPeriod:
       row.fiscal_period_start && row.fiscal_period_end

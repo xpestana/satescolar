@@ -1,9 +1,28 @@
 import { describe, expect, it } from "vitest";
 import type { AnnualCertificate, VoucherData } from "./buildWithholdingVoucherData";
-import { generateAnnualCertificatePdf, generateWithholdingVoucherPdf } from "./generateWithholdingPdf";
+import { generateAnnualCertificatePdf, generateWithholdingVoucherPdf, voucherAmount } from "./generateWithholdingPdf";
 
-const voucher: VoucherData = {
+const vatVoucher: VoucherData = {
   title: "Comprobante de retención de IVA",
+  taxType: "vat",
+  fiscalYear: "2026",
+  fiscalMonth: "11",
+  operation: {
+    date: "02/11/2026",
+    invoiceNumber: "F-0001",
+    debitNoteNumber: "",
+    controlNumber: "00-0001",
+    transactionType: "01-Factura",
+    totalVes: 1160,
+    exemptVes: 0,
+    baseVes: 1000,
+    vatRatePct: 16,
+    taxVes: 160,
+    conceptCode: "—",
+    ratePct: 75,
+    subtrahendVes: 0,
+    withheldVes: 120,
+  },
   voucherNumber: "20261100000001",
   issueDate: "04/11/2026",
   deliveryDate: "—",
@@ -21,17 +40,39 @@ const voucher: VoucherData = {
   isVoided: false,
 };
 
+const islrVoucher: VoucherData = {
+  ...vatVoucher,
+  title: "Comprobante de retención de ISLR",
+  taxType: "islr",
+  operation: { ...vatVoucher.operation, conceptCode: "002", ratePct: 3, subtrahendVes: 107.5, withheldVes: 7898.72, baseVes: 266874 },
+};
+
 describe("withholding PDFs", () => {
-  it("prints the data of the voucher", () => {
-    const content = generateWithholdingVoucherPdf(voucher).output();
-    for (const text of ["20261100000001", "Colegio Uno", "J-12345678-9", "F-0001", "00-0001", "Monto retenido"]) {
+  it("prints the IVA voucher with the SENIAT table", () => {
+    const content = generateWithholdingVoucherPdf(vatVoucher).output();
+    for (const text of [
+      "20261100000001", "Colegio Uno", "J-12345678-9", "F-0001", "00-0001", "01-Factura",
+      "1.160,00", "160,00", "120,00", "16,00%", "FIRMA BENEFICIARIO", "SNAT/2025/000054",
+    ]) {
       expect(content).toContain(text);
     }
     expect(content).not.toContain("ANULADO");
   });
 
+  it("prints the ISLR voucher with concept code, portion and subtrahend", () => {
+    const content = generateWithholdingVoucherPdf(islrVoucher).output();
+    for (const text of ["Decreto 1.808", "002", "266.874,00", "3,00%", "107,50", "7.898,72", "retenido", "20261100000001"]) {
+      expect(content).toContain(text);
+    }
+  });
+
   it("marks a voided voucher", () => {
-    expect(generateWithholdingVoucherPdf({ ...voucher, isVoided: true }).output()).toContain("ANULADO");
+    expect(generateWithholdingVoucherPdf({ ...vatVoucher, isVoided: true }).output()).toContain("ANULADO");
+    expect(generateWithholdingVoucherPdf({ ...islrVoucher, isVoided: true }).output()).toContain("ANULADO");
+  });
+
+  it("formats amounts like the vouchers", () => {
+    expect(voucherAmount(309573.84)).toBe("309.573,84");
   });
 
   it("prints the yearly certificate", () => {
