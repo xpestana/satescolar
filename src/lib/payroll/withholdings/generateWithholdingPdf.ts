@@ -93,6 +93,7 @@ function generateVatVoucherPdf(data: VoucherData): jsPDF {
       "% ALÍCUOTA",
       "IMPUESTO IVA",
       "IVA RETENIDO",
+      "TOTAL FACTURA",
     ]],
     body: [[
       "1",
@@ -109,13 +110,14 @@ function generateVatVoucherPdf(data: VoucherData): jsPDF {
       pct(op.vatRatePct),
       voucherAmount(op.taxVes),
       voucherAmount(op.withheldVes),
+      voucherAmount(op.totalVes),
     ]],
-    foot: [["", "Total", "", "", "", "", "", "", voucherAmount(op.totalVes), voucherAmount(op.exemptVes), voucherAmount(op.baseVes), "", voucherAmount(op.taxVes), voucherAmount(op.withheldVes)]],
+    foot: [["", "Total", "", "", "", "", "", "", voucherAmount(op.totalVes), voucherAmount(op.exemptVes), voucherAmount(op.baseVes), "", voucherAmount(op.taxVes), voucherAmount(op.withheldVes), voucherAmount(op.totalVes)]],
     theme: "grid",
     styles: { fontSize: 7, cellPadding: 1.2, lineColor: 0, lineWidth: 0.2, textColor: 0, valign: "middle" },
     headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: "bold", halign: "center", fontSize: 6.5 },
     footStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: "bold" },
-    columnStyles: Object.fromEntries([8, 9, 10, 11, 12, 13].map((i) => [i, { halign: "right" }])),
+    columnStyles: Object.fromEntries([8, 9, 10, 11, 12, 13, 14].map((i) => [i, { halign: "right" }])),
     margin: { left, right: 10 },
   });
 

@@ -56,6 +56,8 @@ describe("withholding PDFs", () => {
     ]) {
       expect(content).toContain(text);
     }
+    // Total of the invoice twice per row: "total compra" and the last column, "total factura".
+    expect(content.split("1.160,00").length - 1).toBe(4);
     expect(content).not.toContain("ANULADO");
   });
 
