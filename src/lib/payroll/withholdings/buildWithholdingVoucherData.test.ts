@@ -57,6 +57,9 @@ describe("buildWithholdingVoucherData", () => {
     expect(data.fiscalPeriod).toContain("al");
     expect(data.rows.map((r) => r.amount)).toEqual([1160, 1000, 0, 160]);
     expect(data.withheldVes).toBe(120);
+    expect(data.issueDate).toBe("04/11/2026");
+    expect(data.operation.date).toBe("01/11/2026");
+    expect([data.fiscalYear, data.fiscalMonth]).toEqual(["2026", "11"]);
   });
 
   it("converts documents paid in USD to bolivars", () => {

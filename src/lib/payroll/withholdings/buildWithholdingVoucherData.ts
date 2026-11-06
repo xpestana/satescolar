@@ -98,7 +98,7 @@ export interface VoucherData {
 const dash = (value: string | null | undefined) => value?.trim() || "—";
 
 /** dd/mm/aaaa, as vouchers print dates. */
-const voucherDate = (iso: string | null | undefined) => (iso && /^d{4}-d{2}-d{2}/.test(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "—");
+const voucherDate = (iso: string | null | undefined) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "—");
 
 export function buildWithholdingVoucherData(row: WithholdingRow): VoucherData {
   const doc = row.payroll_purchase_documents;
