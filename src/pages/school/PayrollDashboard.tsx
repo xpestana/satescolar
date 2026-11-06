@@ -6,11 +6,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
-import { Users, CreditCard, FileSpreadsheet, Settings, Wallet, Loader2, Sheet } from "lucide-react";
+import { Users, CreditCard, FileSpreadsheet, Settings, Wallet, Loader2, Sheet, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSchoolFiscalData } from "@/hooks/payroll/useSchoolFiscalData";
 import { fetchPayrollSheetPayments } from "@/hooks/payroll/fetchPayrollSheet";
 import { buildPayrollSheetRows, exportPayrollSheet } from "@/lib/payroll/payrollSheet";
+import { downloadPayrollSheetPdf } from "@/lib/payroll/payrollSheetPdf";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
@@ -70,7 +71,7 @@ export default function PayrollDashboard() {
   };
 
   // The sheet the accountant receives: one row per worker of the selected period.
-  const handleSheet = async () => {
+  const handleSheet = async (format: "pdf" | "xlsx") => {
     const period = periods.find((p) => p.id === periodId);
     if (!schoolId || !period) return;
     setSheetLoading(true);
@@ -81,11 +82,10 @@ export default function PayrollDashboard() {
         return;
       }
       const schoolName = fiscal?.name ?? school?.name ?? "Colegio";
-      exportPayrollSheet(
-        { schoolName, schoolRif: fiscal?.rif ?? null, periodName: period.name, periodStart: period.start_date, periodEnd: period.end_date },
-        rows,
-        `planilla-${schoolName}-${period.name}`.replace(/\s+/g, "-")
-      );
+      const heading = { schoolName, schoolRif: fiscal?.rif ?? null, periodName: period.name, periodStart: period.start_date, periodEnd: period.end_date };
+      const filename = `planilla-${schoolName}-${period.name}`.replace(/\s+/g, "-");
+      if (format === "pdf") downloadPayrollSheetPdf(heading, rows, filename);
+      else exportPayrollSheet(heading, rows, filename);
     } catch (e) {
       toast({ title: "No se pudo generar la planilla", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -121,11 +121,19 @@ export default function PayrollDashboard() {
         </Button>
         <Button
           variant="outline"
-          onClick={handleSheet}
+          onClick={() => handleSheet("pdf")}
           disabled={periodId === "all" || sheetLoading}
-          title={periodId === "all" ? "Elija un período" : "Una fila por trabajador, con parafiscales, ISLR y referencia"}
+          title={periodId === "all" ? "Elija un período" : "Para imprimir: una fila por trabajador, con parafiscales, ISLR y referencia"}
         >
-          {sheetLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sheet className="h-4 w-4 mr-1" />}Planilla de nómina
+          {sheetLoading ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Printer className="h-4 w-4 mr-1" />}Planilla de nómina
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => handleSheet("xlsx")}
+          disabled={periodId === "all" || sheetLoading}
+          title={periodId === "all" ? "Elija un período" : "La misma planilla en Excel"}
+        >
+          <Sheet className="h-4 w-4 mr-1" />Planilla en Excel
         </Button>
         <Button asChild variant="outline"><Link to="/pagos/nomina/beneficiarios"><Users className="h-4 w-4 mr-1" />Beneficiarios</Link></Button>
         <Button asChild><Link to="/pagos/nomina/registro"><CreditCard className="h-4 w-4 mr-1" />Registrar</Link></Button>
