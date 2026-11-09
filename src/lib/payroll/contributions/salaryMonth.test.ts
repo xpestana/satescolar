@@ -31,6 +31,7 @@ const concepts: PayrollConcept[] = [
     is_active: true,
     is_islr_taxable: false,
     is_contribution_base: false,
+    is_base_salary: false,
   },
 ];
 

@@ -10,7 +10,8 @@ export async function fetchPayrollSheetPayments(schoolId: string, periodId: stri
     .select(
       "status, currency, exchange_rate, payment_reference, " +
         "payroll_beneficiaries(full_name, document_id, hire_date, job_title, category), " +
-        "payroll_payment_items(concept_kind, amount, amount_ves, withholding_id, " +
+        "payroll_payment_items(concept_kind, description, amount, amount_ves, withholding_id, unpaid_hours, " +
+        "payroll_concepts(name, is_base_salary), " +
         "payroll_contributions!payroll_payment_items_contribution_fk(kind))"
     )
     .eq("school_id", schoolId)
@@ -21,8 +22,9 @@ export async function fetchPayrollSheetPayments(schoolId: string, periodId: stri
 
   type Raw = Omit<SheetPaymentInput, "beneficiary" | "items"> & {
     payroll_beneficiaries: SheetPaymentInput["beneficiary"];
-    payroll_payment_items: (Omit<SheetPaymentInput["items"][number], "contribution_kind"> & {
+    payroll_payment_items: (Omit<SheetPaymentInput["items"][number], "contribution_kind" | "concept"> & {
       payroll_contributions: { kind: ContributionKind } | null;
+      payroll_concepts: { name: string; is_base_salary: boolean } | null;
     })[];
   };
   return ((data ?? []) as unknown as Raw[]).map((p) => ({
@@ -31,9 +33,10 @@ export async function fetchPayrollSheetPayments(schoolId: string, periodId: stri
     exchange_rate: Number(p.exchange_rate) || 0,
     payment_reference: p.payment_reference,
     beneficiary: p.payroll_beneficiaries,
-    items: (p.payroll_payment_items ?? []).map(({ payroll_contributions, ...item }) => ({
+    items: (p.payroll_payment_items ?? []).map(({ payroll_contributions, payroll_concepts, ...item }) => ({
       ...item,
       contribution_kind: payroll_contributions?.kind ?? null,
+      concept: payroll_concepts,
     })),
   }));
 }

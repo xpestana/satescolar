@@ -29,7 +29,7 @@ interface PayrollPaymentFormModalProps {
   onOpenChange: (open: boolean) => void;
   schoolId: string;
   periodId: string;
-  beneficiary: { id: string; full_name: string };
+  beneficiary: { id: string; full_name: string; monthly_hours?: number | null };
 }
 
 interface EditableLine {
@@ -77,6 +77,7 @@ export function PayrollPaymentFormModal({
   const [exchangeRate, setExchangeRate] = useState("1");
   const [methodId, setMethodId] = useState<string>("");
   const [notes, setNotes] = useState("");
+  const [unpaidHours, setUnpaidHours] = useState("");
   const [lines, setLines] = useState<EditableLine[]>([newLine()]);
 
   const selectedMethod = methods.find((m) => m.id === methodId);
@@ -87,6 +88,7 @@ export function PayrollPaymentFormModal({
     setExchangeRate("1");
     setMethodId("");
     setNotes("");
+    setUnpaidHours("");
     setLines([newLine()]);
   }, [open]);
 
@@ -115,6 +117,8 @@ export function PayrollPaymentFormModal({
         priorPayments: month.prior,
         contributionsEnabled,
         contributionParameters,
+        unpaidHours: Number(unpaidHours) || 0,
+        monthlyHours: beneficiary.monthly_hours ?? null,
         lines: lines
           .filter((l) => l.amount !== "" && Number(l.amount) > 0)
           .map((l) => ({
@@ -128,6 +132,7 @@ export function PayrollPaymentFormModal({
     [
       lines, concepts, vatEnabled, islrEnabled, parameters, currency, rate, ratesByBeneficiary, beneficiary.id,
       applyDeductions, period?.end_date, month.prior, contributionsEnabled, contributionParameters,
+      unpaidHours, beneficiary.monthly_hours,
     ]
   );
 
@@ -135,7 +140,7 @@ export function PayrollPaymentFormModal({
   const totals = draft.totals;
   const netVes = totals.netVes;
   const invalidDeductions = deductionsExceedEarnings(items);
-  const automaticLines = items.filter((i) => i.withholding_key || i.contribution_key);
+  const automaticLines = items.filter((i) => i.withholding_key || i.contribution_key || i.unpaid_hours);
   const monthLoading = !period || monthQuery.isLoading;
 
   const updateLine = (key: string, patch: Partial<EditableLine>) =>
@@ -144,10 +149,12 @@ export function PayrollPaymentFormModal({
   const onPickConcept = (key: string, conceptId: string) => {
     const c = concepts.find((x) => x.id === conceptId);
     if (!c) return;
-    // A concept priced in the other currency is converted at the payment's rate.
+    // A concept priced in the other currency is converted at the dollar rate: the one typed in a
+    // payment in dollars, the school's current one in a payment in bolívares (whose rate field is 1).
     let amount = c.default_amount || 0;
     if (amount && c.currency !== currency) {
-      amount = rate > 0 ? round2(c.currency === "USD" ? amount * rate : amount / rate) : 0;
+      const usdToVes = currency === "USD" ? rate : usdRate;
+      amount = usdToVes > 0 ? round2(c.currency === "USD" ? amount * usdToVes : amount / usdToVes) : 0;
     }
     updateLine(key, {
       concept_id: c.id,
@@ -328,7 +335,7 @@ export function PayrollPaymentFormModal({
           <div className="rounded-md border bg-muted/30 p-3 space-y-1 text-sm">
             <div className="flex justify-between"><span>Total asignaciones</span><span>{formatMoney(totals.gross, currency)}</span></div>
             {automaticLines.map((line) => (
-              <div key={line.withholding_key ?? line.contribution_key} className="flex justify-between text-xs text-muted-foreground">
+              <div key={line.withholding_key ?? line.contribution_key ?? "unpaid"} className="flex justify-between text-xs text-muted-foreground">
                 <span>{line.description} (automática)</span>
                 <span className="text-right">
                   {currency === "VES"
@@ -357,6 +364,26 @@ export function PayrollPaymentFormModal({
                 <AlertTriangle className="h-3 w-3" />{message}
               </p>
             ))}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="unpaid-hours" className="text-xs">Horas no trabajadas (permiso no justificado)</Label>
+            <Input
+              id="unpaid-hours"
+              type="number"
+              min="0"
+              step="any"
+              className="w-40"
+              value={unpaidHours}
+              onChange={(e) => setUnpaidHours(e.target.value)}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              {beneficiary.monthly_hours
+                ? `Trabaja ${beneficiary.monthly_hours} h al mes.` +
+                  (draft.hourlyVes ? ` Valor de la hora: ${formatMoney(draft.hourlyVes, "VES")} (sueldo base ÷ horas al mes).` : "")
+                : "Para descontar horas, indique en su ficha cuántas horas trabaja al mes."}
+            </p>
           </div>
 
           <div className="space-y-1.5">

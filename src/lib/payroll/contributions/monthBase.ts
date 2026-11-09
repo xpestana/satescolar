@@ -46,6 +46,7 @@ export function lineFlags(conceptId: string | null, concepts: PayrollConcept[]) 
   return {
     isTaxable: concept?.is_islr_taxable ?? true,
     isContributionBase: concept?.is_contribution_base ?? true,
+    isBaseSalary: concept?.is_base_salary ?? false,
   };
 }
 

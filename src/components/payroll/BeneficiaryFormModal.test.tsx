@@ -123,7 +123,8 @@ describe("BeneficiaryFormModal", () => {
     fireEvent.change(screen.getByPlaceholderText("Nombre y apellido"), { target: { value: "Luis" } });
     fireEvent.change(screen.getByPlaceholderText("12345678"), { target: { value: "7654321" } });
     fireEvent.change(screen.getByPlaceholderText("J-12345678-9"), { target: { value: "V-07654321-0" } });
-    fireEvent.change(screen.getByRole("spinbutton"), { target: { value: "2.5" } });
+    const ariInput = screen.getAllByRole("spinbutton").find((input) => input.getAttribute("name") === "ariRate")!;
+    fireEvent.change(ariInput, { target: { value: "2.5" } });
     fireEvent.click(screen.getByRole("button", { name: "Registrar" }));
     await waitFor(() => expect(addAriRate).toHaveBeenCalled());
     expect(addAriRate.mock.calls[0][0]).toMatchObject({ beneficiary_id: "new-id", rate_pct: 2.5 });

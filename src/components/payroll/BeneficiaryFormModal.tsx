@@ -70,6 +70,7 @@ function initialValues(
     notes: beneficiary?.notes ?? "",
     jobTitle: beneficiary?.job_title ?? "",
     hireDate: beneficiary?.hire_date ?? "",
+    monthlyHours: beneficiary?.monthly_hours != null ? String(beneficiary.monthly_hours) : "",
     ariRate: "",
     ariValidFrom: todayCaracasIso(),
     vatMode: beneficiary?.vat_withholding_mode ?? "standard",
@@ -352,6 +353,12 @@ export function BeneficiaryFormModal({
               <div className="space-y-2">
                 <Label htmlFor="beneficiary-hire-date">Fecha de ingreso</Label>
                 <Input id="beneficiary-hire-date" type="date" max={todayCaracasIso()} {...register("hireDate")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="beneficiary-monthly-hours">Horas al mes</Label>
+                <Input id="beneficiary-monthly-hours" type="number" min="1" step="any" {...register("monthlyHours")} placeholder="160" />
+                <FieldError message={errors.monthlyHours?.message} />
+                <p className="text-xs text-muted-foreground">Para descontar las horas no trabajadas.</p>
               </div>
             </div>
           )}

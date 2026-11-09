@@ -10,6 +10,7 @@ export interface ConceptInput {
   is_active?: boolean;
   is_islr_taxable?: boolean;
   is_contribution_base?: boolean;
+  is_base_salary?: boolean;
 }
 
 const KEY = "payroll-concepts";

@@ -21,9 +21,9 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
   const { concepts, isLoading, saveConcept, deleteConcept } = usePayrollConcepts(schoolId);
   const { islrEnabled } = usePayrollTaxConfig(schoolId);
   const { enabled: contributionsEnabled } = usePayrollContributionConfig(schoolId);
-  const columns = 4 + (islrEnabled ? 1 : 0) + (contributionsEnabled ? 1 : 0);
+  const columns = 5 + (islrEnabled ? 1 : 0) + (contributionsEnabled ? 1 : 0);
   const showError = (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" });
-  const saveFlag = (c: (typeof concepts)[number], patch: { is_islr_taxable?: boolean; is_contribution_base?: boolean }) =>
+  const saveFlag = (c: (typeof concepts)[number], patch: { is_islr_taxable?: boolean; is_contribution_base?: boolean; is_base_salary?: boolean }) =>
     saveConcept.mutate(
       { id: c.id, name: c.name, concept_kind: c.concept_kind, default_amount: c.default_amount, currency: c.currency, ...patch },
       { onError: showError }
@@ -99,6 +99,7 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
                 <TableHead>Concepto</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Monto</TableHead>
+                <TableHead title="Las horas no trabajadas se descuentan de este concepto">Sueldo base</TableHead>
                 {islrEnabled && <TableHead>Base del AR-I</TableHead>}
                 {contributionsEnabled && <TableHead>Parafiscales</TableHead>}
                 <TableHead className="w-16"></TableHead>
@@ -119,6 +120,15 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell>{c.default_amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })} {c.currency}</TableCell>
+                    <TableCell>
+                      {c.concept_kind === "earning" && (
+                        <Switch
+                          aria-label={`${c.name} es el sueldo base`}
+                          checked={c.is_base_salary}
+                          onCheckedChange={(checked) => saveFlag(c, { is_base_salary: checked })}
+                        />
+                      )}
+                    </TableCell>
                     {islrEnabled && (
                       <TableCell>
                         {c.concept_kind === "earning" && (

@@ -30,6 +30,8 @@ export interface PayrollBeneficiary {
   default_islr_concept_id: string | null;
   job_title: string | null;
   hire_date: string | null;
+  /** Hours a month the worker works; sets the value of an hour for unjustified absences. */
+  monthly_hours: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +71,8 @@ export interface PayrollConcept {
   is_islr_taxable: boolean;
   /** Whether it counts for IVSS, paro forzoso and FAOV. */
   is_contribution_base: boolean;
+  /** The base salary: unjustified absences are discounted from it by the hour. */
+  is_base_salary: boolean;
 }
 
 export interface PayrollLineItem {
@@ -78,6 +82,8 @@ export interface PayrollLineItem {
   amount: number;
   /** Exact bolívares of the line (null on lines saved before it existed). */
   amount_ves?: number | null;
+  /** Set on the unjustified-absence discount: the hours it discounts. */
+  unpaid_hours?: number | null;
 }
 
 export interface PayrollPayment {

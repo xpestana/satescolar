@@ -26,6 +26,7 @@ export const beneficiaryFormBaseSchema = z.object({
   notes: z.string(),
   jobTitle: z.string().default(""),
   hireDate: z.string().default(""),
+  monthlyHours: z.string().default(""),
   ariRate: z.string(),
   ariValidFrom: z.string(),
   vatMode: z.enum(["standard", "full", "excluded"]),
@@ -81,6 +82,12 @@ export function buildBeneficiaryFormSchema(ctx: BeneficiaryFormContext) {
     if (rules.email === "required" && !email) fail("email", "El correo es obligatorio");
     else if (email && !z.string().email().safeParse(email).success) fail("email", "Correo no válido");
 
+    const hours = (values.monthlyHours ?? "").trim();
+    if (hours) {
+      const n = Number(hours);
+      if (!Number.isFinite(n) || n <= 0 || n > 744) fail("monthlyHours", "Debe ser un número de horas entre 1 y 744");
+    }
+
     const ari = values.ariRate.trim();
     if (rules.ariRate === "required" && !ari && !ctx.hasAriRate) fail("ariRate", "El % de AR-I es obligatorio");
     if (ari) {
@@ -113,6 +120,7 @@ export interface BeneficiaryPayload {
   /** Staff paid by payroll: shown on the payroll sheet. */
   job_title: string | null;
   hire_date: string | null;
+  monthly_hours: number | null;
   vat_withholding_mode: VatWithholdingMode;
   vat_exclusion_reason: string | null;
   default_islr_concept_id: string | null;
@@ -146,6 +154,7 @@ export function toBeneficiaryPayload(values: BeneficiaryFormValues, ctx: Benefic
     notes: text(values.notes),
     job_title: isInvoice ? null : text(values.jobTitle ?? ""),
     hire_date: isInvoice ? null : values.hireDate || null,
+    monthly_hours: isInvoice || !(values.monthlyHours ?? "").trim() ? null : Number(values.monthlyHours),
     vat_withholding_mode: vatMode,
     vat_exclusion_reason: vatMode === "excluded" ? text(values.vatExclusionReason) : null,
     default_islr_concept_id:

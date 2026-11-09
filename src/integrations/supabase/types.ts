@@ -3219,6 +3219,7 @@ export type Database = {
           id: string
           is_active: boolean
           job_title: string | null
+          monthly_hours: number | null
           notes: string | null
           payment_regime: string
           person_type: string | null
@@ -3242,6 +3243,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           job_title?: string | null
+          monthly_hours?: number | null
           notes?: string | null
           payment_regime?: string
           person_type?: string | null
@@ -3266,6 +3268,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           job_title?: string | null
+          monthly_hours?: number | null
           notes?: string | null
           payment_regime?: string
           person_type?: string | null
@@ -3354,6 +3357,7 @@ export type Database = {
           default_amount: number
           id: string
           is_active: boolean
+          is_base_salary: boolean
           is_contribution_base: boolean
           is_islr_taxable: boolean
           name: string
@@ -3367,6 +3371,7 @@ export type Database = {
           default_amount?: number
           id?: string
           is_active?: boolean
+          is_base_salary?: boolean
           is_contribution_base?: boolean
           is_islr_taxable?: boolean
           name: string
@@ -3380,6 +3385,7 @@ export type Database = {
           default_amount?: number
           id?: string
           is_active?: boolean
+          is_base_salary?: boolean
           is_contribution_base?: boolean
           is_islr_taxable?: boolean
           name?: string
@@ -3706,6 +3712,7 @@ export type Database = {
           description: string | null
           id: string
           payment_id: string
+          unpaid_hours: number | null
           withholding_id: string | null
         }
         Insert: {
@@ -3718,6 +3725,7 @@ export type Database = {
           description?: string | null
           id?: string
           payment_id: string
+          unpaid_hours?: number | null
           withholding_id?: string | null
         }
         Update: {
@@ -3730,6 +3738,7 @@ export type Database = {
           description?: string | null
           id?: string
           payment_id?: string
+          unpaid_hours?: number | null
           withholding_id?: string | null
         }
         Relationships: [

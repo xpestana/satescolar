@@ -96,8 +96,10 @@ export function usePayrollRecalculate(schoolId: string | null | undefined) {
               priorPayments: month?.prior ?? [],
               contributionsEnabled,
               contributionParameters,
+              unpaidHours: Number((itemsResult.data ?? []).find((i) => i.unpaid_hours)?.unpaid_hours) || 0,
+              monthlyHours: beneficiary.monthly_hours,
               lines: (itemsResult.data ?? [])
-                .filter((i) => !i.withholding_id && !i.contribution_id)
+                .filter((i) => !i.withholding_id && !i.contribution_id && !i.unpaid_hours)
                 .map((i) => ({
                   concept_id: i.concept_id,
                   concept_kind: i.concept_kind as ConceptKind,

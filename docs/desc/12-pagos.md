@@ -920,6 +920,18 @@ decimales del BCV. El recibo (PDF y correo) muestra cada línea en dólares y en
 anteriores, sin `amount_ves`, se convierten como antes. Migración `20261106120000_payroll_item_amount_ves.sql`;
 prueba en `src/lib/payroll/contributions/usdSheet.test.ts`.
 
+**Permiso no justificado por horas.** No es un concepto: al registrar el pago se escriben las horas
+no trabajadas y el sistema agrega la línea "Permiso no justificado (N h)" = horas × (sueldo base del
+pago en Bs ÷ horas al mes del trabajador), redondeando solo al final. Las horas al mes van en la ficha
+(`payroll_beneficiaries.monthly_hours`) y el sueldo base es el concepto marcado como tal
+(`payroll_concepts.is_base_salary`). La línea guarda sus horas (`payroll_payment_items.unpaid_hours`)
+y no cambia la base de los parafiscales. Migración `20261109120000_payroll_unpaid_hours.sql`.
+
+**Planilla de nómina** (Dashboard → período → "Planilla de nómina" en PDF o "Planilla en Excel"):
+una hoja por categoría con sueldo base en $ y Bs, una columna por cada otra asignación (bono, cesta
+ticket…), IVSS, FAOV, paro forzoso, permiso no justificado, ISLR, otros descuentos, total a pagar y
+referencia (`payrollSheet.ts`, `payrollSheetPdf.ts`).
+
 Cálculo en `src/lib/payroll/contributions/*` (`calculateContributions`, `monthBase`) y
 `buildSalaryPaymentDraft`; migración `20261105130000_payroll_period_deductions_contributions.sql`.
 

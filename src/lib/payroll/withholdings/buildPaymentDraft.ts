@@ -61,6 +61,7 @@ export interface DraftWithholding {
 export interface DraftItem extends PayrollLineItem {
   withholding_key?: string | null;
   contribution_key?: string | null;
+  unpaid_hours?: number | null;
   /** Exact amount in bolívares, rounded to 2 decimals. What the school actually adds up. */
   amount_ves?: number;
 }
@@ -125,6 +126,8 @@ export interface PaymentDraft {
   /** Salary payments in a discounting period: the earlier payments of the month it summed. */
   monthBasePaymentIds: string[] | null;
   monthBase: MonthBaseSummary | null;
+  /** Unjustified absences: value of one hour of base salary, in bolívares, unrounded. */
+  hourlyVes: number | null;
 }
 
 interface TaxContext {
@@ -159,7 +162,7 @@ function finish(
   currency: PayrollCurrency,
   rate: number,
   errors: string[],
-  salary: Pick<PaymentDraft, "contributions" | "monthBasePaymentIds" | "monthBase"> = {
+  salary: Pick<PaymentDraft, "contributions" | "monthBasePaymentIds" | "monthBase"> & { hourlyVes?: number | null } = {
     contributions: [],
     monthBasePaymentIds: null,
     monthBase: null,
@@ -176,6 +179,7 @@ function finish(
     items: withVes,
     documents,
     withholdings,
+    hourlyVes: null,
     ...salary,
     totals: {
       ...totals,
@@ -352,6 +356,8 @@ export interface SalaryLine extends PayrollLineItem {
   isTaxable: boolean;
   /** Whether it counts for contributions. Lines without a concept count by default. */
   isContributionBase?: boolean;
+  /** The base salary, which unjustified absences are discounted from by the hour. */
+  isBaseSalary?: boolean;
 }
 
 export interface SalaryDraftInput extends TaxContext {
@@ -367,6 +373,44 @@ export interface SalaryDraftInput extends TaxContext {
   priorPayments?: PriorPayment[];
   contributionsEnabled?: boolean;
   contributionParameters?: ContributionParameters[];
+  /** Hours of unjustified absence to discount. */
+  unpaidHours?: number;
+  /** Hours a month the worker works (from their record). */
+  monthlyHours?: number | null;
+}
+
+/**
+ * Unjustified absences: hours × (base salary of the payment ÷ hours a month). The base salary in
+ * bolívares isn't rounded first: only the discount is, at the end of the calculation.
+ */
+function unpaidHoursLine(input: SalaryDraftInput, errors: string[]): { item: DraftItem | null; hourlyVes: number | null } {
+  const hours = input.unpaidHours ?? 0;
+  if (!(hours > 0)) return { item: null, hourlyVes: null };
+  const usdToVes = input.currency === "USD" ? input.exchangeRate : 1;
+  const baseVes = input.lines
+    .filter((l) => l.concept_kind === "earning" && l.isBaseSalary)
+    .reduce((sum, l) => sum + Math.max(0, l.amount || 0) * usdToVes, 0);
+  if (!input.monthlyHours || input.monthlyHours <= 0) {
+    errors.push("Indique en la ficha del trabajador cuántas horas trabaja al mes para descontar las horas no trabajadas.");
+    return { item: null, hourlyVes: null };
+  }
+  if (baseVes <= 0) {
+    errors.push("Agregue la línea del sueldo base para descontar las horas no trabajadas.");
+    return { item: null, hourlyVes: null };
+  }
+  const hourlyVes = baseVes / input.monthlyHours;
+  const discountVes = round2(hours * hourlyVes);
+  return {
+    hourlyVes,
+    item: {
+      concept_id: null,
+      concept_kind: "deduction",
+      description: `Permiso no justificado (${String(hours).replace(".", ",")} h)`,
+      amount: currencyAmount(discountVes, input.currency, input.exchangeRate),
+      amount_ves: discountVes,
+      unpaid_hours: hours,
+    },
+  };
 }
 
 const pctLabel = (pct: number) => `${String(pct).replace(".", ",")} %`;
@@ -380,16 +424,20 @@ const pctLabel = (pct: number) => `${String(pct).replace(".", ",")} %`;
 export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
   const { currency, exchangeRate: rate } = input;
   const errors: string[] = [];
-  const items: DraftItem[] = input.lines.map(({ isTaxable: _t, isContributionBase: _c, ...line }) => line);
+  const items: DraftItem[] = input.lines.map(({ isTaxable: _t, isContributionBase: _c, isBaseSalary: _b, ...line }) => line);
   const withholdings: DraftWithholding[] = [];
   const contributions: DraftContribution[] = [];
   const applyDeductions = input.applyDeductions ?? true;
+  // Absences are discounted whenever they're typed, whether or not the period discounts taxes.
+  const unpaid = unpaidHoursLine(input, errors);
+  if (unpaid.item) items.push(unpaid.item);
 
   if (!applyDeductions) {
     return finish(items, [], withholdings, currency, rate, errors, {
       contributions,
       monthBasePaymentIds: null,
       monthBase: null,
+      hourlyVes: unpaid.hourlyVes,
     });
   }
 
@@ -507,6 +555,7 @@ export function buildSalaryPaymentDraft(input: SalaryDraftInput): PaymentDraft {
     contributions,
     monthBasePaymentIds: prior.map((p) => p.id),
     monthBase,
+    hourlyVes: unpaid.hourlyVes,
   });
 }
 
