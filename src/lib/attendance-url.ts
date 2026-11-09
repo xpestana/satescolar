@@ -1,5 +1,5 @@
 const PREVIEW_HOST_MARKER = "id-preview--";
-const FALLBACK_PUBLISHED_URL = "https://satescolar.lovable.app";
+const FALLBACK_PUBLISHED_URL = "https://app.satescolar.com";
 
 const normalizeUrl = (value: string) => value.replace(/\/+$/, "");
 
