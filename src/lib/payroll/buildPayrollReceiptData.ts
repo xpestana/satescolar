@@ -106,7 +106,8 @@ export function buildPayrollReceiptData(input: PayrollReceiptInput): PayrollRece
     documentId: input.documentId || "—",
     categoryLabel: CATEGORY_LABELS[input.category] ?? input.category,
     periodName: input.periodName || "—",
-    periodRange: `${formatDate(input.periodStart)} — ${formatDate(input.periodEnd)}`,
+    // Empty when the caller has no dates (the history only knows the period name).
+    periodRange: input.periodStart && input.periodEnd ? `${formatDate(input.periodStart)} — ${formatDate(input.periodEnd)}` : "",
     currency: input.currency,
     earnings: input.items.filter((i) => i.concept_kind === "earning").map(toLine),
     deductions: input.items.filter((i) => i.concept_kind === "deduction").map(toLine),

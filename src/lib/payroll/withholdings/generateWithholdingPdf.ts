@@ -37,7 +37,12 @@ function box(doc: jsPDF, x: number, y: number, w: number, h: number, label: stri
   doc.setFontSize(7.5);
   doc.text(label, x + w / 2, y + 3.8, { align: "center" });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  // A long single word (an email) can't wrap: it shrinks to fit the box instead.
+  let size = 8.5;
+  doc.setFontSize(size);
+  if (!/\s/.test(value)) {
+    while (size > 5.5 && doc.getTextWidth(value) > w - 3) doc.setFontSize((size -= 0.5));
+  }
   doc.text(doc.splitTextToSize(value, w - 3) as string[], x + 1.5, y + 8.2);
 }
 

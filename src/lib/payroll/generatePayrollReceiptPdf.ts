@@ -25,7 +25,7 @@ export function generatePayrollReceiptPdf(data: PayrollReceiptData): jsPDF {
     `Beneficiario: ${data.beneficiaryName}`,
     `Cédula/RIF: ${data.documentId}`,
     `Categoría: ${data.categoryLabel}`,
-    `Período: ${data.periodName} (${data.periodRange})`,
+    `Período: ${data.periodName}${data.periodRange ? ` (${data.periodRange})` : ""}`,
     `Método de pago: ${data.methodLabel}`,
     `Fecha de pago: ${data.paymentDateFormatted}`,
     `Referencia: ${data.paymentReference}`,
