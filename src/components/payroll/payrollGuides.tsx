@@ -54,6 +54,7 @@ export function beneficiariesGuide(options: GuideOptions): PayrollGuideContent {
         {options.islrEnabled && <> Indica también su <B>concepto de ISLR habitual</B>.</>}
       </>,
       <>Con <B>Métodos</B>, guarda la cuenta o el medio donde le pagas.</>,
+      <>Con <B>Conceptos</B>, indica lo que se le paga normalmente y su monto, por ejemplo un sueldo distinto al de los demás. Saldrá ya puesto en cada pago.</>,
     ],
     notes: [
       <><B>Docentes:</B> puedes vincular uno ya registrado o registrarlo solo en Nómina, sin darle acceso al sistema. Si luego lo agregas en Docentes con la misma cédula, quedan vinculados.</>,
@@ -122,7 +123,8 @@ export function conceptsGuide(options: { islrEnabled: boolean; contributionsEnab
     steps: [
       <>Crea cada concepto con su nombre y tipo: <B>Asignación</B> suma al pago y <B>Deducción</B> lo resta.</>,
       <>Si suele ser el mismo monto, escríbelo en <B>Monto por defecto</B>.</>,
-      <>Los usarás al registrar los pagos del personal.</>,
+      <>En <B>Por defecto</B>, elige a quién le sale ya puesto al registrar el pago: a todos los trabajadores o solo a una categoría.</>,
+      <>Marca como <B>Sueldo base</B> el concepto del salario: de él se descuentan las horas no trabajadas.</>,
     ],
     notes: [
       ...when(options.islrEnabled, <>Solo las asignaciones con <B>Base del AR-I</B> encendido entran en el cálculo de esa retención.</>),

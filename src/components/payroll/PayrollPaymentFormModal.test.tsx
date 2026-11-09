@@ -8,7 +8,12 @@ let periodApplies = true;
 let monthRows: MonthPaymentRow[] = [];
 
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
-vi.mock("@/hooks/payroll/usePayrollConcepts", () => ({ usePayrollConcepts: () => ({ concepts: [] }) }));
+let concepts: unknown[] = [];
+let own: unknown[] = [];
+vi.mock("@/hooks/payroll/usePayrollConcepts", () => ({ usePayrollConcepts: () => ({ concepts, isLoading: false }) }));
+vi.mock("@/hooks/payroll/usePayrollBeneficiaryConcepts", () => ({
+  usePayrollBeneficiaryConcepts: () => ({ own, isFetched: true }),
+}));
 vi.mock("@/hooks/payroll/usePayrollMethods", () => ({ usePayrollMethods: () => ({ methods: [] }) }));
 vi.mock("@/hooks/payroll/usePayrollUsdRate", () => ({ usePayrollUsdRate: () => ({ data: 0 }) }));
 vi.mock("@/hooks/payroll/usePayrollPayments", () => ({
@@ -88,6 +93,8 @@ describe("PayrollPaymentFormModal: descuento por período", () => {
   beforeEach(() => {
     register.mockReset();
     monthRows = [];
+    concepts = [];
+    own = [];
   });
 
   it("la 1ra quincena que no descuenta se paga completa", () => {
@@ -118,6 +125,38 @@ describe("PayrollPaymentFormModal: descuento por período", () => {
       ["ivss", 30],
       ["rpe", 7.5],
       ["faov", 20],
+    ]);
+  });
+});
+
+describe("PayrollPaymentFormModal: conceptos por defecto", () => {
+  const concept = (id: string, extra: Record<string, unknown>) => ({
+    id, school_id: "s1", name: id, concept_kind: "earning", default_amount: 0, currency: "USD", is_active: true,
+    is_islr_taxable: true, is_contribution_base: false, is_base_salary: false, is_default: false, default_categories: [], ...extra,
+  });
+
+  beforeEach(() => {
+    register.mockReset();
+    monthRows = [];
+    periodApplies = false;
+  });
+
+  it("abre el pago en dólares con sus conceptos y su sueldo propio", () => {
+    concepts = [
+      concept("Sueldo base", { default_amount: 1.5, is_default: true, is_base_salary: true, is_contribution_base: true }),
+      concept("Cesta ticket", { default_amount: 40, is_default: true, is_islr_taxable: false }),
+      concept("Prima docente", { default_amount: 5, is_default: true, default_categories: ["teacher"] }),
+    ];
+    own = [{ concept_id: "Sueldo base", enabled: true, amount: 3 }];
+    render(
+      <PayrollPaymentFormModal open onOpenChange={vi.fn()} schoolId="s1" periodId="q2" beneficiary={{ id: "b1", full_name: "Ana Pérez", category: "worker" }} />
+    );
+    expect(screen.getByText(/Salieron puestos los conceptos/)).toBeInTheDocument();
+    const amounts = screen.getAllByPlaceholderText("Monto").map((input) => (input as HTMLInputElement).value);
+    expect(amounts).toEqual(["3", "40"]);
+    expect(screen.getAllByPlaceholderText("Descripción").map((input) => (input as HTMLInputElement).value)).toEqual([
+      "Sueldo base",
+      "Cesta ticket",
     ]);
   });
 });

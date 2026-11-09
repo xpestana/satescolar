@@ -73,6 +73,10 @@ export interface PayrollConcept {
   is_contribution_base: boolean;
   /** The base salary: unjustified absences are discounted from it by the hour. */
   is_base_salary: boolean;
+  /** Filled in by default when registering a salary payment. */
+  is_default: boolean;
+  /** Categories it's on by default for; empty = every category. */
+  default_categories: string[];
 }
 
 export interface PayrollLineItem {

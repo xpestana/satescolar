@@ -6,7 +6,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { defaultCategoriesLabel } from "@/lib/payroll/defaultConcepts";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { usePayrollConcepts } from "@/hooks/payroll/usePayrollConcepts";
@@ -14,16 +23,18 @@ import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
 import { usePayrollContributionConfig } from "@/hooks/payroll/usePayrollContributionConfig";
 import { PayrollGuide } from "@/components/payroll/PayrollGuide";
 import { conceptsGuide } from "@/components/payroll/payrollGuides";
-import type { ConceptKind, PayrollCurrency } from "@/lib/payroll/types";
+import { CATEGORY_LABELS, type ConceptKind, type PayrollConcept, type PayrollCategory, type PayrollCurrency } from "@/lib/payroll/types";
+
+const STAFF_CATEGORIES = (Object.keys(CATEGORY_LABELS) as PayrollCategory[]).filter((c) => c !== "supplier");
 
 export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
   const { toast } = useToast();
   const { concepts, isLoading, saveConcept, deleteConcept } = usePayrollConcepts(schoolId);
   const { islrEnabled } = usePayrollTaxConfig(schoolId);
   const { enabled: contributionsEnabled } = usePayrollContributionConfig(schoolId);
-  const columns = 5 + (islrEnabled ? 1 : 0) + (contributionsEnabled ? 1 : 0);
+  const columns = 6 + (islrEnabled ? 1 : 0) + (contributionsEnabled ? 1 : 0);
   const showError = (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" });
-  const saveFlag = (c: (typeof concepts)[number], patch: { is_islr_taxable?: boolean; is_contribution_base?: boolean; is_base_salary?: boolean }) =>
+  const saveFlag = (c: (typeof concepts)[number], patch: { is_islr_taxable?: boolean; is_contribution_base?: boolean; is_base_salary?: boolean; is_default?: boolean; default_categories?: string[] }) =>
     saveConcept.mutate(
       { id: c.id, name: c.name, concept_kind: c.concept_kind, default_amount: c.default_amount, currency: c.currency, ...patch },
       { onError: showError }
@@ -99,6 +110,7 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
                 <TableHead>Concepto</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Monto</TableHead>
+                <TableHead title="Sale ya puesto al registrar el pago de estos trabajadores">Por defecto</TableHead>
                 <TableHead title="Las horas no trabajadas se descuentan de este concepto">Sueldo base</TableHead>
                 {islrEnabled && <TableHead>Base del AR-I</TableHead>}
                 {contributionsEnabled && <TableHead>Parafiscales</TableHead>}
@@ -120,6 +132,9 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell>{c.default_amount.toLocaleString("es-VE", { minimumFractionDigits: 2 })} {c.currency}</TableCell>
+                    <TableCell>
+                      <DefaultsMenu concept={c} onChange={(patch) => saveFlag(c, patch)} />
+                    </TableCell>
                     <TableCell>
                       {c.concept_kind === "earning" && (
                         <Switch
@@ -164,5 +179,51 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** Who gets the concept filled in by default: nobody, every worker, or some categories. */
+function DefaultsMenu({
+  concept,
+  onChange,
+}: {
+  concept: PayrollConcept;
+  onChange: (patch: { is_default: boolean; default_categories: string[] }) => void;
+}) {
+  const categories = concept.default_categories ?? [];
+  const forAll = concept.is_default && categories.length === 0;
+  const toggleCategory = (category: PayrollCategory) => {
+    const current = concept.is_default && !forAll ? categories : [];
+    const next = current.includes(category) ? current.filter((c) => c !== category) : [...current, category];
+    onChange({ is_default: next.length > 0, default_categories: next });
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant={concept.is_default ? "secondary" : "ghost"} className="h-8 max-w-[180px] justify-between gap-1">
+          <span className="truncate">{defaultCategoriesLabel(concept)}</span>
+          <ChevronDown className="h-3 w-3 shrink-0" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel className="text-xs">Sale ya puesto al pagar a</DropdownMenuLabel>
+        <DropdownMenuCheckboxItem
+          checked={forAll}
+          onCheckedChange={(checked) => onChange({ is_default: !!checked, default_categories: [] })}
+        >
+          Todos los trabajadores
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        {STAFF_CATEGORIES.map((category) => (
+          <DropdownMenuCheckboxItem
+            key={category}
+            checked={concept.is_default && !forAll && categories.includes(category)}
+            onCheckedChange={() => toggleCategory(category)}
+          >
+            Solo {CATEGORY_LABELS[category].toLowerCase()}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

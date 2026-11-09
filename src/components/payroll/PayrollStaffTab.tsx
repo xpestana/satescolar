@@ -181,7 +181,7 @@ export function PayrollStaffTab({ schoolId, periodId, beneficiaries, canRegister
           onOpenChange={(v) => !v && setRegisterFor(null)}
           schoolId={schoolId}
           periodId={periodId}
-          beneficiary={{ id: registerFor.id, full_name: registerFor.full_name, monthly_hours: registerFor.monthly_hours }}
+          beneficiary={{ id: registerFor.id, full_name: registerFor.full_name, monthly_hours: registerFor.monthly_hours, category: registerFor.category }}
         />
       )}
     </>

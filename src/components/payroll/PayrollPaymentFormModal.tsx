@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,9 +17,11 @@ import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
 import { usePayrollContributionConfig } from "@/hooks/payroll/usePayrollContributionConfig";
 import { usePayrollMonthPayments } from "@/hooks/payroll/usePayrollMonthPayments";
 import { lineFlags, splitMonthPayments } from "@/lib/payroll/contributions/monthBase";
+import { usePayrollBeneficiaryConcepts } from "@/hooks/payroll/usePayrollBeneficiaryConcepts";
+import { amountInPaymentCurrency, defaultConceptLines, sharedCurrency } from "@/lib/payroll/defaultConcepts";
 import { deductionsExceedEarnings, round2 } from "@/lib/payroll/calculateNet";
 import { formatMoney } from "@/lib/payroll/buildPayrollReceiptData";
-import { METHOD_LABELS, type ConceptKind, type PayrollCurrency } from "@/lib/payroll/types";
+import { METHOD_LABELS, type ConceptKind, type PayrollCategory, type PayrollCurrency } from "@/lib/payroll/types";
 import { buildSalaryPaymentDraft, type MonthBaseSummary } from "@/lib/payroll/withholdings/buildPaymentDraft";
 import { todayCaracasIso } from "@/lib/dateUtils";
 import { MethodDetails } from "@/components/payroll/MethodDetails";
@@ -29,7 +31,7 @@ interface PayrollPaymentFormModalProps {
   onOpenChange: (open: boolean) => void;
   schoolId: string;
   periodId: string;
-  beneficiary: { id: string; full_name: string; monthly_hours?: number | null };
+  beneficiary: { id: string; full_name: string; monthly_hours?: number | null; category?: PayrollCategory };
 }
 
 interface EditableLine {
@@ -57,7 +59,8 @@ export function PayrollPaymentFormModal({
   beneficiary,
 }: PayrollPaymentFormModalProps) {
   const { toast } = useToast();
-  const { concepts } = usePayrollConcepts(schoolId);
+  const { concepts, isLoading: conceptsLoading } = usePayrollConcepts(schoolId);
+  const { own, isFetched: ownFetched } = usePayrollBeneficiaryConcepts(schoolId, beneficiary.id);
   const { methods } = usePayrollMethods(schoolId, beneficiary.id);
   const { data: usdRate = 0 } = usePayrollUsdRate(schoolId);
   const { registerPayment } = usePayrollPayments(schoolId);
@@ -79,6 +82,8 @@ export function PayrollPaymentFormModal({
   const [notes, setNotes] = useState("");
   const [unpaidHours, setUnpaidHours] = useState("");
   const [lines, setLines] = useState<EditableLine[]>([newLine()]);
+  const [prefilledCount, setPrefilledCount] = useState(0);
+  const prefilled = useRef(false);
 
   const selectedMethod = methods.find((m) => m.id === methodId);
 
@@ -90,7 +95,33 @@ export function PayrollPaymentFormModal({
     setNotes("");
     setUnpaidHours("");
     setLines([newLine()]);
+    setPrefilledCount(0);
+    prefilled.current = false;
   }, [open]);
+
+  // Once its data is loaded, fill in the concepts this worker usually gets, in the currency they
+  // share (so a salary in dollars opens the payment in dollars).
+  useEffect(() => {
+    if (!open || prefilled.current || conceptsLoading || !ownFetched) return;
+    prefilled.current = true;
+    const defaults = defaultConceptLines(concepts, beneficiary.category ?? "other", own);
+    if (defaults.length === 0) return;
+    const paymentCurrency = sharedCurrency(defaults) ?? "VES";
+    setCurrency(paymentCurrency);
+    setLines(
+      defaults.map(({ concept, amount }) => {
+        const converted = amountInPaymentCurrency(amount, concept.currency, paymentCurrency, usdRate);
+        return {
+          ...newLine(),
+          concept_id: concept.id,
+          description: concept.name,
+          concept_kind: concept.concept_kind,
+          amount: converted ? String(converted) : "",
+        };
+      })
+    );
+    setPrefilledCount(defaults.length);
+  }, [open, conceptsLoading, ownFetched, concepts, own, beneficiary.category, usdRate]);
 
   // When switching to USD, prefill the current rate.
   useEffect(() => {
@@ -269,6 +300,11 @@ export function PayrollPaymentFormModal({
                 <Plus className="h-3 w-3 mr-1" />Agregar línea
               </Button>
             </div>
+            {prefilledCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Salieron puestos los conceptos de este trabajador. Revise los montos y quite o agregue líneas si hace falta.
+              </p>
+            )}
             {lines.map((l) => (
               <div key={l.key} className="grid grid-cols-12 gap-2 items-end">
                 <div className="col-span-4 space-y-1">

@@ -3349,15 +3349,72 @@ export type Database = {
           },
         ]
       }
+      payroll_beneficiary_concepts: {
+        Row: {
+          amount: number | null
+          beneficiary_id: string
+          concept_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number | null
+          beneficiary_id: string
+          concept_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number | null
+          beneficiary_id?: string
+          concept_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_beneficiary_concepts_beneficiary_id_fkey"
+            columns: ["beneficiary_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_beneficiaries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_beneficiary_concepts_concept_id_fkey"
+            columns: ["concept_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_beneficiary_concepts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_concepts: {
         Row: {
           concept_kind: string
           created_at: string
           currency: string
           default_amount: number
+          default_categories: string[]
           id: string
           is_active: boolean
           is_base_salary: boolean
+          is_default: boolean
           is_contribution_base: boolean
           is_islr_taxable: boolean
           name: string
@@ -3369,9 +3426,11 @@ export type Database = {
           created_at?: string
           currency?: string
           default_amount?: number
+          default_categories?: string[]
           id?: string
           is_active?: boolean
           is_base_salary?: boolean
+          is_default?: boolean
           is_contribution_base?: boolean
           is_islr_taxable?: boolean
           name: string
@@ -3383,9 +3442,11 @@ export type Database = {
           created_at?: string
           currency?: string
           default_amount?: number
+          default_categories?: string[]
           id?: string
           is_active?: boolean
           is_base_salary?: boolean
+          is_default?: boolean
           is_contribution_base?: boolean
           is_islr_taxable?: boolean
           name?: string

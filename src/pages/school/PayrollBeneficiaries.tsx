@@ -8,12 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
-import { Search, Plus, CreditCard, History, Pencil } from "lucide-react";
+import { Search, Plus, CreditCard, History, Pencil, ListChecks } from "lucide-react";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { usePayrollBeneficiaries } from "@/hooks/payroll/usePayrollBeneficiaries";
 import { BeneficiaryFormModal } from "@/components/payroll/BeneficiaryFormModal";
 import { PayrollMethodsModal } from "@/components/payroll/PayrollMethodsModal";
+import { PayrollBeneficiaryConceptsModal } from "@/components/payroll/PayrollBeneficiaryConceptsModal";
 import { PayrollBeneficiaryHistoryModal } from "@/components/payroll/PayrollBeneficiaryHistoryModal";
 import { PayrollGuide } from "@/components/payroll/PayrollGuide";
 import { beneficiariesGuide } from "@/components/payroll/payrollGuides";
@@ -37,6 +38,7 @@ export default function PayrollBeneficiaries() {
   const [editing, setEditing] = useState<PayrollBeneficiary | null>(null);
   const [methodsFor, setMethodsFor] = useState<PayrollBeneficiary | null>(null);
   const [historyFor, setHistoryFor] = useState<PayrollBeneficiary | null>(null);
+  const [conceptsFor, setConceptsFor] = useState<PayrollBeneficiary | null>(null);
 
   const normalize = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
@@ -103,7 +105,7 @@ export default function PayrollBeneficiaries() {
                 <TableHead>Cédula/RIF</TableHead>
                 <TableHead>Categoría</TableHead>
                 <TableHead>Correo</TableHead>
-                <TableHead className="w-52">Acciones</TableHead>
+                <TableHead className="w-64">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -135,6 +137,11 @@ export default function PayrollBeneficiaries() {
                         <Button size="sm" variant="outline" onClick={() => setMethodsFor(b)}>
                           <CreditCard className="h-3 w-3 mr-1" />Métodos
                         </Button>
+                        {b.payment_regime === "payroll" && (
+                          <Button size="sm" variant="outline" title="Lo que sale puesto al registrar su pago" onClick={() => setConceptsFor(b)}>
+                            <ListChecks className="h-3 w-3 mr-1" />Conceptos
+                          </Button>
+                        )}
                         <Button size="sm" variant="ghost" title="Historial" onClick={() => setHistoryFor(b)}>
                           <History className="h-3 w-3" />
                         </Button>
@@ -160,6 +167,14 @@ export default function PayrollBeneficiaries() {
           schoolId={schoolId}
           beneficiaryId={methodsFor.id}
           beneficiaryName={methodsFor.full_name}
+        />
+      )}
+      {conceptsFor && (
+        <PayrollBeneficiaryConceptsModal
+          open={!!conceptsFor}
+          onOpenChange={(v) => !v && setConceptsFor(null)}
+          schoolId={schoolId}
+          beneficiary={conceptsFor}
         />
       )}
       {historyFor && (

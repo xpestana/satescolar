@@ -11,6 +11,8 @@ export interface ConceptInput {
   is_islr_taxable?: boolean;
   is_contribution_base?: boolean;
   is_base_salary?: boolean;
+  is_default?: boolean;
+  default_categories?: string[];
 }
 
 const KEY = "payroll-concepts";
