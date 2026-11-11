@@ -61,6 +61,19 @@ describe("withholding PDFs", () => {
     expect(content).not.toContain("ANULADO");
   });
 
+  it("prints the IVA voucher on portrait letter, using only the top half", () => {
+    const doc = generateWithholdingVoucherPdf({
+      ...vatVoucher,
+      agent: { ...vatVoucher.agent, address: "Av. Principal de la urbanización, edificio largo, piso 3, oficina 3-B, municipio y estado ".repeat(2) },
+      operation: { ...vatVoucher.operation, totalVes: 1234567.89, baseVes: 1064282.66, taxVes: 170285.23, withheldVes: 127713.92 },
+    });
+    expect(doc.internal.pageSize.getWidth()).toBeCloseTo(215.9, 0);
+    expect(doc.internal.pageSize.getHeight()).toBeCloseTo(279.4, 0);
+    expect(doc.getNumberOfPages()).toBe(1);
+    const tableEnd = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+    expect(tableEnd).toBeLessThan(279.4 / 2 - 25);
+  });
+
   it("prints the ISLR voucher with concept code, portion and subtrahend", () => {
     const content = generateWithholdingVoucherPdf(islrVoucher).output();
     for (const text of ["Decreto 1.808", "002", "266.874,00", "3,00%", "107,50", "7.898,72", "retenido", "20261100000001"]) {

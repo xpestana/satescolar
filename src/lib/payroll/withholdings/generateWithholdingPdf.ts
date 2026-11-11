@@ -29,60 +29,88 @@ function voidedMark(doc: jsPDF, data: VoucherData, x: number, y: number) {
   doc.setTextColor(0, 0, 0);
 }
 
-/** A bordered field: small bold label on top, value below. */
+/**
+ * A bordered field: small bold label on top, value below. A value that doesn't fit (a long email
+ * or address) shrinks until it does, so nothing spills out of the box.
+ */
 function box(doc: jsPDF, x: number, y: number, w: number, h: number, label: string, value: string) {
   doc.setDrawColor(0);
   doc.rect(x, y, w, h);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.text(label, x + w / 2, y + 3.8, { align: "center" });
+  doc.setFontSize(5.8);
+  doc.text(label, x + w / 2, y + 2.6, { align: "center" });
   doc.setFont("helvetica", "normal");
-  // A long single word (an email) can't wrap: it shrinks to fit the box instead.
-  let size = 8.5;
-  doc.setFontSize(size);
-  if (!/\s/.test(value)) {
-    while (size > 5.5 && doc.getTextWidth(value) > w - 3) doc.setFontSize((size -= 0.5));
+  const maxWidth = w - 2.4;
+  const firstLine = (size: number) => y + 3.4 + size * 0.3528;
+  let size = 7.5;
+  let lines: string[] = [];
+  for (; size >= 5; size -= 0.5) {
+    doc.setFontSize(size);
+    lines = doc.splitTextToSize(value, maxWidth) as string[];
+    const lineHeight = size * 0.3528 * 1.15;
+    const fitsWide = lines.every((line) => doc.getTextWidth(line) <= maxWidth);
+    const fitsTall = firstLine(size) + (lines.length - 1) * lineHeight <= y + h - 0.9;
+    if (fitsWide && fitsTall) break;
   }
-  doc.text(doc.splitTextToSize(value, w - 3) as string[], x + 1.5, y + 8.2);
+  doc.setFontSize(Math.max(size, 5));
+  doc.text(lines, x + 1.2, firstLine(Math.max(size, 5)), { lineHeightFactor: 1.15 });
 }
 
+// US Letter portrait. Everything stays in the top half so the sheet can be cut in two (half
+// letter), while the PDF still shows the whole page.
+const LETTER_WIDTH = 215.9;
+const HALF_LETTER = 279.4 / 2;
+
 function generateVatVoucherPdf(data: VoucherData): jsPDF {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
   const op = data.operation;
-  const left = 10;
+  const left = 8;
+  const right = LETTER_WIDTH - 8;
+  const gap = 2;
+  // Three columns for the boxes: name, RIF and a narrow one on the right.
+  const col3 = { x: right - 42, w: 42 };
+  const col2 = { x: col3.x - gap - 42, w: 42 };
+  const col1 = { x: left, w: col2.x - gap - left };
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("COMPROBANTE DE RETENCIÓN DE IMPUESTO AL VALOR AGREGADO (IVA)", left + 22, 16);
-  box(doc, 200, 9, 34, 13, "FECHA EMISIÓN", data.issueDate);
-  box(doc, 240, 9, 47, 13, "N° COMPROBANTE", data.voucherNumber);
-  voidedMark(doc, data, 287, 28);
+  doc.setFontSize(9.5);
+  doc.text(
+    doc.splitTextToSize("COMPROBANTE DE RETENCIÓN DE IMPUESTO AL VALOR AGREGADO (IVA)", col1.w - 6) as string[],
+    left,
+    10
+  );
+  box(doc, col2.x, 6, col2.w, 9, "FECHA EMISIÓN", data.issueDate);
+  box(doc, col3.x, 6, col3.w, 9, "N° COMPROBANTE", data.voucherNumber);
+  voidedMark(doc, data, right, 19.5);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
+  doc.setFontSize(5.5);
   doc.text(
     doc.splitTextToSize(
       "Comprobante de retención del Impuesto al Valor Agregado emitido conforme al artículo 11 de la Ley que establece el " +
         "Impuesto al Valor Agregado, que faculta a la Administración Tributaria a designar como responsables del pago del " +
         "impuesto, en calidad de agentes de retención, a quienes por sus funciones públicas o por razón de sus actividades " +
         "privadas intervengan en operaciones gravadas con el impuesto.",
-      185
+      right - left - 22
     ) as string[],
     left,
-    27
+    19
   );
 
-  box(doc, left, 36, 150, 11, "NOMBRE O RAZÓN SOCIAL AGENTE DE RETENCIÓN", data.agent.name);
-  box(doc, 170, 36, 64, 11, "RIF DEL AGENTE DE RETENCIÓN", data.agent.taxId);
-  box(doc, 240, 36, 47, 11, "PERÍODO FISCAL", `AÑO ${data.fiscalYear}     MES ${data.fiscalMonth}`);
-  box(doc, left, 49, 224, 11, "DIRECCIÓN FISCAL DEL AGENTE DE RETENCIÓN", data.agent.address);
-  box(doc, left, 62, 150, 11, "NOMBRE O RAZÓN SOCIAL DEL SUJETO RETENIDO", data.supplier.name);
-  box(doc, 170, 62, 64, 11, "RIF DEL SUJETO RETENIDO", data.supplier.taxId);
-  box(doc, 240, 62, 47, 11, "CORREO ELECTRÓNICO", data.supplier.email === "—" ? "" : data.supplier.email);
-  box(doc, left, 75, 224, 11, "DIRECCIÓN FISCAL DEL SUJETO RETENIDO", data.supplier.address);
+  const wide = col2.x + col2.w - left;
+  box(doc, col1.x, 26, col1.w, 9, "NOMBRE O RAZÓN SOCIAL AGENTE DE RETENCIÓN", data.agent.name);
+  box(doc, col2.x, 26, col2.w, 9, "RIF DEL AGENTE DE RETENCIÓN", data.agent.taxId);
+  box(doc, col3.x, 26, col3.w, 9, "PERÍODO FISCAL", `AÑO ${data.fiscalYear}     MES ${data.fiscalMonth}`);
+  box(doc, left, 36.5, wide, 10.5, "DIRECCIÓN FISCAL DEL AGENTE DE RETENCIÓN", data.agent.address);
+  box(doc, col1.x, 48.5, col1.w, 9, "NOMBRE O RAZÓN SOCIAL DEL SUJETO RETENIDO", data.supplier.name);
+  box(doc, col2.x, 48.5, col2.w, 9, "RIF DEL SUJETO RETENIDO", data.supplier.taxId);
+  box(doc, col3.x, 48.5, col3.w, 9, "CORREO ELECTRÓNICO", data.supplier.email === "—" ? "" : data.supplier.email);
+  box(doc, left, 59, wide, 10.5, "DIRECCIÓN FISCAL DEL SUJETO RETENIDO", data.supplier.address);
 
+  // Fixed widths (they add up to the 199.9 mm between the margins) so the 15 SENIAT columns fit.
+  const widths = [7, 13.5, 13.5, 14.5, 10.5, 10.5, 17, 12, 15.5, 14, 15.5, 11.5, 14.5, 14.5, 15.9];
   autoTable(doc, {
-    startY: 92,
+    startY: 72,
     head: [[
       "OPER N°",
       "FECHA DE LA FACTURA",
@@ -119,27 +147,32 @@ function generateVatVoucherPdf(data: VoucherData): jsPDF {
     ]],
     foot: [["", "Total", "", "", "", "", "", "", voucherAmount(op.totalVes), voucherAmount(op.exemptVes), voucherAmount(op.baseVes), "", voucherAmount(op.taxVes), voucherAmount(op.withheldVes), voucherAmount(op.totalVes)]],
     theme: "grid",
-    styles: { fontSize: 7, cellPadding: 1.2, lineColor: 0, lineWidth: 0.2, textColor: 0, valign: "middle" },
-    headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: "bold", halign: "center", fontSize: 6.5 },
+    styles: { fontSize: 6, cellPadding: 0.8, lineColor: 0, lineWidth: 0.2, textColor: 0, valign: "middle", overflow: "linebreak" },
+    headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: "bold", halign: "center", fontSize: 5.3 },
     footStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: "bold" },
-    columnStyles: Object.fromEntries([8, 9, 10, 11, 12, 13, 14].map((i) => [i, { halign: "right" }])),
-    margin: { left, right: 10 },
+    columnStyles: Object.fromEntries(
+      widths.map((cellWidth, i) => [i, { cellWidth, ...(i >= 8 ? { halign: "right" as const } : {}) }])
+    ),
+    margin: { left, right: LETTER_WIDTH - right },
   });
 
-  const signY = Math.max(lastTableY(doc, 120) + 38, 165);
-  doc.line(left + 15, signY, 110, signY);
-  doc.line(190, signY, 280, signY);
+  // Signatures and the legal note close the half page, whatever the table's height.
+  const signY = Math.min(Math.max(lastTableY(doc, 100) + 20, 116), HALF_LETTER - 18);
+  const leftSign = (left + 10 + 95) / 2;
+  const rightSign = (120 + right - 10) / 2;
+  doc.line(left + 10, signY, 95, signY);
+  doc.line(120, signY, right - 10, signY);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.text("FIRMA BENEFICIARIO", 67, signY + 4, { align: "center" });
-  doc.text("FIRMA Y SELLO DEL AGENTE DE RETENCIÓN", 235, signY + 4, { align: "center" });
+  doc.setFontSize(7);
+  doc.text("FIRMA BENEFICIARIO", leftSign, signY + 3.5, { align: "center" });
+  doc.text("FIRMA Y SELLO DEL AGENTE DE RETENCIÓN", rightSign, signY + 3.5, { align: "center" });
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
+  doc.setFontSize(5.5);
   doc.text(
     "Este comprobante se emite conforme a lo indicado en el artículo 16 de la Providencia Administrativa N° SNAT/2025/000054.",
     left,
-    200
+    HALF_LETTER - 6
   );
   return doc;
 }
