@@ -45,11 +45,11 @@ describe("generateDiagnosisSheetBody", () => {
     expect(html).toContain(images.footerLogo);
   });
 
-  it("puts the school logo before the Ministry banner and does not print the school name", () => {
+  it("puts the school logo right of the Ministry banner and does not print the school name", () => {
     const html = generateDiagnosisSheetBody(sheet(), images);
     expect(html).not.toContain('<div class="dx-subtitle">U.E. Colegio Demo</div>');
     expect(html).toContain('alt="U.E. Colegio Demo" class="dx-school-logo"');
-    expect(html.indexOf(images.schoolLogo)).toBeLessThan(html.indexOf(images.headerLogo));
+    expect(html.indexOf(images.headerLogo)).toBeLessThan(html.indexOf(images.schoolLogo));
   });
 
   it("keeps the Ministry banner alone when the school has no logo", () => {

@@ -31,7 +31,7 @@ export interface DiagnosisSheetData extends DiagnosisSections {
 export interface DiagnosisImages {
   headerLogo: string;
   footerLogo: string;
-  /** The school's own logo, top left of the header. Empty when the school has none. */
+  /** The school's own logo, right of the Ministry banner. Empty when the school has none. */
   schoolLogo?: string;
 }
 
@@ -104,14 +104,14 @@ function signaturesHtml(signatures: BoletinSignature[]): string {
 
 /** Body of one sheet (one student), without the page wrapper. */
 export function generateDiagnosisSheetBody(data: DiagnosisSheetData, images: DiagnosisImages): string {
-  // School logo top left, the Ministry banner beside it (it shrinks to make room).
+  // Ministry banner on the left, the school logo to its right (the banner shrinks to make room).
   const schoolLogo = images.schoolLogo
     ? `<img src="${esc(images.schoolLogo)}" alt="${esc(data.schoolName)}" class="dx-school-logo">`
     : "";
   const ministry = images.headerLogo
     ? `<img src="${esc(images.headerLogo)}" alt="Ministerio del Poder Popular para la Educación" class="dx-header-logo">`
     : "";
-  const header = schoolLogo || ministry ? `<div class="dx-header">${schoolLogo}${ministry}</div>` : "";
+  const header = schoolLogo || ministry ? `<div class="dx-header">${ministry}${schoolLogo}</div>` : "";
   const footer = images.footerLogo
     ? `<img src="${esc(images.footerLogo)}" alt="" class="dx-footer-logo">`
     : "";
