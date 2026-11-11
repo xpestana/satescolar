@@ -7,12 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePayrollPeriods } from "@/hooks/payroll/usePayrollPeriods";
 import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { PayrollPeriodEditModal } from "@/components/payroll/PayrollPeriodEditModal";
 import { periodsGuide } from "@/components/payroll/payrollGuides";
-import type { PayrollPeriodType } from "@/lib/payroll/types";
+import type { PayrollPeriod, PayrollPeriodType } from "@/lib/payroll/types";
 
 export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
   const { toast } = useToast();
@@ -23,6 +24,7 @@ export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [applyDeductions, setApplyDeductionsInput] = useState(true);
+  const [editing, setEditing] = useState<PayrollPeriod | null>(null);
 
   const handleAdd = () => {
     if (!name.trim() || !start || !end) {
@@ -111,7 +113,7 @@ export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
                 <TableHead>Rango</TableHead>
                 <TableHead>Descuenta</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead className="w-16"></TableHead>
+                <TableHead className="w-24"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -142,8 +144,11 @@ export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
                       />
                     </TableCell>
                     <TableCell><Badge variant={p.status === "open" ? "outline" : "secondary"}>{p.status === "open" ? "Abierto" : "Cerrado"}</Badge></TableCell>
-                    <TableCell>
-                      <Button size="icon" variant="ghost" onClick={() => deletePeriod.mutate(p.id, { onSuccess: () => toast({ title: "Período eliminado" }), onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }) })}>
+                    <TableCell className="whitespace-nowrap">
+                      <Button size="icon" variant="ghost" aria-label={`Editar ${p.name}`} title="Editar" onClick={() => setEditing(p)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" aria-label={`Eliminar ${p.name}`} title="Eliminar" onClick={() => deletePeriod.mutate(p.id, { onSuccess: () => toast({ title: "Período eliminado" }), onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }) })}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -154,6 +159,13 @@ export function PayrollPeriodsTab({ schoolId }: { schoolId: string }) {
           </Table>
         </CardContent>
       </Card>
+
+      <PayrollPeriodEditModal
+        period={editing}
+        saving={savePeriod.isPending}
+        onClose={() => setEditing(null)}
+        onSave={(input) => savePeriod.mutateAsync(input)}
+      />
     </div>
   );
 }

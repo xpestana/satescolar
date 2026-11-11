@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -22,6 +22,7 @@ import { usePayrollConcepts } from "@/hooks/payroll/usePayrollConcepts";
 import { usePayrollTaxConfig } from "@/hooks/payroll/usePayrollTaxConfig";
 import { usePayrollContributionConfig } from "@/hooks/payroll/usePayrollContributionConfig";
 import { PayrollGuide } from "@/components/payroll/PayrollGuide";
+import { PayrollConceptEditModal } from "@/components/payroll/PayrollConceptEditModal";
 import { conceptsGuide } from "@/components/payroll/payrollGuides";
 import { CATEGORY_LABELS, type ConceptKind, type PayrollConcept, type PayrollCategory, type PayrollCurrency } from "@/lib/payroll/types";
 
@@ -44,6 +45,7 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
   const [kind, setKind] = useState<ConceptKind>("earning");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<PayrollCurrency>("VES");
+  const [editing, setEditing] = useState<PayrollConcept | null>(null);
 
   const handleAdd = () => {
     if (!name.trim()) {
@@ -114,7 +116,7 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
                 <TableHead title="Las horas no trabajadas se descuentan de este concepto">Sueldo base</TableHead>
                 {islrEnabled && <TableHead>Base del AR-I</TableHead>}
                 {contributionsEnabled && <TableHead>Parafiscales</TableHead>}
-                <TableHead className="w-16"></TableHead>
+                <TableHead className="w-24"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -166,8 +168,11 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
                         )}
                       </TableCell>
                     )}
-                    <TableCell>
-                      <Button size="icon" variant="ghost" onClick={() => deleteConcept.mutate(c.id, { onSuccess: () => toast({ title: "Concepto eliminado" }) })}>
+                    <TableCell className="whitespace-nowrap">
+                      <Button size="icon" variant="ghost" aria-label={`Editar ${c.name}`} title="Editar" onClick={() => setEditing(c)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" aria-label={`Eliminar ${c.name}`} title="Eliminar" onClick={() => deleteConcept.mutate(c.id, { onSuccess: () => toast({ title: "Concepto eliminado" }) })}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -178,6 +183,13 @@ export function PayrollConceptsTab({ schoolId }: { schoolId: string }) {
           </Table>
         </CardContent>
       </Card>
+
+      <PayrollConceptEditModal
+        concept={editing}
+        saving={saveConcept.isPending}
+        onClose={() => setEditing(null)}
+        onSave={(input) => saveConcept.mutateAsync(input)}
+      />
     </div>
   );
 }
