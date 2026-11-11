@@ -16,10 +16,35 @@ const data = {
 const cfg = {
   ...DEFAULT_BACHILLERATO_CONFIG,
   style: "primaria_descriptivo" as const,
-  primaria: { slogan: "Construyendo vidas", show_slogan: true, show_footer_logo: true, footer_logo_url: "https://x/old.png" },
+  primaria: {
+    ministry_letterhead: true,
+    slogan: "Construyendo vidas", show_slogan: true, show_footer_logo: true, footer_logo_url: "https://x/old.png",
+  },
+} as typeof DEFAULT_BACHILLERATO_CONFIG;
+const classicCfg = {
+  ...cfg,
+  primaria: { ...cfg.primaria, ministry_letterhead: false },
 } as typeof DEFAULT_BACHILLERATO_CONFIG;
 
-describe("primary descriptive boleta letterhead", () => {
+describe("primary descriptive boleta — classic header (option off, the default)", () => {
+  it("keeps the school name, slogan and the configured footer logo, without the Ministry images", () => {
+    const html = generatePrimaryDescriptiveHtml(classicCfg, data, 215.9, 279.4);
+    expect(html).toContain(">U.E. Colegio Demo<");
+    expect(html).toContain("Construyendo vidas");
+    expect(html).toContain("https://x/old.png");
+    expect(html).not.toContain(data.ministry_header);
+    expect(html).not.toContain(data.ministry_footer);
+  });
+
+  it("is what a template without the option prints", () => {
+    const noFlag = { ...classicCfg, primaria: { ...cfg.primaria, ministry_letterhead: undefined } } as typeof cfg;
+    const html = generatePrimaryDescriptiveHtml(noFlag, data, 215.9, 279.4, { bodyOnly: true });
+    expect(html).toContain(">U.E. Colegio Demo<");
+    expect(html).not.toContain("lh-header");
+  });
+});
+
+describe("primary descriptive boleta — Ministry letterhead (option on)", () => {
   it("prints the Ministry banner with the school logo to its right, inside the repeating header", () => {
     const html = generatePrimaryDescriptiveHtml(cfg, data, 215.9, 279.4);
     const thead = html.slice(html.indexOf('<thead id="pdf-header">'), html.indexOf("</thead>"));

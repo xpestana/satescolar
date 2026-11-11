@@ -68,6 +68,11 @@ export interface BachilleratoConfig {
     sig_pin_bottom:   boolean; // true = anchor signatures to page bottom
   };
   primaria?: {
+    /**
+     * Fixed Ministry letterhead, same as the diagnosis sheet (banner + school logo, flag footer).
+     * When on, the school header and the footer logo below are not printed. Off by default.
+     */
+    ministry_letterhead?: boolean;
     show_footer_logo:     boolean;
     footer_logo_url:      string;
     footer_logo_position: "left" | "center" | "right";
@@ -875,29 +880,67 @@ export function generatePrimaryDescriptiveHtml(
   opts?: { bodyOnly?: boolean },
 ): string {
   const p: Partial<NonNullable<BachilleratoConfig["primaria"]>> = cfg.primaria ?? {};
-  const titleColor   = p.title_color          ?? "#000000";
+  const ministry      = p.ministry_letterhead  === true;
+  const accentColor   = p.accent_color        ?? "#1e3a5f";
+  const titleColor    = p.title_color          ?? "#000000";
   const mTop          = p.margin_top           ?? 12;
+  const mBottom       = p.margin_bottom        ?? 12;
   const mSides        = p.margin_sides         ?? 15;
+  const nameFontSize  = p.name_font_size       ?? 14;
+  const subFontSize   = p.sub_font_size        ?? 10;
   const bodyFontSize  = p.body_font_size       ?? 10;
+  const showAddress   = p.show_address         ?? false;
+  const showDeaCode   = p.show_dea_code        ?? false;
+  const showPhone     = p.show_phone           ?? false;
+  const showSlogan    = p.show_slogan          ?? true;
+  const slogan        = p.slogan               ?? "";
+  const footerPos     = p.footer_logo_position ?? "center";
 
   const lapsoLabels: Record<number, string> = { 1: "1er", 2: "2do", 3: "3er" };
   const lapsoLabel = lapsoLabels[data.momento] ?? `${data.momento}°`;
 
-  // Same fixed Ministry letterhead as the diagnosis sheet: banner with the school logo to its
-  // right, flag strip at the foot. The school name, slogan and contact lines no longer print.
-  const headerHtml = letterheadHeaderHtml({
-    headerLogo: data.ministry_header ?? ministryHeaderUrl,
-    schoolLogo: data.school_logo,
-    schoolName: data.school_name,
-  });
-  const footerImg = letterheadFooterHtml(data.ministry_footer ?? ministryFooterUrl);
+  // ── Classic school header (configurable in /formatos) ──
+  const schoolHeaderHtml = (() => {
+    const logoHtml = data.school_logo
+      ? `<img src="${esc(data.school_logo)}" alt="Logo" crossorigin="anonymous" style="height:70px;width:auto;object-fit:contain;flex-shrink:0">`
+      : `<div style="width:70px;height:70px;background:#e5e7eb;border-radius:50%;flex-shrink:0"></div>`;
+    const subLines = [
+      showAddress  && data.address  ? `<div style="font-size:${subFontSize}pt;color:#4b5563">${esc(data.address)}</div>`  : "",
+      showDeaCode  && data.dea_code ? `<div style="font-size:${subFontSize}pt;color:#4b5563">Cód. DEA: ${esc(data.dea_code)}</div>` : "",
+      showPhone    && data.phone    ? `<div style="font-size:${subFontSize}pt;color:#4b5563">Tel: ${esc(data.phone)}</div>` : "",
+      `<div style="font-size:${subFontSize}pt;color:#4b5563;margin-top:2px">AÑO ESCOLAR ${esc(data.year_range)}</div>`,
+    ].filter(Boolean).join("");
+    const sloganHtml = showSlogan && slogan
+      ? `<div style="font-size:${subFontSize}pt;color:${accentColor};font-style:italic;margin-top:1px">${esc(slogan)}</div>`
+      : "";
+    return `
+  <div style="display:flex;align-items:center;gap:16px;padding-bottom:10px;border-bottom:2px solid ${accentColor};margin-bottom:10px">
+    ${logoHtml}
+    <div style="flex:1;text-align:center">
+      <div style="font-size:${nameFontSize}pt;font-weight:700;color:${accentColor};text-transform:uppercase;letter-spacing:0.5px">${esc(data.school_name)}</div>
+      ${sloganHtml}
+      ${subLines}
+    </div>
+  </div>`;
+  })();
+
+  // ── Ministry letterhead (same as the diagnosis sheet): banner with the school logo to its
+  // right, flag strip at the foot. No school name / slogan / contact lines; year under the title.
+  const headerHtml = ministry
+    ? letterheadHeaderHtml({
+        headerLogo: data.ministry_header ?? ministryHeaderUrl,
+        schoolLogo: data.school_logo,
+        schoolName: data.school_name,
+      })
+    : schoolHeaderHtml;
+  const flagHtml = ministry ? letterheadFooterHtml(data.ministry_footer ?? ministryFooterUrl) : "";
 
   const titleHtml = `
   <div style="text-align:center;margin-bottom:10px">
     <div style="font-size:12pt;font-weight:700;text-decoration:underline;text-transform:uppercase;color:${titleColor}">
       INFORME DESCRIPTIVO DEL ${lapsoLabel} LAPSO
     </div>
-    <div style="font-size:10.5pt;font-weight:700;margin-top:3px">AÑO ESCOLAR ${esc(data.year_range)}</div>
+    ${ministry ? `<div style="font-size:10.5pt;font-weight:700;margin-top:3px">AÑO ESCOLAR ${esc(data.year_range)}</div>` : ""}
   </div>`;
 
   const studentHtml = `
@@ -954,26 +997,41 @@ export function generatePrimaryDescriptiveHtml(
     return `<div style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:20px;margin-top:10px">${cols.join("")}</div>`;
   })() : "";
 
-  // Flag strip — full page width, flush with the bottom of every page.
-  const hasFooter = !!footerImg;
-  // Reserve the strip's height (plus a little air) so content never hides behind it in print.
-  const footerReserveMm = hasFooter ? Math.ceil(letterheadFooterHeightMm(paperWidthMm)) + 4 : 4;
+  // Footer. Ministry letterhead: the flag strip, full page width and flush with the bottom of the
+  // page. Classic: the optional footer logo configured in /formatos.
+  const footerAlignMap: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
+  const footerAlign = footerAlignMap[footerPos] ?? "center";
+  const hasClassicFooter = !ministry && !!(p.show_footer_logo && p.footer_logo_url);
+  const hasFooter = ministry ? !!flagHtml : hasClassicFooter;
+  // Reserve enough bottom space so content never hides behind the fixed footer in print.
+  // Classic: padding-top(≈5mm) + logo(60px≈21mm) + padding-bottom(mBottom) ≈ 26+mBottom mm.
+  const footerReserveMm = ministry
+    ? Math.ceil(letterheadFooterHeightMm(paperWidthMm)) + 4
+    : hasFooter ? mBottom + 32 : mBottom;
 
   // Full HTML (single student): table layout so <thead> repeats on every printed page
   const theadPad = `${mTop}mm ${mSides}mm 0 ${mSides}mm`;
-  const tbodyPad = `0 ${mSides}mm 4mm ${mSides}mm`;
+  const tbodyPad = ministry
+    ? `0 ${mSides}mm 4mm ${mSides}mm`
+    : `8px ${mSides}mm ${mBottom}mm ${mSides}mm`;
 
   const footerPrintCss = hasFooter ? `
     .primaria-tbody-cell{padding-bottom:${footerReserveMm}mm!important}
     #pdf-footer{position:fixed;bottom:0;left:0;right:0;background:white}` : "";
 
-  const footerHtml = hasFooter ? `
-<div id="pdf-footer">${footerImg}</div>` : "";
+  const footerHtml = ministry
+    ? (hasFooter ? `
+<div id="pdf-footer">${flagHtml}</div>` : "")
+    : (hasClassicFooter ? `
+<div id="pdf-footer" style="display:flex;justify-content:${footerAlign};padding:16px ${mSides}mm ${mBottom}mm">
+  <img src="${esc(p.footer_logo_url!)}" alt="Logo pie" style="height:60px;width:auto;object-fit:contain">
+</div>` : "");
 
-  // bodyOnly = one sheet of a whole-section document: a page-tall column so the flag sits at the
-  // bottom of the sheet, exactly like the diagnosis.
   if (opts?.bodyOnly) {
-    return `
+    // Ministry: one sheet of a whole-section document (see wrapPrimaryDescriptiveBoletasHtml), a
+    // page-tall column so the flag sits at the bottom of the sheet, exactly like the diagnosis.
+    if (ministry) {
+      return `
 <div style="font-family:Arial,Helvetica,sans-serif;box-sizing:border-box;min-height:${paperHeightMm}mm;display:flex;flex-direction:column">
   <div style="flex:1;padding:${mTop}mm ${mSides}mm 4mm">
     ${headerHtml}
@@ -984,8 +1042,22 @@ export function generatePrimaryDescriptiveHtml(
     ${literalNumeralHtml}
     ${sigHtml}
   </div>
-  ${footerImg}
+  ${flagHtml}
 </div>`;
+    }
+    // Classic: simple div (the wrapAllBoletasHtml @page handles margins)
+    const bodyOnlyFooterCss = hasClassicFooter ? `<style>@media print{.primaria-footer{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:${footerAlign};padding:16px ${mSides}mm ${mBottom}mm}}</style>` : "";
+    return `${bodyOnlyFooterCss}
+<div style="font-family:Arial,Helvetica,sans-serif;padding:0;box-sizing:border-box">
+  ${headerHtml}
+  ${titleHtml}
+  ${studentHtml}
+  ${mainHtml}
+  ${especialistasHtml}
+  ${literalNumeralHtml}
+  ${sigHtml}
+</div>
+${footerHtml}`;
   }
 
   // Single-student full HTML: table with repeating thead
