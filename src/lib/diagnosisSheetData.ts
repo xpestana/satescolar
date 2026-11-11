@@ -33,12 +33,12 @@ interface AssignmentRow {
   teacher_id: string;
   section: { name: string; grade_level: string } | null;
   school_year: { year_range: string } | null;
-  school: { name: string } | null;
+  school: { name: string; logo_url: string | null } | null;
 }
 
 let imagesPromise: Promise<DiagnosisImages> | null = null;
 
-/** The fixed Ministry header and flag footer, inlined once per session. */
+/** The fixed Ministry header and flag footer, inlined once per session (the school logo is per school). */
 function loadDiagnosisImages(): Promise<DiagnosisImages> {
   imagesPromise ??= Promise.all([
     resolveImageToDataUrl(diagnosisHeaderUrl),
@@ -54,7 +54,7 @@ function loadDiagnosisImages(): Promise<DiagnosisImages> {
 async function fetchAssignment(assignmentId: string): Promise<AssignmentRow> {
   const { data, error } = await supabase
     .from("subject_teacher_assignments")
-    .select("school_id, teacher_id, section:section_id(name, grade_level), school_year:school_year_id(year_range), school:school_id(name)")
+    .select("school_id, teacher_id, section:section_id(name, grade_level), school_year:school_year_id(year_range), school:school_id(name, logo_url)")
     .eq("id", assignmentId)
     .single();
   if (error) throw error;
@@ -123,12 +123,15 @@ export interface DiagnosisDocumentContext {
 
 export async function loadDiagnosisContext(assignmentId: string): Promise<DiagnosisDocumentContext> {
   const assignment = await fetchAssignment(assignmentId);
-  const [saved, teacherSig, institutional, images] = await Promise.all([
+  const logoUrl = assignment.school?.logo_url;
+  const [saved, teacherSig, institutional, fixedImages, schoolLogo] = await Promise.all([
     fetchSavedDiagnoses(assignmentId),
     fetchTeacherSignature(assignment.teacher_id),
     fetchInstitutionalSignatures(assignment.school_id),
     loadDiagnosisImages(),
+    logoUrl ? resolveImageToDataUrl(logoUrl) : Promise.resolve(""),
   ]);
+  const images: DiagnosisImages = { ...fixedImages, schoolLogo };
   return {
     schoolName: assignment.school?.name ?? "",
     yearRange: assignment.school_year?.year_range ?? "",

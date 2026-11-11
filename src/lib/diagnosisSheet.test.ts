@@ -6,7 +6,11 @@ import {
   printableSignatures,
 } from "./diagnosisSheet";
 
-const images = { headerLogo: "data:image/png;base64,HEAD", footerLogo: "data:image/png;base64,FOOT" };
+const images = {
+  headerLogo: "data:image/png;base64,HEAD",
+  footerLogo: "data:image/png;base64,FOOT",
+  schoolLogo: "data:image/png;base64,SCHOOL",
+};
 
 const sheet = (overrides: Partial<DiagnosisSheetData> = {}): DiagnosisSheetData => ({
   schoolName: "U.E. Colegio Demo",
@@ -30,7 +34,6 @@ describe("generateDiagnosisSheetBody", () => {
     const html = generateDiagnosisSheetBody(sheet(), images);
     expect(html).toContain("FICHA DESCRIPTIVA DEL ESTUDIANTE (DIAGNÓSTICO)");
     expect(html).toContain("AÑO ESCOLAR 2026-2027");
-    expect(html).toContain("U.E. Colegio Demo");
     expect(html).toContain("Ana María Pérez Gómez");
     expect(html).toContain("V-12345678");
     expect(html).toContain("1er Grado");
@@ -40,6 +43,19 @@ describe("generateDiagnosisSheetBody", () => {
     expect(html).toContain("ASPECTOS A SUPERAR:");
     expect(html).toContain(images.headerLogo);
     expect(html).toContain(images.footerLogo);
+  });
+
+  it("puts the school logo before the Ministry banner and does not print the school name", () => {
+    const html = generateDiagnosisSheetBody(sheet(), images);
+    expect(html).not.toContain('<div class="dx-subtitle">U.E. Colegio Demo</div>');
+    expect(html).toContain('alt="U.E. Colegio Demo" class="dx-school-logo"');
+    expect(html.indexOf(images.schoolLogo)).toBeLessThan(html.indexOf(images.headerLogo));
+  });
+
+  it("keeps the Ministry banner alone when the school has no logo", () => {
+    const html = generateDiagnosisSheetBody(sheet(), { ...images, schoolLogo: "" });
+    expect(html).not.toContain("dx-school-logo");
+    expect(html).toContain(images.headerLogo);
   });
 
   it("skips empty sections, including editor leftovers like <br> or &nbsp;", () => {
@@ -55,7 +71,7 @@ describe("generateDiagnosisSheetBody", () => {
     expect(html).not.toContain("SECCIÓN");
   });
 
-  it("escapes the student name and the school name", () => {
+  it("escapes the student name and the school name (logo alt text)", () => {
     const html = generateDiagnosisSheetBody(sheet({ studentName: "<b>X</b>", schoolName: "A & B" }), images);
     expect(html).toContain("&lt;b&gt;X&lt;/b&gt;");
     expect(html).toContain("A &amp; B");

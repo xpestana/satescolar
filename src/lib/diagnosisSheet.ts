@@ -31,6 +31,8 @@ export interface DiagnosisSheetData extends DiagnosisSections {
 export interface DiagnosisImages {
   headerLogo: string;
   footerLogo: string;
+  /** The school's own logo, top left of the header. Empty when the school has none. */
+  schoolLogo?: string;
 }
 
 export const DIAGNOSIS_SECTION_TITLES: Record<keyof DiagnosisSections, string> = {
@@ -102,16 +104,20 @@ function signaturesHtml(signatures: BoletinSignature[]): string {
 
 /** Body of one sheet (one student), without the page wrapper. */
 export function generateDiagnosisSheetBody(data: DiagnosisSheetData, images: DiagnosisImages): string {
-  const header = images.headerLogo
+  // School logo top left, the Ministry banner beside it (it shrinks to make room).
+  const schoolLogo = images.schoolLogo
+    ? `<img src="${esc(images.schoolLogo)}" alt="${esc(data.schoolName)}" class="dx-school-logo">`
+    : "";
+  const ministry = images.headerLogo
     ? `<img src="${esc(images.headerLogo)}" alt="Ministerio del Poder Popular para la Educación" class="dx-header-logo">`
     : "";
+  const header = schoolLogo || ministry ? `<div class="dx-header">${schoolLogo}${ministry}</div>` : "";
   const footer = images.footerLogo
     ? `<img src="${esc(images.footerLogo)}" alt="" class="dx-footer-logo">`
     : "";
   return `<div class="dx-content">
     ${header}
     <div class="dx-title">FICHA DESCRIPTIVA DEL ESTUDIANTE (DIAGNÓSTICO)</div>
-    ${data.schoolName ? `<div class="dx-subtitle">${esc(data.schoolName)}</div>` : ""}
     <div class="dx-subtitle">AÑO ESCOLAR ${esc(data.yearRange)}</div>
     <div class="dx-student">${studentLine(data)}</div>
     ${sectionsHtml(data)}
@@ -142,7 +148,9 @@ export function generateDiagnosisDocumentHtml(sheets: DiagnosisSheetData[], imag
     .boleta-page{width:${widthMm}mm;min-height:${heightMm}mm;display:flex;flex-direction:column;background:white}
     @media print{.boleta-page{page-break-after:always}.boleta-page.last{page-break-after:avoid}}
     .dx-content{flex:1;padding:12mm 16mm 4mm}
-    .dx-header-logo{display:block;width:100%;height:auto;margin-bottom:8mm}
+    .dx-header{display:flex;align-items:center;gap:5mm;margin-bottom:7mm}
+    .dx-school-logo{display:block;flex:none;height:24mm;max-width:32mm;object-fit:contain}
+    .dx-header-logo{display:block;flex:1;min-width:0;width:100%;height:auto}
     .dx-title{text-align:center;font-weight:700;font-size:12.5pt;text-decoration:underline;margin-bottom:3px}
     .dx-subtitle{text-align:center;font-weight:700;font-size:10.5pt;margin-bottom:2px}
     .dx-student{font-size:10pt;margin:14px 0 10px;line-height:1.6;display:flex;flex-wrap:wrap}
