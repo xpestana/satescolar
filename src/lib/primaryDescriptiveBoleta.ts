@@ -5,9 +5,10 @@ import {
   DEFAULT_BACHILLERATO_CONFIG,
   PrimaryDescriptiveRenderData,
   generatePrimaryDescriptiveHtml,
-  wrapAllBoletasHtml,
+  wrapPrimaryDescriptiveBoletasHtml,
 } from "@/lib/bachilleratoTemplate";
 import { fetchAsBase64, resolveSignatureImages } from "@/lib/image-resolve";
+import { loadLetterheadImages } from "@/lib/ministryLetterhead";
 import { pickBoletaTemplate } from "@/lib/boletaTemplateSelection";
 
 export { fetchAsBase64 };
@@ -191,12 +192,11 @@ export async function downloadPrimaryDescriptiveBoleta(
   const { main_report, especialistas, literal, literal_numerico, main_teacher_id } =
     await fetchAssignmentsAndReports(schoolId, sectionId, yearId, studentId, momento);
 
-  const [schoolLogoB64, footerLogoB64, signatures] = await Promise.all([
+  const [schoolLogoB64, letterhead, signatures] = await Promise.all([
     fetchAsBase64(school?.logo_url ?? ""),
-    fetchAsBase64(cfg.primaria?.footer_logo_url ?? ""),
+    loadLetterheadImages(),
     fetchTeacherSignature(main_teacher_id).then((sig) => composeSignatures(cfg, sig)),
   ]);
-  if (cfg.primaria) cfg.primaria.footer_logo_url = footerLogoB64;
 
   const data: PrimaryDescriptiveRenderData = {
     school_name:      school?.name ?? "",
@@ -215,6 +215,8 @@ export async function downloadPrimaryDescriptiveBoleta(
     main_report,
     especialistas,
     signatures,
+    ministry_header:  letterhead.headerLogo,
+    ministry_footer:  letterhead.footerLogo,
   };
 
   return generatePrimaryDescriptiveHtml(cfg, data, paperW, paperH);
@@ -239,11 +241,10 @@ export async function downloadAllPrimaryDescriptiveBoletas(params: {
 
   const { cfg, paperW, paperH, school } = await fetchTemplateAndCommon(schoolId, gradeKey);
 
-  const [schoolLogoB64, footerLogoB64] = await Promise.all([
+  const [schoolLogoB64, letterhead] = await Promise.all([
     fetchAsBase64(school?.logo_url ?? ""),
-    fetchAsBase64(cfg.primaria?.footer_logo_url ?? ""),
+    loadLetterheadImages(),
   ]);
-  if (cfg.primaria) cfg.primaria.footer_logo_url = footerLogoB64;
 
   const reports = await Promise.all(
     students.map((s) => fetchAssignmentsAndReports(schoolId, sectionId, yearId, s.studentId, momento)),
@@ -273,9 +274,11 @@ export async function downloadAllPrimaryDescriptiveBoletas(params: {
       main_report,
       especialistas,
       signatures,
+      ministry_header:  letterhead.headerLogo,
+      ministry_footer:  letterhead.footerLogo,
     };
     return generatePrimaryDescriptiveHtml(cfg, data, paperW, paperH, { bodyOnly: true });
   });
 
-  return wrapAllBoletasHtml(bodies, paperW, paperH, "simple");
+  return wrapPrimaryDescriptiveBoletasHtml(bodies, paperW, paperH);
 }

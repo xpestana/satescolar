@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Plus, Edit, Trash2, Loader2, CheckCircle2, ChevronDown, ChevronRight, UserCircle2, Upload,
+  Plus, Edit, Trash2, Loader2, CheckCircle2, ChevronDown, ChevronRight, UserCircle2,
 } from "lucide-react";
 import {
   BachilleratoConfig, BachilleratoTemplate,
@@ -20,7 +20,6 @@ import {
   SAMPLE_PRIMARY_DESCRIPTIVE_DATA, generatePrimaryDescriptiveHtml,
 } from "@/lib/bachilleratoTemplate";
 import { Checkbox } from "@/components/ui/checkbox";
-import { uploadToS3 } from "@/lib/s3-upload";
 import { SignatureEditor } from "@/components/grades/SignatureFields";
 
 const GRADE_LABELS: Record<string, string> = {
@@ -96,48 +95,6 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
     <div className="flex items-center gap-2">
       <Switch checked={value} onCheckedChange={onChange} className="scale-75" />
       <Label className="text-xs">{label}</Label>
-    </div>
-  );
-}
-
-function FooterLogoUpload({ url, onChange, schoolId }: {
-  url: string; onChange: (url: string) => void; schoolId: string;
-}) {
-  const { toast } = useToast();
-  const ref = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs">URL o imagen del logo</Label>
-      <div className="flex gap-1.5">
-        <Input
-          value={url}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="https://... (pega URL o sube imagen)"
-          className="h-7 text-xs flex-1"
-        />
-        <Button size="sm" variant="outline" className="h-7 text-xs px-2 shrink-0" disabled={uploading}
-          onClick={() => ref.current?.click()}>
-          {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-        </Button>
-        <input ref={ref} type="file" accept="image/*" className="hidden"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            setUploading(true);
-            try {
-              const result = await uploadToS3({ file, folder: "assets", schoolId, fileName: `footer-logo-${Date.now()}-${file.name}` });
-              onChange(result.publicUrl);
-            } catch (err: any) {
-              toast({ title: "Error subiendo imagen", description: err.message, variant: "destructive" });
-            } finally {
-              setUploading(false);
-              e.target.value = "";
-            }
-          }}
-        />
-      </div>
-      {url && <img src={url} alt="Logo pie" className="h-10 mt-1 object-contain" />}
     </div>
   );
 }
@@ -281,33 +238,12 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
     const pr = { ...PRIMARIA_DEFAULTS, ...cfg.primaria };
     return (
       <div className="space-y-2 pb-2">
-        <Section label="Cabecera del colegio" enabled={cfg.sections.header} onToggle={() => sect("header")}>
-          <ColorRow label="Color de acento" value={pr.accent_color}
-            onChange={(v) => updPrimaria({ accent_color: v })} />
-          <NumRow label="Tamaño nombre colegio" value={pr.name_font_size} min={8} max={24}
-            onChange={(v) => updPrimaria({ name_font_size: v })} />
-          <NumRow label="Tamaño subtextos" value={pr.sub_font_size} min={6} max={16}
-            onChange={(v) => updPrimaria({ sub_font_size: v })} />
-          <ToggleRow label="Mostrar dirección" value={pr.show_address}
-            onChange={(v) => updPrimaria({ show_address: v })} />
-          <ToggleRow label="Mostrar Código DEA" value={pr.show_dea_code}
-            onChange={(v) => updPrimaria({ show_dea_code: v })} />
-          <ToggleRow label="Mostrar teléfono" value={pr.show_phone}
-            onChange={(v) => updPrimaria({ show_phone: v })} />
-          <ToggleRow label="Mostrar slogan" value={pr.show_slogan ?? true}
-            onChange={(v) => updPrimaria({ show_slogan: v })} />
-          {(pr.show_slogan ?? true) && (
-            <div className="space-y-1">
-              <Label className="text-xs">Texto del slogan</Label>
-              <Input
-                value={pr.slogan ?? ""}
-                onChange={(e) => updPrimaria({ slogan: e.target.value })}
-                placeholder="Ej: Construyendo Vidas con Propósitos"
-                className="h-7 text-xs"
-              />
-            </div>
-          )}
-        </Section>
+        <div className="border rounded-md p-3 space-y-1">
+          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cabecera y pie</Label>
+          <p className="text-xs text-muted-foreground">
+            Fijos, iguales al diagnóstico: banner del Ministerio con el logo del colegio a la derecha y la bandera al pie de la página.
+          </p>
+        </div>
 
         <div className="border rounded-md p-3 space-y-2">
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Título</Label>
@@ -319,40 +255,10 @@ function ConfigPanel({ cfg, onChange, schoolId }: {
           <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Diseño y Espaciado</Label>
           <NumRow label="Margen superior" unit="mm" min={0} max={30}
             value={pr.margin_top} onChange={(v) => updPrimaria({ margin_top: v })} />
-          <NumRow label="Margen inferior" unit="mm" min={0} max={30}
-            value={pr.margin_bottom} onChange={(v) => updPrimaria({ margin_bottom: v })} />
           <NumRow label="Márgenes laterales" unit="mm" min={0} max={30}
             value={pr.margin_sides} onChange={(v) => updPrimaria({ margin_sides: v })} />
           <NumRow label="Tamaño texto cuerpo" unit="pt" min={7} max={16}
             value={pr.body_font_size} onChange={(v) => updPrimaria({ body_font_size: v })} />
-        </div>
-
-        <div className="border rounded-md p-3 space-y-2">
-          <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Logo al pie de página</Label>
-          <ToggleRow label="Mostrar logo al pie" value={pr.show_footer_logo}
-            onChange={(v) => updPrimaria({ show_footer_logo: v })} />
-          {pr.show_footer_logo && (
-            <>
-              <FooterLogoUpload
-                url={pr.footer_logo_url}
-                onChange={(url) => updPrimaria({ footer_logo_url: url })}
-                schoolId={schoolId}
-              />
-              <div className="space-y-1">
-                <Label className="text-xs">Posición del logo</Label>
-                <div className="flex gap-1.5">
-                  {(["left", "center", "right"] as const).map((pos) => (
-                    <Button key={pos} size="sm"
-                      variant={pr.footer_logo_position === pos ? "default" : "outline"}
-                      className="h-7 text-xs flex-1"
-                      onClick={() => updPrimaria({ footer_logo_position: pos })}>
-                      {pos === "left" ? "Izquierda" : pos === "center" ? "Centro" : "Derecha"}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
         </div>
 
         <Section label="Firmas" enabled={cfg.sections.signatures} onToggle={() => sect("signatures")}>

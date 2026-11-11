@@ -10,8 +10,7 @@ import { gradeLabel } from "@/lib/gradeLevels";
 import { resolveImageToDataUrl, resolveSignatureImages } from "@/lib/image-resolve";
 import { untypedSupabase } from "@/lib/untypedSupabase";
 import { teacherDisplayName } from "@/lib/teacherName";
-import diagnosisHeaderUrl from "@/assets/diagnosis-header.png";
-import diagnosisFooterUrl from "@/assets/diagnosis-footer.png";
+import { loadLetterheadImages } from "@/lib/ministryLetterhead";
 
 /**
  * Data side of the diagnosis sheet: everything the render needs, resolved from the section's main
@@ -34,21 +33,6 @@ interface AssignmentRow {
   section: { name: string; grade_level: string } | null;
   school_year: { year_range: string } | null;
   school: { name: string; logo_url: string | null } | null;
-}
-
-let imagesPromise: Promise<DiagnosisImages> | null = null;
-
-/** The fixed Ministry header and flag footer, inlined once per session (the school logo is per school). */
-function loadDiagnosisImages(): Promise<DiagnosisImages> {
-  imagesPromise ??= Promise.all([
-    resolveImageToDataUrl(diagnosisHeaderUrl),
-    resolveImageToDataUrl(diagnosisFooterUrl),
-  ]).then(([headerLogo, footerLogo]) => {
-    // A failed fetch must not stick for the whole session.
-    if (!headerLogo || !footerLogo) imagesPromise = null;
-    return { headerLogo, footerLogo };
-  });
-  return imagesPromise;
 }
 
 async function fetchAssignment(assignmentId: string): Promise<AssignmentRow> {
@@ -128,7 +112,7 @@ export async function loadDiagnosisContext(assignmentId: string): Promise<Diagno
     fetchSavedDiagnoses(assignmentId),
     fetchTeacherSignature(assignment.teacher_id),
     fetchInstitutionalSignatures(assignment.school_id),
-    loadDiagnosisImages(),
+    loadLetterheadImages(),
     logoUrl ? resolveImageToDataUrl(logoUrl) : Promise.resolve(""),
   ]);
   const images: DiagnosisImages = { ...fixedImages, schoolLogo };

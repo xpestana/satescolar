@@ -24,6 +24,7 @@ import {
 } from "@/lib/bachilleratoTemplate";
 import { htmlToPdfBlob } from "@/lib/htmlToPdfDownload";
 import { fetchAsBase64, fetchPrimaryBoletaSignatures } from "@/lib/primaryDescriptiveBoleta";
+import { loadLetterheadImages } from "@/lib/ministryLetterhead";
 
 const GRADE_LABELS: Record<string, string> = {
   "1_grado": "1er Grado", "2_grado": "2do Grado", "3_grado": "3er Grado",
@@ -318,9 +319,12 @@ export default function PrimaryFinalReportModal({
 
         const sectionId = (assignmentDetail as any)?.section?.id;
         const yearId = (assignmentDetail as any)?.school_year?.id;
-        const signatures = sectionId && yearId
-          ? await fetchPrimaryBoletaSignatures(cfg, schoolId, sectionId, yearId)
-          : undefined;
+        const [signatures, letterhead] = await Promise.all([
+          sectionId && yearId
+            ? fetchPrimaryBoletaSignatures(cfg, schoolId, sectionId, yearId)
+            : Promise.resolve(undefined),
+          loadLetterheadImages(),
+        ]);
         if (controller.cancelled) return;
 
         const previewData: PrimaryDescriptiveRenderData = {
@@ -342,6 +346,8 @@ export default function PrimaryFinalReportModal({
             : null,
           especialistas: [],
           signatures,
+          ministry_header: letterhead.headerLogo,
+          ministry_footer: letterhead.footerLogo,
         };
         const html = generatePrimaryDescriptiveHtml(cfg, previewData, paperW, paperH);
         const blob = await htmlToPdfBlob(html);

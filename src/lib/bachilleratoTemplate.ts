@@ -1,3 +1,11 @@
+import {
+  letterheadFooterHeightMm,
+  letterheadFooterHtml,
+  letterheadHeaderHtml,
+  ministryFooterUrl,
+  ministryHeaderUrl,
+} from "@/lib/ministryLetterhead";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface BachilleratoConfig {
@@ -828,6 +836,9 @@ export interface PrimaryDescriptiveRenderData {
    * then the template's). Falls back to the template's own list when absent.
    */
   signatures?:      BoletinSignature[];
+  /** Ministry banner / flag strip. Default to the bundled assets; PDF callers pass data URLs. */
+  ministry_header?: string;
+  ministry_footer?: string;
 }
 
 export const SAMPLE_PRIMARY_DESCRIPTIVE_DATA: PrimaryDescriptiveRenderData = {
@@ -863,55 +874,30 @@ export function generatePrimaryDescriptiveHtml(
   paperHeightMm: number,
   opts?: { bodyOnly?: boolean },
 ): string {
-  const p = cfg.primaria ?? {};
-  const accentColor   = p.accent_color        ?? "#1e3a5f";
-  const titleColor    = p.title_color          ?? "#000000";
+  const p: Partial<NonNullable<BachilleratoConfig["primaria"]>> = cfg.primaria ?? {};
+  const titleColor   = p.title_color          ?? "#000000";
   const mTop          = p.margin_top           ?? 12;
-  const mBottom       = p.margin_bottom        ?? 12;
   const mSides        = p.margin_sides         ?? 15;
-  const nameFontSize  = p.name_font_size       ?? 14;
-  const subFontSize   = p.sub_font_size        ?? 10;
   const bodyFontSize  = p.body_font_size       ?? 10;
-  const showAddress   = p.show_address         ?? false;
-  const showDeaCode   = p.show_dea_code        ?? false;
-  const showPhone     = p.show_phone           ?? false;
-  const showSlogan    = p.show_slogan          ?? true;
-  const slogan        = p.slogan               ?? "";
-  const footerPos     = p.footer_logo_position ?? "center";
 
   const lapsoLabels: Record<number, string> = { 1: "1er", 2: "2do", 3: "3er" };
   const lapsoLabel = lapsoLabels[data.momento] ?? `${data.momento}°`;
 
-  const logoHtml = data.school_logo
-    ? `<img src="${esc(data.school_logo)}" alt="Logo" crossorigin="anonymous" style="height:70px;width:auto;object-fit:contain;flex-shrink:0">`
-    : `<div style="width:70px;height:70px;background:#e5e7eb;border-radius:50%;flex-shrink:0"></div>`;
-
-  const subLines = [
-    showAddress  && data.address  ? `<div style="font-size:${subFontSize}pt;color:#4b5563">${esc(data.address)}</div>`  : "",
-    showDeaCode  && data.dea_code ? `<div style="font-size:${subFontSize}pt;color:#4b5563">Cód. DEA: ${esc(data.dea_code)}</div>` : "",
-    showPhone    && data.phone    ? `<div style="font-size:${subFontSize}pt;color:#4b5563">Tel: ${esc(data.phone)}</div>` : "",
-    `<div style="font-size:${subFontSize}pt;color:#4b5563;margin-top:2px">AÑO ESCOLAR ${esc(data.year_range)}</div>`,
-  ].filter(Boolean).join("");
-
-  const sloganHtml = showSlogan && slogan
-    ? `<div style="font-size:${subFontSize}pt;color:${accentColor};font-style:italic;margin-top:1px">${esc(slogan)}</div>`
-    : "";
-
-  const headerHtml = `
-  <div style="display:flex;align-items:center;gap:16px;padding-bottom:10px;border-bottom:2px solid ${accentColor};margin-bottom:10px">
-    ${logoHtml}
-    <div style="flex:1;text-align:center">
-      <div style="font-size:${nameFontSize}pt;font-weight:700;color:${accentColor};text-transform:uppercase;letter-spacing:0.5px">${esc(data.school_name)}</div>
-      ${sloganHtml}
-      ${subLines}
-    </div>
-  </div>`;
+  // Same fixed Ministry letterhead as the diagnosis sheet: banner with the school logo to its
+  // right, flag strip at the foot. The school name, slogan and contact lines no longer print.
+  const headerHtml = letterheadHeaderHtml({
+    headerLogo: data.ministry_header ?? ministryHeaderUrl,
+    schoolLogo: data.school_logo,
+    schoolName: data.school_name,
+  });
+  const footerImg = letterheadFooterHtml(data.ministry_footer ?? ministryFooterUrl);
 
   const titleHtml = `
   <div style="text-align:center;margin-bottom:10px">
     <div style="font-size:12pt;font-weight:700;text-decoration:underline;text-transform:uppercase;color:${titleColor}">
       INFORME DESCRIPTIVO DEL ${lapsoLabel} LAPSO
     </div>
+    <div style="font-size:10.5pt;font-weight:700;margin-top:3px">AÑO ESCOLAR ${esc(data.year_range)}</div>
   </div>`;
 
   const studentHtml = `
@@ -968,41 +954,38 @@ export function generatePrimaryDescriptiveHtml(
     return `<div style="display:flex;justify-content:space-between;align-items:flex-end;padding-top:20px;margin-top:10px">${cols.join("")}</div>`;
   })() : "";
 
-  // Footer logo — fixed at bottom of every print page
-  const footerAlignMap: Record<string, string> = { left: "flex-start", center: "center", right: "flex-end" };
-  const footerAlign = footerAlignMap[footerPos] ?? "center";
-  const hasFooter = !!(p.show_footer_logo && p.footer_logo_url);
-  // Reserve enough bottom space so content never hides behind the fixed footer
-  // footer = padding-top(14px≈5mm) + logo(60px≈21mm) + padding-bottom(mBottom mm) ≈ 26+mBottom mm
-  const footerReserveMm = hasFooter ? mBottom + 32 : mBottom;
+  // Flag strip — full page width, flush with the bottom of every page.
+  const hasFooter = !!footerImg;
+  // Reserve the strip's height (plus a little air) so content never hides behind it in print.
+  const footerReserveMm = hasFooter ? Math.ceil(letterheadFooterHeightMm(paperWidthMm)) + 4 : 4;
 
   // Full HTML (single student): table layout so <thead> repeats on every printed page
   const theadPad = `${mTop}mm ${mSides}mm 0 ${mSides}mm`;
-  const tbodyPad = `8px ${mSides}mm ${mBottom}mm ${mSides}mm`;
+  const tbodyPad = `0 ${mSides}mm 4mm ${mSides}mm`;
 
   const footerPrintCss = hasFooter ? `
     .primaria-tbody-cell{padding-bottom:${footerReserveMm}mm!important}
     #pdf-footer{position:fixed;bottom:0;left:0;right:0;background:white}` : "";
 
   const footerHtml = hasFooter ? `
-<div id="pdf-footer" style="display:flex;justify-content:${footerAlign};padding:16px ${mSides}mm ${mBottom}mm">
-  <img src="${esc(p.footer_logo_url!)}" alt="Logo pie" style="height:60px;width:auto;object-fit:contain">
-</div>` : "";
+<div id="pdf-footer">${footerImg}</div>` : "";
 
-  // bodyOnly = used when wrapping all students; use simple div (wrapper @page handles margins)
+  // bodyOnly = one sheet of a whole-section document: a page-tall column so the flag sits at the
+  // bottom of the sheet, exactly like the diagnosis.
   if (opts?.bodyOnly) {
-    const bodyOnlyFooterCss = hasFooter ? `<style>@media print{.primaria-footer{position:fixed;bottom:0;left:0;right:0;background:white;display:flex;justify-content:${footerAlign};padding:16px ${mSides}mm ${mBottom}mm}}</style>` : "";
-    return `${bodyOnlyFooterCss}
-<div style="font-family:Arial,Helvetica,sans-serif;padding:0;box-sizing:border-box">
-  ${headerHtml}
-  ${titleHtml}
-  ${studentHtml}
-  ${mainHtml}
-  ${especialistasHtml}
-  ${literalNumeralHtml}
-  ${sigHtml}
-</div>
-${footerHtml}`;
+    return `
+<div style="font-family:Arial,Helvetica,sans-serif;box-sizing:border-box;min-height:${paperHeightMm}mm;display:flex;flex-direction:column">
+  <div style="flex:1;padding:${mTop}mm ${mSides}mm 4mm">
+    ${headerHtml}
+    ${titleHtml}
+    ${studentHtml}
+    ${mainHtml}
+    ${especialistasHtml}
+    ${literalNumeralHtml}
+    ${sigHtml}
+  </div>
+  ${footerImg}
+</div>`;
   }
 
   // Single-student full HTML: table with repeating thead
@@ -1051,6 +1034,36 @@ ${footerHtml}
 <script>
 // No-op: PDF generation is handled by html2canvas + jsPDF from the parent app.
 </script>
+</body>
+</html>`;
+}
+
+/**
+ * Whole-section document for the primary descriptive boleta: one Letter-height `.boleta-page` per
+ * student (bodies from `generatePrimaryDescriptiveHtml(..., { bodyOnly: true })`), no page margins,
+ * so the flag strip lands at the bottom of each sheet like the diagnosis.
+ */
+export function wrapPrimaryDescriptiveBoletasHtml(bodies: string[], paperWidthMm: number, paperHeightMm: number): string {
+  const pages = bodies
+    .map((b, i) => `<div class="boleta-page${i === bodies.length - 1 ? " last" : ""}">${b}</div>`)
+    .join("\n");
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Boletas — Sección completa</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:${paperWidthMm}mm;font-family:Arial,Helvetica,sans-serif;background:white}
+    @page{size:${paperWidthMm}mm ${paperHeightMm}mm;margin:0}
+    @media print{.boleta-page{page-break-after:always}.boleta-page.last{page-break-after:avoid}}
+    .boleta-page{width:${paperWidthMm}mm;background:white}
+    ul,ol{padding-left:20px;margin:4px 0}
+    li{margin-bottom:2px}
+  </style>
+</head>
+<body>
+${pages}
 </body>
 </html>`;
 }

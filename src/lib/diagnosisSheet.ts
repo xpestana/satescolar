@@ -1,4 +1,5 @@
 import { BoletinSignature, isBlankSignature } from "@/lib/bachilleratoTemplate";
+import { letterheadFooterHtml, letterheadHeaderHtml } from "@/lib/ministryLetterhead";
 import { isRichTextEmpty, sanitizeRichText } from "@/lib/richTextSanitize";
 
 /**
@@ -104,17 +105,12 @@ function signaturesHtml(signatures: BoletinSignature[]): string {
 
 /** Body of one sheet (one student), without the page wrapper. */
 export function generateDiagnosisSheetBody(data: DiagnosisSheetData, images: DiagnosisImages): string {
-  // Ministry banner on the left, the school logo to its right (the banner shrinks to make room).
-  const schoolLogo = images.schoolLogo
-    ? `<img src="${esc(images.schoolLogo)}" alt="${esc(data.schoolName)}" class="dx-school-logo">`
-    : "";
-  const ministry = images.headerLogo
-    ? `<img src="${esc(images.headerLogo)}" alt="Ministerio del Poder Popular para la Educación" class="dx-header-logo">`
-    : "";
-  const header = schoolLogo || ministry ? `<div class="dx-header">${ministry}${schoolLogo}</div>` : "";
-  const footer = images.footerLogo
-    ? `<img src="${esc(images.footerLogo)}" alt="" class="dx-footer-logo">`
-    : "";
+  const header = letterheadHeaderHtml({
+    headerLogo: images.headerLogo,
+    schoolLogo: images.schoolLogo,
+    schoolName: data.schoolName,
+  });
+  const footer = letterheadFooterHtml(images.footerLogo);
   return `<div class="dx-content">
     ${header}
     <div class="dx-title">FICHA DESCRIPTIVA DEL ESTUDIANTE (DIAGNÓSTICO)</div>
@@ -148,9 +144,6 @@ export function generateDiagnosisDocumentHtml(sheets: DiagnosisSheetData[], imag
     .boleta-page{width:${widthMm}mm;min-height:${heightMm}mm;display:flex;flex-direction:column;background:white}
     @media print{.boleta-page{page-break-after:always}.boleta-page.last{page-break-after:avoid}}
     .dx-content{flex:1;padding:12mm 16mm 4mm}
-    .dx-header{display:flex;align-items:center;gap:5mm;margin-bottom:7mm}
-    .dx-school-logo{display:block;flex:none;height:24mm;max-width:32mm;object-fit:contain}
-    .dx-header-logo{display:block;flex:1;min-width:0;width:100%;height:auto}
     .dx-title{text-align:center;font-weight:700;font-size:12.5pt;text-decoration:underline;margin-bottom:3px}
     .dx-subtitle{text-align:center;font-weight:700;font-size:10.5pt;margin-bottom:2px}
     .dx-student{font-size:10pt;margin:14px 0 10px;line-height:1.6;display:flex;flex-wrap:wrap}
@@ -163,7 +156,6 @@ export function generateDiagnosisDocumentHtml(sheets: DiagnosisSheetData[], imag
     .dx-rich table{border-collapse:collapse;margin:4px 0}
     .dx-rich td,.dx-rich th{border:1px solid #999;padding:2px 6px}
     .dx-signatures{display:flex;gap:10px;align-items:flex-end;margin-top:28px}
-    .dx-footer-logo{display:block;width:100%;height:auto}
   </style>
 </head>
 <body>
