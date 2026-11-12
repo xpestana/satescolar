@@ -26,7 +26,7 @@ const ROLE_HOME = {
  */
 export function ModuleGate({ module, children }: ModuleGateProps) {
   const { userRole } = useAuth();
-  const { isLoading, isActive, getState, getStatus } = useSchoolModules();
+  const { isLoading, isResolved, isActive, getState, getStatus } = useSchoolModules();
 
   if (isRequirementMet(module, isActive)) return <>{children}</>;
 
@@ -37,6 +37,10 @@ export function ModuleGate({ module, children }: ModuleGateProps) {
       </div>
     );
   }
+
+  // Unknown (role/school momentarily unresolved, or the lookup failed): never pitch a module the
+  // school may well have. Writes are still guarded by the module_gate RLS policies.
+  if (!isResolved) return <>{children}</>;
 
   if (userRole === "teacher" || userRole === "representative") {
     return <Navigate to={ROLE_HOME[userRole]} replace />;

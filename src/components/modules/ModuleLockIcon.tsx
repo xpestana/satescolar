@@ -10,8 +10,8 @@ interface ModuleLockIconProps {
 
 /** Small lock shown next to a tab or button whose module is not active for the school. */
 export function ModuleLockIcon({ module, className }: ModuleLockIconProps) {
-  const { isLoading, isActive } = useSchoolModules();
-  if (isLoading || isRequirementMet(module, isActive)) return null;
+  const { isResolved, isActive } = useSchoolModules();
+  if (!isResolved || isRequirementMet(module, isActive)) return null;
   return (
     <Lock
       className={cn("h-3 w-3 flex-shrink-0 text-muted-foreground", className)}

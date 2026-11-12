@@ -17,25 +17,44 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to fetch user role
-async function fetchUserRole(userId: string): Promise<AppRole | null> {
+type RoleLookup = { ok: true; role: AppRole | null } | { ok: false };
+
+const ROLE_RETRY_DELAYS_MS = [500, 1500, 4000];
+
+/**
+ * Fetches the user's role. `ok: false` means the lookup itself failed (network, expired token…),
+ * which is NOT the same as "this user has no role" — callers must not treat it as a sign-out.
+ */
+async function fetchUserRoleOnce(userId: string): Promise<RoleLookup> {
   try {
     const { data: roleData, error } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', userId)
       .maybeSingle();
-    
+
     if (error) {
       console.error("Error fetching role:", error);
-      return null;
+      return { ok: false };
     }
-    
-    return roleData?.role as AppRole || null;
+
+    return { ok: true, role: (roleData?.role as AppRole) || null };
   } catch (error) {
     console.error("Exception fetching role:", error);
-    return null;
+    return { ok: false };
   }
+}
+
+/** Retries transient failures a few times before giving up. */
+async function fetchUserRole(userId: string, isCurrent: () => boolean): Promise<RoleLookup> {
+  let result = await fetchUserRoleOnce(userId);
+  for (const delay of ROLE_RETRY_DELAYS_MS) {
+    if (result.ok || !isCurrent()) return result;
+    await new Promise((r) => setTimeout(r, delay));
+    if (!isCurrent()) return result;
+    result = await fetchUserRoleOnce(userId);
+  }
+  return result;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -44,6 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<AppRole | null>(null);
   const roleRequestRef = useRef(0);
+  // Last role confirmed by the database, and whose it is. A user's role does not change during a
+  // session, so a later SIGNED_IN for the same user (supabase-js emits one every time the tab
+  // regains focus) must not blank it: a failed lookup at that moment used to set the role to null,
+  // which emptied the sidebar and showed the "module not active" overlay to schools that have it.
+  const confirmedRoleRef = useRef<{ userId: string; role: AppRole | null } | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -57,17 +81,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(nextSession?.user ?? null);
 
       if (!nextSession?.user) {
+        confirmedRoleRef.current = null;
         setUserRole(null);
         setLoading(false);
         return;
       }
 
+      const userId = nextSession.user.id;
+      const confirmed = confirmedRoleRef.current;
+      if (confirmed && confirmed.userId === userId && confirmed.role) {
+        // Same user, role already known: nothing to look up.
+        setUserRole(confirmed.role);
+        setLoading(false);
+        return;
+      }
+
       if (isInitial) setLoading(true);
-      const role = await fetchUserRole(nextSession.user.id);
+      const isCurrent = () => mounted && roleRequestRef.current === requestId;
+      const result = await fetchUserRole(userId, isCurrent);
 
-      if (!mounted || roleRequestRef.current !== requestId) return;
+      if (!isCurrent()) return;
 
-      setUserRole(role);
+      if (result.ok) {
+        confirmedRoleRef.current = { userId, role: result.role };
+        setUserRole(result.role);
+      } else if (!(confirmed && confirmed.userId === userId)) {
+        // Could not tell, and there is nothing known for this user: same as before (no role).
+        setUserRole(null);
+      }
+      // Otherwise keep the role already in state for this user.
       setLoading(false);
     };
 
@@ -91,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Explicit sign-out: clear everything.
         if (event === 'SIGNED_OUT') {
           roleRequestRef.current += 1;
+          confirmedRoleRef.current = null;
           setSession(null);
           setUser(null);
           setUserRole(null);
@@ -106,6 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Any other event without a user — treat as sign-out.
         roleRequestRef.current += 1;
+        confirmedRoleRef.current = null;
         setSession(null);
         setUser(null);
         setUserRole(null);
@@ -150,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    confirmedRoleRef.current = null;
     setUserRole(null);
   };
 

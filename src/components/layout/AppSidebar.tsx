@@ -207,9 +207,10 @@ export function AppSidebar() {
   const { school } = useSchoolData();
   const { familyName } = useRepresentativeFamily();
   const { isOwner, has, loading: permLoading } = usePermissions();
-  const { isActive: isModuleActive, isLoading: modulesLoading } = useSchoolModules();
+  const { isActive: isModuleActive, isResolved: modulesResolved } = useSchoolModules();
+  // Only lock once the school's modules are known (not while loading or after a failed lookup).
   const isItemLocked = (item: NavItem) =>
-    !!item.module && !modulesLoading && !isRequirementMet(item.module, isModuleActive);
+    !!item.module && modulesResolved && !isRequirementMet(item.module, isModuleActive);
 
   const { collapsed, hovering, toggleCollapsed, setHovering } = useSidebarState();
   const isMobile = useIsMobile();

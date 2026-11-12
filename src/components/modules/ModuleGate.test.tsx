@@ -7,6 +7,7 @@ import { TEACHING_MODULES, type ModuleRequirement } from "@/lib/modules/moduleRe
 const auth = { userRole: "school" as string };
 const modules = {
   isLoading: false,
+  isResolved: true,
   active: true,
   expiresAt: null as string | null,
   /** When set, only these keys are active (overrides `active`). */
@@ -18,6 +19,7 @@ vi.mock("@/hooks/useSchoolData", () => ({ useSchoolData: () => ({ school: { name
 vi.mock("@/hooks/useSchoolModules", () => ({
   useSchoolModules: () => ({
     isLoading: modules.isLoading,
+    isResolved: modules.isResolved,
     isActive: (key: string) => (modules.activeKeys ? modules.activeKeys.includes(key) : modules.active),
     getState: () => ({ enabled: true, expires_at: modules.expiresAt }),
     getStatus: () => (modules.active ? "active" : modules.expiresAt ? "expired" : "disabled"),
@@ -39,6 +41,7 @@ function renderGate(module: ModuleRequirement = "payments") {
 beforeEach(() => {
   auth.userRole = "school";
   modules.isLoading = false;
+  modules.isResolved = true;
   modules.active = true;
   modules.expiresAt = null;
   modules.activeKeys = null;
@@ -88,6 +91,14 @@ describe("ModuleGate", () => {
     modules.isLoading = true;
     renderGate();
     expect(screen.queryByText("Contenido real")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /whatsapp/i })).not.toBeInTheDocument();
+  });
+
+  it("never pitches a module while the school's modules are unknown (role/school unresolved or lookup failed)", () => {
+    modules.active = false;
+    modules.isResolved = false;
+    renderGate();
+    expect(screen.getByText("Contenido real")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /whatsapp/i })).not.toBeInTheDocument();
   });
 

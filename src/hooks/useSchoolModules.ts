@@ -43,6 +43,11 @@ export function useSchoolModules() {
   }, [data]);
 
   const isLoading = !isAdmin && (schoolLoading || (!!schoolId && modulesLoading));
+  /**
+   * Whether the school's modules are actually known. False while the role or the school id are
+   * unresolved, or when the lookup failed: callers must not pitch a module as "not active" then.
+   */
+  const isResolved = isAdmin || (!!schoolId && data !== undefined);
 
   const getState = useCallback(
     (key: ModuleKey): SchoolModuleState | null => (key === "registration" ? null : states.get(key) ?? null),
@@ -60,5 +65,5 @@ export function useSchoolModules() {
     [isAdmin, states],
   );
 
-  return { schoolId, isLoading, isActive, getState, getStatus };
+  return { schoolId, isLoading, isResolved, isActive, getState, getStatus };
 }

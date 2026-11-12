@@ -21,10 +21,11 @@ const DEMO_METRICS = { activeTeachers: 24, totalTeachers: 26, subjects: 18, assi
 export default function SchoolDashboard() {
   const { schoolId } = useSchoolId();
   const { school } = useSchoolData();
-  const { isActive: isModuleActive, isLoading: modulesLoading } = useSchoolModules();
+  const { isActive: isModuleActive, isResolved: modulesResolved } = useSchoolModules();
   const hasTeaching = isRequirementMet(TEACHING_MODULES, isModuleActive);
   // Without Notas, Aula Virtual or Asistencias the teacher blocks show sample data (a demo).
-  const showTeachingDemo = !modulesLoading && !hasTeaching;
+  // Only once the modules are known, never while loading or after a failed lookup.
+  const showTeachingDemo = modulesResolved && !hasTeaching;
   const teachingDemoNotice = showTeachingDemo ? <ModuleDemoNotice module="grades" label="Desbloquear" /> : undefined;
 
   // Get active school year
