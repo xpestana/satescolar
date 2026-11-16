@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
@@ -26,6 +27,7 @@ export function PayrollConceptEditModal({ concept, saving, onClose, onSave }: Pr
   const [kind, setKind] = useState<ConceptKind>("earning");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<PayrollCurrency>("VES");
+  const [receiptText, setReceiptText] = useState("");
 
   useEffect(() => {
     if (!concept) return;
@@ -33,6 +35,7 @@ export function PayrollConceptEditModal({ concept, saving, onClose, onSave }: Pr
     setKind(concept.concept_kind);
     setAmount(String(concept.default_amount));
     setCurrency(concept.currency);
+    setReceiptText(concept.receipt_text ?? "");
   }, [concept]);
 
   const parsedAmount = amount.trim() === "" ? 0 : Number(amount);
@@ -52,7 +55,7 @@ export function PayrollConceptEditModal({ concept, saving, onClose, onSave }: Pr
     const earningOnly =
       kind === "deduction" ? { is_base_salary: false, is_islr_taxable: false, is_contribution_base: false } : {};
     try {
-      await onSave({ id: concept.id, name: name.trim(), concept_kind: kind, default_amount: parsedAmount, currency, ...earningOnly });
+      await onSave({ id: concept.id, name: name.trim(), concept_kind: kind, default_amount: parsedAmount, currency, receipt_text: receiptText.trim() || null, ...earningOnly });
       toast({ title: "Concepto actualizado" });
       onClose();
     } catch (e) {
@@ -98,6 +101,23 @@ export function PayrollConceptEditModal({ concept, saving, onClose, onSave }: Pr
                 <SelectItem value="USD">USD</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5 col-span-2">
+            <Label htmlFor="edit-concept-receipt" className="text-xs">Texto en el recibo</Label>
+            <Textarea
+              id="edit-concept-receipt"
+              rows={4}
+              className="text-xs font-mono"
+              placeholder={`Vacío: sale "${name || "el nombre"}" con su monto`}
+              value={receiptText}
+              onChange={(e) => setReceiptText(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Una fila por línea: <span className="font-mono">Etiqueta | detalle | monto</span>. Variables:{" "}
+              <span className="font-mono">{"{monto}"}</span> lo pagado, <span className="font-mono">{"{dias}"}</span> días del período (15 o 30),{" "}
+              <span className="font-mono">{"{valor_dia}"}</span> salario mensual ÷ 30, <span className="font-mono">{"{salario_mensual}"}</span>.
+              Ejemplo: <span className="font-mono">Días trabajados | {"{dias}"}</span>, luego <span className="font-mono">Total | | {"{monto}"}</span>.
+            </p>
           </div>
           {concept && kind === "deduction" && concept.concept_kind === "earning" &&
             (concept.is_base_salary || concept.is_islr_taxable || concept.is_contribution_base) && (

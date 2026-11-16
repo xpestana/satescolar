@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
 import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
+import { salaryReceiptPdfBase64 } from "@/lib/payroll/generateSalaryReceiptPdf";
+import { fetchSalaryReceipt } from "@/hooks/payroll/fetchSalaryReceipt";
 import type { DraftContribution, DraftDocument, DraftItem, DraftWithholding } from "@/lib/payroll/withholdings/buildPaymentDraft";
 import type { PaymentRegime } from "@/lib/payroll/withholdings/types";
 import type {
@@ -159,8 +161,16 @@ export function usePayrollPayments(
       // Best-effort receipt email; never blocks the payment being marked paid. The function answers
       // emailSent: false (not an error) when the beneficiary has no email.
       try {
+        // Salaries go with the payslip PDF attached, built here with the same code as the download.
+        let pdfBase64: string | null = null;
+        try {
+          const salary = await fetchSalaryReceipt(paymentId);
+          if (salary) pdfBase64 = salaryReceiptPdfBase64(salary);
+        } catch {
+          pdfBase64 = null;
+        }
         const { data, error: fnError } = await supabase.functions.invoke("send-payroll-receipt", {
-          body: { payment_id: paymentId },
+          body: { payment_id: paymentId, ...(pdfBase64 ? { pdf_base64: pdfBase64 } : {}) },
         });
         if (fnError) return { emailSent: false, reason: "error" };
         if (data?.emailSent === true) return { emailSent: true, reason: null };

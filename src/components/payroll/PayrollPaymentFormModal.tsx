@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Trash2, AlertTriangle, Info } from "lucide-react";
+import { Loader2, Plus, Trash2, AlertTriangle, Info, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePayrollConcepts } from "@/hooks/payroll/usePayrollConcepts";
 import { usePayrollMethods } from "@/hooks/payroll/usePayrollMethods";
@@ -40,6 +40,9 @@ interface EditableLine {
   description: string;
   concept_kind: ConceptKind;
   amount: string;
+  /** How the line prints on the receipt; copied from the concept and editable for this payment. */
+  receipt_text: string;
+  showReceiptText?: boolean;
 }
 
 let lineCounter = 0;
@@ -49,6 +52,7 @@ const newLine = (): EditableLine => ({
   description: "",
   concept_kind: "earning",
   amount: "",
+  receipt_text: "",
 });
 
 export function PayrollPaymentFormModal({
@@ -117,6 +121,7 @@ export function PayrollPaymentFormModal({
           description: concept.name,
           concept_kind: concept.concept_kind,
           amount: converted ? String(converted) : "",
+          receipt_text: concept.receipt_text ?? "",
         };
       })
     );
@@ -150,6 +155,7 @@ export function PayrollPaymentFormModal({
         contributionParameters,
         unpaidHours: Number(unpaidHours) || 0,
         monthlyHours: beneficiary.monthly_hours ?? null,
+        paymentsPerMonth: period?.period_type === "biweekly" ? 2 : 1,
         lines: lines
           .filter((l) => l.amount !== "" && Number(l.amount) > 0)
           .map((l) => ({
@@ -157,13 +163,14 @@ export function PayrollPaymentFormModal({
             description: l.description,
             concept_kind: l.concept_kind,
             amount: Number(l.amount),
+            receipt_text: l.receipt_text.trim() || null,
             ...lineFlags(l.concept_id, concepts),
           })),
       }),
     [
       lines, concepts, vatEnabled, islrEnabled, parameters, currency, rate, ratesByBeneficiary, beneficiary.id,
       applyDeductions, period?.end_date, month.prior, contributionsEnabled, contributionParameters,
-      unpaidHours, beneficiary.monthly_hours,
+      unpaidHours, beneficiary.monthly_hours, period?.period_type,
     ]
   );
 
@@ -192,6 +199,7 @@ export function PayrollPaymentFormModal({
       description: c.name,
       concept_kind: c.concept_kind,
       amount: amount ? String(amount) : "",
+      receipt_text: c.receipt_text ?? "",
     });
   };
 
@@ -326,6 +334,14 @@ export function PayrollPaymentFormModal({
                     value={l.description}
                     onChange={(e) => updateLine(l.key, { description: e.target.value })}
                   />
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                    onClick={() => updateLine(l.key, { showReceiptText: !l.showReceiptText })}
+                  >
+                    <FileText className="h-3 w-3" />
+                    {l.receipt_text.trim() ? "Texto del recibo (personalizado)" : "Texto del recibo"}
+                  </button>
                 </div>
                 <div className="col-span-3">
                   <Select value={l.concept_kind} onValueChange={(v) => updateLine(l.key, { concept_kind: v as ConceptKind })}>
@@ -356,6 +372,21 @@ export function PayrollPaymentFormModal({
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </div>
+                {l.showReceiptText && (
+                  <div className="col-span-12 space-y-1">
+                    <Textarea
+                      rows={3}
+                      className="text-xs font-mono"
+                      aria-label={`Texto del recibo de ${l.description || "la línea"}`}
+                      placeholder={`Vacío: sale "${l.description || "Concepto"}" con su monto`}
+                      value={l.receipt_text}
+                      onChange={(e) => updateLine(l.key, { receipt_text: e.target.value })}
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Solo para este pago. Una fila por línea: Etiqueta | detalle | monto. Variables: {"{monto}"}, {"{dias}"}, {"{valor_dia}"}, {"{salario_mensual}"}.
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -417,7 +448,7 @@ export function PayrollPaymentFormModal({
             <p className="text-xs text-muted-foreground">
               {beneficiary.monthly_hours
                 ? `Trabaja ${beneficiary.monthly_hours} h al mes.` +
-                  (draft.hourlyVes ? ` Valor de la hora: ${formatMoney(draft.hourlyVes, "VES")} (sueldo base ÷ horas al mes).` : "")
+                  (draft.hourlyVes ? ` Valor de la hora: ${formatMoney(draft.hourlyVes, "VES")} (sueldo base del mes ÷ horas al mes).` : "")
                 : "Para descontar horas, indique en su ficha cuántas horas trabaja al mes."}
             </p>
           </div>

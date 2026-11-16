@@ -124,7 +124,8 @@ export function conceptsGuide(options: { islrEnabled: boolean; contributionsEnab
       <>Crea cada concepto con su nombre y tipo: <B>Asignación</B> suma al pago y <B>Deducción</B> lo resta.</>,
       <>Si suele ser el mismo monto, escríbelo en <B>Monto por defecto</B>.</>,
       <>En <B>Por defecto</B>, elige a quién le sale ya puesto al registrar el pago: a todos los trabajadores o solo a una categoría.</>,
-      <>Marca como <B>Sueldo base</B> el concepto del salario: de él se descuentan las horas no trabajadas.</>,
+      <>Marca como <B>Sueldo base</B> el concepto del salario: de él se descuentan las horas no trabajadas y sale el salario mensual del recibo.</>,
+      <>Con el lápiz puedes escribir el <B>Texto en el recibo</B> de cada concepto, por ejemplo los días y el valor del día.</>,
     ],
     notes: [
       ...when(options.islrEnabled, <>Solo las asignaciones con <B>Base del AR-I</B> encendido entran en el cálculo de esa retención.</>),

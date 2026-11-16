@@ -2,6 +2,7 @@ import { sendViaSmtp } from "../_shared/smtp-client.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 import {
   asciiSubject,
+  buildReceiptAttachmentHtml,
   buildReceiptHtml,
   type Currency,
   type ReceiptEmailData,
@@ -49,6 +50,21 @@ function formatDate(value: string | null): string {
   return d.toLocaleDateString("es-VE", { day: "2-digit", month: "long", year: "numeric" });
 }
 
+/** A PDF sent by the app, as base64. Anything else (or too big) is ignored. */
+function validPdfBase64(value: unknown): string | null {
+  if (typeof value !== "string" || value.length < 100 || value.length > 4_000_000) return null;
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(value)) return null;
+  try {
+    return atob(value.slice(0, 8)).startsWith("%PDF") ? value.replace(/\s+/g, "") : null;
+  } catch {
+    return null;
+  }
+}
+
+function fileSafe(value: string): string {
+  return value.normalize("NFD").replace(/\p{M}/gu, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toLowerCase() || "pago";
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -67,7 +83,7 @@ export default async function handler(req: Request): Promise<Response> {
     const { data: { user } } = await admin.auth.getUser(token);
     if (!user) return json({ error: "Invalid token" }, 401);
 
-    const { payment_id } = await req.json();
+    const { payment_id, pdf_base64 } = await req.json();
     if (!payment_id) return json({ error: "payment_id is required" }, 400);
 
     // Load the payment with its relations.
@@ -151,6 +167,31 @@ export default async function handler(req: Request): Promise<Response> {
 
     const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
     const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
+
+    // Salaries: the app sends the payslip PDF (same code as the download) and it goes attached.
+    const pdf = payment.payment_kind === "payroll" ? validPdfBase64(pdf_base64) : null;
+    if (pdf) {
+      await sendViaSmtp({
+        from: `${fromName} <${fromEmail}>`,
+        to: [to],
+        subject: asciiSubject(`Recibo de pago - ${data.periodName}`),
+        html: buildReceiptAttachmentHtml({
+          schoolName: data.schoolName,
+          beneficiaryName: data.beneficiaryName,
+          periodName: data.periodName,
+          netVes: data.netVes,
+        }),
+        attachments: [
+          {
+            filename: `recibo-${fileSafe(data.periodName)}.pdf`,
+            content: pdf,
+            encoding: "base64",
+            contentType: "application/pdf",
+          },
+        ],
+      } as any);
+      return json({ success: true, emailSent: true, attached: true });
+    }
 
     await sendViaSmtp({
       from: `${fromName} <${fromEmail}>`,

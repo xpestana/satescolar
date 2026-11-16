@@ -783,8 +783,32 @@ El gating es el mismo del resto: `permission` en `AppSidebar.tsx`, `ProtectedRou
 - `payroll_audit_log` — quién creó/aprobó/pagó/anuló y cuándo.
 
 ### Endpoints / Edge Functions
-- `send-payroll-receipt` — al marcar **pagado**, envía el recibo por correo al beneficiario
-  (HTML), autorizando al llamador contra el `school_id` del pago.
+- `send-payroll-receipt` — al marcar **pagado**, envía el recibo por correo al beneficiario,
+  autorizando al llamador contra el `school_id` del pago. En los **sueldos** la app arma el recibo
+  en PDF (el mismo de la descarga) y lo manda como `pdf_base64`; la función lo valida (que empiece
+  por `%PDF`, máx. ~3 MB) y lo **adjunta** con un mensaje corto. Sin PDF (proveedores o una
+  versión vieja de la app) manda el resumen en HTML de siempre.
+
+### Recibo de pago de sueldos (Art. 106 LOTTT)
+- Formato de los colegios: encabezado (nombre, dirección fiscal, RIF, teléfono de `schools`),
+  "NÓMINA OBREROS" para obreros y "NÓMINA EMPLEADOS" para el resto, cuadrícula con trabajador,
+  fecha de ingreso, C.I., período (`16.08 AL 31.08.2026`), cargo, nombre del período, banco y
+  cuenta del método de pago, **salario mensual** (líneas de `is_base_salary` en Bs × 2 si el
+  período es quincenal), Asignaciones y Deducciones con su subtotal, "He recibido…", total
+  neto, firma del trabajador y observaciones con la nota de sello y firma. Todo en Bs, línea
+  por línea (`amount_ves`). Carta vertical, solo la mitad de arriba (media carta). Sin columna
+  de aportes patronales: el sistema no los calcula.
+- Deducciones fijas primero, aunque estén en 0,00: SSO, RPE y FAOV (si el colegio tiene
+  parafiscales), FALTAS (horas no trabajadas) y RETENCIÓN ISLR % (si es agente); luego las demás.
+- **Texto en el recibo** (`payroll_concepts.receipt_text`): una fila por línea
+  `Etiqueta | detalle | monto` con variables `{monto}`, `{dias}` (15 o 30), `{valor_dia}`
+  (salario mensual ÷ 30), `{salario_mensual}` y `{horas}`. Al registrar el pago se copia a
+  `payroll_payment_items.receipt_text` y se puede ajustar solo para ese pago (una quincena de
+  vacaciones). Pagos viejos sin texto propio usan el del concepto. Código:
+  `src/lib/payroll/salaryReceipt.ts`, `generateSalaryReceiptPdf.ts` y
+  `src/hooks/payroll/fetchSalaryReceipt.ts`.
+- Horas no trabajadas: el valor de la hora es **salario mensual** ÷ horas al mes (en quincenas,
+  la línea del sueldo base × 2).
 - `send-payroll-monthly-report` — resumen mensual por colegio (totales por categoría y
   método + gráfico SVG) al **owner** del colegio; modo sistema/cron por JWT `service_role`,
   omite colegios sin pagos ese mes. Ambas reutilizan `supabase/functions/_shared/smtp-client.ts`

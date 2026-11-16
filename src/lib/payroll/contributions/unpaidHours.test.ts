@@ -38,6 +38,13 @@ describe("permiso no justificado por horas", () => {
     expect(absence(draft)?.amount_ves).toBe(99.82); // 1.330,9545 ÷ 40 × 3 = 99,8216
   });
 
+  it("en una quincena la hora sale del sueldo del mes, no del de la quincena", () => {
+    // La línea de la quincena es 1,5 $; el mes es 3 $ = 2.661,909 Bs; ÷ 160 × 3 = 49,9108 → 49,91
+    const draft = buildSalaryPaymentDraft({ ...base, unpaidHours: 3, paymentsPerMonth: 2 });
+    expect(draft.hourlyVes).toBeCloseTo(16.63693, 5);
+    expect(absence(draft)?.amount_ves).toBe(49.91);
+  });
+
   it("acepta medias horas", () => {
     expect(absence(buildSalaryPaymentDraft({ ...base, unpaidHours: 1.5 }))?.description).toBe("Permiso no justificado (1,5 h)");
   });

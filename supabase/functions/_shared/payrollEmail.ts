@@ -197,6 +197,17 @@ export function buildMonthlyReportHtml(d: MonthlyReportData): string {
   </div>`;
 }
 
+/** Short message that goes with the payslip PDF attached. */
+export function buildReceiptAttachmentHtml(d: { schoolName: string; beneficiaryName: string; periodName: string; netVes: number }): string {
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222;max-width:560px">
+  <h2 style="margin:0 0 12px;font-size:18px">${escapeHtml(d.schoolName)}</h2>
+  <p>Hola, ${escapeHtml(d.beneficiaryName)}:</p>
+  <p>Adjuntamos su recibo de pago de <strong>${escapeHtml(d.periodName)}</strong>.</p>
+  <p>Neto pagado: <strong>${money(d.netVes, "VES")}</strong></p>
+  <p style="color:#666;font-size:12px">Este correo se envió automáticamente desde SAT Escolar.</p>
+</div>`;
+}
+
 function escapeHtml(value: string): string {
   return String(value ?? "")
     .replace(/&/g, "&amp;")

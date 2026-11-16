@@ -8,6 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { buildPayrollReceiptData } from "@/lib/payroll/buildPayrollReceiptData";
 import { downloadPayrollReceiptPdf } from "@/lib/payroll/generatePayrollReceiptPdf";
+import { downloadSalaryReceiptPdf } from "@/lib/payroll/generateSalaryReceiptPdf";
+import { fetchSalaryReceipt } from "@/hooks/payroll/fetchSalaryReceipt";
 import { STATUS_LABELS, type PayrollLineItem, type PayrollCategory, type PayrollCurrency, type PayrollMethodType, type PayrollPaymentStatus } from "@/lib/payroll/types";
 import type { PayrollPaymentRow } from "@/hooks/payroll/usePayrollPayments";
 
@@ -44,6 +46,19 @@ export function PayrollBeneficiaryHistoryModal({ open, onOpenChange, schoolId, s
     .reduce((sum, p) => sum + (p.net_amount_ves || 0), 0);
 
   const downloadReceipt = async (p: PayrollPaymentRow) => {
+    // Salaries print the payslip schools hand out (Art. 106 LOTTT); suppliers keep the simple receipt.
+    if (p.payment_kind === "payroll") {
+      try {
+        const salary = await fetchSalaryReceipt(p.id);
+        if (salary) {
+          downloadSalaryReceiptPdf(salary, `recibo-${beneficiary.full_name}-${p.payroll_periods?.name ?? ""}`);
+          return;
+        }
+      } catch (e) {
+        toast({ title: "Error al generar el recibo", description: (e as Error).message, variant: "destructive" });
+        return;
+      }
+    }
     const { data: itemsData, error } = await supabase
       .from("payroll_payment_items")
       .select("concept_id, concept_kind, description, amount, amount_ves")

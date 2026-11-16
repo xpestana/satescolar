@@ -377,11 +377,14 @@ export interface SalaryDraftInput extends TaxContext {
   unpaidHours?: number;
   /** Hours a month the worker works (from their record). */
   monthlyHours?: number | null;
+  /** Payments the period makes a month: 2 in a fortnight. The base salary line × this = the month. */
+  paymentsPerMonth?: number;
 }
 
 /**
- * Unjustified absences: hours × (base salary of the payment ÷ hours a month). The base salary in
- * bolívares isn't rounded first: only the discount is, at the end of the calculation.
+ * Unjustified absences: hours × (monthly base salary ÷ hours a month). A fortnight's base line is
+ * half the month, so it is multiplied back up first. The base salary in bolívares isn't rounded
+ * first: only the discount is, at the end of the calculation.
  */
 function unpaidHoursLine(input: SalaryDraftInput, errors: string[]): { item: DraftItem | null; hourlyVes: number | null } {
   const hours = input.unpaidHours ?? 0;
@@ -398,7 +401,7 @@ function unpaidHoursLine(input: SalaryDraftInput, errors: string[]): { item: Dra
     errors.push("Agregue la línea del sueldo base para descontar las horas no trabajadas.");
     return { item: null, hourlyVes: null };
   }
-  const hourlyVes = baseVes / input.monthlyHours;
+  const hourlyVes = (baseVes * Math.max(1, input.paymentsPerMonth ?? 1)) / input.monthlyHours;
   const discountVes = round2(hours * hourlyVes);
   return {
     hourlyVes,

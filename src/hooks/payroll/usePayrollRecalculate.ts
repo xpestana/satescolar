@@ -36,7 +36,7 @@ export function usePayrollRecalculate(schoolId: string | null | undefined) {
           .select("document_id, tax_type, rate_pct, override_reason")
           .eq("payment_id", payment.id)
           .eq("is_override", true),
-        supabase.from("payroll_periods").select("id, end_date, apply_deductions").eq("id", payment.period_id).single(),
+        supabase.from("payroll_periods").select("id, end_date, apply_deductions, period_type").eq("id", payment.period_id).single(),
       ]);
       const failed =
         beneficiaryResult.error ?? itemsResult.error ?? documentsResult.error ?? overridesResult.error ?? periodResult.error;
@@ -98,6 +98,7 @@ export function usePayrollRecalculate(schoolId: string | null | undefined) {
               contributionParameters,
               unpaidHours: Number((itemsResult.data ?? []).find((i) => i.unpaid_hours)?.unpaid_hours) || 0,
               monthlyHours: beneficiary.monthly_hours,
+              paymentsPerMonth: period.period_type === "biweekly" ? 2 : 1,
               lines: (itemsResult.data ?? [])
                 .filter((i) => !i.withholding_id && !i.contribution_id && !i.unpaid_hours)
                 .map((i) => ({
@@ -105,6 +106,7 @@ export function usePayrollRecalculate(schoolId: string | null | undefined) {
                   concept_kind: i.concept_kind as ConceptKind,
                   description: i.description,
                   amount: i.amount,
+                  receipt_text: i.receipt_text,
                   ...lineFlags(i.concept_id, concepts),
                 })),
             });

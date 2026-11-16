@@ -99,7 +99,18 @@ describe("PayrollConceptEditModal", () => {
         concept_kind: "earning",
         default_amount: 350.5,
         currency: "USD",
+        receipt_text: null,
       })
+    );
+  });
+
+  it("saves the receipt text", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<PayrollConceptEditModal concept={concept} saving={false} onClose={vi.fn()} onSave={onSave} />);
+    fireEvent.change(screen.getByLabelText("Texto en el recibo"), { target: { value: "Días | {dias}\nTotal | | {monto}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ receipt_text: "Días | {dias}\nTotal | | {monto}" }))
     );
   });
 

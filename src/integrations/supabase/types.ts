@@ -3414,6 +3414,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_base_salary: boolean
+          receipt_text: string | null
           is_default: boolean
           is_contribution_base: boolean
           is_islr_taxable: boolean
@@ -3430,6 +3431,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_base_salary?: boolean
+          receipt_text?: string | null
           is_default?: boolean
           is_contribution_base?: boolean
           is_islr_taxable?: boolean
@@ -3446,6 +3448,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_base_salary?: boolean
+          receipt_text?: string | null
           is_default?: boolean
           is_contribution_base?: boolean
           is_islr_taxable?: boolean
@@ -3774,6 +3777,7 @@ export type Database = {
           id: string
           payment_id: string
           unpaid_hours: number | null
+          receipt_text: string | null
           withholding_id: string | null
         }
         Insert: {
@@ -3787,6 +3791,7 @@ export type Database = {
           id?: string
           payment_id: string
           unpaid_hours?: number | null
+          receipt_text?: string | null
           withholding_id?: string | null
         }
         Update: {
@@ -3800,6 +3805,7 @@ export type Database = {
           id?: string
           payment_id?: string
           unpaid_hours?: number | null
+          receipt_text?: string | null
           withholding_id?: string | null
         }
         Relationships: [

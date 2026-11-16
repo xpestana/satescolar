@@ -13,6 +13,7 @@ export interface ConceptInput {
   is_base_salary?: boolean;
   is_default?: boolean;
   default_categories?: string[];
+  receipt_text?: string | null;
 }
 
 const KEY = "payroll-concepts";

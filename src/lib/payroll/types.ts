@@ -77,6 +77,8 @@ export interface PayrollConcept {
   is_default: boolean;
   /** Categories it's on by default for; empty = every category. */
   default_categories: string[];
+  /** How it prints on the salary receipt (lines "Etiqueta | detalle | monto" with variables). */
+  receipt_text?: string | null;
 }
 
 export interface PayrollLineItem {
@@ -88,6 +90,8 @@ export interface PayrollLineItem {
   amount_ves?: number | null;
   /** Set on the unjustified-absence discount: the hours it discounts. */
   unpaid_hours?: number | null;
+  /** Receipt text of this line, copied from the concept and adjustable per payment. */
+  receipt_text?: string | null;
 }
 
 export interface PayrollPayment {
