@@ -173,9 +173,17 @@ export default function AddRepresentative() {
           .eq("id", representativeId);
         if (error) throw error;
       } else {
+        // The family's first representative (or the first one added while none is primary) becomes primary,
+        // as in the representative portal. The family name, ledgers and enrollment rely on it.
+        const { count, error: countError } = await supabase
+          .from("representatives")
+          .select("id", { count: "exact", head: true })
+          .eq("family_id", familyId!)
+          .eq("is_primary", true);
+        if (countError) throw countError;
         const { error } = await supabase
           .from("representatives")
-          .insert({ id: repIdForUpload, ...repData });
+          .insert({ id: repIdForUpload, ...repData, is_primary: (count ?? 0) === 0 });
         if (error) throw error;
       }
     },

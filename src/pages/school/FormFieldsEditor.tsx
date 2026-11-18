@@ -66,6 +66,7 @@ import {
 } from "lucide-react";
 import { FormGroupsManager } from "@/components/forms/FormGroupsManager";
 import { isEffectivelyRequired, isProtectedField } from "@/lib/protected-fields";
+import { buildNewFormFieldRow } from "@/lib/new-form-field";
 
 type FormType = "representative" | "student" | "teacher";
 type FieldType = "text" | "email" | "phone" | "number" | "date" | "select" | "textarea" | "checkbox" | "file";
@@ -260,22 +261,13 @@ export default function FormFieldsEditor() {
     mutationFn: async (fieldData: Partial<FormField>) => {
       if (!schoolId) throw new Error("No school assigned");
       
-      const maxOrder = fields.length > 0 
-        ? Math.max(...fields.map(f => f.field_order)) + 1 
-        : 0;
-      
       const { error } = await supabase
         .from("form_fields")
-        .insert({
-          school_id: schoolId,
-          form_type: formType,
-          field_name: fieldData.field_name,
-          field_label: fieldData.field_label,
-          field_type: fieldData.field_type,
-          placeholder: fieldData.placeholder || null,
-          is_required: fieldData.is_required || false,
-          field_order: maxOrder,
-        });
+        .insert(buildNewFormFieldRow(fieldData, {
+          schoolId,
+          formType,
+          existingOrders: fields.map(f => f.field_order),
+        }));
       
       if (error) throw error;
     },
