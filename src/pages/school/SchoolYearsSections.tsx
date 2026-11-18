@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
+import { useSchoolId } from "@/hooks/useSchoolId";
 import { UserPlus, Info, X, Edit, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 
@@ -111,15 +111,11 @@ const DIRECT_CATEGORIES = ["Pre-Maternal / Maternal"];
 export default function SchoolYearsSections() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const [isYearModalOpen, setIsYearModalOpen] = useState(false);
   const [isSectionModalOpen, setIsSectionModalOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState<GradeLevel | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<GradeCategory | null>(null);
   const [yearRange, setYearRange] = useState("");
-  const [userSchoolId, setUserSchoolId] = useState<string | null>(null);
-  
-  
   // Section modal state
   const [newSectionName, setNewSectionName] = useState("");
   const [pendingSections, setPendingSections] = useState<Record<string, string[]>>({});
@@ -131,23 +127,12 @@ export default function SchoolYearsSections() {
   const [editingYearId, setEditingYearId] = useState<string | null>(null);
   const [editingYearRange, setEditingYearRange] = useState("");
 
-  // Get user's school_id
-  const { data: userRole } = useQuery({
-    queryKey: ["user-school-id", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("school_id")
-        .eq("user_id", user.id)
-        .single();
-      
-      if (error) throw error;
-      setUserSchoolId(data.school_id);
-      return data;
-    },
-    enabled: !!user?.id,
-  });
+  // Colegio del usuario. Antes había aquí una consulta propia con la misma clave
+  // ["user-school-id"] que useSchoolId (montado siempre por el layout) pero con otra forma de
+  // datos, y el id solo se guardaba si SU queryFn corría: si React Query reusaba la consulta del
+  // layout, el id quedaba en null y crear el año fallaba con "No se pudo crear el año escolar".
+  const { schoolId, isLoading: schoolIdLoading } = useSchoolId();
+  const userSchoolId = schoolId ?? null;
 
   // Fetch school years
   const { data: schoolYears = [], isLoading } = useQuery({
@@ -189,8 +174,14 @@ export default function SchoolYearsSections() {
   // Create school year mutation
   const createYearMutation = useMutation({
     mutationFn: async (yearRange: string) => {
-      if (!userSchoolId) throw new Error("No school assigned");
-      
+      if (!userSchoolId) {
+        throw new Error(
+          schoolIdLoading
+            ? "Todavía se está cargando el colegio. Intente de nuevo en unos segundos."
+            : "No se encontró el colegio de su usuario. Recargue la página e intente de nuevo."
+        );
+      }
+
       const { error } = await supabase
         .from("school_years")
         .insert({
@@ -215,7 +206,7 @@ export default function SchoolYearsSections() {
         title: "Error",
         description: error.message.includes("duplicate")
           ? "Este año escolar ya existe."
-          : "No se pudo crear el año escolar.",
+          : `No se pudo crear el año escolar: ${error.message}`,
       });
     },
   });
