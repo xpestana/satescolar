@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
 import { supabase } from "@/integrations/supabase/client";
 import { isEffectivelyRequired } from "@/lib/protected-fields";
+import { findMissingRequiredFields } from "@/lib/enrollment-completeness";
 
 import { AlertTriangle, GraduationCap, Users, UserPen } from "lucide-react";
 
@@ -257,7 +258,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
     queryFn: async () => {
       const { data, error } = await supabase
         .from("representatives")
-        .select("id, form_data")
+        .select("id, form_data, photo_url")
         .eq("family_id", student.family_id)
         .eq("is_primary", true)
         .maybeSingle();
@@ -269,19 +270,19 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
 
 
   // Completeness check based on required fields from saved forms
-  const isEmpty = (v: any) =>
-    v === null || v === undefined || (typeof v === "string" && !v.trim());
-
   const requiredStudent = allFormFields.filter(f => f.form_type === "student" && f.is_visible && isEffectivelyRequired("student", f.field_name, f.is_required));
   const requiredRep = allFormFields.filter(f => f.form_type === "representative" && f.is_visible && isEffectivelyRequired("representative", f.field_name, f.is_required));
 
-  const missingStudentFields = requiredStudent
-    .filter(f => isEmpty(student.form_data?.[f.field_name]))
-    .map(f => `student:${f.field_name}`);
+  const missingStudentFields = findMissingRequiredFields(
+    requiredStudent.map(f => f.field_name),
+    student.form_data,
+    student.photo_url,
+  ).map(name => `student:${name}`);
 
-  const repFormData = (primaryRep?.form_data as Record<string, any> | null) || null;
+  const repFormData = (primaryRep?.form_data as Record<string, unknown> | null) || null;
   const missingRepresentativeFields = primaryRep
-    ? requiredRep.filter(f => isEmpty(repFormData?.[f.field_name])).map(f => `representative:${f.field_name}`)
+    ? findMissingRequiredFields(requiredRep.map(f => f.field_name), repFormData, primaryRep.photo_url)
+        .map(name => `representative:${name}`)
     : [];
 
   const completeness = {

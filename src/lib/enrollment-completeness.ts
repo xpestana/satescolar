@@ -7,6 +7,26 @@ export const ENROLLMENT_CUSTOM_FIELDS = [
   "custom:fecha_de_inscripcion",
 ];
 
+/** System field for the profile photo. Its value lives in the person's `photo_url`, not in `form_data`. */
+export const PROFILE_PHOTO_FIELD = "foto_perfil";
+
+const isBlank = (value: unknown) =>
+  value === null || value === undefined || (typeof value === "string" && !value.trim());
+
+/**
+ * Returns the required field names a person (student or representative) still has empty.
+ * The profile photo counts as filled when the person has a `photo_url`.
+ */
+export function findMissingRequiredFields(
+  requiredFieldNames: string[],
+  formData: Record<string, unknown> | null,
+  photoUrl: string | null,
+): string[] {
+  return requiredFieldNames.filter((name) =>
+    name === PROFILE_PHOTO_FIELD ? isBlank(photoUrl) : isBlank(formData?.[name]),
+  );
+}
+
 export interface CompletenessResult {
   isComplete: boolean;
   missingStudentFields: string[];
