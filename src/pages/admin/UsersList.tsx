@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Pencil, Trash2, Ban, CheckCircle, LogIn, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Ban, CheckCircle, LogIn, X, KeyRound, Copy } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,13 @@ export default function UsersList() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isImpersonating, setIsImpersonating] = useState(false);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{
+    email: string;
+    password: string;
+    email_sent: boolean;
+    email_error: string | null;
+  } | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -226,11 +233,19 @@ export default function UsersList() {
         });
 
         if (emailsData?.users) {
-          emailsData.users.forEach((u: { id: string; email: string; banned_until: string | null }) => {
+          emailsData.users.forEach((u: {
+            id: string;
+            email: string;
+            banned_until: string | null;
+            user_metadata?: { full_name?: string };
+          }) => {
             const user = usersMap.get(u.id);
             if (user) {
               user.email = u.email;
               user.is_suspended = u.banned_until ? new Date(u.banned_until) > new Date() : false;
+              // Si el perfil quedó sin nombre, se usa el que se cargó al crear la cuenta.
+              const metaName = u.user_metadata?.full_name?.trim();
+              if (withoutName(user) && metaName) user.full_name = metaName;
             }
           });
         }
@@ -313,13 +328,14 @@ export default function UsersList() {
     setIsSaving(true);
     try {
       if (isEditing && editingUserId) {
-        // Update user profile
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({ full_name: formData.full_name })
-          .eq("user_id", editingUserId);
-
-        if (profileError) throw profileError;
+        // El nombre va por la función: la RLS de profiles no deja al admin escribir perfiles ajenos
+        // (un update directo no daba error pero no cambiaba nada).
+        const { data: nameData, error: nameError } = await supabase.functions.invoke(
+          "admin-user-actions",
+          { body: { action: "update_name", user_id: editingUserId, full_name: formData.full_name } }
+        );
+        if (nameError) throw nameError;
+        if (nameData?.error) throw new Error(nameData.error);
 
         // Update school assignment
         const { error: roleError } = await supabase
@@ -364,16 +380,44 @@ export default function UsersList() {
             .eq("user_id", data.user.id);
         }
 
-        toast.success("Usuario creado correctamente");
+        if (data?.email_sent) {
+          toast.success(`Usuario creado. Se envió el correo de bienvenida a ${formData.email}`);
+        } else {
+          toast.warning(
+            `Usuario creado, pero no se pudo enviar el correo de bienvenida${data?.email_error ? `: ${data.email_error}` : ""}. Use el botón de la llave para reenviarlo.`
+          );
+        }
       }
 
       handleCloseDialog();
       fetchUsers();
     } catch (error: any) {
       console.error("Error saving user:", error);
-      toast.error("Error al guardar el usuario");
+      toast.error(error?.message ? `Error al guardar el usuario: ${error.message}` : "Error al guardar el usuario");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleResetAndWelcome = async (userId: string) => {
+    setResettingUserId(userId);
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
+        body: { action: "reset_and_welcome", user_id: userId },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setResetResult({
+        email: data.email,
+        password: data.password,
+        email_sent: !!data.email_sent,
+        email_error: data.email_error ?? null,
+      });
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast.error(error?.message || "Error al restablecer la contraseña");
+    } finally {
+      setResettingUserId(null);
     }
   };
 
@@ -689,6 +733,34 @@ export default function UsersList() {
                       )}
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Nueva contraseña y reenviar bienvenida"
+                            disabled={!user.email || resettingUserId === user.user_id}
+                          >
+                            <KeyRound className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Restablecer contraseña y reenviar bienvenida?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Se generará una contraseña nueva para "{user.full_name}" y se enviará el
+                              correo de bienvenida con las credenciales a {user.email}. La contraseña
+                              actual dejará de funcionar.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleResetAndWelcome(user.user_id)}>
+                              Restablecer y enviar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
                           <Button variant="ghost" size="icon" title="Eliminar">
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
@@ -811,6 +883,54 @@ export default function UsersList() {
             <Button onClick={handleSubmit} disabled={isSaving}>
               {isSaving ? "Guardando..." : "Guardar"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Resultado de restablecer contraseña */}
+      <Dialog open={!!resetResult} onOpenChange={(open) => !open && setResetResult(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Contraseña restablecida</DialogTitle>
+          </DialogHeader>
+          {resetResult && (
+            <div className="space-y-4 py-2 text-sm">
+              {resetResult.email_sent ? (
+                <p>
+                  Se envió el correo de bienvenida a <strong>{resetResult.email}</strong>.
+                </p>
+              ) : (
+                <p className="text-destructive">
+                  La contraseña se cambió, pero no se pudo enviar el correo
+                  {resetResult.email_error ? ` (${resetResult.email_error})` : ""}. Compártala con el
+                  usuario por otro medio.
+                </p>
+              )}
+              <div className="rounded-lg bg-muted p-3 space-y-1">
+                <p className="text-muted-foreground">Usuario</p>
+                <p className="font-medium">{resetResult.email}</p>
+                <p className="text-muted-foreground pt-2">Contraseña nueva</p>
+                <div className="flex items-center gap-2">
+                  <code className="font-mono font-semibold">{resetResult.password}</code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    title="Copiar contraseña"
+                    onClick={() => {
+                      navigator.clipboard
+                        .writeText(resetResult.password)
+                        .then(() => toast.success("Contraseña copiada"))
+                        .catch(() => toast.error("No se pudo copiar"));
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setResetResult(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

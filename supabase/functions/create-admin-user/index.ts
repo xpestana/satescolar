@@ -1,4 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWelcomeEmail } from "../_shared/welcome-email.ts";
+
+// Evita que un error interno de SMTP/TLS tumbe el worker.
+if (typeof addEventListener === "function") {
+  addEventListener("unhandledrejection", (e: any) => {
+    console.error("[create-admin-user] unhandledrejection:", e?.reason ?? e);
+    e?.preventDefault?.();
+  });
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -146,10 +155,27 @@ export default async function handler(req: Request): Promise<Response> {
       }
     }
 
+    // El nombre se guarda tambien en profiles (la lista de /admin/usuarios lo lee de alli).
+    if (userData.user && full_name) {
+      await supabaseAdmin
+        .from("profiles")
+        .upsert({ user_id: userData.user.id, full_name }, { onConflict: "user_id" });
+    }
+
+    // Correo de bienvenida con las credenciales (antes no se enviaba ninguno).
+    const welcome = await sendWelcomeEmail(supabaseAdmin, {
+      schoolId: school_id || null,
+      email,
+      password,
+      role: role === "school" ? "administrador" : "representante",
+    });
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        user: { id: userData.user?.id, email: userData.user?.email } 
+      JSON.stringify({
+        success: true,
+        user: { id: userData.user?.id, email: userData.user?.email },
+        email_sent: welcome.sent,
+        email_error: welcome.error ?? null,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

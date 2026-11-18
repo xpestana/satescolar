@@ -15,6 +15,9 @@ verify_jwt = false
 [functions.create-admin-user]
 verify_jwt = false
 
+[functions.admin-user-actions]
+verify_jwt = false
+
 [functions.create-system-admin]
 verify_jwt = false
 

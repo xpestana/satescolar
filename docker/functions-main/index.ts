@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+import adminUserActions from "../admin-user-actions/index.ts";
 import createAdminUser from "../create-admin-user/index.ts";
 import createFamily from "../create-family/index.ts";
 import createSystemAdmin from "../create-system-admin/index.ts";
@@ -22,6 +23,7 @@ import updateSystemAdmin from "../update-system-admin/index.ts";
 import updateTeacherPassword from "../update-teacher-password/index.ts";
 
 const staticHandlers: Record<string, (req: Request) => Promise<Response>> = {
+  "admin-user-actions": (req) => adminUserActions(req),
   "create-admin-user": (req) => createAdminUser(req),
   "create-family": (req) => createFamily(req),
   "create-system-admin": (req) => createSystemAdmin(req),
