@@ -152,7 +152,9 @@ export default function EmailTemplateEditor() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["email-templates", schoolId] });
-      queryClient.invalidateQueries({ queryKey: ["email-template", schoolId, templateType] });
+      // Drop the cached (deleted) template first: otherwise the "sync from DB" block copies it back
+      // into the form before the refetch arrives, and the old subject/body stay on screen.
+      queryClient.setQueryData(["email-template", schoolId, templateType], null);
       setLoadedId(null);
       setSubject(DEFAULT_SUBJECTS[templateType] ?? "");
       setBodyHtml(DEFAULT_BODIES[templateType] ?? "");

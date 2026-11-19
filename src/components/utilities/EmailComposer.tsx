@@ -65,7 +65,7 @@ export function EmailComposer() {
   });
 
   // Families: account email (as shown in "Familias"), with the representative's as fallback.
-  const { data: families = [] } = useFamilyEmailRecipients(schoolId);
+  const { data: families = [], isLoading: familiesLoading } = useFamilyEmailRecipients(schoolId);
 
   const getTeacherName = (t: any) => {
     const fd = t.form_data as Record<string, any> | null;
@@ -283,10 +283,10 @@ export function EmailComposer() {
                 size="sm"
                 onClick={addAllFamilies}
                 className="gap-2"
-                disabled={families.length === 0}
+                disabled={familiesLoading || families.length === 0}
               >
                 <Users className="h-4 w-4" />
-                Todas las Familias ({families.length})
+                Todas las Familias ({familiesLoading ? "cargando…" : families.length})
               </Button>
 
               {/* Individual teacher */}
