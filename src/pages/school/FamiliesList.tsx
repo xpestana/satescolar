@@ -43,6 +43,7 @@ import { ViewFamilyModal } from "@/components/families/ViewFamilyModal";
 import { ChangePasswordModal } from "@/components/families/ChangePasswordModal";
 import FamilyGradeAccessDialog from "@/components/families/FamilyGradeAccessDialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 
 interface FamilyWithEmail {
   id: string;
@@ -314,17 +315,20 @@ export default function FamiliesList() {
   // Resend welcome email mutation
   const resendEmailMutation = useMutation({
     mutationFn: async (familyId: string) => {
-      const { data, error } = await supabase.functions.invoke("resend-welcome-email", {
-        body: { family_id: familyId, target_type: "family" },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data;
+      return invokeEdgeFunction<{ message: string; email_sent?: boolean }>(
+        "resend-welcome-email",
+        { family_id: familyId, target_type: "family" },
+        "No se pudo reenviar el correo",
+      );
     },
     onSuccess: (data) => {
+      // When the email fails the password was still changed: the message carries the new one.
+      const emailFailed = data.email_sent === false;
       toast({
-        title: "Correo enviado",
+        variant: emailFailed ? "destructive" : "default",
+        title: emailFailed ? "Contraseña cambiada, correo no enviado" : "Correo enviado",
         description: data.message,
+        duration: emailFailed ? 60000 : undefined,
       });
       setResendDialogOpen(false);
       setResendFamily(null);

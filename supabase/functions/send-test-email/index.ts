@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { getCallerRole } from "../_shared/callerRole.ts";
 import { buildWelcomeEmailHtml, buildDelinquencyEmailHtml, resolveSnippets, wrapWithEmailLayout } from "../_shared/email-templates.ts";
 
 const corsHeaders = {
@@ -222,13 +223,10 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const userId = claimsData.claims.sub as string;
-    const { data: roleData } = await supabaseClient
-      .from("user_roles")
-      .select("role, school_id")
-      .eq("user_id", userId)
-      .single();
+    // A user may hold several roles (e.g. school staff who is also a representative).
+    const roleData = await getCallerRole(supabaseClient, userId, ["admin", "school"]);
 
-    if (!roleData || !["admin", "school"].includes(roleData.role)) {
+    if (!roleData) {
       return new Response(
         JSON.stringify({ error: "No autorizado para usar esta función" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

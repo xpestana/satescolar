@@ -1,5 +1,9 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
+import { getCallerRole } from "../_shared/callerRole.ts";
+import { hasSchoolPermission } from "../_shared/schoolPermissions.ts";
+import { buildBulkEnvelopes, parseRecipients } from "../_shared/bulkRecipients.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
@@ -18,105 +22,106 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+/**
+ * Free-form email from the platform admin (/admin/enviar-email) or from school staff with the
+ * `emails.send` permission (/utilidades/correo). Several recipients go in BCC, in batches.
+ */
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verify auth
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "No authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    if (!authHeader) return json({ error: "No autorizado" }, 401);
 
-    // Verify admin role
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { autoRefreshToken: false, persistSession: false } }
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user } } = await supabaseAdmin.auth.getUser(token);
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Invalid token" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const { data: { user } } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (!user) return json({ error: "Sesión inválida" }, 401);
 
-    const { data: roleData } = await supabaseAdmin
-      .from("user_roles")
-      .select("role, school_id")
-      .eq("user_id", user.id)
-      .in("role", ["admin", "school"]);
+    const callerRole = await getCallerRole(supabaseAdmin, user.id, ["admin", "school"]);
+    if (!callerRole) return json({ error: "Solo el administrador o el personal del colegio pueden enviar correos" }, 403);
 
-    if (!roleData || roleData.length === 0) {
-      return new Response(JSON.stringify({ error: "Unauthorized: Admin or School only" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Admins are never gated. School staff need the messaging module and the emails.send permission.
+    if (callerRole.role === "school") {
+      if (!callerRole.school_id) return json({ error: "Su usuario no está asociado a un colegio" }, 403);
+      if (!(await isSchoolModuleActive(supabaseAdmin, callerRole.school_id, "messaging"))) {
+        return json({
+          error: "El módulo de Mensajes Masivos no está activo en este colegio",
+          status: "module_inactive",
+        }, 403);
+      }
+      const allowed = await hasSchoolPermission(supabaseAdmin, {
+        userId: user.id,
+        schoolId: callerRole.school_id,
+        isOwner: !!callerRole.is_owner,
+        permission: "emails.send",
       });
-    }
-
-    // School staff need the messaging module (docs/desc/19-modulos.md); admins are never gated.
-    const isAdmin = roleData.some((r) => r.role === "admin");
-    if (!isAdmin && !(await isSchoolModuleActive(supabaseAdmin, roleData[0].school_id, "messaging"))) {
-      return new Response(JSON.stringify({
-        error: "El módulo de Mensajes Masivos no está activo en este colegio",
-        status: "module_inactive",
-      }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      if (!allowed) return json({ error: "No tiene permiso para enviar correos" }, 403);
     }
 
     const { to, subject, body, isHtml } = await req.json();
+    if (!to || !subject || !body) return json({ error: "Destinatarios, asunto y mensaje son obligatorios" }, 400);
 
-    if (!to || !subject || !body) {
-      return new Response(JSON.stringify({ error: "to, subject, and body are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    const { valid: recipients, invalid } = parseRecipients(to);
+    if (recipients.length === 0) {
+      return json({ error: `No hay destinatarios válidos${invalid.length ? `: ${invalid.join(", ")}` : ""}` }, 400);
     }
 
-    const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-    const smtpUser = Deno.env.get("SMTP_USER") ?? "";
-    const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
     const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
     const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
-    const recipients = Array.isArray(to) ? to : to.split(",").map((e: string) => e.trim());
-
-    const mailConfig: Record<string, unknown> = {
-      from: `${fromName} <${fromEmail}>`,
-      to: recipients,
-      subject,
-    };
-
-    if (isHtml) {
-      mailConfig.html = body;
-    } else {
-      mailConfig.content = body;
+    if (!fromEmail || !Deno.env.get("SMTP_HOST")) {
+      return json({ error: "El envío de correos no está configurado en el servidor" }, 503);
     }
 
-    await sendViaSmtp(mailConfig as any);
+    let sent = 0;
+    const failed: string[] = [];
+    let lastError = "";
 
-    return new Response(
-      JSON.stringify({ success: true, message: `Email enviado a ${recipients.length} destinatario(s)` }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    for (const envelope of buildBulkEnvelopes(recipients, fromEmail)) {
+      const batch = envelope.bcc ?? envelope.to;
+      try {
+        await sendViaSmtp({
+          from: `${fromName} <${fromEmail}>`,
+          to: envelope.to,
+          ...(envelope.bcc ? { bcc: envelope.bcc } : {}),
+          subject,
+          ...(isHtml ? { html: body } : { content: body }),
+        } as any);
+        sent += batch.length;
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : String(e);
+        console.error("[send-email] batch failed:", e);
+        failed.push(...batch);
+      }
+    }
+
+    if (sent === 0) return json({ error: `No se pudo enviar el correo: ${lastError || "error desconocido"}`, failed }, 502);
+
+    const notes = [
+      failed.length ? `${failed.length} no se pudieron enviar` : "",
+      invalid.length ? `${invalid.length} direcciones inválidas omitidas` : "",
+    ].filter(Boolean);
+
+    return json({
+      success: true,
+      sent,
+      failed,
+      invalid,
+      message: `Email enviado a ${sent} destinatario(s)${notes.length ? ` (${notes.join("; ")})` : ""}`,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("Error sending email:", error);
-    return new Response(
-      JSON.stringify({ error: message || "Error al enviar email" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ error: message || "Error al enviar email" }, 500);
   }
 }
 

@@ -21,6 +21,7 @@ function generateRandomPassword(): string {
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 
 export default function SchoolUserForm() {
   const { userId } = useParams<{ userId?: string }>();
@@ -36,7 +37,12 @@ export default function SchoolUserForm() {
   const [profiles, setProfiles] = useState<{ id: string; name: string; description: string | null }[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
+  const [createdCreds, setCreatedCreds] = useState<{
+    email: string;
+    password: string;
+    emailSent: boolean;
+    emailError: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!schoolId) return;
@@ -74,14 +80,22 @@ export default function SchoolUserForm() {
     const body = isEdit
       ? { action: "update", user_id: userId, full_name: fullName, profile_ids: Array.from(selected) }
       : { action: "create", email, full_name: fullName, profile_ids: Array.from(selected), password: password || undefined };
-    const { data, error } = await supabase.functions.invoke("manage-school-subuser", { body });
-    setSaving(false);
-    if (error || data?.error) {
-      toast({ title: "Error", description: data?.error || error?.message, variant: "destructive" });
+    let data: { password?: string; email_sent?: boolean; email_error?: string | null };
+    try {
+      data = await invokeEdgeFunction("manage-school-subuser", body, "No se pudo guardar el usuario");
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
       return;
+    } finally {
+      setSaving(false);
     }
     if (!isEdit && data?.password) {
-      setCreatedCreds({ email, password: data.password });
+      setCreatedCreds({
+        email,
+        password: data.password,
+        emailSent: data.email_sent === true,
+        emailError: data.email_error ?? null,
+      });
       return;
     }
     toast({ title: isEdit ? "Usuario actualizado" : "Usuario creado" });
@@ -212,7 +226,9 @@ export default function SchoolUserForm() {
           <DialogHeader>
             <DialogTitle>Usuario creado</DialogTitle>
             <DialogDescription>
-              Copia las credenciales ahora. También se enviaron por correo, pero no podrás volver a verlas aquí.
+              {createdCreds?.emailSent
+                ? "Copia las credenciales ahora. También se enviaron por correo, pero no podrás volver a verlas aquí."
+                : `Copia las credenciales ahora: no se pudo enviar el correo${createdCreds?.emailError ? ` (${createdCreds.emailError})` : ""}. Entrégaselas al usuario por otro medio; no podrás volver a verlas aquí.`}
             </DialogDescription>
           </DialogHeader>
           {createdCreds && (

@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useToast } from "@/hooks/use-toast";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -172,29 +173,45 @@ export default function SchoolUsersList() {
       return;
     }
     setResetting(true);
-    const { data, error } = await supabase.functions.invoke("manage-school-subuser", {
-      body: { action: "reset_password", user_id: resetTarget.user_id, password: resetPassword },
-    });
-    setResetting(false);
-    if (error || data?.error) {
-      toast({ title: "Error", description: data?.error || error?.message, variant: "destructive" });
+    let data: { password?: string; email_sent?: boolean; email_error?: string | null };
+    try {
+      data = await invokeEdgeFunction(
+        "manage-school-subuser",
+        { action: "reset_password", user_id: resetTarget.user_id, password: resetPassword },
+        "No se pudo cambiar la contraseña",
+      );
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
       return;
+    } finally {
+      setResetting(false);
     }
-    toast({ title: "Contraseña actualizada", description: "Se envió la nueva contraseña al correo del usuario." });
+    if (data.email_sent) {
+      toast({ title: "Contraseña actualizada", description: "Se envió la nueva contraseña al correo del usuario." });
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Contraseña actualizada, correo no enviado",
+        description: `No se pudo enviar el correo${data.email_error ? ` (${data.email_error})` : ""}. Entrégale la contraseña por otro medio: ${data.password ?? resetPassword}`,
+        duration: 60000,
+      });
+    }
     setResetTarget(null);
     setResetPassword("");
   };
 
   const handleDelete = async () => {
     if (!confirmDelete) return;
-    const { data, error } = await supabase.functions.invoke("manage-school-subuser", {
-      body: { action: "delete", user_id: confirmDelete.user_id },
-    });
-    if (error || data?.error) {
-      toast({ title: "Error", description: data?.error || error?.message, variant: "destructive" });
-    } else {
+    try {
+      await invokeEdgeFunction(
+        "manage-school-subuser",
+        { action: "delete", user_id: confirmDelete.user_id },
+        "No se pudo eliminar el usuario",
+      );
       toast({ title: "Usuario eliminado" });
       loadData();
+    } catch (e) {
+      toast({ title: "Error", description: (e as Error).message, variant: "destructive" });
     }
     setConfirmDelete(null);
   };

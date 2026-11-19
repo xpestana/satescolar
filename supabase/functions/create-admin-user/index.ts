@@ -150,8 +150,13 @@ export default async function handler(req: Request): Promise<Response> {
         });
 
       if (roleError) {
+        // Without a role the account cannot use the platform: undo it so the admin can retry.
         console.error("Error assigning role:", roleError);
-        // Don't expose role error details to client
+        await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
+        return new Response(
+          JSON.stringify({ error: "No se pudo asignar el rol al usuario. No se creó la cuenta; intente de nuevo." }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     }
 

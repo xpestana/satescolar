@@ -1,11 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
-import { buildWelcomeEmailHtml, resolveSnippets, wrapWithEmailLayout } from "../_shared/email-templates.ts";
+import { findUserByEmail, normalizeEmail } from "../_shared/authUsers.ts";
+import { getCallerRole } from "../_shared/callerRole.ts";
+import { generatePassword, sendWelcomeEmail } from "../_shared/welcome-email.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
-// Without this, a failed sendWelcomeEmail (e.g. self-hosted SMTP misconfigured)
-// can escape the event loop and tear down the runtime, causing every
-// subsequent function (impersonate-user, get-user-emails, etc.) to 500.
 if (typeof addEventListener === "function") {
   addEventListener("unhandledrejection", (e: any) => {
     console.error("[create-family] unhandledrejection swallowed:", e?.reason ?? e);
@@ -22,45 +20,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-
-
-async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
-  const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-  const smtpUser = Deno.env.get("SMTP_USER") ?? "";
-  const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
-  const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-  const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
-  if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-    console.log("SMTP not configured, skipping welcome email");
-    return;
-  }
-
-  try {
-    await Promise.race([
-      sendViaSmtp({
-        from: `${fromName} <${fromEmail}>`,
-        to: [to],
-        subject: `Bienvenido a ${schoolName} - SAT Escolar`,
-        html,
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("SMTP send timeout (15s)")), 15000)
-      ),
-    ]);
-    console.log(`Welcome email sent to ${to}`);
-  } catch (err) {
-    console.error("Failed to send welcome email:", err);
-  }
-}
-
-
-function generateRandomPassword(length = 16): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  return Array.from(array, (byte) => chars[byte % chars.length]).join('');
-}
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
@@ -76,174 +37,130 @@ export default async function handler(req: Request): Promise<Response> {
     });
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (!authHeader) return json({ error: "No autorizado" }, 401);
 
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (userError || !user) return json({ error: "No autorizado" }, 401);
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: "No autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Only school staff (a staff member may also be a representative: several user_roles rows).
+    const callerRole = await getCallerRole(supabaseAdmin, user.id, ["school"], { requireSchool: true });
+    if (!callerRole?.school_id) return json({ error: "No tiene permisos para crear familias" }, 403);
+    const schoolId = callerRole.school_id;
 
-    const { data: roleData, error: roleError } = await supabaseClient
-      .from("user_roles")
-      .select("school_id, role")
-      .eq("user_id", user.id)
-      .single();
+    const body = await req.json();
+    const email = typeof body?.email === "string" ? normalizeEmail(body.email) : "";
+    if (!email) return json({ error: "El correo electrónico es requerido" }, 400);
 
-    if (roleError || !roleData?.school_id) {
-      return new Response(
-        JSON.stringify({ error: "No tiene permisos para crear familias" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { email } = await req.json();
-
-    if (!email) {
-      return new Response(
-        JSON.stringify({ error: "El correo electrónico es requerido" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const genericPassword = generateRandomPassword();
-
-    // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    const existingUser = await findUserByEmail(supabaseAdmin, email);
 
     let userId: string;
+    let createdUser = false;
+    let password: string | null = null;
 
     if (existingUser) {
       userId = existingUser.id;
 
-      // ── NEW: Validate existing user's role ──
-      // Block if user has a non-representative role (admin, school, teacher)
+      // Block if the account already has a non-representative role (admin, school, teacher).
       const { data: existingRoles } = await supabaseAdmin
         .from("user_roles")
         .select("role")
         .eq("user_id", userId);
 
-      const nonRepRoles = (existingRoles || []).filter(r => r.role !== "representative");
+      const nonRepRoles = (existingRoles || []).filter((r) => r.role !== "representative");
       if (nonRepRoles.length > 0) {
-        return new Response(
-          JSON.stringify({ error: "Este correo pertenece a una cuenta administrativa o docente. Use un correo diferente para la familia." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json({
+          error: "Este correo pertenece a una cuenta administrativa o docente. Use un correo diferente para la familia.",
+        }, 400);
       }
 
-      // Check if user already has a family
       const { data: userFamilies } = await supabaseAdmin
         .from("families")
         .select("id")
         .eq("user_id", userId);
 
       if (userFamilies && userFamilies.length > 0) {
-        const familyIds = userFamilies.map(f => f.id);
-        
-        // Check if already associated with this school
+        const familyIds = userFamilies.map((f) => f.id);
+
         const { data: existingAssoc } = await supabaseAdmin
           .from("family_schools")
           .select("id")
-          .eq("school_id", roleData.school_id)
+          .eq("school_id", schoolId)
           .in("family_id", familyIds)
+          .limit(1)
           .maybeSingle();
 
         if (existingAssoc) {
-          return new Response(
-            JSON.stringify({ error: "Ya existe una familia con este correo en esta institución" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          return json({ error: "Ya existe una familia con este correo en esta institución" }, 400);
         }
 
-        // Associate existing family to this school
+        // Associate the existing family to this school.
         const familyId = userFamilies[0].id;
         const { error: assocError } = await supabaseAdmin
           .from("family_schools")
-          .insert({ family_id: familyId, school_id: roleData.school_id });
+          .insert({ family_id: familyId, school_id: schoolId });
 
         if (assocError) {
           console.error("Error associating family to school:", assocError);
-          return new Response(
-            JSON.stringify({ error: "Error al asociar la familia al colegio" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          return json({ error: "Error al asociar la familia al colegio" }, 500);
         }
 
-        // Ensure user has representative role for this school
         await supabaseAdmin
           .from("user_roles")
           .upsert(
-            { user_id: userId, role: "representative", school_id: roleData.school_id },
-            { onConflict: "user_id,role,school_id", ignoreDuplicates: true }
+            { user_id: userId, role: "representative", school_id: schoolId },
+            { onConflict: "user_id,role,school_id", ignoreDuplicates: true },
           );
 
-        return new Response(
-          JSON.stringify({
-            success: true,
-            family: { id: familyId },
-            message: "Familia existente asociada a esta institución exitosamente"
-          }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json({
+          success: true,
+          family: { id: familyId },
+          existing_user: true,
+          email_sent: false,
+          message: "La familia ya existía en otro colegio y se asoció a esta institución. Conserva su contraseña actual.",
+        });
       }
 
-      // User exists but has no family — ensure they have representative role, then create family
+      // User exists but has no family: ensure the representative role, then create the family.
       await supabaseAdmin
         .from("user_roles")
         .upsert(
-          { user_id: userId, role: "representative", school_id: roleData.school_id },
-          { onConflict: "user_id,role,school_id", ignoreDuplicates: true }
+          { user_id: userId, role: "representative", school_id: schoolId },
+          { onConflict: "user_id,role,school_id", ignoreDuplicates: true },
         );
-
     } else {
-      // Create new user
+      password = generatePassword();
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
-        password: genericPassword,
+        password,
         email_confirm: true,
       });
 
       if (createError || !newUser.user) {
         console.error("Error creating user:", createError);
-        return new Response(
-          JSON.stringify({ error: "Error al crear el usuario" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json({ error: "Error al crear el usuario" }, 500);
       }
 
       userId = newUser.user.id;
+      createdUser = true;
 
       const { error: roleInsertError } = await supabaseAdmin
         .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: "representative",
-          school_id: roleData.school_id,
-        });
+        .insert({ user_id: userId, role: "representative", school_id: schoolId });
 
       if (roleInsertError) {
         console.error("Error creating role:", roleInsertError);
         await supabaseAdmin.auth.admin.deleteUser(userId);
-        return new Response(
-          JSON.stringify({ error: "Error al asignar rol al usuario" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json({ error: "Error al asignar rol al usuario" }, 500);
       }
     }
 
-    // Create family record
+    /** Undo an account created in this request so a retry starts clean. */
+    const rollbackNewUser = async () => {
+      if (!createdUser) return;
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+      await supabaseAdmin.auth.admin.deleteUser(userId);
+    };
+
     const { data: family, error: familyError } = await supabaseAdmin
       .from("families")
       .insert({ user_id: userId })
@@ -252,89 +169,49 @@ export default async function handler(req: Request): Promise<Response> {
 
     if (familyError) {
       console.error("Error creating family:", familyError);
-      return new Response(
-        JSON.stringify({ error: "Error al crear la familia" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      await rollbackNewUser();
+      return json({ error: "Error al crear la familia" }, 500);
     }
 
     const { error: assocError } = await supabaseAdmin
       .from("family_schools")
-      .insert({ family_id: family.id, school_id: roleData.school_id });
+      .insert({ family_id: family.id, school_id: schoolId });
 
     if (assocError) {
       console.error("Error creating family-school association:", assocError);
-      return new Response(
-        JSON.stringify({ error: "Error al asociar la familia al colegio" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      await supabaseAdmin.from("families").delete().eq("id", family.id);
+      await rollbackNewUser();
+      return json({ error: "Error al asociar la familia al colegio" }, 500);
     }
 
-    // Send welcome email only for NEW users
-    if (!existingUser) {
-      const { data: schoolData } = await supabaseAdmin
-        .from("schools")
-        .select("name, logo_url")
-        .eq("id", roleData.school_id)
-        .single();
-
-      if (schoolData) {
-        const loginUrl = "https://app.satescolar.com/login";
-        const { data: customTemplate } = await supabaseAdmin
-          .from("email_templates")
-          .select("subject, body_html, primary_color, text_color")
-          .eq("school_id", roleData.school_id)
-          .eq("template_type", "welcome-family")
-          .eq("is_active", true)
-          .maybeSingle();
-
-        let html: string;
-        if (customTemplate) {
-          const snippetData: Record<string, string> = {
-            nombre_colegio: schoolData.name,
-            email_usuario: email,
-            contrasena: genericPassword,
-            url_plataforma: loginUrl,
-            primary_color: customTemplate.primary_color,
-          };
-          html = wrapWithEmailLayout(
-            resolveSnippets(customTemplate.body_html, snippetData),
-            customTemplate.primary_color,
-            customTemplate.text_color,
-            schoolData.name,
-            schoolData.logo_url
-          );
-        } else {
-          html = buildWelcomeEmailHtml(
-            schoolData.name,
-            schoolData.logo_url,
-            email,
-            genericPassword,
-            "representante",
-            loginUrl
-          );
-        }
-        sendWelcomeEmail(email, schoolData.name, html).catch(console.error);
-      }
-    }
-
-    return new Response(
-      JSON.stringify({
+    // Welcome email only for new accounts. Awaited so the screen can say whether it went out;
+    // a failed email never undoes the family (it can be resent from the list).
+    if (!password) {
+      return json({
         success: true,
         family,
-        message: existingUser
-          ? "Familia creada exitosamente (usuario ya existía)"
-          : `Familia creada exitosamente. Contraseña temporal: ${genericPassword}`
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+        existing_user: true,
+        email_sent: false,
+        message: "Familia creada. La cuenta ya existía y conserva su contraseña actual.",
+      });
+    }
 
+    const welcome = await sendWelcomeEmail(supabaseAdmin, { schoolId, email, password, role: "representante" });
+    return json({
+      success: true,
+      family,
+      existing_user: false,
+      password,
+      email_sent: welcome.sent,
+      email_error: welcome.error ?? null,
+      message: welcome.sent
+        ? `Familia creada. Se envió el correo de bienvenida a ${email}. Contraseña temporal: ${password}`
+        : `Familia creada, pero no se pudo enviar el correo de bienvenida (${welcome.error ?? "error desconocido"}). ` +
+          `Contraseña temporal: ${password}. Puede reenviarlo desde la lista de familias.`,
+    });
   } catch (error) {
     console.error("Unexpected error:", error);
-    return new Response(
-      JSON.stringify({ error: "Error interno del servidor" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ error: "Error interno del servidor" }, 500);
   }
 }
 

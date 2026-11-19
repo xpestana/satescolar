@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import type { WithholdingRow } from "@/lib/payroll/withholdings/buildWithholdingVoucherData";
 import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
 import type { TaxType } from "@/lib/payroll/withholdings/types";
@@ -53,11 +54,12 @@ export function usePayrollWithholdings(schoolId: string | null | undefined, filt
 
   const sendVoucher = useMutation({
     mutationFn: async (withholdingId: string) => {
-      const { data, error } = await supabase.functions.invoke("send-withholding-voucher", {
-        body: { withholding_id: withholdingId },
-      });
-      if (error) throw new Error("No se pudo enviar el comprobante");
-      if (data?.error) throw new Error(data.error);
+      // Shows the function's own message (e.g. "El proveedor no tiene correo registrado").
+      await invokeEdgeFunction(
+        "send-withholding-voucher",
+        { withholding_id: withholdingId },
+        "No se pudo enviar el comprobante",
+      );
     },
     onSuccess: invalidate,
   });

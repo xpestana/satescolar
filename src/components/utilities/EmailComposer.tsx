@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "sonner";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import {
   Send,
   X,
@@ -227,14 +228,19 @@ export function EmailComposer() {
     let errorMessage: string | null = null;
 
     try {
-      const { data, error } = await supabase.functions.invoke("send-email", {
-        body: { to: emails, subject, body: html, isHtml: true },
-      });
+      const data = await invokeEdgeFunction<{ message?: string; failed?: string[]; invalid?: string[] }>(
+        "send-email",
+        { to: emails, subject, body: html, isHtml: true },
+        "Error al enviar el correo",
+      );
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast.success(`Correo enviado a ${emails.length} destinatario(s)`);
+      const skipped = [...(data.failed ?? []), ...(data.invalid ?? [])];
+      if (skipped.length > 0) {
+        errorMessage = `No se envió a: ${skipped.join(", ")}`;
+        toast.warning(`${data.message ?? "Correo enviado"}. ${errorMessage}`, { duration: 15000 });
+      } else {
+        toast.success(data.message ?? `Correo enviado a ${emails.length} destinatario(s)`);
+      }
     } catch (e: any) {
       status = "error";
       errorMessage = e.message || "Error al enviar";

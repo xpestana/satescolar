@@ -1,15 +1,34 @@
 import { buildDelinquencyEmailHtml, resolveSnippets, wrapWithEmailLayout } from "../_shared/email-templates.ts";
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
+import { bearerToken, isServiceRoleToken } from "../_shared/serviceRole.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+/**
+ * Daily cron (pg_cron → net.http_post with the service-role key). Only the system may run it:
+ * before, any valid JWT (even the public anon key) could trigger reminders for every school.
+ * Relies on the gateway verifying the JWT signature (verify_jwt = true in config.toml).
+ */
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  if (!isServiceRoleToken(bearerToken(req))) {
+    return json({ error: "Solo el sistema puede ejecutar los recordatorios" }, 403);
+  }
+
+  const smtpFromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
+  const smtpFromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
+  if (!smtpFromEmail || !Deno.env.get("SMTP_HOST")) {
+    return json({ error: "El envío de correos no está configurado en el servidor" }, 503);
   }
 
   try {
@@ -141,9 +160,6 @@ export default async function handler(req: Request): Promise<Response> {
         ? await supabaseAdmin.from("schools").select("logo_url").eq("id", schoolId).maybeSingle()
         : { data: null };
 
-      const smtpFromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-      const smtpFromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
       for (const student of (students || [])) {
         const debt = studentDebts[student.id];
         if (!debt) continue;
@@ -210,24 +226,14 @@ export default async function handler(req: Request): Promise<Response> {
         let errorMessage = null;
 
         try {
-          if (customTemplate && smtpFromEmail) {
-            await sendViaSmtp({
-              from: `${smtpFromName} <${smtpFromEmail}>`,
-              to: [email],
-              subject: emailSubject,
-              html: htmlBody,
-            });
-          } else {
-            const { error: sendErr } = await supabaseAdmin.functions.invoke("send-email", {
-              body: {
-                to: [email],
-                subject: emailSubject,
-                body: htmlBody,
-                isHtml: true,
-              },
-            });
-            if (sendErr) throw sendErr;
-          }
+          // Always direct SMTP. The old fallback called `send-email` with the service key, which
+          // that function rejects (401), so every reminder without a custom template failed.
+          await sendViaSmtp({
+            from: `${smtpFromName} <${smtpFromEmail}>`,
+            to: [email],
+            subject: emailSubject,
+            html: htmlBody,
+          });
           totalSent++;
         } catch (err: any) {
           status = "failed";

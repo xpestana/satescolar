@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
-import { buildWelcomeEmailHtml, resolveSnippets, wrapWithEmailLayout } from "../_shared/email-templates.ts";
+import { getCallerRole } from "../_shared/callerRole.ts";
+import { generatePassword, isSmtpConfigured, sendWelcomeEmail, type WelcomeRole } from "../_shared/welcome-email.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
@@ -19,14 +19,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function generateRandomPassword(length = 12): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const array = new Uint8Array(length);
-  crypto.getRandomValues(array);
-  return Array.from(array, (byte) => chars[byte % chars.length]).join('');
-}
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-
+/**
+ * Generates new credentials for a family or a teacher of the caller's school and emails them.
+ * The new password is always returned, so a failed email never leaves the user locked out.
+ */
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -41,246 +40,110 @@ export default async function handler(req: Request): Promise<Response> {
     });
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (!authHeader) return json({ error: "No autorizado" }, 401);
 
-    const token = authHeader.replace("Bearer ", "");
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (userError || !user) return json({ error: "No autorizado" }, 401);
 
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(
-        JSON.stringify({ error: "No autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const callerRole = await getCallerRole(supabaseAdmin, user.id, ["school", "admin"], { requireSchool: true });
+    if (!callerRole?.school_id) return json({ error: "No tiene permisos" }, 403);
+    const schoolId = callerRole.school_id;
 
-    const user = { id: claimsData.claims.sub as string };
-
-    const { data: roleData } = await supabaseClient
-      .from("user_roles")
-      .select("school_id, role")
-      .eq("user_id", user.id)
-      .single();
-
-    if (!roleData || !["school", "admin"].includes(roleData.role) || !roleData.school_id) {
-      return new Response(
-        JSON.stringify({ error: "No tiene permisos" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // target_type: "family" (family_id = families.id) or "teacher" (family_id = teachers.id)
     const { family_id, target_type } = await req.json();
-    // target_type: "family" or "teacher"
-
-    if (!family_id) {
-      return new Response(
-        JSON.stringify({ error: "family_id es requerido" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (!family_id) return json({ error: "family_id es requerido" }, 400);
 
     let targetUserId: string;
     let targetEmail: string;
-    let role: "representante" | "docente";
-
+    let role: WelcomeRole;
     let teacherDocumentId: string | null = null;
 
     if (target_type === "teacher") {
-      // Get teacher data including document_id
       const { data: teacher, error: teacherError } = await supabaseAdmin
         .from("teachers")
         .select("user_id, email, document_id")
         .eq("id", family_id)
-        .eq("school_id", roleData.school_id)
-        .single();
+        .eq("school_id", schoolId)
+        .maybeSingle();
 
-      if (teacherError || !teacher || !teacher.user_id) {
-        return new Response(
-          JSON.stringify({ error: "Docente no encontrado" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      if (teacherError || !teacher || !teacher.user_id) return json({ error: "Docente no encontrado" }, 404);
 
       targetUserId = teacher.user_id;
       targetEmail = teacher.email || "";
       teacherDocumentId = teacher.document_id || null;
       role = "docente";
     } else {
-      // Get family data
       const { data: family, error: familyError } = await supabaseAdmin
         .from("families")
         .select("user_id")
         .eq("id", family_id)
-        .single();
+        .maybeSingle();
 
-      if (familyError || !family) {
-        return new Response(
-          JSON.stringify({ error: "Familia no encontrada" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      if (familyError || !family) return json({ error: "Familia no encontrada" }, 404);
 
-      // Verify family belongs to school
       const { data: familySchool } = await supabaseAdmin
         .from("family_schools")
         .select("id")
         .eq("family_id", family_id)
-        .eq("school_id", roleData.school_id)
+        .eq("school_id", schoolId)
+        .limit(1)
         .maybeSingle();
 
-      if (!familySchool) {
-        return new Response(
-          JSON.stringify({ error: "No tiene permisos sobre esta familia" }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      if (!familySchool) return json({ error: "No tiene permisos sobre esta familia" }, 403);
 
       targetUserId = family.user_id;
       role = "representante";
 
-      // Get email from auth
       const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
       targetEmail = authUser?.user?.email || "";
     }
 
-    if (!targetEmail) {
-      return new Response(
-        JSON.stringify({ error: "No se encontró el correo del usuario" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!targetEmail) return json({ error: "No se encontró el correo del usuario" }, 400);
+
+    // Check BEFORE touching the password: if mail cannot go out, keep the current password.
+    if (!isSmtpConfigured()) {
+      return json({ error: "El envío de correos no está configurado en el servidor. No se cambió la contraseña." }, 503);
     }
 
-    // For teachers: use document_id (without prefix) as password; for families: generate random
+    // Teachers: the document number (without prefix) as before; families: a random password.
     let newPassword: string;
     if (target_type === "teacher" && teacherDocumentId) {
-      const rawDoc = teacherDocumentId.includes("-")
+      newPassword = teacherDocumentId.includes("-")
         ? teacherDocumentId.split("-").slice(1).join("-")
         : teacherDocumentId;
-      newPassword = rawDoc;
     } else {
-      newPassword = generateRandomPassword();
+      newPassword = generatePassword();
     }
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      targetUserId,
-      { password: newPassword }
-    );
 
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+      password: newPassword,
+    });
     if (updateError) {
       console.error("Error updating password:", updateError);
-      return new Response(
-        JSON.stringify({ error: "Error al actualizar la contraseña" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: "Error al actualizar la contraseña" }, 500);
     }
 
-    // Get school data for email
-    const { data: schoolData } = await supabaseAdmin
-      .from("schools")
-      .select("name, logo_url")
-      .eq("id", roleData.school_id)
-      .single();
-
-    if (!schoolData) {
-      return new Response(
-        JSON.stringify({ error: "Colegio no encontrado" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const loginUrl = "https://app.satescolar.com/login";
-    const templateType = target_type === "teacher" ? "welcome-teacher" : "welcome-family";
-
-    // Check for custom template in DB
-    const { data: customTemplate } = await supabaseAdmin
-      .from("email_templates")
-      .select("subject, body_html, primary_color, text_color")
-      .eq("school_id", roleData.school_id)
-      .eq("template_type", templateType)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    let html: string;
-    let emailSubject: string;
-
-    if (customTemplate) {
-      const snippetData: Record<string, string> = {
-        nombre_colegio: schoolData.name,
-        email_usuario: targetEmail,
-        contrasena: newPassword,
-        url_plataforma: loginUrl,
-        primary_color: customTemplate.primary_color,
-      };
-      const resolvedBody = resolveSnippets(customTemplate.body_html, snippetData);
-      const resolvedSubject = resolveSnippets(customTemplate.subject, snippetData);
-      html = wrapWithEmailLayout(
-        resolvedBody,
-        customTemplate.primary_color,
-        customTemplate.text_color,
-        schoolData.name,
-        schoolData.logo_url
-      );
-      emailSubject = resolvedSubject;
-    } else {
-      html = buildWelcomeEmailHtml(
-        schoolData.name,
-        schoolData.logo_url,
-        targetEmail,
-        newPassword,
-        role,
-        loginUrl
-      );
-      emailSubject = `Bienvenido a ${schoolData.name} - SAT Escolar`;
-    }
-
-    const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-    const smtpUser = Deno.env.get("SMTP_USER") ?? "";
-    const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      return new Response(
-        JSON.stringify({ error: "SMTP no configurado" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    await sendViaSmtp({
-      from: `${fromName} <${fromEmail}>`,
-      to: [targetEmail],
-      subject: emailSubject,
-      headers: {
-        "X-Mailin-track": "0",
-        "X-Mailgun-Track-Clicks": "no",
-        "X-SMTPAPI": '{"filters":{"clicktrack":{"settings":{"enable":0}}}}',
-      },
-      html,
+    const welcome = await sendWelcomeEmail(supabaseAdmin, {
+      schoolId,
+      email: targetEmail,
+      password: newPassword,
+      role,
     });
 
-    console.log(`Welcome email resent to ${targetEmail}`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: `Correo de bienvenida reenviado a ${targetEmail}. Nueva contraseña generada.`,
-        newPassword,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-
+    return json({
+      success: true,
+      email: targetEmail,
+      newPassword,
+      email_sent: welcome.sent,
+      email_error: welcome.error ?? null,
+      message: welcome.sent
+        ? `Correo de bienvenida reenviado a ${targetEmail}. Nueva contraseña generada.`
+        : `Se generó una contraseña nueva, pero no se pudo enviar el correo a ${targetEmail} ` +
+          `(${welcome.error ?? "error desconocido"}). Contraseña nueva: ${newPassword}`,
+    });
   } catch (error) {
     console.error("Unexpected error:", error);
-    return new Response(
-      JSON.stringify({ error: "Error interno del servidor" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ error: "Error interno del servidor" }, 500);
   }
 }
 

@@ -10,8 +10,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
+
+interface CreateFamilyResult {
+  message: string;
+  existing_user?: boolean;
+  email_sent?: boolean;
+}
 
 interface AddFamilyModalProps {
   open: boolean;
@@ -26,20 +32,16 @@ export function AddFamilyModal({ open, onClose, schoolId }: AddFamilyModalProps)
 
   const createFamilyMutation = useMutation({
     mutationFn: async (email: string) => {
-      const { data, error } = await supabase.functions.invoke("create-family", {
-        body: { email },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      
-      return data;
+      return invokeEdgeFunction<CreateFamilyResult>("create-family", { email }, "No se pudo crear la familia");
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["families"] });
+      const emailFailed = !data.existing_user && data.email_sent === false;
       toast({
-        title: "Familia creada",
+        title: emailFailed ? "Familia creada, correo no enviado" : "Familia creada",
         description: data.message,
+        // Long enough to copy the temporary password when the email did not go out.
+        duration: emailFailed ? 30000 : 10000,
       });
       handleClose();
     },

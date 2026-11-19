@@ -15,8 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import {
   Mail,
   Send,
@@ -117,12 +117,17 @@ export default function SendEmail() {
     setShowPreview(false);
 
     try {
-      const { data, error } = await supabase.functions.invoke("send-test-email", {
-        body: { to: testTo.trim(), email_type: emailType },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const data = await invokeEdgeFunction<{
+        message: string;
+        subject: string;
+        source: string;
+        trigger: string;
+        smtp_from: string;
+      }>(
+        "send-test-email",
+        { to: testTo.trim(), email_type: emailType },
+        "Error al enviar el correo de prueba",
+      );
 
       setTestResult({
         success: true,
@@ -150,13 +155,18 @@ export default function SendEmail() {
 
     setSending(true);
     try {
-      const { data, error } = await supabase.functions.invoke("send-email", {
-        body: { to: to.trim(), subject: subject.trim(), body: body.trim(), isHtml },
-      });
+      const data = await invokeEdgeFunction<{ message?: string; failed?: string[]; invalid?: string[] }>(
+        "send-email",
+        { to: to.trim(), subject: subject.trim(), body: body.trim(), isHtml },
+        "Error al enviar el email",
+      );
 
-      if (error) throw error;
-
-      toast.success(data?.message || "Email enviado exitosamente");
+      const skipped = [...(data.failed ?? []), ...(data.invalid ?? [])];
+      if (skipped.length > 0) {
+        toast.warning(`${data.message ?? "Email enviado"}. No se envió a: ${skipped.join(", ")}`, { duration: 15000 });
+      } else {
+        toast.success(data.message || "Email enviado exitosamente");
+      }
       setTo("");
       setSubject("");
       setBody("");

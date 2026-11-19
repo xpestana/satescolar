@@ -1,54 +1,19 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { findUserByEmail, normalizeEmail } from "../_shared/authUsers.ts";
+import { generatePassword, sendWelcomeEmail } from "../_shared/welcome-email.ts";
+
+// Evita que un error interno de SMTP/TLS tumbe el worker.
+if (typeof addEventListener === "function") {
+  addEventListener("unhandledrejection", (e: any) => {
+    console.error("[manage-school-subuser] unhandledrejection:", e?.reason ?? e);
+    e?.preventDefault?.();
+  });
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const PLATFORM_URL = "https://app.satescolar.com/login";
-
-function generatePassword(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  let p = "";
-  const arr = new Uint8Array(12);
-  crypto.getRandomValues(arr);
-  for (let i = 0; i < 12; i++) p += chars[arr[i] % chars.length];
-  return p;
-}
-
-function welcomeHtml(schoolName: string, logoUrl: string | null, email: string, password: string, fullName: string): string {
-  const logo = logoUrl ? `<img src="${logoUrl}" alt="${schoolName}" style="max-height:80px;margin-bottom:12px;" />` : "";
-  return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f4f7;font-family:Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;">
-<tr><td align="center" style="padding:32px 24px 16px;background:#f8f9fc;border-bottom:1px solid #e8e8ed;">${logo}<h2 style="margin:0;font-size:20px;color:#1a1a2e;">${schoolName}</h2></td></tr>
-<tr><td style="padding:32px;"><h1 style="margin:0 0 16px;font-size:22px;color:#1a1a2e;">Hola ${fullName},</h1>
-<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#4a4a5a;">Has sido registrado/a como <strong>usuario escolar</strong> en <strong>${schoolName}</strong> con permisos específicos asignados por la administración del colegio.</p>
-<p style="margin:0 0 8px;font-size:15px;color:#4a4a5a;">Tus credenciales:</p>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f4ff;border-radius:8px;margin:12px 0 24px;"><tr><td style="padding:16px 20px;">
-<p style="margin:0 0 6px;font-size:14px;color:#6b7280;">Usuario</p><p style="margin:0 0 12px;font-size:16px;font-weight:bold;color:#1a1a2e;">${email}</p>
-<p style="margin:0 0 6px;font-size:14px;color:#6b7280;">Contraseña</p><p style="margin:0;font-size:16px;font-weight:bold;color:#1a1a2e;">${password}</p>
-</td></tr></table>
-<table width="100%"><tr><td align="center" style="padding:8px 0 16px;">
-<a href="${PLATFORM_URL}" style="display:inline-block;padding:14px 32px;background:#1e78c8;color:#fff;font-weight:bold;text-decoration:none;border-radius:8px;">Ingresar a la Plataforma</a>
-</td></tr></table>
-<p style="margin:0;font-size:13px;color:#9ca3af;text-align:center;">Te recomendamos cambiar tu contraseña al ingresar.</p></td></tr>
-<tr><td align="center" style="padding:20px;background:#f8f9fc;border-top:1px solid #e8e8ed;"><p style="margin:0;font-size:13px;color:#6b7280;font-weight:bold;">SAT ESCOLAR</p></td></tr>
-</table></td></tr></table></body></html>`;
-}
-
-async function sendEmail(to: string, schoolName: string, html: string, subject: string) {
-  try {
-    const host = Deno.env.get("SMTP_HOST") ?? "";
-    const user = Deno.env.get("SMTP_USER") ?? "";
-    const pass = Deno.env.get("SMTP_PASS") ?? "";
-    const from = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-    if (!host || !user || !pass || !from) { console.log("SMTP not configured"); return; }
-    await sendViaSmtp({ from: `${fromName} <${from}>`, to: [to], subject, html });
-  } catch (e) { console.error("Email failed:", e); }
-}
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -103,21 +68,21 @@ export default async function handler(req: Request): Promise<Response> {
     const body = await req.json();
     const { action } = body;
 
-    const { data: schoolData } = await admin.from("schools").select("name, logo_url").eq("id", schoolId).single();
+    const { data: schoolData } = await admin.from("schools").select("name").eq("id", schoolId).maybeSingle();
     const schoolName = schoolData?.name ?? "Colegio";
-    const logoUrl = schoolData?.logo_url ?? null;
 
     // === CREATE === (owner or settings.users)
     if (action === "create") {
       if (!callerIsOwner && !callerHasSettingsUsers) {
         return new Response(JSON.stringify({ error: "No tienes permisos para crear usuarios" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-      const { email, full_name, profile_ids, password: customPassword } = body;
+      const { full_name, profile_ids, password: customPassword } = body;
+      const email = typeof body.email === "string" ? normalizeEmail(body.email) : "";
       if (!email || !full_name) return new Response(JSON.stringify({ error: "Email y nombre son requeridos" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
       const password = (typeof customPassword === "string" && customPassword.length >= 8) ? customPassword : generatePassword();
-      const { data: existing } = await admin.auth.admin.listUsers();
-      if (existing?.users?.find(u => u.email === email)) {
+      // Paginated lookup: listUsers() alone only sees the first 50 accounts.
+      if (await findUserByEmail(admin, email)) {
         return new Response(JSON.stringify({ error: "Ya existe un usuario con este correo" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
@@ -147,9 +112,10 @@ export default async function handler(req: Request): Promise<Response> {
         }
       }
 
-      sendEmail(email, schoolName, welcomeHtml(schoolName, logoUrl, email, password, full_name), `Bienvenido a ${schoolName} - SAT Escolar`).catch(console.error);
+      // Awaited so the screen can say whether the email went out (the password is shown anyway).
+      const welcome = await sendWelcomeEmail(admin, { schoolId, email, password, role: "usuario del colegio" });
 
-      return new Response(JSON.stringify({ success: true, user_id: userId, password }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ success: true, user_id: userId, password, email_sent: welcome.sent, email_error: welcome.error ?? null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // === UPDATE (profiles + name) === (owner or settings.users)
@@ -190,12 +156,23 @@ export default async function handler(req: Request): Promise<Response> {
       const password = (typeof customPassword === "string" && customPassword.length >= 8) ? customPassword : generatePassword();
       const { data: u } = await admin.auth.admin.getUserById(user_id);
       const email = u?.user?.email;
-      const fullName = (u?.user?.user_metadata as any)?.full_name ?? "Usuario";
-      await admin.auth.admin.updateUserById(user_id, { password });
+      const { error: updateErr } = await admin.auth.admin.updateUserById(user_id, { password });
+      if (updateErr) {
+        console.error("[manage-school-subuser] password:", updateErr);
+        return new Response(JSON.stringify({ error: "No se pudo cambiar la contraseña" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
-      if (email) sendEmail(email, schoolName, welcomeHtml(schoolName, logoUrl, email, password, fullName), `Nuevas credenciales - ${schoolName}`).catch(console.error);
+      const welcome = email
+        ? await sendWelcomeEmail(admin, {
+          schoolId,
+          email,
+          password,
+          role: "usuario del colegio",
+          defaultSubject: `Nuevas credenciales - ${schoolName}`,
+        })
+        : { sent: false, error: "La cuenta no tiene correo" };
 
-      return new Response(JSON.stringify({ success: true, password }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ success: true, password, email_sent: welcome.sent, email_error: welcome.error ?? null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // === DELETE === (owner only)

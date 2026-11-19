@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
-import { buildWelcomeEmailHtml, resolveSnippets, wrapWithEmailLayout } from "../_shared/email-templates.ts";
+import { findUserByEmail, normalizeEmail } from "../_shared/authUsers.ts";
+import { getCallerRole } from "../_shared/callerRole.ts";
+import { sendWelcomeEmail } from "../_shared/welcome-email.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
@@ -19,31 +20,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-
-async function sendWelcomeEmail(to: string, schoolName: string, html: string) {
-  try {
-    const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-    const smtpUser = Deno.env.get("SMTP_USER") ?? "";
-    const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
-    if (!smtpHost || !smtpUser || !smtpPass || !fromEmail) {
-      console.log("SMTP not configured, skipping welcome email");
-      return;
-    }
-
-    await sendViaSmtp({
-      from: `${fromName} <${fromEmail}>`,
-      to: [to],
-      subject: `Bienvenido a ${schoolName} - SAT Escolar`,
-      html,
-    });
-    console.log(`Welcome email sent to ${to}`);
-  } catch (err) {
-    console.error("Failed to send welcome email:", err);
-  }
-}
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
@@ -59,57 +37,32 @@ export default async function handler(req: Request): Promise<Response> {
     });
 
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "No autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (!authHeader) return json({ error: "No autorizado" }, 401);
 
-    const token = authHeader.replace("Bearer ", "");
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (userError || !user) return json({ error: "No autorizado" }, 401);
 
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(
-        JSON.stringify({ error: "No autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    // Only school staff (a staff member may also be a representative: several user_roles rows).
+    const callerRole = await getCallerRole(supabaseAdmin, user.id, ["school"], { requireSchool: true });
+    if (!callerRole?.school_id) return json({ error: "No tiene permisos para crear docentes" }, 403);
+    const schoolId = callerRole.school_id;
 
-    const user = { id: claimsData.claims.sub as string };
-
-    const { data: roleData, error: roleError } = await supabaseClient
-      .from("user_roles")
-      .select("school_id, role")
-      .eq("user_id", user.id)
-      .single();
-
-    if (roleError || !roleData?.school_id) {
-      return new Response(
-        JSON.stringify({ error: "No tiene permisos para crear docentes" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { email, password, form_data, photo_url, document_id, phone } = await req.json();
+    const { email: rawEmail, form_data, photo_url, document_id, phone } = await req.json();
+    const email = typeof rawEmail === "string" ? normalizeEmail(rawEmail) : "";
 
     if (!email || !document_id) {
-      return new Response(
-        JSON.stringify({ error: "El correo electrónico y el documento son requeridos" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return json({ error: "El correo electrónico y el documento son requeridos" }, 400);
     }
 
+    // The initial password is the document number without its prefix (V-12345678 → 12345678).
     const rawDocument = document_id.includes("-") ? document_id.split("-").slice(1).join("-") : document_id;
     const teacherPassword = rawDocument;
 
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    const existingUser = await findUserByEmail(supabaseAdmin, email);
 
     let userId: string;
+    let createdUser = false;
+    let createdRoleId: string | null = null;
 
     if (existingUser) {
       userId = existingUser.id;
@@ -118,14 +71,11 @@ export default async function handler(req: Request): Promise<Response> {
         .from("teachers")
         .select("id")
         .eq("user_id", userId)
-        .eq("school_id", roleData.school_id)
+        .eq("school_id", schoolId)
         .maybeSingle();
 
       if (existingTeacher) {
-        return new Response(
-          JSON.stringify({ error: "Ya existe un docente con este correo en esta institución" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json({ error: "Ya existe un docente con este correo en esta institución" }, 400);
       }
 
       const { data: existingRole } = await supabaseAdmin
@@ -133,12 +83,21 @@ export default async function handler(req: Request): Promise<Response> {
         .select("id")
         .eq("user_id", userId)
         .eq("role", "teacher")
+        .eq("school_id", schoolId)
+        .limit(1)
         .maybeSingle();
 
       if (!existingRole) {
-        await supabaseAdmin
+        const { data: newRole, error: roleError } = await supabaseAdmin
           .from("user_roles")
-          .insert({ user_id: userId, role: "teacher", school_id: roleData.school_id });
+          .insert({ user_id: userId, role: "teacher", school_id: schoolId })
+          .select("id")
+          .single();
+        if (roleError) {
+          console.error("Error adding teacher role:", roleError);
+          return json({ error: "Error al asignar rol al usuario" }, 500);
+        }
+        createdRoleId = newRole.id;
       }
     } else {
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -149,29 +108,25 @@ export default async function handler(req: Request): Promise<Response> {
 
       if (createError || !newUser.user) {
         console.error("Error creating user:", createError);
-        return new Response(
-          JSON.stringify({ error: "Error al crear el usuario" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        const weakPassword = /password/i.test(createError?.message ?? "");
+        return json({
+          error: weakPassword
+            ? "No se pudo crear la cuenta: el número de documento no sirve como contraseña inicial (muy corto)"
+            : "Error al crear el usuario",
+        }, weakPassword ? 400 : 500);
       }
 
       userId = newUser.user.id;
+      createdUser = true;
 
       const { error: roleInsertError } = await supabaseAdmin
         .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: "teacher",
-          school_id: roleData.school_id,
-        });
+        .insert({ user_id: userId, role: "teacher", school_id: schoolId });
 
       if (roleInsertError) {
         console.error("Error creating role:", roleInsertError);
         await supabaseAdmin.auth.admin.deleteUser(userId);
-        return new Response(
-          JSON.stringify({ error: "Error al asignar rol al usuario" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return json({ error: "Error al asignar rol al usuario" }, 500);
       }
     }
 
@@ -179,89 +134,60 @@ export default async function handler(req: Request): Promise<Response> {
       .from("teachers")
       .insert({
         user_id: userId,
-        school_id: roleData.school_id,
+        school_id: schoolId,
         form_data: form_data || {},
         photo_url: photo_url || null,
         document_id: document_id || null,
         phone: phone || null,
-        email: email,
+        email,
       })
       .select()
       .single();
 
     if (teacherError) {
       console.error("Error creating teacher:", teacherError);
-      return new Response(
-        JSON.stringify({ error: "Error al crear el docente" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Fire and forget: send welcome email only for NEW users
-    if (!existingUser) {
-      const { data: schoolData } = await supabaseAdmin
-        .from("schools")
-        .select("name, logo_url")
-        .eq("id", roleData.school_id)
-        .single();
-
-      if (schoolData) {
-        const loginUrl = "https://app.satescolar.com/login";
-        const { data: customTemplate } = await supabaseAdmin
-          .from("email_templates")
-          .select("subject, body_html, primary_color, text_color")
-          .eq("school_id", roleData.school_id)
-          .eq("template_type", "welcome-teacher")
-          .eq("is_active", true)
-          .maybeSingle();
-
-        let html: string;
-        if (customTemplate) {
-          const snippetData: Record<string, string> = {
-            nombre_colegio: schoolData.name,
-            email_usuario: email,
-            contrasena: teacherPassword,
-            url_plataforma: loginUrl,
-            primary_color: customTemplate.primary_color,
-          };
-          html = wrapWithEmailLayout(
-            resolveSnippets(customTemplate.body_html, snippetData),
-            customTemplate.primary_color,
-            customTemplate.text_color,
-            schoolData.name,
-            schoolData.logo_url
-          );
-        } else {
-          html = buildWelcomeEmailHtml(
-            schoolData.name,
-            schoolData.logo_url,
-            email,
-            teacherPassword,
-            "docente",
-            loginUrl
-          );
-        }
-        sendWelcomeEmail(email, schoolData.name, html).catch(console.error);
+      // Undo what this request created so the account is not left with a role and no teacher record.
+      if (createdUser) {
+        await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+      } else if (createdRoleId) {
+        await supabaseAdmin.from("user_roles").delete().eq("id", createdRoleId);
       }
+      return json({ error: "Error al crear el docente" }, 500);
     }
 
-    return new Response(
-      JSON.stringify({
+    if (!createdUser) {
+      return json({
         success: true,
         teacher,
-        message: existingUser
-          ? "Docente creado exitosamente (usuario ya existía)"
-          : `Docente creado exitosamente. Contraseña temporal: ${teacherPassword}`,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+        existing_user: true,
+        email_sent: false,
+        message: "Docente creado. La cuenta ya existía y conserva su contraseña actual.",
+      });
+    }
 
+    // Awaited so the screen can say whether it went out; a failed email never undoes the teacher.
+    const welcome = await sendWelcomeEmail(supabaseAdmin, {
+      schoolId,
+      email,
+      password: teacherPassword,
+      role: "docente",
+    });
+    return json({
+      success: true,
+      teacher,
+      existing_user: false,
+      password: teacherPassword,
+      email_sent: welcome.sent,
+      email_error: welcome.error ?? null,
+      message: welcome.sent
+        ? `Docente creado. Se envió el correo de bienvenida a ${email}. Contraseña temporal: ${teacherPassword}`
+        : `Docente creado, pero no se pudo enviar el correo de bienvenida (${welcome.error ?? "error desconocido"}). ` +
+          `Contraseña temporal: ${teacherPassword}. Puede reenviarlo desde la lista de docentes.`,
+    });
   } catch (error) {
     console.error("Unexpected error:", error);
-    return new Response(
-      JSON.stringify({ error: "Error interno del servidor" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ error: "Error interno del servidor" }, 500);
   }
 }
 

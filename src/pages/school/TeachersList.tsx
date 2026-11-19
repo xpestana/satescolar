@@ -27,6 +27,7 @@ import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { useNavigate } from "react-router-dom";
 import { useCarnetConfig } from "@/hooks/useCarnetConfig";
 import { toast } from "sonner";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import {
   DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent,
 } from "@dnd-kit/core";
@@ -439,16 +440,19 @@ export default function TeachersList() {
   // Resend welcome email
   const resendEmailMutation = useMutation({
     mutationFn: async (teacherId: string) => {
-      const response = await supabase.functions.invoke("resend-welcome-email", {
-        body: { family_id: teacherId, target_type: "teacher" },
-      });
-      if (response.error) throw new Error(response.error.message);
-      const result = response.data;
-      if (result?.error) throw new Error(result.error);
-      return result;
+      return invokeEdgeFunction<{ message: string; email_sent?: boolean }>(
+        "resend-welcome-email",
+        { family_id: teacherId, target_type: "teacher" },
+        "Error al reenviar el correo",
+      );
     },
-    onSuccess: () => {
-      toast.success("Correo de bienvenida reenviado exitosamente");
+    onSuccess: (result) => {
+      // When the email fails the password was still changed: the message carries the new one.
+      if (result.email_sent === false) {
+        toast.error(result.message, { duration: 60000 });
+      } else {
+        toast.success("Correo de bienvenida reenviado exitosamente");
+      }
       setResendDialog({ open: false, teacherId: "", teacherName: "" });
     },
     onError: (error) => {

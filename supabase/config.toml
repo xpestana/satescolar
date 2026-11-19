@@ -71,3 +71,7 @@ verify_jwt = false
 
 [functions.send-withholding-voucher]
 verify_jwt = false
+
+# Cron only: the function checks for a service-role JWT and relies on the gateway verifying it.
+[functions.send-delinquency-reminders]
+verify_jwt = true

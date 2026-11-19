@@ -31,6 +31,7 @@ import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { buildEmailPreviewHtml } from "@/lib/email-preview";
 import { toast } from "sonner";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import {
   Save,
   RotateCcw,
@@ -231,15 +232,11 @@ export default function EmailTemplateEditor() {
     }
     setSendingTest(true);
     try {
-      const { data, error } = await supabase.functions.invoke("send-test-email", {
-        body: {
-          to: testEmail.trim(),
-          email_type: templateType,
-          school_id: schoolId,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      await invokeEdgeFunction(
+        "send-test-email",
+        { to: testEmail.trim(), email_type: templateType, school_id: schoolId },
+        "Error al enviar la prueba",
+      );
       toast.success(`Correo de prueba enviado a ${testEmail}`);
       setTestDialogOpen(false);
     } catch (err: any) {

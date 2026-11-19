@@ -48,7 +48,7 @@ export function buildWelcomeEmailHtml(
   schoolLogoUrl: string | null,
   userEmail: string,
   password: string,
-  role: "representante" | "docente" | "administrador",
+  role: string,
   platformUrl: string
 ): string {
   const logoBlock = schoolLogoUrl

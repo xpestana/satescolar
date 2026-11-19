@@ -44,6 +44,7 @@ import { Pagination } from "@/components/ui/data-pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { toast } from "sonner";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import {
   ROLE_LABELS,
   countActiveFilters,
@@ -330,12 +331,11 @@ export default function UsersList() {
       if (isEditing && editingUserId) {
         // El nombre va por la función: la RLS de profiles no deja al admin escribir perfiles ajenos
         // (un update directo no daba error pero no cambiaba nada).
-        const { data: nameData, error: nameError } = await supabase.functions.invoke(
+        await invokeEdgeFunction(
           "admin-user-actions",
-          { body: { action: "update_name", user_id: editingUserId, full_name: formData.full_name } }
+          { action: "update_name", user_id: editingUserId, full_name: formData.full_name },
+          "No se pudo guardar el nombre",
         );
-        if (nameError) throw nameError;
-        if (nameData?.error) throw new Error(nameData.error);
 
         // Update school assignment
         const { error: roleError } = await supabase
@@ -348,29 +348,31 @@ export default function UsersList() {
 
         // Update password if provided
         if (formData.password) {
-          const { data: pwdData, error: pwdError } = await supabase.functions.invoke(
+          await invokeEdgeFunction(
             "update-user-password",
-            { body: { user_id: editingUserId, new_password: formData.password } }
+            { user_id: editingUserId, new_password: formData.password },
+            "No se pudo cambiar la contraseña",
           );
-          if (pwdError) throw pwdError;
-          if (pwdData?.error) throw new Error(pwdData.error);
         }
 
         toast.success("Usuario actualizado correctamente");
       } else {
         // Create new user via edge function
-        const { data, error } = await supabase.functions.invoke("create-admin-user", {
-          body: {
+        const data = await invokeEdgeFunction<{
+          user?: { id?: string };
+          email_sent?: boolean;
+          email_error?: string | null;
+        }>(
+          "create-admin-user",
+          {
             email: formData.email,
             password: formData.password,
             full_name: formData.full_name,
             role: "school",
             school_id: formData.school_id || null,
           },
-        });
-
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+          "No se pudo crear el usuario",
+        );
 
         // Update the school assignment if provided
         if (formData.school_id && data?.user?.id) {
@@ -402,11 +404,12 @@ export default function UsersList() {
   const handleResetAndWelcome = async (userId: string) => {
     setResettingUserId(userId);
     try {
-      const { data, error } = await supabase.functions.invoke("admin-user-actions", {
-        body: { action: "reset_and_welcome", user_id: userId },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const data = await invokeEdgeFunction<{
+        email: string;
+        password: string;
+        email_sent?: boolean;
+        email_error?: string | null;
+      }>("admin-user-actions", { action: "reset_and_welcome", user_id: userId }, "Error al restablecer la contraseña");
       setResetResult({
         email: data.email,
         password: data.password,

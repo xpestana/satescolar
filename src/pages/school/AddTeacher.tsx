@@ -14,6 +14,13 @@ import { useToast } from "@/hooks/use-toast";
 import { PhotoUpload } from "@/components/families/PhotoUpload";
 import { GroupedFormFields } from "@/components/forms/GroupedFormFields";
 import type { Json } from "@/integrations/supabase/types";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
+
+interface CreateTeacherResult {
+  message?: string;
+  existing_user?: boolean;
+  email_sent?: boolean;
+}
 
 interface FormField {
   id: string;
@@ -163,38 +170,37 @@ export default function AddTeacher() {
         const email = resolvedEmail;
         if (!email) throw new Error("El correo electrónico es obligatorio para crear el docente");
         if (!documentId) throw new Error("El número de documento es obligatorio para crear el docente");
-        const response = await supabase.functions.invoke("create-teacher", {
-          body: {
+        const result = await invokeEdgeFunction<CreateTeacherResult>(
+          "create-teacher",
+          {
             email,
             form_data: formData,
             photo_url: photoUrl,
             document_id: documentId,
             phone: resolvedPhone,
           },
-        });
-
-        if (response.error) throw new Error(response.error.message || "Error al crear el docente");
-        const result = response.data;
-        if (result?.error) throw new Error(result.error);
-
-        // Show the temporary password message
-        if (result?.message) {
-          toast({
-            title: "Docente creado",
-            description: result.message,
-            duration: 10000,
-          });
-          return; // Skip the onSuccess toast since we already showed one
-        }
+          "No se pudo crear el docente",
+        );
+        return result;
       }
+      return null;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["teachers", schoolId] });
+      // One toast only (the toaster shows one at a time): the function's message carries the
+      // temporary password and whether the welcome email went out.
+      const emailFailed = !!result && !result.existing_user && result.email_sent === false;
       toast({
-        title: isEditing ? "Docente actualizado" : "Docente agregado",
-        description: isEditing
-          ? "Los datos del docente se han actualizado correctamente"
-          : "El docente ha sido agregado correctamente",
+        title: isEditing
+          ? "Docente actualizado"
+          : emailFailed
+            ? "Docente creado, correo no enviado"
+            : "Docente agregado",
+        description: result?.message
+          ?? (isEditing
+            ? "Los datos del docente se han actualizado correctamente"
+            : "El docente ha sido agregado correctamente"),
+        duration: emailFailed ? 30000 : result?.message ? 10000 : undefined,
       });
       navigate("/registros/docentes");
     },
@@ -203,7 +209,7 @@ export default function AddTeacher() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "No se pudo guardar el docente",
+        description: error instanceof Error && error.message ? error.message : "No se pudo guardar el docente",
       });
     },
   });
