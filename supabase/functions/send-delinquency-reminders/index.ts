@@ -1,7 +1,8 @@
-import { buildDelinquencyEmailHtml, resolveSnippets, wrapWithEmailLayout } from "../_shared/email-templates.ts";
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 import { bearerToken, isServiceRoleToken } from "../_shared/serviceRole.ts";
+import { mailer } from "../_shared/email/mailer.ts";
+import { loadEmailTemplate, renderSchoolEmail, type SchoolBranding } from "../_shared/email/schoolTemplates.ts";
+import { buildDelinquencyVariables, collectFamilyEmails, type DebtConcept } from "../_shared/email/delinquency.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,10 +12,25 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+const WEEKDAYS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+// deno-lint-ignore no-explicit-any
+function shouldSendToday(config: any, today: Date): boolean {
+  if (config.reminder_mode === "never") return false;
+  if (config.reminder_mode === "weekly") {
+    return ((config.reminder_days_of_week as string[]) || []).includes(WEEKDAYS[today.getDay()]);
+  }
+  if (config.reminder_mode === "monthly_days") {
+    return ((config.reminder_days_of_month as number[]) || []).includes(today.getDate());
+  }
+  return config.reminder_mode === "daily";
+}
+
 /**
- * Daily cron (pg_cron → net.http_post with the service-role key). Only the system may run it:
- * before, any valid JWT (even the public anon key) could trigger reminders for every school.
+ * Daily cron (pg_cron → net.http_post with the service-role key). Only the system may run it.
  * Relies on the gateway verifying the JWT signature (verify_jwt = true in config.toml).
+ * Each delinquent student's family gets ONE email addressed to the family account and every
+ * representative with an email; the text is the school's "delinquency" template.
  */
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
@@ -24,10 +40,7 @@ export default async function handler(req: Request): Promise<Response> {
   if (!isServiceRoleToken(bearerToken(req))) {
     return json({ error: "Solo el sistema puede ejecutar los recordatorios" }, 403);
   }
-
-  const smtpFromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-  const smtpFromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-  if (!smtpFromEmail || !Deno.env.get("SMTP_HOST")) {
+  if (!mailer.isConfigured()) {
     return json({ error: "El envío de correos no está configurado en el servidor" }, 503);
   }
 
@@ -36,35 +49,22 @@ export default async function handler(req: Request): Promise<Response> {
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { autoRefreshToken: false, persistSession: false } }
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
     const today = new Date();
-    const dayOfWeek = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"][today.getDay()];
-    const dayOfMonth = today.getDate();
+    const todayStr = today.toISOString().split("T")[0];
 
-    // Get all schools with delinquency config
     const { data: configs, error: cfgErr } = await supabaseAdmin
       .from("delinquency_config")
-      .select("*, schools(name, email, phone, address)");
+      .select("*, schools(name, email, phone, logo_url)");
     if (cfgErr) throw cfgErr;
 
     let totalSent = 0;
     let totalErrors = 0;
 
-    for (const config of (configs || [])) {
-      // Check if we should send today
-      if (config.reminder_mode === "never") continue;
-      if (config.reminder_mode === "weekly") {
-        const days = (config.reminder_days_of_week as string[]) || [];
-        if (!days.includes(dayOfWeek)) continue;
-      }
-      if (config.reminder_mode === "monthly_days") {
-        const days = (config.reminder_days_of_month as number[]) || [];
-        if (!days.includes(dayOfMonth)) continue;
-      }
-      // daily: always send
-
+    for (const config of configs || []) {
+      if (!shouldSendToday(config, today)) continue;
       const schoolId = config.school_id;
 
       // Reminders are part of the payments module (docs/desc/19-modulos.md).
@@ -73,19 +73,16 @@ export default async function handler(req: Request): Promise<Response> {
         continue;
       }
 
-      // Get active school year
       const { data: activeYear } = await supabaseAdmin
         .from("school_years")
-        .select("id, year_range")
+        .select("id")
         .eq("school_id", schoolId)
         .eq("is_active", true)
         .maybeSingle();
       if (!activeYear) continue;
 
-      // Asegurar saldos completos antes de calcular morosos.
+      // Complete balances before computing delinquents (same RPC as the UI).
       await supabaseAdmin.rpc("rebuild_student_concept_balances_for_active_year");
-
-      // Obtener morosos desde el RPC autoritativo (mismo criterio que la UI).
       const { data: delinquentRows, error: rpcErr } = await supabaseAdmin.rpc("get_delinquent_students", {
         _school_id: schoolId,
         _school_year_id: activeYear.id,
@@ -95,79 +92,63 @@ export default async function handler(req: Request): Promise<Response> {
         continue;
       }
 
-      const studentDebts: Record<string, { total: number; concepts: any[] }> = {};
+      const debts = new Map<string, { total: number; concepts: DebtConcept[] }>();
+      // deno-lint-ignore no-explicit-any
       for (const row of (delinquentRows || []) as any[]) {
-        studentDebts[row.student_id] = {
+        debts.set(row.student_id, {
           total: Number(row.total_owed) || 0,
+          // deno-lint-ignore no-explicit-any
           concepts: (row.concepts || []).map((c: any) => ({ name: c.name, balance: Number(c.balance) || 0 })),
-        };
+        });
       }
-
-      const studentIds = Object.keys(studentDebts);
+      const studentIds = [...debts.keys()];
       if (studentIds.length === 0) continue;
 
-      // Get student families and emails
       const { data: students } = await supabaseAdmin
         .from("students")
         .select("id, form_data, family_id")
         .in("id", studentIds);
 
-      // Get enrollments for grade info
       const { data: enrollments } = await supabaseAdmin
         .from("enrollments")
         .select("student_id, sections(name, grade_level)")
         .eq("school_id", schoolId)
         .eq("school_year_id", activeYear.id)
         .in("student_id", studentIds);
-      const enrollMap: Record<string, any> = {};
-      (enrollments || []).forEach((e: any) => { enrollMap[e.student_id] = e; });
+      // deno-lint-ignore no-explicit-any
+      const enrollmentByStudent = new Map<string, any>((enrollments || []).map((e: any) => [e.student_id, e]));
 
-      // Get family emails
-      const familyIds = [...new Set((students || []).map((s: any) => s.family_id))];
-      const { data: families } = await supabaseAdmin
-        .from("families")
-        .select("id, contact_phone")
-        .in("id", familyIds);
+      // deno-lint-ignore no-explicit-any
+      const familyIds = [...new Set((students || []).map((s: any) => s.family_id).filter(Boolean))];
+      const [{ data: families }, { data: representatives }] = await Promise.all([
+        supabaseAdmin.from("families").select("id, user_id").in("id", familyIds),
+        supabaseAdmin.from("representatives").select("family_id, email, form_data").in("family_id", familyIds),
+      ]);
 
-      // Get family user emails
-      const { data: familyUsers } = await supabaseAdmin
-        .from("families")
-        .select("id, user_id")
-        .in("id", familyIds);
-      const userIds = (familyUsers || []).map((f: any) => f.user_id).filter(Boolean);
-      const emailMap: Record<string, string> = {};
-      if (userIds.length > 0) {
-        for (const fu of (familyUsers || [])) {
-          if (!fu.user_id) continue;
-          const { data: userData } = await supabaseAdmin.auth.admin.getUserById(fu.user_id);
-          if (userData?.user?.email) emailMap[fu.id] = userData.user.email;
-        }
+      const recipientsByFamily = new Map<string, string[]>();
+      for (const family of families || []) {
+        const account = family.user_id ? (await supabaseAdmin.auth.admin.getUserById(family.user_id)).data?.user?.email : null;
+        // deno-lint-ignore no-explicit-any
+        const reps = (representatives || []).filter((r: any) => r.family_id === family.id);
+        recipientsByFamily.set(family.id, collectFamilyEmails(account ?? null, reps));
       }
 
-      const schoolInfo = config.schools as any;
+      // deno-lint-ignore no-explicit-any
+      const school = config.schools as any;
+      const branding: SchoolBranding = {
+        name: school?.name || "La Institución",
+        logoUrl: school?.logo_url ?? null,
+        phone: school?.phone ?? null,
+        email: school?.email ?? null,
+      };
+      const { template } = await loadEmailTemplate(supabaseAdmin, schoolId, "delinquency");
 
-      // Check for custom template once per school
-      const { data: customTemplate } = await supabaseAdmin
-        .from("email_templates")
-        .select("subject, body_html, primary_color, text_color")
-        .eq("school_id", schoolId)
-        .eq("template_type", "delinquency")
-        .eq("is_active", true)
-        .maybeSingle();
+      for (const student of students || []) {
+        const debt = debts.get(student.id);
+        const to = recipientsByFamily.get(student.family_id) ?? [];
+        if (!debt || to.length === 0) continue;
 
-      // Fetch school logo for custom template wrapper
-      const { data: schoolRecord } = customTemplate
-        ? await supabaseAdmin.from("schools").select("logo_url").eq("id", schoolId).maybeSingle()
-        : { data: null };
-
-      for (const student of (students || [])) {
-        const debt = studentDebts[student.id];
-        if (!debt) continue;
-        const email = emailMap[student.family_id];
-        if (!email) continue;
-
-        // Check if already sent today
-        const todayStr = today.toISOString().split("T")[0];
+        // At most one notice per student per day.
         const { data: existingNotif } = await supabaseAdmin
           .from("delinquency_notifications")
           .select("id")
@@ -177,94 +158,50 @@ export default async function handler(req: Request): Promise<Response> {
           .limit(1);
         if (existingNotif && existingNotif.length > 0) continue;
 
+        // deno-lint-ignore no-explicit-any
         const fd = student.form_data as any;
-        const studentName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido].filter(Boolean).join(" ");
-        const enrollment = enrollMap[student.id];
-        const gradeName = enrollment?.sections?.grade_level || "";
-        const sectionName = enrollment?.sections?.name || "";
+        const studentName = [fd?.primer_nombre, fd?.segundo_nombre, fd?.primer_apellido, fd?.segundo_apellido]
+          .filter(Boolean)
+          .join(" ");
+        const section = enrollmentByStudent.get(student.id)?.sections;
 
-        let htmlBody: string;
-        let emailSubject: string;
-
-        if (customTemplate) {
-          const conceptsList = debt.concepts
-            .map((c: any) => `<li>${c.name}: <strong>${c.balance.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES</strong></li>`)
-            .join("");
-          const snippetData: Record<string, string> = {
-            nombre_colegio: schoolInfo?.name || "La Institución",
-            nombre_estudiante: studentName,
-            grado_seccion: gradeName ? `${gradeName} - ${sectionName}` : "",
-            conceptos_pendientes: `<ul>${conceptsList}</ul>`,
-            total_adeudado: `${debt.total.toLocaleString("es-VE", { minimumFractionDigits: 2 })} VES`,
-            telefono_colegio: schoolInfo?.phone || "",
-            email_colegio: schoolInfo?.email || "",
-            primary_color: customTemplate.primary_color,
-          };
-          htmlBody = wrapWithEmailLayout(
-            resolveSnippets(customTemplate.body_html, snippetData),
-            customTemplate.primary_color,
-            customTemplate.text_color,
-            schoolInfo?.name || "La Institución",
-            schoolRecord?.logo_url ?? null
-          );
-          emailSubject = resolveSnippets(customTemplate.subject, snippetData);
-        } else {
-          htmlBody = buildDelinquencyEmailHtml(
-            schoolInfo?.name || "La Institución",
+        const { subject, html } = await renderSchoolEmail(
+          supabaseAdmin,
+          schoolId,
+          "delinquency",
+          buildDelinquencyVariables({
             studentName,
-            gradeName,
-            sectionName,
-            debt.concepts,
-            debt.total,
-            schoolInfo?.phone,
-            schoolInfo?.email
-          );
-          emailSubject = `Recordatorio de Pago Pendiente - ${studentName}`;
-        }
+            gradeName: section?.grade_level || "",
+            sectionName: section?.name || "",
+            concepts: debt.concepts,
+            total: debt.total,
+            schoolPhone: branding.phone,
+            schoolEmail: branding.email,
+          }),
+          { branding, template },
+        );
 
-        let status = "sent";
-        let errorMessage = null;
+        const result = await mailer.send({ to, subject, html });
+        if (result.sent) totalSent++;
+        else totalErrors++;
 
-        try {
-          // Always direct SMTP. The old fallback called `send-email` with the service key, which
-          // that function rejects (401), so every reminder without a custom template failed.
-          await sendViaSmtp({
-            from: `${smtpFromName} <${smtpFromEmail}>`,
-            to: [email],
-            subject: emailSubject,
-            html: htmlBody,
-          });
-          totalSent++;
-        } catch (err: any) {
-          status = "failed";
-          errorMessage = err.message || "Error desconocido";
-          totalErrors++;
-        }
-
-        // Log notification
         await supabaseAdmin.from("delinquency_notifications").insert({
           school_id: schoolId,
           student_id: student.id,
           family_id: student.family_id,
-          email_sent_to: email,
+          email_sent_to: to.join(", "),
           total_owed_ves: debt.total,
           concepts_detail: debt.concepts,
-          status,
-          error_message: errorMessage,
+          status: result.sent ? "sent" : "failed",
+          error_message: result.sent ? null : (result.error ?? "Error desconocido"),
         });
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true, sent: totalSent, errors: totalErrors }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (error: any) {
+    return json({ success: true, sent: totalSent, errors: totalErrors });
+  } catch (error) {
     console.error("Error:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Error al procesar recordatorios" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ error: error instanceof Error ? error.message : "Error al procesar recordatorios" }, 500);
   }
 }
 

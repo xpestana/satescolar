@@ -5,36 +5,31 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MailCheck, ChevronRight, Users, GraduationCap, AlertCircle, CreditCard } from "lucide-react";
+import { MailCheck, ChevronRight, Users, GraduationCap, AlertCircle, CreditCard, UserCog, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import {
+  EMAIL_TEMPLATES,
+  EMAIL_TEMPLATE_TYPES,
+  type EmailTemplateType,
+} from "../../../supabase/functions/_shared/email/templates.ts";
 
-const TEMPLATE_TYPES = [
-  {
-    id: "welcome-family",
-    label: "Bienvenida Representante",
-    description: "Se envía cuando se registra una nueva familia o desde el botón de reenvío en la lista de familias.",
-    icon: Users,
-  },
-  {
-    id: "welcome-teacher",
-    label: "Bienvenida Docente",
-    description: "Se envía cuando se registra un nuevo docente o desde el botón de reenvío en la lista de docentes.",
-    icon: GraduationCap,
-  },
-  {
-    id: "delinquency",
-    label: "Aviso de Morosidad",
-    description: "Se envía automáticamente según la configuración de morosidad del colegio (diario, semanal o por días del mes).",
-    icon: AlertCircle,
-  },
-  {
-    id: "payment-reminder",
-    label: "Recordatorio de Cuotas",
-    description: "Aviso de cuotas próximas o pendientes. Permite personalizar el mensaje antes de configurar el envío automático.",
-    icon: CreditCard,
-  },
-];
+const ICONS: Record<EmailTemplateType, LucideIcon> = {
+  "welcome-family": Users,
+  "welcome-teacher": GraduationCap,
+  "welcome-staff": UserCog,
+  delinquency: AlertCircle,
+  "payment-reminder": CreditCard,
+};
+
+// Same catalog the Edge Functions send with (supabase/functions/_shared/email/templates.ts).
+const TEMPLATE_TYPES = EMAIL_TEMPLATE_TYPES.map((id) => ({
+  id,
+  label: EMAIL_TEMPLATES[id].label,
+  description: EMAIL_TEMPLATES[id].description,
+  comingSoon: !EMAIL_TEMPLATES[id].sendsAutomatically,
+  icon: ICONS[id],
+}));
 
 export default function EmailTemplatesList() {
   const navigate = useNavigate();
@@ -53,7 +48,7 @@ export default function EmailTemplatesList() {
     enabled: !!schoolId,
   });
 
-  const customizedTypes = new Set((templates ?? []).map((t: any) => t.template_type));
+  const customizedTypes = new Set((templates ?? []).map((t) => t.template_type));
 
   return (
     <DashboardLayout>
@@ -82,6 +77,11 @@ export default function EmailTemplatesList() {
                     <Badge variant={isCustom ? "default" : "secondary"} className="text-xs">
                       {isCustom ? "Personalizado" : "Por defecto"}
                     </Badge>
+                    {type.comingSoon && (
+                      <Badge variant="outline" className="text-xs">
+                        Próximamente
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{type.description}</p>
                 </div>

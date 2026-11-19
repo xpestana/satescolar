@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { sendWelcomeEmail } from "../_shared/welcome-email.ts";
+import { sendInBatches } from "../_shared/email/batch.ts";
 
 // Prevent stray rejections from tearing down the edge worker.
 if (typeof addEventListener === "function") {
@@ -123,6 +125,9 @@ export default async function handler(req: Request): Promise<Response> {
     // ── Parse body ──
     const body = await req.json();
     const schoolId: string = body?.school_id;
+    // Optional: email the credentials of the accounts this import creates.
+    const sendWelcome = body?.send_welcome === true;
+    const newAccounts: { email: string; password: string; role: "representante" | "docente" }[] = [];
     const yearRangeInput: string = body?.school_year || "2024-2025";
     const representantes: ImportRepresentative[] = Array.isArray(body?.representantes) ? body.representantes : [];
     const docentes: ImportTeacher[] = Array.isArray(body?.docentes) ? body.docentes : [];
@@ -194,6 +199,7 @@ export default async function handler(req: Request): Promise<Response> {
         }
         userId = newUser.user.id;
         emailToUserId.set(key, userId);
+        newAccounts.push({ email, password: safePassword, role: role === "teacher" ? "docente" : "representante" });
       }
 
       // Ensure the role for this school (idempotent).
@@ -547,7 +553,25 @@ export default async function handler(req: Request): Promise<Response> {
       if (name) await ensureSubject(name);
     }
 
-    return json({ success: true, summary, created, skipped, failed }, 200);
+    // Welcome emails for the new accounts (never undoes the import). Batched and time-boxed so a
+    // big import stays within the time limit; the rest can use "Reenviar" from each list.
+    const welcome = sendWelcome && newAccounts.length > 0
+      ? await sendInBatches(newAccounts, (a) => sendWelcomeEmail(supabaseAdmin, { schoolId, ...a }), {
+        concurrency: 4,
+        budgetMs: 90_000,
+      })
+      : null;
+
+    return json({
+      success: true,
+      summary,
+      created,
+      skipped,
+      failed,
+      welcome: welcome
+        ? { requested: newAccounts.length, sent: welcome.sent, failed: welcome.failed, pending: welcome.pending }
+        : null,
+    }, 200);
   } catch (error) {
     console.error("[import-school-data] unexpected error:", error);
     return json({ error: "Error interno del servidor" }, 500);

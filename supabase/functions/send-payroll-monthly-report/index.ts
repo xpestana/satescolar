@@ -1,8 +1,7 @@
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { mailer } from "../_shared/email/mailer.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 import { verifyServiceRoleToken } from "../_shared/serviceRole.ts";
 import {
-  asciiSubject,
   buildMonthlyReportHtml,
   money,
   type MonthlyReportData,
@@ -126,14 +125,12 @@ async function reportForSchool(
     byMethod,
   };
 
-  const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-  const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-  await sendViaSmtp({
-    from: `${fromName} <${fromEmail}>`,
+  const result = await mailer.send({
     to: [to],
-    subject: asciiSubject(`Reporte de nomina - ${monthLabel} (${money(totalVes, "VES")})`),
+    subject: `Reporte de nomina - ${monthLabel} (${money(totalVes, "VES")})`,
     html: buildMonthlyReportHtml(data),
-  } as any);
+  });
+  if (!result.sent) throw new Error(result.error ?? "No se pudo enviar el reporte");
 
   return { emailed: true };
 }

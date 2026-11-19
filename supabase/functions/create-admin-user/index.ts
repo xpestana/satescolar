@@ -173,6 +173,7 @@ export default async function handler(req: Request): Promise<Response> {
       email,
       password,
       role: role === "school" ? "administrador" : "representante",
+      fullName: full_name ?? null,
     });
 
     return new Response(

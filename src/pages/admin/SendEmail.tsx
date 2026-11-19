@@ -53,6 +53,13 @@ const EMAIL_TYPES: EmailTypeInfo[] = [
     previewDataDesc: "Colegio Demo SAT · pedro.gomez@demo.com · contraseña: 12345678",
   },
   {
+    id: "welcome-staff",
+    label: "Bienvenida Personal del Colegio",
+    source: "manage-school-subuser / create-admin-user / admin-user-actions",
+    trigger: "Alta de un usuario del colegio o del dueño, y restablecimiento de su contraseña",
+    previewDataDesc: "Colegio Demo SAT · ana.lopez@demo.com · Ana López · contraseña: Demo1234",
+  },
+  {
     id: "delinquency",
     label: "Aviso de Morosidad",
     source: "send-delinquency-reminders",

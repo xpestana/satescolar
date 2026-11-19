@@ -124,7 +124,13 @@ export default async function handler(req: Request): Promise<Response> {
         return json({ error: "Error al actualizar la contraseña" }, 500);
       }
 
-      const welcome = await sendWelcomeEmail(admin, { schoolId, email, password, role: welcomeRole });
+      const welcome = await sendWelcomeEmail(admin, {
+        schoolId,
+        email,
+        password,
+        role: welcomeRole,
+        fullName: (target.user.user_metadata as { full_name?: string } | undefined)?.full_name ?? null,
+      });
       return json({
         success: true,
         email,

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { mailer } from "../_shared/email/mailer.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 import { getCallerRole } from "../_shared/callerRole.ts";
 import { hasSchoolPermission } from "../_shared/schoolPermissions.ts";
@@ -76,9 +76,7 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ error: `No hay destinatarios válidos${invalid.length ? `: ${invalid.join(", ")}` : ""}` }, 400);
     }
 
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-    if (!fromEmail || !Deno.env.get("SMTP_HOST")) {
+    if (!mailer.isConfigured()) {
       return json({ error: "El envío de correos no está configurado en el servidor" }, 503);
     }
 
@@ -86,20 +84,19 @@ export default async function handler(req: Request): Promise<Response> {
     const failed: string[] = [];
     let lastError = "";
 
-    for (const envelope of buildBulkEnvelopes(recipients, fromEmail)) {
+    for (const envelope of buildBulkEnvelopes(recipients, mailer.senderAddress())) {
       const batch = envelope.bcc ?? envelope.to;
-      try {
-        await sendViaSmtp({
-          from: `${fromName} <${fromEmail}>`,
-          to: envelope.to,
-          ...(envelope.bcc ? { bcc: envelope.bcc } : {}),
-          subject,
-          ...(isHtml ? { html: body } : { content: body }),
-        } as any);
+      const result = await mailer.send({
+        to: envelope.to,
+        bcc: envelope.bcc,
+        subject,
+        ...(isHtml ? { html: body } : { text: body }),
+      });
+      if (result.sent) {
         sent += batch.length;
-      } catch (e) {
-        lastError = e instanceof Error ? e.message : String(e);
-        console.error("[send-email] batch failed:", e);
+      } else {
+        lastError = result.error ?? "";
+        console.error("[send-email] batch failed:", result.error);
         failed.push(...batch);
       }
     }

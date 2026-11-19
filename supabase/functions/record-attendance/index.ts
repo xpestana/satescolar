@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { mailer } from "../_shared/email/mailer.ts";
+import { buildAttendanceEmail } from "../_shared/email/attendance.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
@@ -186,7 +187,7 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // 5. Send email notification (fire and forget)
+    // 5. Email notification (a failure never undoes the attendance record)
     if (notificationEmail) {
       try {
         // Get school info for email
@@ -196,50 +197,17 @@ export default async function handler(req: Request): Promise<Response> {
           .eq("id", school_id)
           .maybeSingle();
 
-        const dateStr = now.toLocaleDateString("es-VE", { year: "numeric", month: "long", day: "numeric" });
-        const timeStr = now.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" });
+        const { subject, html } = buildAttendanceEmail({
+          schoolName: school?.name || "Colegio",
+          logoUrl: school?.logo_url ?? null,
+          personName,
+          roleLabel: rolLabel,
+          dateLabel: now.toLocaleDateString("es-VE", { year: "numeric", month: "long", day: "numeric" }),
+          timeLabel: now.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" }),
+        });
+        const result = await mailer.send({ to: [notificationEmail], subject, html });
 
-        const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;">
-  <div style="max-width:500px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.1);">
-    <div style="background:#01051e;padding:20px;text-align:center;">
-      ${school?.logo_url ? `<img src="${school.logo_url}" alt="" style="height:50px;margin-bottom:10px;">` : ""}
-      <h2 style="color:#fff;margin:0;font-size:16px;">${school?.name || "Colegio"}</h2>
-    </div>
-    <div style="padding:24px;">
-      <h3 style="color:#01051e;margin-top:0;">✅ Asistencia Registrada</h3>
-      <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="padding:8px 0;color:#666;">Nombre:</td><td style="padding:8px 0;font-weight:bold;">${personName}</td></tr>
-        <tr><td style="padding:8px 0;color:#666;">Rol:</td><td style="padding:8px 0;">${rolLabel}</td></tr>
-        <tr><td style="padding:8px 0;color:#666;">Fecha:</td><td style="padding:8px 0;">${dateStr}</td></tr>
-        <tr><td style="padding:8px 0;color:#666;">Hora:</td><td style="padding:8px 0;">${timeStr}</td></tr>
-      </table>
-    </div>
-    <div style="background:#f8f8f8;padding:12px;text-align:center;font-size:11px;color:#999;">
-      SAT ESCOLAR — Sistema de Asistencia y Tecnología Escolar
-    </div>
-  </div>
-</body>
-</html>`;
-
-        const smtpHost = Deno.env.get("SMTP_HOST") ?? "";
-        const smtpUser = Deno.env.get("SMTP_USER") ?? "";
-        const smtpPass = Deno.env.get("SMTP_PASS") ?? "";
-        const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-        const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
-        if (smtpHost && smtpUser) {
-          await sendViaSmtp({
-            from: `${fromName} <${fromEmail}>`,
-            to: notificationEmail,
-            subject: `Asistencia registrada - ${personName}`,
-            html,
-          });
-
-          // Update notification_sent
+        if (result.sent) {
           await supabase
             .from("attendance_records")
             .update({ notification_sent: true })
@@ -248,6 +216,8 @@ export default async function handler(req: Request): Promise<Response> {
             .eq("attendance_date", now.toISOString().split("T")[0])
             .order("attendance_timestamp", { ascending: false })
             .limit(1);
+        } else if (result.error !== "SMTP no configurado") {
+          console.error("Email notification error:", result.error);
         }
       } catch (emailErr) {
         console.error("Email notification error:", emailErr);

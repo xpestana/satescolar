@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -336,6 +338,14 @@ function parseJson(raw: any): { reps: UIRep[]; docs: UITeacher[]; subjects: stri
   return { reps: Array.from(byEmail.values()), docs, subjects };
 }
 
+interface ImportReport {
+  summary?: Record<string, number>;
+  created?: string[];
+  skipped?: string[];
+  failed?: string[];
+  welcome?: { requested: number; sent: number; failed: { item: string; error: string }[]; pending: number } | null;
+}
+
 export default function ImportData() {
   const [schools, setSchools] = useState<School[]>([]);
   const [schoolId, setSchoolId] = useState<string>("");
@@ -344,7 +354,8 @@ export default function ImportData() {
   const [docs, setDocs] = useState<UITeacher[]>([]);
   const [parsed, setParsed] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [report, setReport] = useState<any>(null);
+  const [sendWelcome, setSendWelcome] = useState(false);
+  const [report, setReport] = useState<any>(null); // ImportReport | { error }
   const [subjects, setSubjects] = useState<string[]>([]);
 
   useEffect(() => {
@@ -403,6 +414,7 @@ export default function ImportData() {
 
   const buildPayload = () => ({
     school_id: schoolId,
+    send_welcome: sendWelcome,
     school_year: "2024-2025",
     representantes: reps.map((r) => ({
       email: r.email,
@@ -451,9 +463,7 @@ export default function ImportData() {
     setImporting(true);
     setReport(null);
     try {
-      const { data, error } = await supabase.functions.invoke("import-school-data", { body: buildPayload() });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
+      const data = await invokeEdgeFunction<ImportReport>("import-school-data", buildPayload(), "Error en la importación");
       setReport(data);
       const errs = data?.summary?.errores ?? 0;
       if (errs > 0) toast.warning(`Importación finalizada con ${errs} incidencia(s). Revisa el reporte.`);
@@ -655,9 +665,18 @@ export default function ImportData() {
             <Button onClick={handleImport} disabled={importing || !schoolId} size="lg">
               {importing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importando...</> : <><Upload className="h-4 w-4 mr-2" /> Importar al colegio</>}
             </Button>
-            <p className="text-xs text-muted-foreground">
-              No se envían correos. Contraseña de docentes y representantes = su cédula (los sin cédula reciben una aleatoria).
-            </p>
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-sm">
+                <Checkbox checked={sendWelcome} onCheckedChange={(v) => setSendWelcome(v === true)} />
+                Enviar el correo de bienvenida a las cuentas nuevas
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Contraseña de docentes y representantes = su cédula (los sin cédula reciben una aleatoria).
+                {sendWelcome
+                  ? " Se usa la plantilla de bienvenida del colegio; las cuentas que ya existían no reciben correo."
+                  : " No se envían correos."}
+              </p>
+            </div>
           </div>
         </>
       )}
@@ -683,6 +702,22 @@ export default function ImportData() {
                     </Badge>
                   ))}
                 </div>
+                {report.welcome && (
+                  <div className="text-sm">
+                    <p className="font-medium">
+                      Correos de bienvenida: {report.welcome.sent} de {report.welcome.requested} enviados
+                    </p>
+                    {(report.welcome.failed.length > 0 || report.welcome.pending > 0) && (
+                      <p className="text-xs text-amber-700">
+                        {report.welcome.failed.length > 0 &&
+                          `No se enviaron: ${report.welcome.failed.map((x: { item: string }) => x.item).join(", ")}. `}
+                        {report.welcome.pending > 0 &&
+                          `${report.welcome.pending} quedaron sin enviar por tiempo. `}
+                        Use "Reenviar" en Familias o Docentes para esas cuentas.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {Array.isArray(report.failed) && report.failed.length > 0 && (
                   <div>
                     <p className="text-sm font-medium text-red-600 mb-1">Incidencias ({report.failed.length})</p>

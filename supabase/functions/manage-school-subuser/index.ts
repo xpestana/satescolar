@@ -113,7 +113,7 @@ export default async function handler(req: Request): Promise<Response> {
       }
 
       // Awaited so the screen can say whether the email went out (the password is shown anyway).
-      const welcome = await sendWelcomeEmail(admin, { schoolId, email, password, role: "usuario del colegio" });
+      const welcome = await sendWelcomeEmail(admin, { schoolId, email, password, role: "usuario del colegio", fullName: full_name });
 
       return new Response(JSON.stringify({ success: true, user_id: userId, password, email_sent: welcome.sent, email_error: welcome.error ?? null }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -168,6 +168,7 @@ export default async function handler(req: Request): Promise<Response> {
           email,
           password,
           role: "usuario del colegio",
+          fullName: (u?.user?.user_metadata as { full_name?: string } | undefined)?.full_name ?? null,
           defaultSubject: `Nuevas credenciales - ${schoolName}`,
         })
         : { sent: false, error: "La cuenta no tiene correo" };

@@ -1,6 +1,6 @@
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { mailer } from "../_shared/email/mailer.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
-import { asciiSubject, money } from "../_shared/payrollEmail.ts";
+import { money } from "../_shared/payrollEmail.ts";
 
 // Prevent SMTP/TLS internal errors from crashing the edge worker.
 if (typeof addEventListener === "function") {
@@ -126,16 +126,13 @@ export default async function handler(req: Request): Promise<Response> {
     const to = withholding.beneficiary_snapshot?.email?.trim();
     if (!to) return json({ error: "El proveedor no tiene correo registrado" }, 400);
 
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
     const taxLabel = withholding.tax_type === "vat" ? "IVA" : "ISLR";
-
-    await sendViaSmtp({
-      from: `${fromName} <${fromEmail}>`,
+    const result = await mailer.send({
       to: [to],
-      subject: asciiSubject(`Comprobante de retencion ${taxLabel} ${withholding.voucher_number}`),
+      subject: `Comprobante de retención ${taxLabel} ${withholding.voucher_number}`,
       html: buildVoucherHtml(withholding),
-    } as any);
+    });
+    if (!result.sent) return json({ error: `No se pudo enviar el comprobante: ${result.error}` }, 502);
 
     await admin
       .from("payroll_withholdings")

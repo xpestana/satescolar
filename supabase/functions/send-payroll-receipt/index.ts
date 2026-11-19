@@ -1,7 +1,6 @@
-import { sendViaSmtp } from "../_shared/smtp-client.ts";
+import { mailer } from "../_shared/email/mailer.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
 import {
-  asciiSubject,
   buildReceiptAttachmentHtml,
   buildReceiptHtml,
   type Currency,
@@ -165,16 +164,13 @@ export default async function handler(req: Request): Promise<Response> {
       notes: payment.notes ?? "",
     };
 
-    const fromEmail = Deno.env.get("SMTP_FROM_EMAIL") ?? "";
-    const fromName = Deno.env.get("SMTP_FROM_NAME") ?? "SAT Escolar";
-
     // Salaries: the app sends the payslip PDF (same code as the download) and it goes attached.
     const pdf = payment.payment_kind === "payroll" ? validPdfBase64(pdf_base64) : null;
-    if (pdf) {
-      await sendViaSmtp({
-        from: `${fromName} <${fromEmail}>`,
+    const subject = `Recibo de pago - ${data.periodName}`;
+    const result = pdf
+      ? await mailer.send({
         to: [to],
-        subject: asciiSubject(`Recibo de pago - ${data.periodName}`),
+        subject,
         html: buildReceiptAttachmentHtml({
           schoolName: data.schoolName,
           beneficiaryName: data.beneficiaryName,
@@ -182,25 +178,13 @@ export default async function handler(req: Request): Promise<Response> {
           netVes: data.netVes,
         }),
         attachments: [
-          {
-            filename: `recibo-${fileSafe(data.periodName)}.pdf`,
-            content: pdf,
-            encoding: "base64",
-            contentType: "application/pdf",
-          },
+          { filename: `recibo-${fileSafe(data.periodName)}.pdf`, content: pdf, contentType: "application/pdf" },
         ],
-      } as any);
-      return json({ success: true, emailSent: true, attached: true });
-    }
+      })
+      : await mailer.send({ to: [to], subject, html: buildReceiptHtml(data) });
 
-    await sendViaSmtp({
-      from: `${fromName} <${fromEmail}>`,
-      to: [to],
-      subject: asciiSubject(`Recibo de pago - ${data.periodName}`),
-      html: buildReceiptHtml(data),
-    } as any);
-
-    return json({ success: true, emailSent: true });
+    if (!result.sent) return json({ error: result.error || "Error al enviar el recibo" }, 502);
+    return json({ success: true, emailSent: true, ...(pdf ? { attached: true } : {}) });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[send-payroll-receipt] error:", error);

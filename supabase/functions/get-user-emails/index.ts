@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { allowedUserIds, loadScopeRows } from "../_shared/userEmailScope.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -48,7 +49,7 @@ export default async function handler(req: Request): Promise<Response> {
     // Check if requesting user is admin or school
     const { data: roleRows } = await supabaseAdmin
       .from("user_roles")
-      .select("role")
+      .select("role, school_id")
       .eq("user_id", requestingUserId)
       .in("role", ["admin", "school"]);
 
@@ -80,8 +81,17 @@ export default async function handler(req: Request): Promise<Response> {
       }
     }
 
+    // School users only see accounts linked to their own school(s); the platform admin sees all.
+    const isAdmin = roleRows.some((r) => r.role === "admin");
+    let visibleIds: string[] = [...new Set(user_ids as string[])];
+    if (!isAdmin) {
+      const schoolIds = roleRows.filter((r) => r.role === "school" && r.school_id).map((r) => r.school_id as string);
+      const allowed = allowedUserIds(visibleIds, await loadScopeRows(supabaseAdmin, visibleIds, schoolIds));
+      visibleIds = visibleIds.filter((id) => allowed.has(id));
+    }
+
     const userResults = await Promise.all(
-      user_ids.map(async (userId: string) => {
+      visibleIds.map(async (userId: string) => {
         const { data: userData } = await supabaseAdmin.auth.admin.getUserById(userId);
         return userData?.user
           ? {

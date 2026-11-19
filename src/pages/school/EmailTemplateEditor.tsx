@@ -30,6 +30,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { buildEmailPreviewHtml } from "@/lib/email-preview";
+import {
+  DEFAULT_PRIMARY_COLOR,
+  DEFAULT_TEXT_COLOR,
+  EMAIL_TEMPLATES,
+  type EmailTemplateType,
+} from "../../../supabase/functions/_shared/email/templates.ts";
 import { toast } from "sonner";
 import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
 import {
@@ -42,89 +48,21 @@ import {
   Type,
 } from "lucide-react";
 
-type TemplateType = "welcome-family" | "welcome-teacher" | "delinquency" | "payment-reminder";
+type TemplateType = EmailTemplateType;
 
-const TYPE_LABELS: Record<TemplateType, string> = {
-  "welcome-family": "Bienvenida Representante",
-  "welcome-teacher": "Bienvenida Docente",
-  delinquency: "Aviso de Morosidad",
-  "payment-reminder": "Recordatorio de Cuotas",
-};
-
-const TYPE_SNIPPETS: Record<TemplateType, { key: string; label: string }[]> = {
-  "welcome-family": [
-    { key: "nombre_colegio", label: "Nombre del colegio" },
-    { key: "email_usuario", label: "Email del representante" },
-    { key: "contrasena", label: "Contraseña generada" },
-    { key: "url_plataforma", label: "Link de acceso" },
-  ],
-  "welcome-teacher": [
-    { key: "nombre_colegio", label: "Nombre del colegio" },
-    { key: "email_usuario", label: "Email del docente" },
-    { key: "contrasena", label: "Contraseña generada" },
-    { key: "url_plataforma", label: "Link de acceso" },
-  ],
-  delinquency: [
-    { key: "nombre_colegio", label: "Nombre del colegio" },
-    { key: "nombre_estudiante", label: "Nombre del estudiante" },
-    { key: "grado_seccion", label: "Grado y sección" },
-    { key: "conceptos_pendientes", label: "Lista de conceptos" },
-    { key: "total_adeudado", label: "Total adeudado" },
-    { key: "telefono_colegio", label: "Teléfono del colegio" },
-    { key: "email_colegio", label: "Email del colegio" },
-  ],
-  "payment-reminder": [
-    { key: "nombre_colegio", label: "Nombre del colegio" },
-    { key: "nombre_estudiante", label: "Nombre del estudiante" },
-    { key: "grado_seccion", label: "Grado y sección" },
-    { key: "conceptos_pendientes", label: "Lista de conceptos" },
-    { key: "total_adeudado", label: "Monto pendiente" },
-    { key: "telefono_colegio", label: "Teléfono del colegio" },
-    { key: "email_colegio", label: "Email del colegio" },
-  ],
-};
-
-const DEFAULT_SUBJECTS: Record<TemplateType, string> = {
-  "welcome-family": "Bienvenido/a a {{nombre_colegio}} - SAT Escolar",
-  "welcome-teacher": "Bienvenido/a a {{nombre_colegio}} - SAT Escolar",
-  delinquency: "Recordatorio de Pago Pendiente - {{nombre_estudiante}}",
-  "payment-reminder": "Recordatorio de Cuota - {{nombre_estudiante}}",
-};
-
-const DEFAULT_BODIES: Record<TemplateType, string> = {
-  "welcome-family": `<h2>¡Bienvenido/a!</h2>
-<p>Ha sido registrado como <strong>representante</strong> en <strong>{{nombre_colegio}}</strong> a través de la plataforma <strong>SAT Escolar</strong>.</p>
-<p>Sus credenciales de acceso:</p>
-<p><strong>Usuario:</strong> {{email_usuario}}<br/><strong>Contraseña:</strong> {{contrasena}}</p>
-<p style="text-align:center;"><a href="{{url_plataforma}}" style="display:inline-block;padding:12px 28px;background-color:{{primary_color}};color:#ffffff;font-weight:bold;text-decoration:none;border-radius:8px;">Ingresar a la Plataforma</a></p>
-<p style="font-size:13px;color:#9ca3af;text-align:center;">Le recomendamos cambiar su contraseña una vez ingrese al sistema.</p>`,
-
-  "welcome-teacher": `<h2>¡Bienvenido/a!</h2>
-<p>Ha sido registrado como <strong>docente</strong> en <strong>{{nombre_colegio}}</strong> a través de la plataforma <strong>SAT Escolar</strong>.</p>
-<p>Sus credenciales de acceso:</p>
-<p><strong>Usuario:</strong> {{email_usuario}}<br/><strong>Contraseña:</strong> {{contrasena}}</p>
-<p style="text-align:center;"><a href="{{url_plataforma}}" style="display:inline-block;padding:12px 28px;background-color:{{primary_color}};color:#ffffff;font-weight:bold;text-decoration:none;border-radius:8px;">Ingresar a la Plataforma</a></p>
-<p style="font-size:13px;color:#9ca3af;text-align:center;">Le recomendamos cambiar su contraseña una vez ingrese al sistema.</p>`,
-
-  delinquency: `<h2>Recordatorio de Pago Pendiente</h2>
-<p>Estimado(a) representante,</p>
-<p>Le informamos que <strong>{{nombre_estudiante}}</strong> ({{grado_seccion}}) presenta un saldo pendiente en <strong>{{nombre_colegio}}</strong>.</p>
-<h3>Conceptos pendientes:</h3>
-{{conceptos_pendientes}}
-<p style="font-size:18px;color:#c0392b;"><strong>Total pendiente: {{total_adeudado}}</strong></p>
-<p>Le invitamos a regularizar su situación. Si ya realizó el pago, háganos llegar el comprobante.</p>
-<p>Contáctenos:<br/>Teléfono: {{telefono_colegio}}<br/>Email: {{email_colegio}}</p>
-<p>Atentamente,<br/><strong>{{nombre_colegio}}</strong></p>`,
-
-  "payment-reminder": `<h2>Recordatorio de Cuota</h2>
-<p>Estimado(a) representante,</p>
-<p>Le recordamos que <strong>{{nombre_estudiante}}</strong> ({{grado_seccion}}) tiene cuotas próximas a vencer en <strong>{{nombre_colegio}}</strong>.</p>
-<h3>Detalle:</h3>
-{{conceptos_pendientes}}
-<p><strong>Total: {{total_adeudado}}</strong></p>
-<p>Para consultas:<br/>Teléfono: {{telefono_colegio}}<br/>Email: {{email_colegio}}</p>
-<p>Atentamente,<br/><strong>{{nombre_colegio}}</strong></p>`,
-};
+// Labels, snippets and default subject/body come from the catalog shared with the Edge Functions.
+const TYPE_LABELS = Object.fromEntries(
+  Object.values(EMAIL_TEMPLATES).map((t) => [t.type, t.label]),
+) as Record<TemplateType, string>;
+const TYPE_SNIPPETS = Object.fromEntries(
+  Object.values(EMAIL_TEMPLATES).map((t) => [t.type, t.variables]),
+) as Record<TemplateType, { key: string; label: string }[]>;
+const DEFAULT_SUBJECTS = Object.fromEntries(
+  Object.values(EMAIL_TEMPLATES).map((t) => [t.type, t.subject]),
+) as Record<TemplateType, string>;
+const DEFAULT_BODIES = Object.fromEntries(
+  Object.values(EMAIL_TEMPLATES).map((t) => [t.type, t.body]),
+) as Record<TemplateType, string>;
 
 export default function EmailTemplateEditor() {
   const { type } = useParams<{ type: string }>();
@@ -139,8 +77,8 @@ export default function EmailTemplateEditor() {
 
   const [subject, setSubject] = useState(DEFAULT_SUBJECTS[templateType] ?? "");
   const [bodyHtml, setBodyHtml] = useState(DEFAULT_BODIES[templateType] ?? "");
-  const [primaryColor, setPrimaryColor] = useState("#1e78c8");
-  const [textColor, setTextColor] = useState("#ffffff");
+  const [primaryColor, setPrimaryColor] = useState(DEFAULT_PRIMARY_COLOR);
+  const [textColor, setTextColor] = useState(DEFAULT_TEXT_COLOR);
   const [testEmail, setTestEmail] = useState("");
   const [testDialogOpen, setTestDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
@@ -167,7 +105,7 @@ export default function EmailTemplateEditor() {
     setSubject(existingTemplate.subject);
     setBodyHtml(existingTemplate.body_html);
     setPrimaryColor(existingTemplate.primary_color);
-    setTextColor(existingTemplate.text_color ?? "#ffffff");
+    setTextColor(existingTemplate.text_color ?? DEFAULT_TEXT_COLOR);
   }
 
   const saveMutation = useMutation({
@@ -218,7 +156,8 @@ export default function EmailTemplateEditor() {
       setLoadedId(null);
       setSubject(DEFAULT_SUBJECTS[templateType] ?? "");
       setBodyHtml(DEFAULT_BODIES[templateType] ?? "");
-      setPrimaryColor("#1e78c8");
+      setPrimaryColor(DEFAULT_PRIMARY_COLOR);
+      setTextColor(DEFAULT_TEXT_COLOR);
       setResetDialogOpen(false);
       toast.success("Template restaurado al diseño por defecto");
     },
@@ -273,6 +212,15 @@ export default function EmailTemplateEditor() {
           { label: TYPE_LABELS[templateType] },
         ]}
       />
+
+      {!EMAIL_TEMPLATES[templateType].sendsAutomatically && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            Próximamente: puede dejar este correo listo, pero todavía no hay un envío automático que lo use.
+          </span>
+        </div>
+      )}
 
       <div className="flex gap-6 items-start">
         {/* ── Columna izquierda: controles ── */}
