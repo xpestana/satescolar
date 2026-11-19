@@ -63,6 +63,10 @@ con vista previa (`src/lib/email-preview.ts`). Estas plantillas son las que usa 
   `listUsers()` sin paginar solo ve 50 cuentas.
 - **Rol del que llama:** `getCallerRole` (`_shared/callerRole.ts`) filtra por los roles permitidos;
   nunca `.single()` sobre `user_roles` (un usuario puede tener varios roles).
+- **Destinatarios "Familias"** del correo masivo: el correo de la **cuenta** de la familia (el que se ve
+  en Familias, vía `get-user-emails`) y, si falta, el del representante principal
+  (`useFamilyEmailRecipients` + `src/lib/email/familyRecipients.ts`). `representatives.email` casi
+  siempre está vacío, por eso antes salía "Todas las Familias (0)".
 - **Correo masivo** (`send-email`): varios destinatarios van en **BCC** en tandas de 50 (el `To:`
   visible es el remitente); el personal del colegio necesita el permiso `emails.send`.
 - **Morosidad** (`send-delinquency-reminders`): solo con JWT de service role (cron); envía directo por

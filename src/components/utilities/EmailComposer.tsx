@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { useCarnetConfig } from "@/hooks/useCarnetConfig";
+import { useFamilyEmailRecipients } from "@/hooks/useFamilyEmailRecipients";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,28 +64,8 @@ export function EmailComposer() {
     enabled: !!schoolId,
   });
 
-  // Fetch families (primary representatives)
-  const { data: families = [] } = useQuery({
-    queryKey: ["email-families", schoolId],
-    queryFn: async () => {
-      const { data: familySchools, error: fsError } = await supabase
-        .from("family_schools")
-        .select("family_id")
-        .eq("school_id", schoolId!);
-      if (fsError) throw fsError;
-      const familyIds = (familySchools || []).map((fs) => fs.family_id);
-      if (familyIds.length === 0) return [];
-
-      const { data: reps, error: repError } = await supabase
-        .from("representatives")
-        .select("id, email, form_data, family_id")
-        .in("family_id", familyIds)
-        .eq("is_primary", true);
-      if (repError) throw repError;
-      return (reps || []).filter((r) => r.email);
-    },
-    enabled: !!schoolId,
-  });
+  // Families: account email (as shown in "Familias"), with the representative's as fallback.
+  const { data: families = [] } = useFamilyEmailRecipients(schoolId);
 
   const getTeacherName = (t: any) => {
     const fd = t.form_data as Record<string, any> | null;
@@ -92,11 +73,6 @@ export function EmailComposer() {
     return [fd.primer_nombre, fd.primer_apellido].filter(Boolean).join(" ") || t.email;
   };
 
-  const getFamilyName = (r: any) => {
-    const fd = r.form_data as Record<string, any> | null;
-    if (!fd) return r.email;
-    return [fd.primer_nombre, fd.primer_apellido].filter(Boolean).join(" ") || r.email;
-  };
 
   const addRecipient = (r: Recipient) => {
     if (!recipients.some((x) => x.email === r.email)) {
@@ -118,7 +94,7 @@ export function EmailComposer() {
   const addAllFamilies = () => {
     const newOnes = families
       .filter((f) => !recipients.some((r) => r.email === f.email))
-      .map((f) => ({ email: f.email!, name: getFamilyName(f), type: "family" as const }));
+      .map((f) => ({ email: f.email, name: f.name, type: "family" as const }));
     setRecipients((prev) => [...prev, ...newOnes]);
   };
 
@@ -362,15 +338,15 @@ export function EmailComposer() {
                       <CommandGroup>
                         {families.map((f) => (
                           <CommandItem
-                            key={f.id}
-                            value={`${getFamilyName(f)} ${f.email}`}
+                            key={f.familyId}
+                            value={`${f.name} ${f.email}`}
                             onSelect={() => {
-                              addRecipient({ email: f.email!, name: getFamilyName(f), type: "family" });
+                              addRecipient({ email: f.email, name: f.name, type: "family" });
                               setFamilyOpen(false);
                             }}
                           >
                             <div className="flex flex-col">
-                              <span className="text-sm font-medium">{getFamilyName(f)}</span>
+                              <span className="text-sm font-medium">{f.name}</span>
                               <span className="text-xs text-muted-foreground">{f.email}</span>
                             </div>
                           </CommandItem>
