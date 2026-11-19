@@ -67,18 +67,18 @@ export default function EmailTemplatesList() {
               className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => navigate(`/school/configuraciones/correos/${type.id}`)}
             >
-              <CardContent className="p-4 flex items-center gap-4">
+              <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
                     <span className="font-semibold text-sm">{type.label}</span>
-                    <Badge variant={isCustom ? "default" : "secondary"} className="text-xs">
+                    <Badge variant={isCustom ? "default" : "secondary"} className="text-xs whitespace-nowrap">
                       {isCustom ? "Personalizado" : "Por defecto"}
                     </Badge>
                     {type.comingSoon && (
-                      <Badge variant="outline" className="text-xs">
+                      <Badge variant="outline" className="text-xs whitespace-nowrap">
                         Próximamente
                       </Badge>
                     )}
