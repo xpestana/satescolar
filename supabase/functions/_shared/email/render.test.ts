@@ -28,6 +28,19 @@ describe("layout", () => {
     expect(html).toContain("a.png&quot; onerror=&quot;alert(1)");
     expect(html).not.toContain('onerror="');
   });
+
+  it("is fluid on phones: no fixed 560px table, max-width instead, and a mobile media query", () => {
+    const html = wrapWithEmailLayout("<p>x</p>", {
+      primaryColor: "#111111",
+      textColor: "#ffffff",
+      schoolName: "Colegio",
+      logoUrl: null,
+    });
+    expect(html).not.toContain('width="560"');
+    expect(html).toContain("max-width:560px");
+    expect(html).toMatch(/@media only screen and \(max-width: 600px\)/);
+    expect(html).toContain('name="viewport"');
+  });
 });
 
 describe("fillPlaceholders", () => {

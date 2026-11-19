@@ -224,9 +224,9 @@ export default function EmailTemplateEditor() {
         </div>
       )}
 
-      <div className="flex gap-6 items-start">
+      <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
         {/* ── Columna izquierda: controles ── */}
-        <div className="flex-1 min-w-0 space-y-4">
+        <div className="w-full lg:flex-1 min-w-0 space-y-4">
 
           {/* Asunto */}
           <Card>
@@ -256,7 +256,7 @@ export default function EmailTemplateEditor() {
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Color principal (encabezado y botones)</Label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <input
                     type="color"
                     value={primaryColor}
@@ -283,7 +283,7 @@ export default function EmailTemplateEditor() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Color del texto del encabezado</Label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <input
                     type="color"
                     value={textColor}
@@ -366,7 +366,7 @@ export default function EmailTemplateEditor() {
           </Card>
 
           {/* Acciones */}
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 [&>button]:w-full sm:[&>button]:w-auto">
             <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
               {saveMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -406,7 +406,7 @@ export default function EmailTemplateEditor() {
         </div>
 
         {/* ── Columna derecha: preview sticky ── */}
-        <div className="w-[480px] shrink-0 sticky top-6">
+        <div className="w-full min-w-0 lg:w-[480px] lg:shrink-0 lg:sticky lg:top-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">Preview en vivo</CardTitle>
@@ -414,8 +414,8 @@ export default function EmailTemplateEditor() {
             <CardContent className="p-0">
               <iframe
                 srcDoc={previewHtml}
-                className="w-full rounded-b-lg"
-                style={{ height: "600px", border: "none" }}
+                className="w-full rounded-b-lg h-[520px] lg:h-[600px]"
+                style={{ border: "none" }}
                 sandbox="allow-same-origin"
                 title="Email preview"
               />
