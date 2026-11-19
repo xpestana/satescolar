@@ -810,8 +810,9 @@ El gating es el mismo del resto: `permission` en `AppSidebar.tsx`, `ProtectedRou
 - Horas no trabajadas: el valor de la hora es **salario mensual** ÷ horas al mes (en quincenas,
   la línea del sueldo base × 2).
 - `send-payroll-monthly-report` — resumen mensual por colegio (totales por categoría y
-  método + gráfico SVG) al **owner** del colegio; modo sistema/cron por JWT `service_role`,
-  omite colegios sin pagos ese mes. Ambas reutilizan `supabase/functions/_shared/smtp-client.ts`
+  método + gráfico SVG) al **owner** del colegio; modo sistema/cron por clave `service_role`
+  **verificada** (`verifyServiceRoleToken` en `_shared/serviceRole.ts`: la función tiene
+  `verify_jwt = false`, así que leer el claim no basta), omite colegios sin pagos ese mes. Ambas reutilizan `supabase/functions/_shared/smtp-client.ts`
   (SMTP/Mailgun) y `_shared/payrollEmail.ts`. Los **asuntos van en ASCII** (`asciiSubject`)
   para evitar corrupción RFC 2047 del cliente SMTP compartido.
 - Cron `payroll-monthly-report` (`0 6 1 * *`, pg_cron + pg_net): invoca el reporte mensual;

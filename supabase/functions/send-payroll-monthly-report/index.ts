@@ -1,5 +1,6 @@
 import { sendViaSmtp } from "../_shared/smtp-client.ts";
 import { isSchoolModuleActive } from "../_shared/schoolModules.ts";
+import { verifyServiceRoleToken } from "../_shared/serviceRole.ts";
 import {
   asciiSubject,
   buildMonthlyReportHtml,
@@ -39,18 +40,6 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
-}
-
-/** Detect a service-role caller (cron / server) by reading the JWT role claim.
- *  Robust to service-key rotation, unlike comparing against an env value. */
-function isServiceRoleToken(token: string): boolean {
-  try {
-    const part = token.split(".")[1];
-    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
-    return payload?.role === "service_role";
-  } catch {
-    return false;
-  }
 }
 
 /** [start, endExclusive, label] for the target month (defaults to previous month). */
@@ -167,8 +156,12 @@ export default async function handler(req: Request): Promise<Response> {
     const body = await req.json().catch(() => ({}));
     const [startDate, endDate, monthLabel] = monthRange(body.year, body.month);
 
-    // System/cron mode: caller presents a service-role JWT -> process all (or one) schools.
-    const isSystem = isServiceRoleToken(token);
+    // System/cron mode: caller presents a VERIFIED service-role key -> process all (or one) schools.
+    // This function runs with verify_jwt = false, so decoding the claim alone let anyone forge it.
+    const isSystem = await verifyServiceRoleToken(token, {
+      supabaseUrl: Deno.env.get("SUPABASE_URL") ?? "",
+      serviceRoleKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    });
 
     let schoolIds: string[] = [];
     if (isSystem) {
