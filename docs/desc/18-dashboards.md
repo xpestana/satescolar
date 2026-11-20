@@ -30,6 +30,22 @@ Panel de inicio de cada rol, con métricas y accesos rápidos según el contexto
 > ⏳ Por documentar (métricas agregadas).
 
 ## Reglas de negocio
+### Pendientes por Atender (`/school/dashboard`)
+Tarjeta `PendingItemsCard`; la lista la arma `buildPendingItems` (`src/lib/dashboardPendingItems.ts`)
+con los conteos de `useDashboardPendingItems`. Orden y reglas:
+
+| Aviso | Cuándo aparece | Enlace |
+|---|---|---|
+| No hay un año escolar activo configurado | ningún `school_years.is_active` | `/school/configuraciones/anos-secciones` |
+| Falta agregar las secciones del colegio | 0 filas en `sections` del colegio | `/school/configuraciones/anos-secciones` |
+| Falta registrar las familias del colegio | 0 filas en `family_schools` del colegio | `/registros/familias` |
+| Alumnos registrados sin inscripción en el año activo | estudiantes activos sin `enrollments` en el año activo | `/inscripciones` |
+| Docentes activos sin áreas asignadas en el año activo | solo con módulos docentes | `/registros/asignacion-areas` |
+| Áreas curriculares sin docente asignado | solo con módulos docentes | `/registros/asignacion-areas` |
+
+Los tres primeros son de configuración inicial y van arriba. Si alguna consulta falla, la
+tarjeta muestra un error en vez de "No hay pendientes".
+
 ### Dashboard del representante (`/representative/dashboard`)
 - **Título `Familia [apellidos]`:** usa `useRepresentativeFamily().familyName`, con la cadena
   de respaldo apellidos de la familia → representante principal → estudiante → `"Mi Familia"`
@@ -47,7 +63,8 @@ Panel de inicio de cada rol, con métricas y accesos rápidos según el contexto
 - `src/pages/representative/RepresentativeDashboard.tsx`
 - `src/hooks/useRepresentativeFamily.ts`
 - `src/lib/familyDisplayName.ts`
-- `src/components/dashboard/...`
+- `src/components/dashboard/...` (incluye `PendingItemsCard.tsx`)
+- `src/hooks/useDashboardPendingItems.ts`, `src/lib/dashboardPendingItems.ts`
 
 ## Por documentar
 - Métricas/KPIs de los dashboards admin, colegio y docente.

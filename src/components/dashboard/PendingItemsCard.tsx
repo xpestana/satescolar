@@ -1,10 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, CheckCircle2, Info, ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { Link } from "react-router-dom";
+import { useDashboardPendingItems } from "@/hooks/useDashboardPendingItems";
 
 interface Props {
   schoolId: string | null;
@@ -13,123 +12,12 @@ interface Props {
   includeTeaching?: boolean;
 }
 
-interface PendingItem {
-  label: string;
-  count: number;
-  type: "warning" | "info";
-  link?: string;
-}
-
 export function PendingItemsCard({ schoolId, activeSchoolYearId, includeTeaching = true }: Props) {
-  const { data: items, isLoading } = useQuery({
-    queryKey: ["dashboard-pending", schoolId, activeSchoolYearId, includeTeaching],
-    queryFn: async () => {
-      const pending: PendingItem[] = [];
-
-      // 1. Active students in system but NOT enrolled in active year
-      if (activeSchoolYearId) {
-        const [{ data: allStudentSchools }, { data: enrolledStudents }] = await Promise.all([
-          supabase
-            .from("student_schools")
-            .select("student_id, students!inner(status)")
-            .eq("school_id", schoolId!)
-            .eq("students.status", "active"),
-          supabase
-            .from("enrollments")
-            .select("student_id")
-            .eq("school_id", schoolId!)
-            .eq("school_year_id", activeSchoolYearId),
-        ]);
-
-        const enrolledIds = new Set((enrolledStudents || []).map((e) => e.student_id));
-        const notEnrolled = (allStudentSchools || []).filter(
-          (s) => !enrolledIds.has(s.student_id)
-        ).length;
-
-        if (notEnrolled > 0) {
-          pending.push({
-            label: "Alumnos registrados sin inscripción en el año activo",
-            count: notEnrolled,
-            type: "warning",
-            link: "/inscripciones",
-          });
-        }
-      }
-
-      // 2. Teachers without assignments in active year
-      if (activeSchoolYearId && includeTeaching) {
-        const [{ data: allTeachers }, { data: assignedTeachers }] = await Promise.all([
-          supabase
-            .from("teachers")
-            .select("id")
-            .eq("school_id", schoolId!)
-            .eq("is_suspended", false),
-          supabase
-            .from("subject_teacher_assignments")
-            .select("teacher_id")
-            .eq("school_id", schoolId!)
-            .eq("school_year_id", activeSchoolYearId)
-            .eq("is_suspended", false),
-        ]);
-
-        const assignedIds = new Set((assignedTeachers || []).map((a) => a.teacher_id));
-        const unassigned = (allTeachers || []).filter((t) => !assignedIds.has(t.id)).length;
-
-        if (unassigned > 0) {
-          pending.push({
-            label: "Docentes activos sin áreas asignadas en el año activo",
-            count: unassigned,
-            type: "warning",
-            link: "/registros/asignacion-areas",
-          });
-        }
-      }
-
-      // 3. Subjects not assigned to any teacher
-      if (activeSchoolYearId && includeTeaching) {
-        const [{ data: allSubjects }, { data: assignedSubjects }] = await Promise.all([
-          supabase
-            .from("school_subjects")
-            .select("id")
-            .eq("school_id", schoolId!)
-            .eq("is_suspended", false),
-          supabase
-            .from("subject_teacher_assignments")
-            .select("subject_id")
-            .eq("school_id", schoolId!)
-            .eq("school_year_id", activeSchoolYearId)
-            .eq("is_suspended", false),
-        ]);
-
-        const assignedSubjectIds = new Set((assignedSubjects || []).map((a) => a.subject_id));
-        const unassignedSubjects = (allSubjects || []).filter(
-          (s) => !assignedSubjectIds.has(s.id)
-        ).length;
-
-        if (unassignedSubjects > 0) {
-          pending.push({
-            label: "Áreas curriculares sin docente asignado",
-            count: unassignedSubjects,
-            type: "info",
-            link: "/registros/asignacion-areas",
-          });
-        }
-      }
-
-      // 4. No active school year
-      if (!activeSchoolYearId) {
-        pending.push({
-          label: "No hay un año escolar activo configurado",
-          count: 1,
-          type: "warning",
-          link: "/school/configuraciones/anos-secciones",
-        });
-      }
-
-      return pending;
-    },
-    enabled: !!schoolId,
-  });
+  const { data: items, isLoading, isError } = useDashboardPendingItems(
+    schoolId,
+    activeSchoolYearId,
+    includeTeaching,
+  );
 
   const hasPending = items && items.length > 0;
 
@@ -137,7 +25,7 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId, includeTeaching
     <Card className="border shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
-          {hasPending ? (
+          {hasPending || isError ? (
             <AlertTriangle className="h-4 w-4 text-amber-500" />
           ) : (
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -150,6 +38,11 @@ export function PendingItemsCard({ schoolId, activeSchoolYearId, includeTeaching
           <div className="space-y-3">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
+          </div>
+        ) : isError ? (
+          <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>No se pudieron cargar los pendientes. Recarga la página para intentarlo de nuevo.</span>
           </div>
         ) : !hasPending ? (
           <div className="flex items-center gap-2 text-sm text-emerald-600 bg-emerald-50 rounded-lg p-3">
