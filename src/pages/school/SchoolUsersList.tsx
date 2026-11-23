@@ -83,13 +83,20 @@ export default function SchoolUsersList() {
     // Get emails via edge function
     let emails: Record<string, { email: string; full_name: string }> = {};
     if (userIds.length > 0) {
-      const { data: emailData } = await supabase.functions.invoke("get-user-emails", {
-        body: { user_ids: userIds },
-      });
-      if (emailData?.users) {
-        for (const u of emailData.users) {
+      try {
+        const emailData = await invokeEdgeFunction<{
+          users?: { id: string; email?: string; user_metadata?: { full_name?: string } }[];
+        }>("get-user-emails", { user_ids: userIds }, "No se pudieron cargar los nombres y correos");
+        for (const u of emailData.users ?? []) {
           emails[u.id] = { email: u.email ?? "", full_name: u.user_metadata?.full_name ?? "" };
         }
+      } catch (err) {
+        // Previously swallowed: the list showed "—" with no explanation.
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : "No se pudieron cargar los nombres y correos",
+          variant: "destructive",
+        });
       }
     }
 

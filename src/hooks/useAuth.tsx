@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext, ReactNode, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useServerSessionCheck } from '@/hooks/useServerSessionCheck';
 
 type AppRole = 'admin' | 'school' | 'representative' | 'teacher';
 
@@ -192,8 +193,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
+  // Page reloads and tab refocus confirm the session still exists on the server (see sessionGuard).
+  useServerSessionCheck(user?.id);
+
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Local scope: end only THIS browser's session. supabase-js defaults to "global", which deletes
+    // every session of the user on the server. When an admin ended an impersonation that way, the
+    // real user's session died too: lists kept loading but every Edge Function answered
+    // "No autorizado" (no names/emails in Usuarios y Permisos, could not create sub-users).
+    await supabase.auth.signOut({ scope: 'local' });
     confirmedRoleRef.current = null;
     setUserRole(null);
   };
