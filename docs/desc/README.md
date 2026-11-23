@@ -99,3 +99,4 @@ La lógica de servidor vive en `supabase/functions/` (Deno). Cada archivo de tem
 | 17 | [17-importacion-de-datos.md](17-importacion-de-datos.md) | Importación de datos |
 | 18 | [18-dashboards.md](18-dashboards.md) | Dashboards por rol |
 | 19 | [19-modulos.md](19-modulos.md) | Módulos habilitables por colegio (venta por módulos) |
+| 20 | [20-clientes-y-cobros.md](20-clientes-y-cobros.md) | Clientes y cobros de SAT Escolar (CRM, recordatorios y agradecimientos) |

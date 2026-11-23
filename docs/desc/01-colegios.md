@@ -37,5 +37,9 @@ Gestión de los colegios (tenants) de la plataforma por parte del administrador 
 Cada colegio tiene módulos habilitables (on/off + vencimiento) que gestiona el admin.
 Ver [19-modulos](19-modulos.md).
 
+## Cliente de SAT Escolar
+Cada colegio nuevo se crea también como cliente (Demo) en `/admin/clientes`.
+Ver [20-clientes-y-cobros](20-clientes-y-cobros.md).
+
 ## Por documentar
 - Estructura de datos del colegio y multi-tenant.

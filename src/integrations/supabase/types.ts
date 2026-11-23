@@ -1261,6 +1261,224 @@ export type Database = {
           },
         ]
       }
+      client_accounts: {
+        Row: {
+          account_type: string
+          billing_start_month: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          demo_ends_on: string | null
+          id: string
+          monthly_fee_usd: number | null
+          notify_owner: boolean
+          observations: string | null
+          reminders_enabled: boolean
+          school_id: string
+          updated_at: string
+        }
+        Insert: {
+          account_type?: string
+          billing_start_month?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          demo_ends_on?: string | null
+          id?: string
+          monthly_fee_usd?: number | null
+          notify_owner?: boolean
+          observations?: string | null
+          reminders_enabled?: boolean
+          school_id: string
+          updated_at?: string
+        }
+        Update: {
+          account_type?: string
+          billing_start_month?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          demo_ends_on?: string | null
+          id?: string
+          monthly_fee_usd?: number | null
+          notify_owner?: boolean
+          observations?: string | null
+          reminders_enabled?: boolean
+          school_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_accounts_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: true
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_billing_contacts: {
+        Row: {
+          client_account_id: string
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          name: string | null
+          role_label: string | null
+        }
+        Insert: {
+          client_account_id: string
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          name?: string | null
+          role_label?: string | null
+        }
+        Update: {
+          client_account_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          name?: string | null
+          role_label?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_billing_contacts_client_account_id_fkey"
+            columns: ["client_account_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_billing_emails: {
+        Row: {
+          client_account_id: string
+          error_message: string | null
+          id: string
+          kind: string
+          months: string[]
+          recipients: string[]
+          sent_at: string
+          sent_by: string | null
+          status: string
+          subject: string
+          triggered_by: string
+        }
+        Insert: {
+          client_account_id: string
+          error_message?: string | null
+          id?: string
+          kind: string
+          months?: string[]
+          recipients?: string[]
+          sent_at?: string
+          sent_by?: string | null
+          status: string
+          subject: string
+          triggered_by?: string
+        }
+        Update: {
+          client_account_id?: string
+          error_message?: string | null
+          id?: string
+          kind?: string
+          months?: string[]
+          recipients?: string[]
+          sent_at?: string
+          sent_by?: string | null
+          status?: string
+          subject?: string
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_billing_emails_client_account_id_fkey"
+            columns: ["client_account_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_billing_payments: {
+        Row: {
+          amount_usd: number | null
+          client_account_id: string
+          created_at: string
+          id: string
+          method: string | null
+          notes: string | null
+          paid_on: string
+          period_month: string
+          recorded_by: string | null
+          reference: string | null
+          status: string
+        }
+        Insert: {
+          amount_usd?: number | null
+          client_account_id: string
+          created_at?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_on?: string
+          period_month: string
+          recorded_by?: string | null
+          reference?: string | null
+          status?: string
+        }
+        Update: {
+          amount_usd?: number | null
+          client_account_id?: string
+          created_at?: string
+          id?: string
+          method?: string | null
+          notes?: string | null
+          paid_on?: string
+          period_month?: string
+          recorded_by?: string | null
+          reference?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_billing_payments_client_account_id_fkey"
+            columns: ["client_account_id"]
+            isOneToOne: false
+            referencedRelation: "client_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_billing_settings: {
+        Row: {
+          contact_phone: string | null
+          id: boolean
+          payment_instructions: string | null
+          reminder_days: number[]
+          updated_at: string
+        }
+        Insert: {
+          contact_phone?: string | null
+          id?: boolean
+          payment_instructions?: string | null
+          reminder_days?: number[]
+          updated_at?: string
+        }
+        Update: {
+          contact_phone?: string | null
+          id?: boolean
+          payment_instructions?: string | null
+          reminder_days?: number[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       concept_exonerations: {
         Row: {
           amount_ves: number
@@ -3240,6 +3458,7 @@ export type Database = {
           email?: string | null
           fiscal_address?: string | null
           full_name: string
+          hire_date?: string | null
           id?: string
           is_active?: boolean
           job_title?: string | null
@@ -3414,11 +3633,11 @@ export type Database = {
           id: string
           is_active: boolean
           is_base_salary: boolean
-          receipt_text: string | null
-          is_default: boolean
           is_contribution_base: boolean
+          is_default: boolean
           is_islr_taxable: boolean
           name: string
+          receipt_text: string | null
           school_id: string
           updated_at: string
         }
@@ -3431,11 +3650,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_base_salary?: boolean
-          receipt_text?: string | null
-          is_default?: boolean
           is_contribution_base?: boolean
+          is_default?: boolean
           is_islr_taxable?: boolean
           name: string
+          receipt_text?: string | null
           school_id: string
           updated_at?: string
         }
@@ -3448,11 +3667,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_base_salary?: boolean
-          receipt_text?: string | null
-          is_default?: boolean
           is_contribution_base?: boolean
+          is_default?: boolean
           is_islr_taxable?: boolean
           name?: string
+          receipt_text?: string | null
           school_id?: string
           updated_at?: string
         }
@@ -3776,8 +3995,8 @@ export type Database = {
           description: string | null
           id: string
           payment_id: string
-          unpaid_hours: number | null
           receipt_text: string | null
+          unpaid_hours: number | null
           withholding_id: string | null
         }
         Insert: {
@@ -3790,8 +4009,8 @@ export type Database = {
           description?: string | null
           id?: string
           payment_id: string
-          unpaid_hours?: number | null
           receipt_text?: string | null
+          unpaid_hours?: number | null
           withholding_id?: string | null
         }
         Update: {
@@ -3804,8 +4023,8 @@ export type Database = {
           description?: string | null
           id?: string
           payment_id?: string
-          unpaid_hours?: number | null
           receipt_text?: string | null
+          unpaid_hours?: number | null
           withholding_id?: string | null
         }
         Relationships: [
@@ -6398,6 +6617,15 @@ export type Database = {
           student_id: string
         }[]
       }
+      admin_school_owner_contacts: {
+        Args: never
+        Returns: {
+          email: string
+          full_name: string
+          school_id: string
+          user_id: string
+        }[]
+      }
       algorithm_sign: {
         Args: { algorithm: string; secret: string; signables: string }
         Returns: string
@@ -6522,13 +6750,23 @@ export type Database = {
       }
       is_school_teacher: { Args: { _school_id: string }; Returns: boolean }
       mark_payroll_payment_paid: {
-        Args: { _payment_date?: string; _payment_id: string; _reference: string }
+        Args: {
+          _payment_date?: string
+          _payment_id: string
+          _reference: string
+        }
         Returns: undefined
       }
       payroll_can: {
         Args: { _key: string; _school_id: string }
         Returns: boolean
       }
+      payroll_jsonb_uuid_array: { Args: { _value: Json }; Returns: string[] }
+      payroll_month_prior_payment_ids: {
+        Args: { _payment_id: string }
+        Returns: string[]
+      }
+      payroll_sorted_ids: { Args: { _ids: string[] }; Returns: string[] }
       populate_default_primary_indicators: {
         Args: { p_school_id: string }
         Returns: undefined
@@ -6667,6 +6905,7 @@ export type Database = {
       }
       write_payroll_payment_lines: {
         Args: {
+          _contributions: Json
           _documents_by_key: Json
           _items: Json
           _payment: Database["public"]["Tables"]["payroll_payments"]["Row"]

@@ -75,3 +75,7 @@ verify_jwt = false
 # Cron only: the function checks for a service-role JWT and relies on the gateway verifying it.
 [functions.send-delinquency-reminders]
 verify_jwt = true
+
+# Admin actions + daily cron; the function verifies the admin role or the service-role key itself.
+[functions.client-billing]
+verify_jwt = false

@@ -76,6 +76,7 @@ const navSections: NavSection[] = [
       { label: "Usuarios", href: "/admin/usuarios", icon: Users, requiredRole: "admin" },
       { label: "Administradores", href: "/admin/administradores", icon: ShieldAlert, requiredRole: "admin" },
       { label: "Colegios", href: "/admin/colegios", icon: GraduationCap, requiredRole: "admin" },
+      { label: "Clientes y Cobros", href: "/admin/clientes", icon: HandCoins, requiredRole: "admin" },
       { label: "Enviar Email", href: "/admin/enviar-email", icon: Mail, requiredRole: "admin" },
       { label: "Importar Datos", href: "/admin/importar-datos", icon: Upload, requiredRole: "admin" },
       { label: "Importar Calificaciones", href: "/admin/importar-calificaciones", icon: ClipboardCheck, requiredRole: "admin" },

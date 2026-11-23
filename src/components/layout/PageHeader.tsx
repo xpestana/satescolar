@@ -93,6 +93,7 @@ const DESCRIPTIONS: Array<[string, string]> = [
   // Admin general
   ["Crear Colegio", "Da de alta un nuevo colegio y déjalo listo para operar en minutos."],
   ["Editar Colegio", "Actualiza la información institucional y los datos clave del colegio."],
+  ["Clientes y Cobros", "Controla qué colegios son clientes, cuánto pagan, qué meses deben y a quién se le cobra."],
   ["Colegios", "Administra todas las instituciones de la plataforma desde un único panel centralizado."],
   ["Administradores del Sistema", "Controla quién tiene acceso administrativo total a la plataforma."],
   ["Usuarios", "Gestiona todos los usuarios de la plataforma de forma segura y centralizada."],
