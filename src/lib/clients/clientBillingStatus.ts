@@ -124,16 +124,26 @@ export function addDays(isoDate: string, days: number): string {
 }
 
 /**
- * Months shown in the payments grid: from the first billable month (or a year back when it is not
- * set) to `monthsAhead` months after the current one, so prepayments (e.g. a whole year) fit.
+ * Months shown in the payments grid: `monthsBefore` months before the first billable month (or the
+ * last year when it is not set), so earlier payments can be recorded, up to `monthsAhead` months
+ * after the current one, so prepayments (e.g. a whole year) fit. Never more than 3 years back.
  */
-export function gridMonths(startMonth: string | null, currentMonth: MonthKey, monthsAhead = 11): MonthKey[] {
-  const start = normalizeMonthKey(startMonth) ?? addMonths(currentMonth, -11);
-  const first = start < addMonths(currentMonth, -36) ? addMonths(currentMonth, -36) : start;
+export function gridMonths(
+  startMonth: string | null,
+  currentMonth: MonthKey,
+  monthsAhead = 11,
+  monthsBefore = 5,
+): MonthKey[] {
+  const start = normalizeMonthKey(startMonth);
+  const latestFirst = addMonths(currentMonth, -monthsBefore);
+  let first = start ? addMonths(start, -monthsBefore) : addMonths(currentMonth, -11);
+  if (first > latestFirst) first = latestFirst;
+  const earliest = addMonths(currentMonth, -36);
+  if (first < earliest) first = earliest;
   return monthRange(first, addMonths(currentMonth, monthsAhead));
 }
 
-export type MonthCellState = "paid" | "waived" | "pending" | "upcoming";
+export type MonthCellState = "paid" | "waived" | "pending" | "past" | "upcoming";
 
 export function monthCellState(
   month: MonthKey,
@@ -144,5 +154,6 @@ export function monthCellState(
   const status = settled.get(month);
   if (status) return status;
   const start = normalizeMonthKey(startMonth);
-  return start && month >= start && month <= currentMonth ? "pending" : "upcoming";
+  if (start && month >= start && month <= currentMonth) return "pending";
+  return month < currentMonth ? "past" : "upcoming";
 }

@@ -118,7 +118,7 @@ export function ClientPaymentsPanel({
           <div>
             <CardTitle className="text-base">Meses</CardTitle>
             <CardDescription>
-              Seleccione uno o varios meses y pulse «Registrar». Puede marcar meses futuros si pagan por adelantado.
+              Seleccione uno o varios meses y pulse «Registrar». Puede marcar meses anteriores o futuros (pago adelantado).
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">

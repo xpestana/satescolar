@@ -8,6 +8,7 @@ const CELL_STYLES: Record<MonthCellState, string> = {
   paid: "border-emerald-300 bg-emerald-50 text-emerald-800",
   waived: "border-sky-300 bg-sky-50 text-sky-800",
   pending: "border-red-300 bg-red-50 text-red-800 hover:bg-red-100",
+  past: "border-dashed border-border bg-muted/40 text-muted-foreground hover:bg-muted",
   upcoming: "border-border bg-background hover:bg-muted",
 };
 
@@ -15,6 +16,7 @@ const CELL_HINTS: Record<MonthCellState, string> = {
   paid: "Pagado",
   waived: "Exonerado",
   pending: "Pendiente",
+  past: "Anterior",
   upcoming: "Por venir",
 };
 
@@ -69,6 +71,7 @@ export function ClientMonthsGrid({ months, stateOf, selected, onToggle }: Client
         <span className="flex items-center gap-1"><span className="h-3 w-3 rounded border border-red-300 bg-red-50" /> Pendiente</span>
         <span className="flex items-center gap-1"><span className="h-3 w-3 rounded border border-emerald-300 bg-emerald-50" /> Pagado</span>
         <span className="flex items-center gap-1"><span className="h-3 w-3 rounded border border-sky-300 bg-sky-50" /> Exonerado</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded border border-dashed bg-muted/40" /> Anterior al inicio de cobro</span>
         <span className="flex items-center gap-1"><span className="h-3 w-3 rounded border bg-background" /> Por venir (pago adelantado)</span>
       </div>
     </div>

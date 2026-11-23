@@ -80,10 +80,19 @@ describe("grid helpers", () => {
     expect(addDays("2026-11-28", 7)).toBe("2026-12-05");
   });
 
-  it("shows from the start month to months ahead", () => {
+  it("shows 5 months before the start month and months ahead", () => {
     const months = gridMonths("2026-09-01", "2026-11-01", 2);
-    expect(months[0]).toBe("2026-09-01");
+    expect(months[0]).toBe("2026-04-01");
     expect(months[months.length - 1]).toBe("2027-01-01");
+  });
+
+  it("shows at least 5 past months when billing starts this month or later", () => {
+    expect(gridMonths("2026-11-01", "2026-11-01", 0)[0]).toBe("2026-06-01");
+    expect(gridMonths("2027-03-01", "2026-11-01", 0)[0]).toBe("2026-06-01");
+  });
+
+  it("never goes more than 3 years back", () => {
+    expect(gridMonths("2020-01-01", "2026-11-01", 0)[0]).toBe("2023-11-01");
   });
 
   it("shows the last year when there is no start month", () => {
@@ -96,6 +105,7 @@ describe("grid helpers", () => {
     expect(monthCellState("2026-10-01", settled, "2026-09-01", "2026-11-01")).toBe("waived");
     expect(monthCellState("2026-11-01", settled, "2026-09-01", "2026-11-01")).toBe("pending");
     expect(monthCellState("2026-12-01", settled, "2026-09-01", "2026-11-01")).toBe("upcoming");
-    expect(monthCellState("2026-08-01", settled, "2026-09-01", "2026-11-01")).toBe("upcoming");
+    expect(monthCellState("2026-08-01", settled, "2026-09-01", "2026-11-01")).toBe("past");
+    expect(monthCellState("2026-05-01", settled, null, "2026-11-01")).toBe("past");
   });
 });
