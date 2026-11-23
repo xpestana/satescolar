@@ -166,6 +166,8 @@ export default function ClientDetail() {
                 recipients={recipients}
                 isSaving={mutations.registerPayment.isPending}
                 onRegister={(input) => mutations.registerPayment.mutateAsync(input)}
+                onSendThanks={(months) => mutations.sendThanks.mutateAsync(months)}
+                isSendingThanks={mutations.sendThanks.isPending}
                 onRemovePayment={(p) =>
                   run(() => mutations.removePayment.mutateAsync(p.id), "Registro eliminado", "No se pudo eliminar").catch(() => undefined)
                 }

@@ -8,6 +8,8 @@ export interface EmailLayoutOptions {
   textColor: string;
   schoolName: string;
   logoUrl: string | null;
+  /** When the logo already shows the name (e.g. SAT Escolar's own logo), skip the title and enlarge it. */
+  logoOnly?: boolean;
 }
 
 const HTML_ESCAPES: Record<string, string> = {
@@ -33,9 +35,15 @@ export function wrapWithEmailLayout(bodyHtml: string, opts: EmailLayoutOptions):
   const primary = safeColor(opts.primaryColor, "#1e78c8");
   const text = safeColor(opts.textColor, "#ffffff");
   const schoolName = escapeHtml(opts.schoolName);
+  const logoOnly = !!(opts.logoOnly && opts.logoUrl);
   const logoBlock = opts.logoUrl
-    ? `<img src="${escapeHtml(opts.logoUrl)}" alt="${schoolName}" style="max-height:80px;max-width:200px;margin-bottom:12px;" />`
+    ? logoOnly
+      ? `<img src="${escapeHtml(opts.logoUrl)}" alt="${schoolName}" width="180" style="display:block;width:180px;max-width:70%;height:auto;margin:0 auto;border:0;" />`
+      : `<img src="${escapeHtml(opts.logoUrl)}" alt="${schoolName}" style="max-height:80px;max-width:200px;margin-bottom:12px;" />`
     : "";
+  const titleBlock = logoOnly
+    ? ""
+    : `<h2 style="margin:0;font-size:20px;color:${text};word-break:break-word;">${schoolName}</h2>`;
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -57,7 +65,7 @@ export function wrapWithEmailLayout(bodyHtml: string, opts: EmailLayoutOptions):
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
   <tr><td align="center" class="sat-header" style="padding:24px 24px 16px;background-color:${primary};border-bottom:3px solid ${primary};">
     ${logoBlock}
-    <h2 style="margin:0;font-size:20px;color:${text};word-break:break-word;">${schoolName}</h2>
+    ${titleBlock}
   </td></tr>
   <tr><td class="sat-body" style="padding:32px 32px 24px;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#4a4a5a;line-height:1.6;word-break:break-word;">
     ${bodyHtml}

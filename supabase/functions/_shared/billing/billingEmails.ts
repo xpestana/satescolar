@@ -10,7 +10,8 @@ export const SAT_BRANDING = {
   primaryColor: "#1e78c8",
   textColor: "#ffffff",
   schoolName: "SAT Escolar",
-  logoUrl: "https://app.satescolar.com/pwa-192x192.png",
+  logoUrl: "https://app.satescolar.com/email/sat-escolar-logo-white.png",
+  logoOnly: true,
 };
 
 export interface BuiltEmail {

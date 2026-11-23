@@ -22,7 +22,7 @@ export interface ClientListItem {
   contactPhone: string | null;
   notifyOwner: boolean;
   remindersEnabled: boolean;
-  hasObservations: boolean;
+  observations: string | null;
   activeContacts: number;
   owners: SchoolOwnerContact[];
   snapshot: ClientBillingSnapshot;
@@ -73,7 +73,7 @@ export function useClientAccounts() {
       contactPhone: a.contact_phone,
       notifyOwner: a.notify_owner,
       remindersEnabled: a.reminders_enabled,
-      hasObservations: !!a.observations?.trim(),
+      observations: a.observations?.trim() || null,
       activeContacts: accounts.data.contacts.filter((c) => c.client_account_id === a.id && c.is_active).length,
       owners: owners.data?.get(a.school_id) ?? [],
       snapshot: summarizeClientBilling({

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { BellOff, ChevronRight, StickyNote } from "lucide-react";
+import { BellOff, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -7,6 +7,7 @@ import { formatDateOnly } from "@/lib/dateUtils";
 import { formatMonthLabel, formatUsd } from "@/lib/clients/billingMonths";
 import type { ClientListItem } from "@/hooks/clients/useClientAccounts";
 import { BillingStatusBadge, ClientTypeBadge } from "./ClientBadges";
+import { ClientObservationsPopover } from "./ClientObservationsPopover";
 
 function initials(name: string): string {
   return name
@@ -31,6 +32,7 @@ export function ClientsTable({ items }: { items: ClientListItem[] }) {
           <TableHead>Estado de cobro</TableHead>
           <TableHead className="text-right">Cuota</TableHead>
           <TableHead className="text-right">Por cobrar</TableHead>
+          <TableHead>Observaciones</TableHead>
           <TableHead>Destinatarios</TableHead>
           <TableHead className="w-8" />
         </TableRow>
@@ -47,17 +49,7 @@ export function ClientsTable({ items }: { items: ClientListItem[] }) {
                     <AvatarFallback className="text-xs">{initials(item.schoolName)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <p className="flex items-center gap-1.5 font-medium leading-tight">
-                      {item.schoolName}
-                      {item.hasObservations && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <StickyNote className="h-3.5 w-3.5 text-amber-500" />
-                          </TooltipTrigger>
-                          <TooltipContent>Tiene observaciones</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </p>
+                    <p className="font-medium leading-tight">{item.schoolName}</p>
                     <p className="text-xs text-muted-foreground">
                       {item.contactName || item.owners[0]?.fullName || item.schoolEmail || "Sin contacto"}
                     </p>
@@ -85,6 +77,13 @@ export function ClientsTable({ items }: { items: ClientListItem[] }) {
                 ) : (
                   "—"
                 )}
+              </TableCell>
+              <TableCell>
+                <ClientObservationsPopover
+                  accountId={item.id}
+                  schoolName={item.schoolName}
+                  observations={item.observations}
+                />
               </TableCell>
               <TableCell>
                 <span className="flex items-center gap-1.5 text-sm">

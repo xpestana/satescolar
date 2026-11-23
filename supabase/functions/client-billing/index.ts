@@ -22,6 +22,9 @@ const corsHeaders = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+const parseMonths = (value: unknown): string[] =>
+  [...new Set((Array.isArray(value) ? value : []).map((m) => normalizeMonthKey(String(m))).filter((m): m is string => !!m))];
+
 /** Caracas has no DST: its calendar day starts at 04:00 UTC. */
 const startOfLocalDayIso = (date: string) => `${date}T04:00:00Z`;
 
@@ -78,6 +81,42 @@ async function sendReminder(
   return { sent: result.sent, error: result.error, recipients: ctx.recipients, months };
 }
 
+/** Thank-you email for `months` (paid), sent to the client's recipients and logged. */
+async function sendThanks(admin: Admin, ctx: ClientBillingContext, months: string[], currentMonth: string, userId: string) {
+  const remaining = pendingMonths({
+    startMonth: ctx.account.billing_start_month,
+    currentMonth,
+    settledMonths: [...ctx.settledMonths, ...months],
+  });
+  const { subject, html } = buildThanksEmail({
+    schoolName: ctx.schoolName,
+    contactName: ctx.account.contact_name,
+    paidMonths: months,
+    remainingMonths: remaining,
+  });
+  let email: { sent: boolean; error?: string; recipients: string[] };
+  if (ctx.recipients.length === 0) {
+    email = { sent: false, error: "No hay destinatarios para el agradecimiento", recipients: [] };
+  } else if (!mailer.isConfigured()) {
+    email = { sent: false, error: "El envío de correos no está configurado en el servidor", recipients: ctx.recipients };
+  } else {
+    const result = await mailer.send({ to: ctx.recipients, subject, html });
+    email = { sent: result.sent, error: result.error, recipients: ctx.recipients };
+  }
+  await logBillingEmail(admin, {
+    client_account_id: ctx.account.id,
+    kind: "thanks",
+    recipients: email.recipients,
+    subject,
+    months,
+    sent: email.sent,
+    error: email.error,
+    triggered_by: "admin",
+    sent_by: userId,
+  });
+  return email;
+}
+
 /**
  * Billing of SAT Escolar's client schools (/admin/clientes).
  * - `run_reminders` — daily cron (verified service-role key). Sends the reminder on the configured
@@ -85,6 +124,7 @@ async function sendReminder(
  * - `send_reminder` — admin: sends the reminder to one client now.
  * - `register_payment` — admin: marks several months as paid/waived and, optionally, sends the
  *   thank-you email.
+ * - `send_thanks` — admin: (re)sends the thank-you email for months already recorded as paid.
  */
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -146,9 +186,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     if (action === "register_payment") {
-      const months = [
-        ...new Set((Array.isArray(body.months) ? body.months : []).map((m: string) => normalizeMonthKey(m)).filter(Boolean)),
-      ] as string[];
+      const months = parseMonths(body.months);
       if (months.length === 0) return json({ error: "Seleccione al menos un mes" }, 400);
       const status = body.status === "waived" ? "waived" : "paid";
       const amount = body.amount_usd_per_month === null || body.amount_usd_per_month === undefined || body.amount_usd_per_month === ""
@@ -173,40 +211,26 @@ export default async function handler(req: Request): Promise<Response> {
         .upsert(rows, { onConflict: "client_account_id,period_month" });
       if (upsertError) throw upsertError;
 
-      let email: { sent: boolean; error?: string; recipients: string[] } | null = null;
-      if (status === "paid" && body.send_thanks) {
-        const remaining = pendingMonths({
-          startMonth: ctx.account.billing_start_month,
-          currentMonth: today.month,
-          settledMonths: [...ctx.settledMonths, ...months],
-        });
-        const { subject, html } = buildThanksEmail({
-          schoolName: ctx.schoolName,
-          contactName: ctx.account.contact_name,
-          paidMonths: months,
-          remainingMonths: remaining,
-        });
-        if (ctx.recipients.length === 0) {
-          email = { sent: false, error: "No hay destinatarios para el agradecimiento", recipients: [] };
-        } else if (!mailer.isConfigured()) {
-          email = { sent: false, error: "El envío de correos no está configurado en el servidor", recipients: ctx.recipients };
-        } else {
-          const result = await mailer.send({ to: ctx.recipients, subject, html });
-          email = { sent: result.sent, error: result.error, recipients: ctx.recipients };
-        }
-        await logBillingEmail(admin, {
-          client_account_id: accountId,
-          kind: "thanks",
-          recipients: email.recipients,
-          subject,
-          months,
-          sent: email.sent,
-          error: email.error,
-          triggered_by: "admin",
-          sent_by: user.id,
-        });
-      }
+      const email = status === "paid" && body.send_thanks ? await sendThanks(admin, ctx, months, today.month, user.id) : null;
       return json({ success: true, saved: months.length, email });
+    }
+
+    if (action === "send_thanks") {
+      const months = parseMonths(body.months);
+      if (months.length === 0) return json({ error: "Seleccione al menos un mes pagado" }, 400);
+      const { data: paidRows, error: paidError } = await admin
+        .from("client_billing_payments")
+        .select("period_month")
+        .eq("client_account_id", accountId)
+        .eq("status", "paid")
+        .in("period_month", months);
+      if (paidError) throw paidError;
+      if ((paidRows ?? []).length !== months.length) {
+        return json({ error: "Solo se agradece por meses ya registrados como pagados" }, 400);
+      }
+      const email = await sendThanks(admin, ctx, months, today.month, user.id);
+      if (!email.sent) return json({ error: `No se pudo enviar el agradecimiento: ${email.error ?? "error desconocido"}` }, 400);
+      return json({ success: true, recipients: email.recipients, months });
     }
 
     return json({ error: "Acción no válida" }, 400);

@@ -21,6 +21,12 @@ describe("buildReminderEmail", () => {
     expect(html).toContain("+58 414 0000000");
   });
 
+  it("uses SAT Escolar's white logo without repeating the name as a title", () => {
+    const { html } = buildReminderEmail({ schoolName: "Colegio X", pendingMonths: ["2026-11-01"] });
+    expect(html).toContain("https://app.satescolar.com/email/sat-escolar-logo-white.png");
+    expect(html).not.toContain("<h2");
+  });
+
   it("works without fee, instructions or contact name", () => {
     const { html } = buildReminderEmail({ schoolName: "Colegio X", pendingMonths: ["2026-11-01"] });
     expect(html).toContain("Estimado equipo de Colegio X:");

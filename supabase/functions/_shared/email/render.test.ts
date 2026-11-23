@@ -113,3 +113,12 @@ describe("template catalog", () => {
     expect(EMAIL_TEMPLATE_TYPES.filter((t) => !EMAIL_TEMPLATES[t].sendsAutomatically)).toEqual(["payment-reminder"]);
   });
 });
+
+describe("wrapWithEmailLayout logoOnly", () => {
+  it("keeps the school name title by default and drops it with logoOnly", () => {
+    const base = { primaryColor: "#123456", textColor: "#ffffff", schoolName: "Colegio X", logoUrl: "https://x/logo.png" };
+    expect(wrapWithEmailLayout("<p>hi</p>", base)).toContain("<h2");
+    expect(wrapWithEmailLayout("<p>hi</p>", { ...base, logoOnly: true })).not.toContain("<h2");
+    expect(wrapWithEmailLayout("<p>hi</p>", { ...base, logoUrl: null, logoOnly: true })).toContain("<h2");
+  });
+});

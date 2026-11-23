@@ -1,16 +1,6 @@
 import { useState } from "react";
-import { Eye, Loader2, MessageCircle, Send } from "lucide-react";
+import { Loader2, MessageCircle, Send } from "lucide-react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ClientBillingSnapshot } from "@/lib/clients/clientBillingStatus";
@@ -20,7 +10,7 @@ import { buildWhatsAppLink, buildWhatsAppReminderText } from "@/lib/clients/what
 import type { ClientAccount } from "@/hooks/clients/useClientAccount";
 import type { ClientBillingSettings } from "@/hooks/clients/useClientBillingSettings";
 import { BillingStatusBadge } from "./ClientBadges";
-import { EmailPreviewDialog } from "./EmailPreviewDialog";
+import { SendEmailConfirmDialog } from "./SendEmailConfirmDialog";
 
 interface ClientBillingSummaryCardProps {
   account: ClientAccount;
@@ -42,7 +32,6 @@ export function ClientBillingSummaryCard({
   onSendReminder,
   isSending,
 }: ClientBillingSummaryCardProps) {
-  const [previewOpen, setPreviewOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const hasDebt = snapshot.pendingMonths.length > 0;
 
@@ -68,9 +57,9 @@ export function ClientBillingSummaryCard({
     : null;
 
   const send = async () => {
-    setConfirmOpen(false);
     try {
       const result = await onSendReminder();
+      setConfirmOpen(false);
       toast.success(`Recordatorio enviado a ${result.recipients.join(", ")}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudo enviar el recordatorio");
@@ -93,13 +82,9 @@ export function ClientBillingSummaryCard({
               </a>
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} disabled={!hasDebt}>
-            <Eye className="mr-2 h-4 w-4" />
-            Ver recordatorio
-          </Button>
           <Button size="sm" onClick={() => setConfirmOpen(true)} disabled={!hasDebt || isSending}>
             {isSending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Enviar recordatorio ahora
+            Ver y enviar recordatorio
           </Button>
         </div>
       </CardHeader>
@@ -124,29 +109,16 @@ export function ClientBillingSummaryCard({
         </div>
       </CardContent>
 
-      <EmailPreviewDialog
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
+      <SendEmailConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Enviar recordatorio de pago"
         subject={email.subject}
         html={email.html}
         recipients={recipients}
+        isSending={isSending}
+        onConfirm={send}
       />
-
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Enviar el recordatorio de pago?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se enviará a {recipients.length ? recipients.join(", ") : "nadie (agregue destinatarios)"} con{" "}
-              {snapshot.pendingMonths.length} mes(es) pendiente(s).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={send}>Enviar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Card>
   );
 }

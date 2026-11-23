@@ -22,6 +22,7 @@ export interface RegisterPaymentResult {
   email: { sent: boolean; error?: string; recipients: string[] } | null;
 }
 
+/** Result of a manual reminder or thank-you email. */
 export interface SendReminderResult {
   recipients: string[];
   months: string[];
@@ -111,5 +112,24 @@ export function useClientAccountMutations(accountId: string | undefined) {
     onSettled: refresh,
   });
 
-  return { updateAccount, addContact, setContactActive, removeContact, removePayment, registerPayment, sendReminder };
+  const sendThanks = useMutation({
+    mutationFn: (months: string[]) =>
+      invokeEdgeFunction<SendReminderResult>(
+        "client-billing",
+        { action: "send_thanks", client_account_id: accountId, months },
+        "No se pudo enviar el agradecimiento",
+      ),
+    onSettled: refresh,
+  });
+
+  return {
+    updateAccount,
+    addContact,
+    setContactActive,
+    removeContact,
+    removePayment,
+    registerPayment,
+    sendReminder,
+    sendThanks,
+  };
 }

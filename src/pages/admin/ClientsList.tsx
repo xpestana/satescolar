@@ -49,7 +49,7 @@ export default function ClientsList() {
       .filter(
         (i) =>
           !term ||
-          [i.schoolName, i.contactName, i.schoolEmail, ...i.owners.map((o) => o.email)]
+          [i.schoolName, i.contactName, i.schoolEmail, i.observations, ...i.owners.map((o) => o.email)]
             .filter(Boolean)
             .some((v) => String(v).toLowerCase().includes(term)),
       );
@@ -88,7 +88,7 @@ export default function ClientsList() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar colegio, contacto o correo..."
+                placeholder="Buscar colegio, contacto, correo o nota..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 sm:w-72"

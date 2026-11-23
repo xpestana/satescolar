@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { formatMonthLabel, formatUsd } from "@/lib/clients/billingMonths";
@@ -20,9 +21,12 @@ import type { ClientPayment } from "@/hooks/clients/useClientAccount";
 interface ClientPaymentsHistoryProps {
   payments: ClientPayment[];
   onRemove: (payment: ClientPayment) => void;
+  /** Paid months selected to (re)send the thank-you email. */
+  selected: Set<string>;
+  onToggleSelected: (month: string) => void;
 }
 
-export function ClientPaymentsHistory({ payments, onRemove }: ClientPaymentsHistoryProps) {
+export function ClientPaymentsHistory({ payments, onRemove, selected, onToggleSelected }: ClientPaymentsHistoryProps) {
   if (payments.length === 0) {
     return <p className="py-6 text-center text-sm text-muted-foreground">Todavía no hay meses registrados.</p>;
   }
@@ -38,6 +42,7 @@ export function ClientPaymentsHistory({ payments, onRemove }: ClientPaymentsHist
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10" />
               <TableHead>Mes</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead className="text-right">Monto</TableHead>
@@ -50,6 +55,15 @@ export function ClientPaymentsHistory({ payments, onRemove }: ClientPaymentsHist
           <TableBody>
             {payments.map((p) => (
               <TableRow key={p.id}>
+                <TableCell>
+                  {p.status === "paid" && (
+                    <Checkbox
+                      checked={selected.has(p.period_month)}
+                      onCheckedChange={() => onToggleSelected(p.period_month)}
+                      aria-label={`Seleccionar ${formatMonthLabel(p.period_month)} para enviar agradecimiento`}
+                    />
+                  )}
+                </TableCell>
                 <TableCell className="font-medium capitalize">{formatMonthLabel(p.period_month)}</TableCell>
                 <TableCell>
                   {p.status === "paid" ? (
