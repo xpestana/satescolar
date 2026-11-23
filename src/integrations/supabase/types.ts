@@ -6541,7 +6541,6 @@ export type Database = {
         Args: { _payload: Json; _payment_id: string }
         Returns: undefined
       }
-      record_login: { Args: never; Returns: undefined }
       register_payroll_payment_with_withholdings: {
         Args: { _payload: Json }
         Returns: string

@@ -52,7 +52,8 @@ entre sí, más una búsqueda mejorada:
 - **Estado** — activos / suspendidos (la suspensión viene del `banned_until` que devuelve
   `get-user-emails`, no de una columna propia).
 - **Actividad** — *Nunca ha ingresado*, *Ingresó en los últimos 30 días*, *Sin ingresar hace más
-  de 90 días*. Sale de `profiles.login_count` / `profiles.last_login_at`.
+  de 90 días*. Sale de `profiles.login_count` / `profiles.last_login_at` (cómo se llenan: ver
+  [00-autenticacion-y-roles](00-autenticacion-y-roles.md#perfil-profiles-y-contador-de-ingresos)).
 - **Búsqueda** — sin acentos en ambos sentidos ("jose" encuentra "José") y **multi-término**:
   cada palabra debe aparecer en algún lado, en cualquier orden ("maria luther" cae en María del
   Martin Luther King). Busca en nombre, email, colegio y rol.

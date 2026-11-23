@@ -156,15 +156,15 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
-    const profileUpdate: { full_name: string; phone?: string | null } = { full_name };
+    const profileUpdate: { user_id: string; full_name: string; phone?: string | null } = { user_id, full_name };
     if (phone !== undefined) {
       profileUpdate.phone = phone;
     }
 
+    // Upsert, not update: an update on a missing profile row silently changes nothing.
     const { error: profileErr } = await supabaseAdmin
       .from("profiles")
-      .update(profileUpdate)
-      .eq("user_id", user_id);
+      .upsert(profileUpdate, { onConflict: "user_id" });
 
     if (profileErr) {
       console.error("Error updating profile:", profileErr);

@@ -116,8 +116,8 @@ export default function SchoolUsersList() {
     setUsers(
       userIds.map((uid) => ({
         user_id: uid,
-        email: emails[uid]?.email ?? "—",
-        full_name: emails[uid]?.full_name ?? "—",
+        email: emails[uid]?.email || "—",
+        full_name: emails[uid]?.full_name || "—",
         is_owner: ownerById.get(uid) ?? false,
         profiles: userProfiles.get(uid) ?? [],
       }))

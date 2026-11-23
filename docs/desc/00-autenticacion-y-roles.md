@@ -95,8 +95,9 @@ Para el rol `school` existe además un sistema de **permisos granulares** por pe
 > en el servidor las sesiones reales del cliente. Su navegador seguía con un access token que
 > PostgREST acepta hasta que vence (las listas cargan), pero `auth.getUser(token)` en las Edge
 > Functions falla porque la sesión ya no existe. Síntomas: en *Usuarios y Permisos* nombre y
-> correo en "—", toast **"No autorizado"**, no se pueden crear sub-usuarios, y
-> `profiles.login_count` no sube porque el cliente nunca vuelve a iniciar sesión de verdad.
+> correo en "—", toast **"No autorizado"** y no se pueden crear sub-usuarios. Dura como mucho lo
+> que vive el access token (`jwt_exp` = 1 h); después el refresh falla y el usuario vuelve al login.
+> (Que `login_count` no subiera era otro problema: ver *Perfil y contador de ingresos*.)
 >
 > Protección adicional (`src/lib/sessionGuard.ts` + `src/hooks/useServerSessionCheck.ts`):
 > - Al cargar la app y al volver a la pestaña (máx. cada 5 min) se confirma la sesión con
@@ -110,6 +111,37 @@ Para el rol `school` existe además un sistema de **permisos granulares** por pe
 >
 > Nota: cada impersonación pasa por `verifyOtp`, que actualiza `last_sign_in_at`, así que
 > **suma** un ingreso al `login_count` del usuario impersonado.
+
+## Perfil (`profiles`) y contador de ingresos
+Cada usuario de `auth.users` tiene **una** fila en `public.profiles` (`full_name`, `phone`,
+`login_count`, `last_login_at`). La usan la lista de usuarios del admin (actividad, nombre), el
+panel del admin (conteo de usuarios) y las funciones de administradores.
+
+Dos triggers sobre `auth.users` la mantienen (migración `20261123200000_profiles_created_on_signup.sql`):
+
+| Trigger | Cuándo | Qué hace |
+|---|---|---|
+| `on_auth_user_created` → `handle_new_user()` | al crear el usuario (cualquier vía) | crea la fila con `full_name` de `user_metadata` |
+| `on_auth_user_updated` → `sync_profile_from_auth()` | al cambiar `last_sign_in_at` o `user_metadata.full_name` | **upsert**: suma 1 a `login_count`, guarda `last_login_at` y sincroniza el nombre |
+
+- `last_sign_in_at` cambia en cada inicio de sesión real (contraseña, magic link, impersonación),
+  no al refrescar el token: un usuario que deja la pestaña abierta días no suma ingresos.
+- Ambas funciones atrapan sus errores (`RAISE WARNING`): un problema en `profiles` **nunca** debe
+  impedir un alta o un login.
+- El nombre visible sale de `user_metadata.full_name`; las Edge Functions solo actualizan la
+  metadata y el trigger copia el nombre a `profiles`.
+
+> 🐞 Corregido: al mover el proyecto (~2026-06-02) se copiaron el esquema `public` y el historial de
+> migraciones, pero **no** los triggers de `auth.users`. `on_auth_user_created` figuraba como
+> aplicado pero no existía, así que 210 de 236 usuarios no tenían perfil y el contador (un `UPDATE`
+> simple) no contaba nada: todos aparecían con 0 ingresos y el panel del admin mostraba 26 usuarios.
+> Se recreó el trigger, el contador pasó a upsert y se rellenaron los perfiles faltantes (con
+> `login_count` = 1 si el usuario había entrado alguna vez; el historial anterior no existe).
+>
+> ⚠️ Regla: tras restaurar o mover la base, verificar que existan los dos triggers:
+> `select tgname from pg_trigger where tgrelid = 'auth.users'::regclass and not tgisinternal;`
+> Nunca actualizar `profiles` con `update` desde una Edge Function: usar `upsert` con
+> `onConflict: "user_id"`.
 
 ## Archivos clave (código)
 - `src/hooks/useAuth.tsx`
