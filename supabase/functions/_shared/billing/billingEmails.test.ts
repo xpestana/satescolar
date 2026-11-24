@@ -25,6 +25,7 @@ describe("buildReminderEmail", () => {
     const { html } = buildReminderEmail({ schoolName: "Colegio X", pendingMonths: ["2026-11-01"] });
     expect(html).toContain("https://app.satescolar.com/email/sat-escolar-logo-white.png");
     expect(html).not.toContain("<h2");
+    expect(html).not.toMatch(/[ \t]+\n/);
   });
 
   it("works without fee, instructions or contact name", () => {

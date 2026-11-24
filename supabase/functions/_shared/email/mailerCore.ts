@@ -84,13 +84,21 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+/**
+ * Removes spaces/tabs at the end of each line. The SMTP client encodes them as quoted-printable
+ * "=20" and some clients then show a literal "=20" (e.g. under the logo). HTML does not need them.
+ */
+export function stripTrailingWhitespace(html: string): string {
+  return html.replace(/[ \t]+(?=\r?\n|$)/g, "");
+}
+
 export function buildTransportMessage(email: OutgoingEmail, config: MailerConfig): TransportMessage {
   return {
     from: `${config.fromName || "SAT Escolar"} <${config.fromEmail}>`,
     to: email.to,
     ...(email.bcc && email.bcc.length ? { bcc: email.bcc } : {}),
     subject: asciiSubject(email.subject),
-    ...(email.html ? { html: email.html } : { content: email.text ?? "" }),
+    ...(email.html ? { html: stripTrailingWhitespace(email.html) } : { content: email.text ?? "" }),
     headers: { ...NO_TRACKING_HEADERS },
     ...(email.attachments && email.attachments.length
       ? {

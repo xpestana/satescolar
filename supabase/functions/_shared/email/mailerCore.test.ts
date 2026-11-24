@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { asciiSubject, buildTransportMessage, createMailer, type MailerConfig, type TransportMessage } from "./mailerCore";
+import {
+  asciiSubject,
+  buildTransportMessage,
+  createMailer,
+  stripTrailingWhitespace,
+  type MailerConfig,
+  type TransportMessage,
+} from "./mailerCore";
 
 const config: MailerConfig = {
   host: "smtp.example.com",
@@ -16,6 +23,13 @@ describe("asciiSubject", () => {
 
   it("keeps ASCII subjects untouched apart from spacing", () => {
     expect(asciiSubject("  Bienvenido a  Colegio Demo - SAT Escolar ")).toBe("Bienvenido a Colegio Demo - SAT Escolar");
+  });
+});
+
+describe("stripTrailingWhitespace", () => {
+  it("removes spaces at the end of lines (they turned into a visible =20)", () => {
+    expect(stripTrailingWhitespace("<td>\n    \n<p>hola</p>  \r\n<b>x</b>\t")).toBe("<td>\n\n<p>hola</p>\r\n<b>x</b>");
+    expect(stripTrailingWhitespace("<p>a b</p>")).toBe("<p>a b</p>");
   });
 });
 

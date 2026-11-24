@@ -64,8 +64,7 @@ export function wrapWithEmailLayout(bodyHtml: string, opts: EmailLayoutOptions):
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
   <tr><td align="center" class="sat-header" style="padding:24px 24px 16px;background-color:${primary};border-bottom:3px solid ${primary};">
-    ${logoBlock}
-    ${titleBlock}
+    ${logoBlock}${titleBlock}
   </td></tr>
   <tr><td class="sat-body" style="padding:32px 32px 24px;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#4a4a5a;line-height:1.6;word-break:break-word;">
     ${bodyHtml}
