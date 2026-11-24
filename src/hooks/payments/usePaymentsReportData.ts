@@ -14,6 +14,7 @@ import {
   type RawPaymentOther,
 } from "@/lib/paymentsReportRows";
 import type { PaymentReportRow } from "@/lib/paymentsReport";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 interface StudentRow {
   id: string;
@@ -215,7 +216,7 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
     queryKey: ["payments-report-enrollments", schoolId, schoolYearId],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
-        .select("student_id, sections(name, grade_level)")
+        .select("student_id, sections(name, grade_level, is_technical)")
         .eq("school_id", schoolId!)
         .eq("school_year_id", schoolYearId!);
       return (data || []) as unknown as EnrollmentRow[];
@@ -253,10 +254,10 @@ export function usePaymentsReportData(schoolId?: string | null, schoolYearId?: s
     const studentSections: Record<string, string> = {};
     enrollments.forEach((e) => {
       const grade = formatGradeLevel(e.sections?.grade_level || "");
-      studentGrades[e.student_id] = e.sections?.name ? `${grade} - ${e.sections.name}` : grade;
+      studentGrades[e.student_id] = e.sections?.name ? `${grade} - ${sectionDisplayName(e.sections)}` : grade;
       // Grado y sección "crudos" (enum + nombre) los necesita la factura sobre el formato
       studentGradeLevels[e.student_id] = e.sections?.grade_level || "";
-      studentSections[e.student_id] = e.sections?.name || "";
+      studentSections[e.student_id] = sectionDisplayName(e.sections);
     });
 
     const studentNames: Record<string, string> = {};

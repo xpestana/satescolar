@@ -43,7 +43,9 @@ boleta**.
   (`applicable_grades`); sin selección = aplica a todos los grados.
   - Preescolar: `pre_maternal`, `maternal`, `i_nivel`, `ii_nivel`, `iii_nivel`
   - Primaria: `1_grado` … `6_grado`
-  - Secundaria: `1_ano` … `6_ano`
+  - Secundaria: `1_ano` … `6_ano`. Una sección puede ser **técnica** (`sections.is_technical`);
+    la boleta, la sábana, el resumen final y la vista del representante la imprimen como
+    `Sección: A (Técnica)` vía `sectionDisplayName` (ver [15](15-configuracion-colegio.md)).
 - **Estilos de boleta** (`config.style`):
   - `simple`
   - `boletin_completo` → "Bachillerato media hoja" (se imprime a la mitad de la hoja;

@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
 import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas, downloadBachilleratoBoletaDefinitiva, downloadAllBachilleratoBoletasDefinitiva } from "@/lib/bachilleratoBoleta";
 import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
-import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES, formatSectionLabel } from "@/lib/gradeLevels";
+import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES, formatSectionLabel, sectionDisplayName, formatGradeSectionLabel } from "@/lib/gradeLevels";
 import RepresentativeVisibilityTab from "@/components/grades/RepresentativeVisibilityTab";
 import PdfPreviewDialog from "@/components/grades/PdfPreviewDialog";
 import DiagnosisTab from "@/components/diagnosis/DiagnosisTab";
@@ -91,7 +91,7 @@ export default function GradesConsultation() {
     queryFn: async () => {
       const { data } = await supabase
         .from("sections")
-        .select("id, name, grade_level")
+        .select("id, name, grade_level, is_technical")
         .eq("school_id", schoolId!)
         .order("grade_level")
         .order("name");
@@ -338,7 +338,7 @@ export default function GradesConsultation() {
             <Popover open={openSection} onOpenChange={setOpenSection}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" aria-expanded={openSection} className="w-full justify-between font-normal">
-                  {selectedSection ? `${GRADE_LABELS[sections.find(s => s.id === selectedSection)?.grade_level || ""] || ""} - ${sections.find(s => s.id === selectedSection)?.name || ""}` : "Seleccione sección"}
+                  {selectedSection ? formatGradeSectionLabel(sections.find(s => s.id === selectedSection)) : "Seleccione sección"}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -349,9 +349,9 @@ export default function GradesConsultation() {
                     <CommandEmpty>No se encontró.</CommandEmpty>
                     <CommandGroup>
                       {sectionOptions.map((s) => (
-                        <CommandItem key={s.id} value={`${GRADE_LABELS[s.grade_level] || s.grade_level} ${s.name}`} onSelect={() => { setSelectedSection(s.id); setOpenSection(false); }}>
+                        <CommandItem key={s.id} value={`${GRADE_LABELS[s.grade_level] || s.grade_level} ${sectionDisplayName(s)}`} onSelect={() => { setSelectedSection(s.id); setOpenSection(false); }}>
                           <Check className={cn("mr-2 h-4 w-4", selectedSection === s.id ? "opacity-100" : "opacity-0")} />
-                          {GRADE_LABELS[s.grade_level] || s.grade_level} - {s.name}
+                          {GRADE_LABELS[s.grade_level] || s.grade_level} - {sectionDisplayName(s)}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -565,7 +565,7 @@ export default function GradesConsultation() {
                                   const html = await downloadAllPrimaryDescriptiveBoletas({
                                     schoolId,
                                     sectionId: selectedSection,
-                                    sectionName: sectionData?.name ?? "",
+                                    sectionName: sectionDisplayName(sectionData),
                                     gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
                                     gradeKey: sectionData?.grade_level ?? "",
                                     yearId: effectiveYear,
@@ -580,7 +580,7 @@ export default function GradesConsultation() {
                                   await openBoletaPreview(
                                     html,
                                     `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
-                                    `Sección ${sectionData?.name ?? ""} — todas las boletas`,
+                                    `Sección ${sectionDisplayName(sectionData)} — todas las boletas`,
                                   );
                                 } finally {
                                   setDownloadingAll(false);
@@ -602,7 +602,7 @@ export default function GradesConsultation() {
                                   const html = await downloadAllPrimaryDescriptiveBoletas({
                                     schoolId,
                                     sectionId: selectedSection,
-                                    sectionName: sectionData?.name ?? "",
+                                    sectionName: sectionDisplayName(sectionData),
                                     gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
                                     gradeKey: sectionData?.grade_level ?? "",
                                     yearId: effectiveYear,
@@ -617,7 +617,7 @@ export default function GradesConsultation() {
                                   await openBoletaPreview(
                                     html,
                                     `Boletas_${sectionData?.name ?? "seccion"}_Definitiva_${yearRange}.pdf`,
-                                    `Sección ${sectionData?.name ?? ""} — Definitiva Final`,
+                                    `Sección ${sectionDisplayName(sectionData)} — Definitiva Final`,
                                   );
                                 } finally {
                                   setDownloadingAllFinal(false);
@@ -642,7 +642,7 @@ export default function GradesConsultation() {
                                   const html = await downloadAllBachilleratoBoletas({
                                     schoolId,
                                     sectionId: selectedSection,
-                                    sectionName: sectionData?.name ?? "",
+                                    sectionName: sectionDisplayName(sectionData),
                                     gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
                                     gradeKey: sectionData?.grade_level ?? "",
                                     yearId: effectiveYear,
@@ -657,7 +657,7 @@ export default function GradesConsultation() {
                                   await openBoletaPreview(
                                     html,
                                     `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
-                                    `Sección ${sectionData?.name ?? ""} — todas las boletas`,
+                                    `Sección ${sectionDisplayName(sectionData)} — todas las boletas`,
                                   );
                                 } finally {
                                   setDownloadingAll(false);
@@ -683,7 +683,7 @@ export default function GradesConsultation() {
                                   const html = await downloadAllBachilleratoBoletasDefinitiva({
                                     schoolId,
                                     sectionId: selectedSection,
-                                    sectionName: sectionData?.name ?? "",
+                                    sectionName: sectionDisplayName(sectionData),
                                     gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
                                     gradeKey: sectionData?.grade_level ?? "",
                                     yearId: effectiveYear,
@@ -697,7 +697,7 @@ export default function GradesConsultation() {
                                   await openBoletaPreview(
                                     html,
                                     `Boletas_${sectionData?.name ?? "seccion"}_Definitiva_${yearRange}.pdf`,
-                                    `Sección ${sectionData?.name ?? ""} — Definitiva Final`,
+                                    `Sección ${sectionDisplayName(sectionData)} — Definitiva Final`,
                                   );
                                 } finally {
                                   setDownloadingAllFinal(false);
@@ -790,7 +790,7 @@ export default function GradesConsultation() {
                                               studentName: s.full_name,
                                               documentId: s.document_id ?? null,
                                               sectionId: selectedSection,
-                                              sectionName: sectionData?.name ?? "",
+                                              sectionName: sectionDisplayName(sectionData),
                                               gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
                                               gradeKey: sectionData?.grade_level ?? "",
                                               yearId: effectiveYear,
@@ -829,7 +829,7 @@ export default function GradesConsultation() {
                                               studentName: s.full_name,
                                               documentId: s.document_id ?? null,
                                               sectionId: selectedSection,
-                                              sectionName: sectionData?.name ?? "",
+                                              sectionName: sectionDisplayName(sectionData),
                                               gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
                                               gradeKey: sectionData?.grade_level ?? "",
                                               yearId: effectiveYear,
@@ -870,7 +870,7 @@ export default function GradesConsultation() {
                                               studentName: s.full_name,
                                               documentId: s.document_id ?? null,
                                               sectionId: selectedSection,
-                                              sectionName: sectionData?.name ?? "",
+                                              sectionName: sectionDisplayName(sectionData),
                                               gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
                                               gradeKey: sectionData?.grade_level ?? "",
                                               yearId: effectiveYear,
@@ -909,7 +909,7 @@ export default function GradesConsultation() {
                                               studentName: s.full_name,
                                               documentId: s.document_id ?? null,
                                               sectionId: selectedSection,
-                                              sectionName: sectionData?.name ?? "",
+                                              sectionName: sectionDisplayName(sectionData),
                                               gradeLabel: GRADE_LABELS[sectionData?.grade_level ?? ""] ?? sectionData?.grade_level ?? "",
                                               gradeKey: sectionData?.grade_level ?? "",
                                               yearId: effectiveYear,

@@ -4,17 +4,18 @@ import { useSchoolId } from "@/hooks/useSchoolId";
 import { fetchAllRows } from "@/lib/fetch-all-rows";
 import { CERTIFICATE_GRADE_LEVELS } from "@/lib/grade-certificate";
 import { type CertificateEnrollmentRow, buildCertificateStudentList } from "@/lib/grade-certificate-students";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 /** Only the name keys of `form_data`: the list covers every year, so the whole JSON is not downloaded. */
 const ENROLLMENT_SELECT =
-  "student_id, sections!inner(grade_level, name), school_years!inner(year_range), "
+  "student_id, sections!inner(grade_level, name, is_technical), school_years!inner(year_range), "
   + "student:student_id(document_id, status, primer_nombre:form_data->>primer_nombre, "
   + "segundo_nombre:form_data->>segundo_nombre, primer_apellido:form_data->>primer_apellido, "
   + "segundo_apellido:form_data->>segundo_apellido, nombre:form_data->>nombre, apellido:form_data->>apellido)";
 
 interface EnrollmentQueryRow {
   student_id: string;
-  sections: { grade_level: string; name: string };
+  sections: { grade_level: string; name: string; is_technical?: boolean };
   school_years: { year_range: string };
   student: ({ document_id: string | null; status: string | null } & Record<string, string | null>) | null;
 }
@@ -50,7 +51,7 @@ export function useGradeCertificateStudents() {
       const rows: CertificateEnrollmentRow[] = enrollments.map((e) => ({
         studentId: e.student_id,
         gradeLevel: e.sections.grade_level,
-        sectionName: e.sections.name,
+        sectionName: sectionDisplayName(e.sections),
         yearRange: e.school_years.year_range,
         documentId: e.student?.document_id ?? null,
         status: e.student?.status ?? null,

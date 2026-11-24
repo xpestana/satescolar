@@ -25,6 +25,7 @@ import jsPDF from "jspdf";
 import { addArialFont } from "@/lib/pdf-fonts";
 import { ModuleGate } from "@/components/modules/ModuleGate";
 import { ModuleLockIcon } from "@/components/modules/ModuleLockIcon";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 export default function GradeSheets() {
   const { schoolId } = useSchoolId();
@@ -272,7 +273,7 @@ export default function GradeSheets() {
       const doc = new jsPDF({ orientation: "landscape", format: "a4" });
       await addArialFont(doc);
       const year = schoolYears?.find(y => y.id === selectedYearId);
-      generateSabanaPdf(doc, section.name, section.grade_level, year?.year_range || "", data, false, selectedMomento, school?.name || "", sabanaConfig);
+      generateSabanaPdf(doc, sectionDisplayName(section), section.grade_level, year?.year_range || "", data, false, selectedMomento, school?.name || "", sabanaConfig);
       const momentoLabel = selectedMomento === "definitiva" ? "Definitiva" : `Momento_${selectedMomento}`;
       const schoolName = (school?.name || "Colegio").replace(/\s+/g, "_");
       doc.save(`Sabana_de_Notas_${schoolName}_${GRADE_LABELS[section.grade_level]}_Seccion_${section.name}_${momentoLabel}_${year?.year_range || ""}.pdf`);
@@ -297,7 +298,7 @@ export default function GradeSheets() {
       for (const section of sectionsData) {
         const data = await fetchSectionData(section.id, section.studentIds);
         if (!data) continue;
-        generateSabanaPdf(doc, section.name, section.grade_level, year?.year_range || "", data, !first, selectedMomento, school?.name || "", sabanaConfig);
+        generateSabanaPdf(doc, sectionDisplayName(section), section.grade_level, year?.year_range || "", data, !first, selectedMomento, school?.name || "", sabanaConfig);
         first = false;
       }
 
@@ -448,7 +449,7 @@ export default function GradeSheets() {
                               >
                                 <div>
                                   <p className="text-xs font-semibold leading-tight">
-                                    {GRADE_LABELS[section.grade_level] || section.grade_level} - {section.name}
+                                    {GRADE_LABELS[section.grade_level] || section.grade_level} - {sectionDisplayName(section)}
                                   </p>
                                   <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
                                     <Users className="h-2.5 w-2.5" />
@@ -461,7 +462,7 @@ export default function GradeSheets() {
                                   className="h-7 w-7 p-0"
                                   onClick={() => handleDownloadSection(section)}
                                   disabled={downloading === section.id}
-                                  title={`Descargar ${GRADE_LABELS[section.grade_level]} - ${section.name}`}
+                                  title={`Descargar ${GRADE_LABELS[section.grade_level]} - ${sectionDisplayName(section)}`}
                                 >
                                   {downloading === section.id
                                     ? <Loader2 className="h-3.5 w-3.5 animate-spin" />

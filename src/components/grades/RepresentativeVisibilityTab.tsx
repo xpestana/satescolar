@@ -12,7 +12,7 @@ import { useGradeVisibilitySettings, VISIBILITY_MOMENTOS, MOMENTO_LABELS } from 
 import { useStudentGradeBlock } from "@/hooks/useStudentGradeBlock";
 import StudentGradeAccessToggle from "@/components/students/StudentGradeAccessToggle";
 import { studentListName } from "@/lib/studentName";
-import { GRADE_LABELS } from "@/lib/gradeLevels";
+import { GRADE_LABELS, sectionDisplayName } from "@/lib/gradeLevels";
 
 /**
  * "Visibilidad para Representantes" tab of /notas/consulta.
@@ -26,7 +26,7 @@ import { GRADE_LABELS } from "@/lib/gradeLevels";
 interface EnrollmentRow {
   student_id: string;
   student: { id: string; document_id: string | null; form_data: Record<string, unknown> | null } | null;
-  section: { id: string; name: string | null; grade_level: string | null } | null;
+  section: { id: string; name: string | null; grade_level: string | null; is_technical?: boolean | null } | null;
 }
 
 interface RepresentativeVisibilityTabProps {
@@ -51,7 +51,7 @@ export default function RepresentativeVisibilityTab({
       const { data, error } = await supabase
         .from("enrollments")
         .select(
-          "student_id, student:student_id(id, document_id, form_data), section:section_id(id, name, grade_level)",
+          "student_id, student:student_id(id, document_id, form_data), section:section_id(id, name, grade_level, is_technical)",
         )
         .eq("school_year_id", schoolYearId)
         .eq("school_id", schoolId);
@@ -63,7 +63,7 @@ export default function RepresentativeVisibilityTab({
           documentId: e.student?.document_id as string | null,
           sectionLabel: [
             e.section?.grade_level ? GRADE_LABELS[e.section.grade_level] || e.section.grade_level : "",
-            e.section?.name || "",
+            sectionDisplayName(e.section),
           ]
             .filter(Boolean)
             .join(" · "),

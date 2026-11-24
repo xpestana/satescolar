@@ -111,7 +111,7 @@ export default async function handler(req: Request): Promise<Response> {
 
       const { data: enrollments } = await supabaseAdmin
         .from("enrollments")
-        .select("student_id, sections(name, grade_level)")
+        .select("student_id, sections(name, grade_level, is_technical)")
         .eq("school_id", schoolId)
         .eq("school_year_id", activeYear.id)
         .in("student_id", studentIds);
@@ -172,7 +172,8 @@ export default async function handler(req: Request): Promise<Response> {
           buildDelinquencyVariables({
             studentName,
             gradeName: section?.grade_level || "",
-            sectionName: section?.name || "",
+            // Same format as sectionDisplayName (src/lib/gradeLevels.ts): "A (Técnica)".
+            sectionName: section?.name ? `${section.name}${section.is_technical ? " (Técnica)" : ""}` : "",
             concepts: debt.concepts,
             total: debt.total,
             schoolPhone: branding.phone,

@@ -22,6 +22,7 @@ import jsPDF from "jspdf";
 import { addArialFont } from "@/lib/pdf-fonts";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 // ── Snippet definitions ─────────────────────────────────────────────
 interface SnippetDef { key: string; label: string; }
@@ -203,7 +204,7 @@ export function DocumentBuilder() {
       if (!activeYear || !selectedStudentId) return null;
       const { data: enrollment } = await supabase
         .from("enrollments")
-        .select(`id, enrollment_type, enrollment_date, observations, sections!inner(id, name, grade_level), school_years!inner(year_range)`)
+        .select(`id, enrollment_type, enrollment_date, observations, sections!inner(id, name, grade_level, is_technical), school_years!inner(year_range)`)
         .eq("student_id", selectedStudentId).eq("school_year_id", activeYear.id).maybeSingle();
       return enrollment;
     },
@@ -255,7 +256,7 @@ export function DocumentBuilder() {
     if (studentEnrollment) {
       const sec = studentEnrollment.sections as any;
       d.grado = GRADE_LABELS[sec?.grade_level] || sec?.grade_level || "";
-      d.seccion = sec?.name || "";
+      d.seccion = sectionDisplayName(sec);
       d.tipo_de_estudiante = studentEnrollment.enrollment_type || "";
       d.fecha_de_inscripcion = studentEnrollment.enrollment_date ? format(new Date(studentEnrollment.enrollment_date), "dd/MM/yyyy") : "";
       d.año_escolar = (studentEnrollment.school_years as any)?.year_range || "";

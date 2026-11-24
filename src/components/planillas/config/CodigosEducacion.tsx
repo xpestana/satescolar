@@ -12,6 +12,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 import {
   type EducationCodes,
   type SeccionMencionConfig,
@@ -68,7 +69,7 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sections")
-        .select("id, grade_level, name")
+        .select("id, grade_level, name, is_technical")
         .eq("school_id", schoolId!)
         .in("grade_level", [...SECONDARY_GRADES])
         .order("name", { ascending: true });
@@ -227,7 +228,7 @@ export function CodigosEducacion({ educationCodes, saveEducationCodes, isLoading
                     return (
                       <SelectItem key={s.id} value={s.id}>
                         <span className="flex items-center gap-2">
-                          {GRADE_LABELS[s.grade_level] ?? s.grade_level} Sección: {s.name}
+                          {GRADE_LABELS[s.grade_level] ?? s.grade_level} Sección: {sectionDisplayName(s)}
                           {hasConfig && <span className="text-xs text-primary">•</span>}
                         </span>
                       </SelectItem>

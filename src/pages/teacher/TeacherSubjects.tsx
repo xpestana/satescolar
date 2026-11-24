@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { BookOpen, CheckCircle2, AlertCircle, ClipboardList, FileEdit, History } from "lucide-react";
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
-import { GRADE_LABELS, SECONDARY_GRADES } from "@/lib/gradeLevels";
+import { GRADE_LABELS, SECONDARY_GRADES, sectionDisplayName } from "@/lib/gradeLevels";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
 import { isDiagnosisGrade } from "@/lib/diagnosisEligibility";
 import { useSectionDiagnosisAssignments } from "@/hooks/useSectionDiagnosisAssignments";
@@ -83,7 +83,7 @@ export default function TeacherSubjects() {
           school_id,
           subject:subject_id(id, name, subject_type, evaluation_type),
           school_year:school_year_id(id, year_range, is_active),
-          section:section_id(id, name, grade_level)
+          section:section_id(id, name, grade_level, is_technical)
         `)
         .eq("teacher_id", teacher!.id)
         .eq("is_suspended", false);
@@ -191,7 +191,7 @@ export default function TeacherSubjects() {
 
   const getSectionLabel = (a: AssignmentWithDetails) =>
     a.section
-      ? `${GRADE_LABELS[a.section.grade_level] || a.section.grade_level} - Sección ${a.section.name}`
+      ? `${GRADE_LABELS[a.section.grade_level] || a.section.grade_level} - Sección ${sectionDisplayName(a.section)}`
       : a.subject?.subject_type === "gcrp"
         ? "GCRP — Estudiantes individuales"
         : "Sin sección";

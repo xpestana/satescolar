@@ -18,7 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { CardGridSkeleton } from "@/components/ui/loading-skeletons";
 import { ClassroomListTutorial } from "@/components/classroom/ClassroomTutorial";
-import { GRADE_LABELS } from "@/lib/gradeLevels";
+import { GRADE_LABELS, sectionDisplayName } from "@/lib/gradeLevels";
 
 /**
  * Aula Virtual of the teacher: the list of their classrooms.
@@ -53,7 +53,7 @@ function ClassroomCard({ assignment }: { assignment: ClassroomAssignment }) {
 
   const color = config?.color || "#4285f4";
   const sectionLabel = assignment.section
-    ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${assignment.section.name}`
+    ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${sectionDisplayName(assignment.section)}`
     : assignment.subject?.subject_type === "gcrp" ? "GCRP" : "Sin sección";
 
   return (

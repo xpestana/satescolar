@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, AlertTriangle, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { formatGradeLevel } from "@/lib/utils";
 import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 interface Props {
   schoolId: string;
@@ -56,7 +57,7 @@ export function DelinquentFamiliesView({ schoolId, schoolYearId }: Props) {
     queryKey: ["delinquent-families-enrollments", schoolId, schoolYearId, studentIds],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
-        .select("student_id, students(id, document_id, form_data), sections(name, grade_level)")
+        .select("student_id, students(id, document_id, form_data), sections(name, grade_level, is_technical)")
         .eq("school_id", schoolId)
         .eq("school_year_id", schoolYearId)
         .in("student_id", studentIds);
@@ -211,7 +212,7 @@ export function DelinquentFamiliesView({ schoolId, schoolYearId }: Props) {
                                     <div className="flex items-center gap-2">
                                       <span className="font-medium text-sm">{studentName(s.student_id)}</span>
                                       <Badge variant="outline" className="text-[10px]">
-                                        {formatGradeLevel(e?.sections?.grade_level)}{e?.sections?.name ? ` - ${e.sections.name}` : ""}
+                                        {formatGradeLevel(e?.sections?.grade_level)}{e?.sections?.name ? ` - ${sectionDisplayName(e.sections)}` : ""}
                                       </Badge>
                                       {(studentInfoMap[s.student_id]?.document_id || e?.students?.document_id) && (
                                         <span className="text-xs text-muted-foreground">{studentInfoMap[s.student_id]?.document_id || e?.students?.document_id}</span>

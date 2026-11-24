@@ -28,6 +28,7 @@ import { useSchoolYearSelection } from "@/hooks/useSchoolYearSelection";
 import { useBillingMode } from "@/hooks/useBillingMode";
 import { useToast } from "@/hooks/use-toast";
 import { Pagination } from "@/components/ui/data-pagination";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 export default function PaymentRegistration() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -81,7 +82,7 @@ export default function PaymentRegistration() {
     queryKey: ["enrolled-students-payments", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("enrollments")
-        .select("*, students(id, document_id, form_data, family_id, photo_url), sections(id, name, grade_level)")
+        .select("*, students(id, document_id, form_data, family_id, photo_url), sections(id, name, grade_level, is_technical)")
         .eq("school_id", schoolId!)
         .eq("school_year_id", selectedYear!.id)
         .order("created_at");
@@ -402,7 +403,7 @@ export default function PaymentRegistration() {
               <SelectContent>
                 <SelectItem value="all">Todas las secciones</SelectItem>
                 {sections.filter((s: any) => gradeFilter === "all" || s.grade_level === gradeFilter).map((s: any) => (
-                  <SelectItem key={s.id} value={s.id}>{formatGradeLevel(s.grade_level)} - {s.name}</SelectItem>
+                  <SelectItem key={s.id} value={s.id}>{formatGradeLevel(s.grade_level)} - {sectionDisplayName(s)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -435,7 +436,7 @@ export default function PaymentRegistration() {
                           <TableCell className="font-medium">{fullName || "Sin nombre"}</TableCell>
                           <TableCell>{e.students?.document_id || "—"}</TableCell>
                           <TableCell>{formatGradeLevel(e.sections?.grade_level)}</TableCell>
-                          <TableCell>{e.sections?.name || "—"}</TableCell>
+                          <TableCell>{sectionDisplayName(e.sections) || "—"}</TableCell>
                           <TableCell className="text-center">
                             {hasPlan ? <Badge variant="outline">{planMap[e.students?.id]?.payment_plans?.name || "—"}</Badge> : <Badge variant="destructive" className="text-xs">Sin plan</Badge>}
                           </TableCell>

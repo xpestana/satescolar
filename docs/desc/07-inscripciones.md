@@ -44,6 +44,8 @@ Proceso de inscripción de estudiantes al colegio (matrícula por año escolar/s
 ## Reglas de negocio (datos)
 - Una inscripción liga estudiante ↔ año escolar ↔ sección (y por la sección, el
   `grade_level`). Es la base para notas ([09](09-notas-y-boletas.md)) y asistencias.
+- Si la sección es técnica (`sections.is_technical`), el selector de sección, la lista de
+  inscritos y la planilla la muestran como `A (Técnica)`.
 
 ## Reglas de negocio
 - Los campos del formulario de inscripción se configuran en

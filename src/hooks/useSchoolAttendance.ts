@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfWeek, startOfMonth } from "date-fns";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -159,7 +160,7 @@ export function useAttendanceBySection(
       if (sectionIds.length === 0) return [] as AttendanceBySectionPoint[];
 
       const [{ data: sections }, { data: subjects }] = await Promise.all([
-        supabase.from("sections").select("id, name, grade_level").in("id", sectionIds),
+        supabase.from("sections").select("id, name, grade_level, is_technical").in("id", sectionIds),
         subjectIds.length > 0
           ? supabase.from("school_subjects").select("id, name, abbreviation").in("id", subjectIds)
           : Promise.resolve({ data: [] }),
@@ -177,7 +178,7 @@ export function useAttendanceBySection(
       const sectionMap = new Map<string, string>(
         (sections ?? []).map((s) => {
           const grade = GRADE_LABELS[s.grade_level] ?? s.grade_level;
-          return [s.id, `${grade} - ${s.name}`];
+          return [s.id, `${grade} - ${sectionDisplayName(s)}`];
         })
       );
       const subjectMap = new Map<string, string>(

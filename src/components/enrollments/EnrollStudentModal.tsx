@@ -21,6 +21,7 @@ import { isEffectivelyRequired } from "@/lib/protected-fields";
 import { findMissingRequiredFields } from "@/lib/enrollment-completeness";
 
 import { AlertTriangle, GraduationCap, Users, UserPen } from "lucide-react";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 const GRADE_PROGRESSION: Record<string, string> = {
   pre_maternal: "maternal",
@@ -515,7 +516,7 @@ export function EnrollStudentModal({ open, onOpenChange, student, activeYear, se
                     const gradeLabel = GRADE_LABELS[s.grade_level] || s.grade_level;
                     return (
                       <SelectItem key={s.id} value={s.id}>
-                        {gradeLabel} - Sección {s.name}
+                        {gradeLabel} - Sección {sectionDisplayName(s)}
                       </SelectItem>
                     );
                   })}

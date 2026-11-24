@@ -5948,6 +5948,7 @@ export type Database = {
           created_at: string
           grade_level: Database["public"]["Enums"]["grade_level"]
           id: string
+          is_technical: boolean
           name: string
           school_id: string
           updated_at: string
@@ -5956,6 +5957,7 @@ export type Database = {
           created_at?: string
           grade_level: Database["public"]["Enums"]["grade_level"]
           id?: string
+          is_technical?: boolean
           name: string
           school_id: string
           updated_at?: string
@@ -5964,6 +5966,7 @@ export type Database = {
           created_at?: string
           grade_level?: Database["public"]["Enums"]["grade_level"]
           id?: string
+          is_technical?: boolean
           name?: string
           school_id?: string
           updated_at?: string

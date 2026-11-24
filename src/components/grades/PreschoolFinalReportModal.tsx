@@ -158,7 +158,7 @@ export default function PreschoolFinalReportModal({
     queryFn: async () => {
       const { data } = await supabase
         .from("subject_teacher_assignments")
-        .select("section:section_id(id, name, grade_level), school_year:school_year_id(id, year_range)")
+        .select("section:section_id(id, name, grade_level, is_technical), school_year:school_year_id(id, year_range)")
         .eq("id", assignmentId)
         .maybeSingle();
       return data as any;

@@ -17,6 +17,7 @@ import { Pagination } from "@/components/ui/data-pagination";
 import { FamilyPaymentFormModal, type FamilyChildRow } from "@/components/payments/FamilyPaymentFormModal";
 import { FamilyPaymentHistoryModal } from "@/components/payments/FamilyPaymentHistoryModal";
 import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 interface Props {
   schoolId: string;
@@ -82,7 +83,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, selectedYear }: Props) 
     queryKey: ["family-reg-enrollments", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data, error } = await supabase.from("enrollments")
-        .select("*, sections(id, name, grade_level)")
+        .select("*, sections(id, name, grade_level, is_technical)")
         .eq("school_id", schoolId)
         .eq("school_year_id", selectedYear.id)
         .order("created_at");
@@ -368,7 +369,7 @@ export function FamilyPaymentRegistrationTab({ schoolId, selectedYear }: Props) 
                             <span className="font-medium">{studentFullName(c.student)}</span>
                             {c.enrollment ? (
                               <Badge variant="outline" className="text-[10px]">
-                                {formatGradeLevel(c.enrollment?.sections?.grade_level)}{c.enrollment?.sections?.name ? ` - ${c.enrollment.sections.name}` : ""}
+                                {formatGradeLevel(c.enrollment?.sections?.grade_level)}{c.enrollment?.sections?.name ? ` - ${sectionDisplayName(c.enrollment.sections)}` : ""}
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-[10px] text-muted-foreground">No inscrito</Badge>

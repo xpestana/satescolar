@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Skeleton } from "@/components/ui/skeleton";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 const COLORS = [
   "hsl(207, 90%, 45%)",
@@ -60,7 +61,7 @@ export function EnrollmentBySectionChart({ schoolId, activeSchoolYearId }: Props
 
       const { data: sections } = await supabase
         .from("sections")
-        .select("id, name, grade_level")
+        .select("id, name, grade_level, is_technical")
         .in("id", sectionIds);
 
       const sectionMap = new Map(
@@ -72,7 +73,7 @@ export function EnrollmentBySectionChart({ schoolId, activeSchoolYearId }: Props
         const section = sectionMap.get(e.section_id);
         if (!section) continue;
         const gradeLabel = GRADE_LABELS[section.grade_level] || section.grade_level;
-        const label = `${gradeLabel} - ${section.name}`;
+        const label = `${gradeLabel} - ${sectionDisplayName(section)}`;
         if (!counts[label]) counts[label] = { name: label, count: 0 };
         counts[label].count++;
       }

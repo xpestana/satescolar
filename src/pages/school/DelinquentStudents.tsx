@@ -17,6 +17,7 @@ import { useBillingMode } from "@/hooks/useBillingMode";
 import { DelinquentFamiliesView } from "@/components/payments/DelinquentFamiliesView";
 import { SchoolYearSelect } from "@/components/payments/SchoolYearSelect";
 import { useSchoolYearSelection } from "@/hooks/useSchoolYearSelection";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 export default function DelinquentStudents() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -71,7 +72,7 @@ export default function DelinquentStudents() {
     queryKey: ["enrolled-students-delinquent", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
-        .select("*, students(id, document_id, form_data, family_id), sections(name, grade_level)")
+        .select("*, students(id, document_id, form_data, family_id), sections(name, grade_level, is_technical)")
         .eq("school_id", schoolId!)
         .eq("school_year_id", selectedYear!.id);
       return data || [];
@@ -235,7 +236,7 @@ export default function DelinquentStudents() {
                       <TableCell className="font-medium">{name}</TableCell>
                       <TableCell>{e?.students?.document_id || "—"}</TableCell>
                       <TableCell>{e?.sections?.grade_level || "—"}</TableCell>
-                      <TableCell>{e?.sections?.name || "—"}</TableCell>
+                      <TableCell>{sectionDisplayName(e?.sections) || "—"}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {d.concepts.slice(0, 3).map((c: any, i: number) => (

@@ -9,6 +9,7 @@ import {
   buildSyncSource,
 } from "@/lib/grade-certificate-sync-source";
 import type { SyncSourceEnrollment } from "@/lib/grade-certificate-sync";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 const ASSIGNMENT_SELECT =
   "id, subject_id, section_id, school_year_id, "
@@ -18,7 +19,7 @@ interface EnrollmentQueryRow {
   id: string;
   section_id: string;
   school_year_id: string;
-  sections: { grade_level: string; name: string };
+  sections: { grade_level: string; name: string; is_technical?: boolean };
   school_years: { year_range: string };
 }
 
@@ -32,7 +33,7 @@ export async function fetchGradeCertificateSyncSource(
 ): Promise<SyncSourceEnrollment[]> {
   const { data: enrollmentData, error: enrollmentError } = await supabase
     .from("enrollments")
-    .select("id, section_id, school_year_id, sections!inner(grade_level, name), school_years!inner(year_range)")
+    .select("id, section_id, school_year_id, sections!inner(grade_level, name, is_technical), school_years!inner(year_range)")
     .eq("school_id", schoolId)
     .eq("student_id", studentId)
     .in("sections.grade_level", [...CERTIFICATE_GRADE_LEVELS]);
@@ -43,7 +44,7 @@ export async function fetchGradeCertificateSyncSource(
     sectionId: e.section_id,
     schoolYearId: e.school_year_id,
     gradeLevel: e.sections.grade_level,
-    sectionName: e.sections.name,
+    sectionName: sectionDisplayName(e.sections),
     yearRange: e.school_years.year_range,
   }));
   if (enrollments.length === 0) return [];

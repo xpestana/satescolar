@@ -11,6 +11,7 @@ import { Search, BookOpen, Users, FileText, MessageSquare, Activity } from "luci
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { formatGradeLevel } from "@/lib/utils";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 export default function ClassroomSupervision() {
   const { schoolId } = useSchoolId();
@@ -25,7 +26,7 @@ export default function ClassroomSupervision() {
         .select(`
           id, school_id,
           subject:subject_id(id, name),
-          section:section_id(id, name, grade_level),
+          section:section_id(id, name, grade_level, is_technical),
           school_year:school_year_id(id, year_range, is_active),
           teacher:teacher_id(id, form_data)
         `)
@@ -211,7 +212,7 @@ export default function ClassroomSupervision() {
                   <TableCell className="font-medium">{c.subject?.name || "—"}</TableCell>
                   <TableCell>
                     {c.section
-                      ? `${formatGradeLevel(c.section.grade_level)} — ${c.section.name}`
+                      ? `${formatGradeLevel(c.section.grade_level)} — ${sectionDisplayName(c.section)}`
                       : "General"}
                   </TableCell>
                   <TableCell>{getTeacherName(c.teacher)}</TableCell>

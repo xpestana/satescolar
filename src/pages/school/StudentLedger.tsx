@@ -32,6 +32,7 @@ import { useBillingMode } from "@/hooks/useBillingMode";
 import { FamilyLedgerView } from "@/components/payments/FamilyLedgerView";
 import { SchoolYearSelect } from "@/components/payments/SchoolYearSelect";
 import { useSchoolYearSelection } from "@/hooks/useSchoolYearSelection";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 export default function StudentLedger() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
@@ -69,7 +70,7 @@ export default function StudentLedger() {
     queryKey: ["enrolled-students-ledger", schoolId, selectedYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
-        .select("*, students(id, document_id, form_data, family_id), sections(name, grade_level)")
+        .select("*, students(id, document_id, form_data, family_id), sections(name, grade_level, is_technical)")
         .eq("school_id", schoolId!).eq("school_year_id", selectedYear!.id);
       return data || [];
     },
@@ -166,7 +167,7 @@ export default function StudentLedger() {
   const studentFd = selectedEnrollment?.students?.form_data as any;
   const studentName = studentFd ? [studentFd.primer_nombre, studentFd.segundo_nombre, studentFd.primer_apellido, studentFd.segundo_apellido].filter(Boolean).join(" ") : "";
   const gradeLevel = selectedEnrollment?.sections?.grade_level || "";
-  const sectionName = selectedEnrollment?.sections?.name || "";
+  const sectionName = sectionDisplayName(selectedEnrollment?.sections);
 
   const handlePrintOverlay = (payment: any) => {
     if (!activeTemplate) {
@@ -272,7 +273,7 @@ export default function StudentLedger() {
                           <TableCell className="font-medium">{name}</TableCell>
                           <TableCell>{e.students?.document_id || "—"}</TableCell>
                           <TableCell>{e.sections?.grade_level}</TableCell>
-                          <TableCell>{e.sections?.name}</TableCell>
+                          <TableCell>{sectionDisplayName(e.sections)}</TableCell>
                           <TableCell><Button size="sm" variant="ghost"><Eye className="h-4 w-4" /></Button></TableCell>
                         </TableRow>
                       );

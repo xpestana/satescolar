@@ -7,7 +7,7 @@ export interface ClassroomAssignment {
   school_id: string;
   subject: { id: string; name: string; subject_type: string; evaluation_type: string };
   school_year: { id: string; year_range: string; is_active: boolean };
-  section: { id: string; name: string; grade_level: string } | null;
+  section: { id: string; name: string; grade_level: string; is_technical?: boolean } | null;
 }
 
 export interface ClassroomConfig {
@@ -47,7 +47,7 @@ export function useClassroomAssignments() {
           id, school_id,
           subject:subject_id(id, name, subject_type, evaluation_type),
           school_year:school_year_id(id, year_range, is_active),
-          section:section_id(id, name, grade_level)
+          section:section_id(id, name, grade_level, is_technical)
         `)
         .eq("teacher_id", teacher!.id)
         .eq("is_suspended", false);

@@ -15,6 +15,7 @@ import { ChildClassroomTutorial } from "@/components/classroom/ClassroomTutorial
 import { StudentSubmissionPanel } from "@/components/classroom/StudentSubmissionPanel";
 import { CommentsAndReactions } from "@/components/classroom/CommentsAndReactions";
 import { formatGradeLevel } from "@/lib/utils";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 export default function ChildClassroom() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -69,7 +70,7 @@ export default function ChildClassroom() {
         .select(`
           id, school_id,
           subject:subject_id(id, name, subject_type, evaluation_type),
-          section:section_id(id, name, grade_level),
+          section:section_id(id, name, grade_level, is_technical),
           teacher:teacher_id(id, form_data)
         `)
         .in("section_id", sectionIds)
@@ -235,7 +236,7 @@ export default function ChildClassroom() {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">{subj.subject?.name || "Área"}</CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      {subj.section ? `${formatGradeLevel(subj.section.grade_level)} — ${subj.section.name}` : "General"}
+                      {subj.section ? `${formatGradeLevel(subj.section.grade_level)} — ${sectionDisplayName(subj.section)}` : "General"}
                     </p>
                   </CardHeader>
                   <CardContent>

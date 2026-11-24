@@ -40,6 +40,7 @@ import {
   arrayMove, SortableContext, horizontalListSortingStrategy, useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 const GRADE_LEVEL_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial", primaria: "Primaria",
@@ -369,14 +370,14 @@ export default function EnrollmentsList() {
       if (resolvedYear?.id) {
         const { data: enrollments } = await supabase
           .from("enrollments")
-          .select("id, student_id, section_id, enrollment_type, sections(name, grade_level)")
+          .select("id, student_id, section_id, enrollment_type, sections(name, grade_level, is_technical)")
           .eq("school_year_id", resolvedYear.id)
           .eq("school_id", schoolId);
 
         enrollments?.forEach((e: any) => {
           enrollmentMap.set(e.student_id, {
             id: e.id,
-            section: e.sections?.name || "",
+            section: sectionDisplayName(e.sections),
             type: e.enrollment_type || "",
             gradeLevel: e.sections?.grade_level || "",
             year: resolvedYear?.year_range || "",

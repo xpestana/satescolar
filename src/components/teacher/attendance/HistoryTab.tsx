@@ -23,6 +23,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Edit2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 import {
   TeacherAssignment,
   useAttendanceByDate,
@@ -141,7 +142,7 @@ export function HistoryTab({ assignments, schoolId, allStudentsBySection }: Hist
                   <SelectItem value="all">Todas las materias</SelectItem>
                   {assignments.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.subject?.name} — {a.section?.name}
+                      {a.subject?.name} — {sectionDisplayName(a.section)}
                     </SelectItem>
                   ))}
                 </SelectContent>

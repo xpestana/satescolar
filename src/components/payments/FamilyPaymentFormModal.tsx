@@ -34,6 +34,7 @@ import { PaymentRateNotice } from "@/components/payments/PaymentRateNotice";
 import { applyRateOverride } from "@/lib/exchangeRateOverride";
 import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
 import { FAMILY_CREDIT_METHOD, FAMILY_CREDIT_LABEL } from "@/lib/familyCredit";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 interface InvoiceProfile {
   id: string;
@@ -822,7 +823,7 @@ export function FamilyPaymentFormModal({ open, onOpenChange, family, familyStude
                       const allSelected = childBalances.length > 0 && childBalances.every((b: any) => b.id in selectedConcepts);
                       const childSelected = selectedTotalByStudent[sid] || 0;
                       const grade = child.enrollment ? formatGradeLevel(child.enrollment?.sections?.grade_level) : "No inscrito";
-                      const section = child.enrollment?.sections?.name || "";
+                      const section = sectionDisplayName(child.enrollment?.sections);
                       return [
                         <TableRow key={`header-${sid}`} className="bg-muted/40 hover:bg-muted/40">
                           <TableCell>

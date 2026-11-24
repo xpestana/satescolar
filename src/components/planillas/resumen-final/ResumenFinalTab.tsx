@@ -26,6 +26,7 @@ import { DEFAULT_PRIMARY_COD, isPrimaryGradeLevel } from "@/lib/resumen-final-le
 import { fetchResumenFinalPrimariaDocxData } from "@/hooks/useResumenFinalPrimariaDocxData";
 import { generateResumenFinalPrimariaDocx } from "@/lib/resumen-final-primaria-docx";
 import { defaultFechaRemisionIso, isoToPlanillaDate } from "@/lib/resumen-final-remision";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 const gradeLabel = (gradeLevel: string) => GRADE_LABELS[gradeLevel] ?? gradeLevel;
 
@@ -326,7 +327,7 @@ export function ResumenFinalTab() {
                     return (
                       <SelectItem key={key} value={key}>
                         <span className="flex items-center gap-2">
-                          {label} Sección: {sp.section.name}
+                          {label} Sección: {sectionDisplayName(sp.section)}
                           {sp.totalParts > 1 && ` parte ${sp.parte}`}
                           {hasConfig && <span className="text-xs text-primary font-bold">•</span>}
                         </span>
@@ -347,7 +348,7 @@ export function ResumenFinalTab() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">
                 {gradeLabel(selectedPart.section.grade_level)} Sección:{" "}
-                {selectedPart.section.name}
+                {sectionDisplayName(selectedPart.section)}
                 {selectedPart.totalParts > 1 && ` — parte ${selectedPart.parte}`}
               </CardTitle>
               <Badge variant="outline" className="gap-1 text-xs">
@@ -606,7 +607,7 @@ export function ResumenFinalTab() {
                     const label = gradeLabel(sp.section.grade_level);
                     return (
                       <SelectItem key={key} value={key}>
-                        {label} Sección: {sp.section.name}
+                        {label} Sección: {sectionDisplayName(sp.section)}
                         {sp.totalParts > 1 && ` — parte ${sp.parte} de ${sp.totalParts}`}
                       </SelectItem>
                     );

@@ -58,6 +58,7 @@ import {
 import { PaymentRateNotice } from "@/components/payments/PaymentRateNotice";
 import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
 import { FAMILY_CREDIT_METHOD, FAMILY_CREDIT_LABEL } from "@/lib/familyCredit";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 const today = () => todayCaracasIso();
 
@@ -722,7 +723,7 @@ export function PaymentFormModal({ open, onOpenChange, student, enrollment, scho
     (student.form_data as any)?.segundo_apellido,
   ].filter(Boolean).join(" ") : "";
 
-  const sectionName = enrollment?.sections?.name || "";
+  const sectionName = sectionDisplayName(enrollment?.sections);
   const gradeName = formatGradeLevel(enrollment?.sections?.grade_level);
   const resolvedStudentPlan = studentPlan || initialStudentPlan;
 

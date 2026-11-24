@@ -80,6 +80,7 @@ import { resolvePlanEstudio } from "@/lib/resumen-final-plan-estudio";
 import { formatFechaRemision } from "@/lib/resumen-final-remision";
 import { FOREIGN_ENTIDAD_FEDERAL, isBornAbroad } from "@/lib/birthCountry";
 import { formatResumenFinalGrade } from "@/lib/gradeLiteral";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 function gradeDisplay(
   gradeValue: string | null,
@@ -344,7 +345,7 @@ export async function fetchResumenFinalDocxData(
 
   // 3. section info
   const { data: section } = await supabase
-    .from("sections").select("grade_level, name").eq("id", sectionId).single();
+    .from("sections").select("grade_level, name, is_technical").eq("id", sectionId).single();
 
   // 3b. tipo de planilla (define layout GP/GRUPO vs productivas mezcladas)
   const { data: rfConfig } = await supabase
@@ -624,7 +625,7 @@ export async function fetchResumenFinalDocxData(
     schoolHeader,
     yearRange: yearData?.year_range || schoolYearId,
     sectionGradeLevel: section?.grade_level || "",
-    sectionName: section?.name || "",
+    sectionName: sectionDisplayName(section),
     parte,
     totalStudentsInSection,
     studentsInPage: studentRows.length,

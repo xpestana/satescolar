@@ -16,6 +16,7 @@ import {
 import { Users, CheckCircle2, Loader2 } from "lucide-react";
 import { StudentAttendanceCard } from "./StudentAttendanceCard";
 import { AbsenceConfirmDialog } from "./AbsenceConfirmDialog";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 import {
   TeacherAssignment,
   useEnrolledStudents,
@@ -200,7 +201,7 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
                 <SelectContent>
                   {assignments.map((a) => (
                     <SelectItem key={a.id} value={a.id}>
-                      {a.subject?.name ?? "Sin nombre"} — {a.section?.name}
+                      {a.subject?.name ?? "Sin nombre"} — {sectionDisplayName(a.section)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -225,7 +226,7 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
           {selectedAssignment && (
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               <Badge variant="secondary">
-                Sección: {selectedAssignment.section?.name}
+                Sección: {sectionDisplayName(selectedAssignment.section)}
               </Badge>
               <Badge variant="outline">
                 {selectedAssignment.school_year?.year_range}

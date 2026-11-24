@@ -23,11 +23,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 interface SchoolYear { id: string; year_range: string; is_active: boolean; }
 interface Subject { id: string; name: string; subject_type: string; is_suspended: boolean; }
 interface Teacher { id: string; form_data: any; is_suspended: boolean; document_id: string | null; }
-interface Section { id: string; name: string; grade_level: string; }
+interface Section { id: string; name: string; grade_level: string; is_technical?: boolean; }
 interface Assignment { id: string; subject_id: string; teacher_id: string; school_year_id: string; school_id: string; section_id: string | null; is_suspended: boolean; }
 
 const GRADE_LABELS: Record<string, string> = {
@@ -49,7 +50,7 @@ function getTeacherName(t: Teacher): string {
 }
 
 function getSectionLabel(s: Section): string {
-  return `${GRADE_LABELS[s.grade_level] || s.grade_level} - ${s.name}`;
+  return `${GRADE_LABELS[s.grade_level] || s.grade_level} - ${sectionDisplayName(s)}`;
 }
 
 function getStudentName(fd: any): string {
@@ -121,7 +122,7 @@ export default function SubjectAssignments() {
   const { data: sections = [] } = useQuery({
     queryKey: ["school-sections", schoolId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sections").select("id, name, grade_level").eq("school_id", schoolId!).order("grade_level").order("name");
+      const { data, error } = await supabase.from("sections").select("id, name, grade_level, is_technical").eq("school_id", schoolId!).order("grade_level").order("name");
       if (error) throw error;
       return data as Section[];
     },
@@ -189,10 +190,10 @@ export default function SubjectAssignments() {
       // Fetch enrollments to get section/grade info
       let enrollmentMap: Record<string, { grade_level: string; section_name: string }> = {};
       if (studentIds.length > 0) {
-        const { data: enrollData } = await supabase.from("enrollments").select("student_id, section:section_id(name, grade_level)").in("student_id", studentIds).eq("school_id", schoolId!);
+        const { data: enrollData } = await supabase.from("enrollments").select("student_id, section:section_id(name, grade_level, is_technical)").in("student_id", studentIds).eq("school_id", schoolId!);
         (enrollData || []).forEach((e: any) => {
           if (!enrollmentMap[e.student_id] && e.section) {
-            enrollmentMap[e.student_id] = { grade_level: e.section.grade_level, section_name: e.section.name };
+            enrollmentMap[e.student_id] = { grade_level: e.section.grade_level, section_name: sectionDisplayName(e.section) };
           }
         });
       }
@@ -660,7 +661,7 @@ export default function SubjectAssignments() {
                     <SelectTrigger><SelectValue placeholder={formGradeLevel ? "Seleccionar sección" : "Primero selecciona un nivel"} /></SelectTrigger>
                     <SelectContent>
                       {filteredSections.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        <SelectItem key={s.id} value={s.id}>{sectionDisplayName(s)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -690,7 +691,7 @@ export default function SubjectAssignments() {
                       <SelectTrigger className="h-9"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                       <SelectContent>
                         {gcrpBrowseSections.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                          <SelectItem key={s.id} value={s.id}>{sectionDisplayName(s)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

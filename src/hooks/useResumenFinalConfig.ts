@@ -35,6 +35,7 @@ export interface SectionPart {
     id: string;
     grade_level: string;
     name: string;
+    is_technical?: boolean;
   };
   parte: number;
   studentCount: number;
@@ -66,7 +67,7 @@ export function useResumenFinalConfig(schoolYearId: string) {
       // Fetch all sections for this school
       const { data: sections, error: sectionsError } = await supabase
         .from("sections")
-        .select("id, grade_level, name")
+        .select("id, grade_level, name, is_technical")
         .eq("school_id", schoolId);
       if (sectionsError) throw sectionsError;
       if (!sections?.length) return [];

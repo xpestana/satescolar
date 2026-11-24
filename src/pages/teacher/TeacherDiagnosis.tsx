@@ -19,7 +19,7 @@ interface AssignmentDetail {
   teacher_id: string;
   subject: { name: string } | null;
   school_year: { id: string; year_range: string } | null;
-  section: { id: string; name: string; grade_level: string } | null;
+  section: { id: string; name: string; grade_level: string; is_technical?: boolean } | null;
 }
 
 /** The teacher writes the diagnosis of each student of one of their áreas. */
@@ -36,7 +36,7 @@ export default function TeacherDiagnosis() {
           id, school_id, teacher_id,
           subject:subject_id(name),
           school_year:school_year_id(id, year_range),
-          section:section_id(id, name, grade_level)
+          section:section_id(id, name, grade_level, is_technical)
         `)
         .eq("id", assignmentId!)
         .single();

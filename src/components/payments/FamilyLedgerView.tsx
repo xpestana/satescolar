@@ -25,6 +25,7 @@ import { formatGradeLevel } from "@/lib/utils";
 import { formatDateOnly } from "@/lib/dateUtils";
 import { familySurname, buildPrimaryRepMap } from "@/lib/familyDisplayName";
 import { useFamilyCredits } from "@/hooks/payments/useFamilyCredits";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 interface Props {
   schoolId: string;
@@ -74,7 +75,7 @@ export function FamilyLedgerView({ schoolId, schoolYear }: Props) {
     queryKey: ["family-ledger-enrollments", schoolId, schoolYear?.id],
     queryFn: async () => {
       const { data } = await supabase.from("enrollments")
-        .select("*, sections(name, grade_level)")
+        .select("*, sections(name, grade_level, is_technical)")
         .eq("school_id", schoolId)
         .eq("school_year_id", schoolYear.id);
       return data || [];
@@ -266,7 +267,7 @@ export function FamilyLedgerView({ schoolId, schoolYear }: Props) {
     const students = studentIds.map((id) => ({
       name: studentNameMap[id] || "",
       gradeLevel: enrollmentByStudent[id]?.sections?.grade_level || "",
-      sectionName: enrollmentByStudent[id]?.sections?.name || "",
+      sectionName: sectionDisplayName(enrollmentByStudent[id]?.sections),
     }));
     const first = students[0];
     const data = buildInvoiceData(
@@ -359,7 +360,7 @@ export function FamilyLedgerView({ schoolId, schoolYear }: Props) {
                         <div className="flex flex-wrap gap-1.5">
                           {(childrenByFamily[f.id] || []).map((c) => (
                             <Badge key={c.student.id} variant="outline" className="text-xs">
-                              {studentFullName(c.student)} · {c.enrollment ? `${formatGradeLevel(c.enrollment.sections?.grade_level)}${c.enrollment.sections?.name ? ` - ${c.enrollment.sections.name}` : ""}` : "No inscrito"}
+                              {studentFullName(c.student)} · {c.enrollment ? `${formatGradeLevel(c.enrollment.sections?.grade_level)}${c.enrollment.sections?.name ? ` - ${sectionDisplayName(c.enrollment.sections)}` : ""}` : "No inscrito"}
                             </Badge>
                           ))}
                         </div>
@@ -405,7 +406,7 @@ export function FamilyLedgerView({ schoolId, schoolYear }: Props) {
                     <TableCell colSpan={6}>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{studentFullName(c.student)}</span>
-                        <Badge variant="outline" className="text-xs">{c.enrollment ? `${formatGradeLevel(c.enrollment.sections?.grade_level)}${c.enrollment.sections?.name ? ` - ${c.enrollment.sections.name}` : ""}` : "No inscrito"}</Badge>
+                        <Badge variant="outline" className="text-xs">{c.enrollment ? `${formatGradeLevel(c.enrollment.sections?.grade_level)}${c.enrollment.sections?.name ? ` - ${sectionDisplayName(c.enrollment.sections)}` : ""}` : "No inscrito"}</Badge>
                       </div>
                     </TableCell>
                   </TableRow>,

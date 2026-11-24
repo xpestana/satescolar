@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import QRCode from "qrcode";
 import { buildAttendanceScanUrl } from "@/lib/attendance-url";
 import { resolveImageToPngDataUrl } from "@/lib/image-resolve";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 interface ExportColumn {
   key: string;
@@ -713,7 +714,7 @@ function resolveFieldValue(
         return formatDate(data.enrollment.enrollment_date);
       }
       if (fieldName === "grupo_asignado" && data.enrollmentSection) {
-        return data.enrollmentSection.name || "No registrado";
+        return sectionDisplayName(data.enrollmentSection) || "No registrado";
       }
       return studentFd[fieldName] || "No registrado";
     }

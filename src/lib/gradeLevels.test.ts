@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { resolveGradeLevelKind, gradeLabel, formatSectionLabel, NUMERIC_GRADES } from "./gradeLevels";
+import {
+  resolveGradeLevelKind,
+  gradeLabel,
+  formatSectionLabel,
+  formatGradeSectionLabel,
+  sectionDisplayName,
+  NUMERIC_GRADES,
+} from "./gradeLevels";
 
 describe("resolveGradeLevelKind", () => {
   it("maps preschool grades", () => {
@@ -54,5 +61,38 @@ describe("formatSectionLabel", () => {
   it("joins the grade label and the section name", () => {
     expect(formatSectionLabel({ grade_level: "4_grado", name: "U" })).toBe("4to Grado - Sección U");
     expect(formatSectionLabel(null)).toBe("");
+  });
+
+  it("marks technical sections", () => {
+    expect(formatSectionLabel({ grade_level: "1_ano", name: "A", is_technical: true })).toBe(
+      "1er Año - Sección A (Técnica)",
+    );
+  });
+});
+
+describe("sectionDisplayName", () => {
+  it("returns the plain name for non-technical sections", () => {
+    expect(sectionDisplayName({ name: "B", is_technical: false })).toBe("B");
+    expect(sectionDisplayName({ name: "B", is_technical: null })).toBe("B");
+    expect(sectionDisplayName({ name: "B" })).toBe("B");
+  });
+
+  it("appends the technical suffix", () => {
+    expect(sectionDisplayName({ name: "C", is_technical: true })).toBe("C (Técnica)");
+  });
+
+  it("empties nullish sections", () => {
+    expect(sectionDisplayName(null)).toBe("");
+    expect(sectionDisplayName(undefined)).toBe("");
+  });
+});
+
+describe("formatGradeSectionLabel", () => {
+  it("joins grade and section without the word Sección", () => {
+    expect(formatGradeSectionLabel({ grade_level: "6_ano", name: "A" })).toBe("6to Año - A");
+    expect(formatGradeSectionLabel({ grade_level: "1_ano", name: "A", is_technical: true })).toBe(
+      "1er Año - A (Técnica)",
+    );
+    expect(formatGradeSectionLabel(null)).toBe("");
   });
 });

@@ -102,7 +102,7 @@ export default function PaymentReportsList() {
   const handleConfirm = async (r: any) => {
     // Need enrollment for the modal
     const { data: enr } = await supabase.from("enrollments")
-      .select("*, sections(id, name, grade_level)")
+      .select("*, sections(id, name, grade_level, is_technical)")
       .eq("student_id", r.student_id)
       .eq("school_year_id", r.school_year_id)
       .eq("school_id", schoolId!)

@@ -18,6 +18,7 @@ import { PeopleList } from "@/components/classroom/PeopleList";
 import { ClassroomCalendar } from "@/components/classroom/ClassroomCalendar";
 import { ClassroomNotifications } from "@/components/classroom/ClassroomNotifications";
 import { ClassroomDetailTutorial } from "@/components/classroom/ClassroomTutorial";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -44,7 +45,7 @@ export default function ClassroomDetail() {
           id, school_id,
           subject:subject_id(id, name, subject_type, evaluation_type),
           school_year:school_year_id(id, year_range, is_active),
-          section:section_id(id, name, grade_level)
+          section:section_id(id, name, grade_level, is_technical)
         `)
         .eq("id", assignmentId!)
         .single();
@@ -66,7 +67,7 @@ export default function ClassroomDetail() {
 
   const color = config?.color || "#4285f4";
   const sectionLabel = assignment.section
-    ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${assignment.section.name}`
+    ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${sectionDisplayName(assignment.section)}`
     : "";
 
   return (

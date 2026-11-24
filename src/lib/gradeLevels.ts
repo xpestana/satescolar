@@ -49,7 +49,30 @@ export function gradeLabel(gradeLevel: string | null | undefined): string {
   return GRADE_LABELS[gradeLevel] || gradeLevel;
 }
 
-/** "4to Grado - Sección U"; empty without a section. */
-export function formatSectionLabel(section: { grade_level: string; name: string } | null | undefined): string {
-  return section ? `${gradeLabel(section.grade_level)} - Sección ${section.name}` : "";
+/** Minimum shape needed to print a section. `is_technical` is optional for queries that predate it. */
+export interface SectionNameLike {
+  name: string | null;
+  is_technical?: boolean | null;
+}
+
+export interface SectionLabelLike extends SectionNameLike {
+  grade_level: string;
+}
+
+export const TECHNICAL_SECTION_SUFFIX = "(Técnica)";
+
+/** "A" or "A (Técnica)"; empty without a section. Use it wherever the section name is shown. */
+export function sectionDisplayName(section: SectionNameLike | null | undefined): string {
+  if (!section?.name) return "";
+  return section.is_technical ? `${section.name} ${TECHNICAL_SECTION_SUFFIX}` : section.name;
+}
+
+/** "4to Grado - Sección U" / "1er Año - Sección A (Técnica)"; empty without a section. */
+export function formatSectionLabel(section: SectionLabelLike | null | undefined): string {
+  return section ? `${gradeLabel(section.grade_level)} - Sección ${sectionDisplayName(section)}` : "";
+}
+
+/** "4to Grado - U" / "1er Año - A (Técnica)"; empty without a section. */
+export function formatGradeSectionLabel(section: SectionLabelLike | null | undefined): string {
+  return section ? `${gradeLabel(section.grade_level)} - ${sectionDisplayName(section)}` : "";
 }

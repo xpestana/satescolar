@@ -9,7 +9,7 @@ export interface TeacherAssignment {
   school_id: string;
   school_year_id: string;
   subject: { id: string; name: string; abbreviation: string } | null;
-  section: { id: string; name: string; grade_level: string } | null;
+  section: { id: string; name: string; grade_level: string; is_technical?: boolean } | null;
   school_year: { id: string; year_range: string; is_active: boolean } | null;
 }
 
@@ -74,7 +74,7 @@ export function useTeacherAssignments(teacherId: string | undefined) {
           school_id,
           school_year_id,
           subject:subject_id(id, name, abbreviation),
-          section:section_id(id, name, grade_level),
+          section:section_id(id, name, grade_level, is_technical),
           school_year:school_year_id(id, year_range, is_active)
         `)
         .eq("teacher_id", teacherId!)

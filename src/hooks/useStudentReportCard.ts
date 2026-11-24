@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { GradeLevelKind, resolveGradeLevelKind } from "@/lib/gradeLevels";
+import { GradeLevelKind, resolveGradeLevelKind, sectionDisplayName } from "@/lib/gradeLevels";
 
 /**
  * Everything the representative report-card screen needs for one student / school year:
@@ -112,7 +112,7 @@ export function useStudentReportCard({ studentId, schoolId, schoolYearId }: UseS
     queryFn: async (): Promise<StudentReportCard> => {
       const { data: enrollment, error: enrollmentError } = await supabase
         .from("enrollments")
-        .select("section_id, sections:section_id(id, name, grade_level)")
+        .select("section_id, sections:section_id(id, name, grade_level, is_technical)")
         .eq("student_id", studentId!)
         .eq("school_year_id", schoolYearId!)
         // A section change mid-year leaves two rows; the latest one is the one that counts.
@@ -121,13 +121,13 @@ export function useStudentReportCard({ studentId, schoolId, schoolYearId }: UseS
         .maybeSingle();
       if (enrollmentError) throw enrollmentError;
 
-      const section = enrollment?.sections as { id: string; name: string; grade_level: string } | null;
+      const section = enrollment?.sections as { id: string; name: string; grade_level: string; is_technical?: boolean } | null;
       if (!enrollment || !section) return EMPTY;
 
       const levelKind = resolveGradeLevelKind(section.grade_level);
       const base = {
         sectionId: section.id,
-        sectionName: section.name,
+        sectionName: sectionDisplayName(section),
         gradeLevel: section.grade_level,
         levelKind,
       };

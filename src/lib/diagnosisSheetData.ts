@@ -6,7 +6,7 @@ import {
   DiagnosisSheetData,
   generateDiagnosisDocumentHtml,
 } from "@/lib/diagnosisSheet";
-import { gradeLabel } from "@/lib/gradeLevels";
+import { gradeLabel, sectionDisplayName } from "@/lib/gradeLevels";
 import { resolveImageToDataUrl, resolveSignatureImages } from "@/lib/image-resolve";
 import { untypedSupabase } from "@/lib/untypedSupabase";
 import { teacherDisplayName } from "@/lib/teacherName";
@@ -30,7 +30,7 @@ export interface DiagnosisStudentRef {
 interface AssignmentRow {
   school_id: string;
   teacher_id: string;
-  section: { name: string; grade_level: string } | null;
+  section: { name: string; grade_level: string; is_technical?: boolean } | null;
   school_year: { year_range: string } | null;
   school: { name: string; logo_url: string | null } | null;
 }
@@ -38,7 +38,7 @@ interface AssignmentRow {
 async function fetchAssignment(assignmentId: string): Promise<AssignmentRow> {
   const { data, error } = await supabase
     .from("subject_teacher_assignments")
-    .select("school_id, teacher_id, section:section_id(name, grade_level), school_year:school_year_id(year_range), school:school_id(name, logo_url)")
+    .select("school_id, teacher_id, section:section_id(name, grade_level, is_technical), school_year:school_year_id(year_range), school:school_id(name, logo_url)")
     .eq("id", assignmentId)
     .single();
   if (error) throw error;
@@ -120,7 +120,7 @@ export async function loadDiagnosisContext(assignmentId: string): Promise<Diagno
     schoolName: assignment.school?.name ?? "",
     yearRange: assignment.school_year?.year_range ?? "",
     gradeLabel: gradeLabel(assignment.section?.grade_level),
-    sectionName: assignment.section?.name ?? null,
+    sectionName: assignment.section ? sectionDisplayName(assignment.section) : null,
     saved,
     signatures: await resolveSignatureImages(teacherSig ? [teacherSig, ...institutional] : institutional),
     images,

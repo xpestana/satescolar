@@ -18,6 +18,7 @@ import { useGradeStudents } from "@/hooks/useGradeStudents";
 import { countFilledGrades, gradeKey, isAcceptedGradeInput, studentGradeValues, type GradeChange } from "@/lib/gradeEntry";
 import { MobileStudentGradeCards } from "@/components/teacher/grades/MobileStudentGradeCards";
 import { StudentGradesDialog } from "@/components/teacher/grades/StudentGradesDialog";
+import { sectionDisplayName } from "@/lib/gradeLevels";
 
 const GRADE_LABELS: Record<string, string> = {
   pre_maternal: "Pre-Maternal", maternal: "Maternal", inicial: "Inicial",
@@ -69,7 +70,7 @@ export default function TeacherGrades() {
           id, school_id,
           subject:subject_id(id, name, subject_type, evaluation_type),
           school_year:school_year_id(id, year_range, is_active),
-          section:section_id(id, name, grade_level)
+          section:section_id(id, name, grade_level, is_technical)
         `)
         .eq("id", assignmentId!)
         .single();
@@ -83,7 +84,7 @@ export default function TeacherGrades() {
   const gradeLevel = assignment?.section?.grade_level as string | undefined;
   const isNumeric = isGcrp || (gradeLevel ? NUMERIC_GRADES.has(gradeLevel) : false);
   const sectionLabel = assignment?.section
-    ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${assignment.section.name}`
+    ? `${GRADE_LABELS[assignment.section.grade_level] || assignment.section.grade_level} - Sección ${sectionDisplayName(assignment.section)}`
     : isGcrp ? "GCRP — Estudiantes individuales" : "";
 
   // Fetch evaluation plan items for the current momento

@@ -47,6 +47,21 @@ Define los **años escolares** (`school_years`: `year_range`, **`is_active`**) y
 **secciones** (`sections`, con `grade_level` enum). Base de toda la estructura académica:
 inscripciones, notas, asistencias y pagos se apoyan en año escolar + sección + grado.
 
+- **Botones de alta por nivel:** Pre-Maternal y Maternal (uno por grado), **Inicial**,
+  **Primaria** y **Secundaria** (1er–6to Año). Antes Secundaria eran dos botones ("Media General"
+  1er–5to y "Media Técnica" solo 6to); se unificaron. La UI vive en `src/components/sections/`
+  (`SectionsModal`, `SectionLetterInput`, `sectionCategories.ts`).
+- **Sección técnica (`sections.is_technical`, boolean, default `false`):** al crear o editar una
+  sección de Secundaria se marca el check **"Técnica"**. Las secciones que existían antes del
+  campo quedaron como no técnicas (incluido 6to Año); se cambia editando la sección.
+  Solo Secundaria admite el check (`gradeAllowsTechnical`).
+- **Cómo se imprime:** la marca va pegada al **nombre de la sección**, no al grado:
+  `1er Año - A (Técnica)`; las no técnicas no cambian. Usa siempre los helpers de
+  `src/lib/gradeLevels.ts`: `sectionDisplayName` ("A (Técnica)"), `formatSectionLabel`
+  ("1er Año - Sección A (Técnica)") y `formatGradeSectionLabel` ("1er Año - A (Técnica)").
+  Toda consulta que muestre la sección debe traer `is_technical` junto a `name`.
+  No se usa en `form_data.nivel_grado` ni en nombres de archivo.
+
 > **Año activo:** `school_years.is_active` marca el año en curso. Muchos flujos (balances
 > de pago, asignaciones, inscripciones) operan sobre el año activo (p. ej. la función
 > `rebuild_student_concept_balances_for_active_year`).
