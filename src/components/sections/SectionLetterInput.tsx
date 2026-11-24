@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { TechnicalSectionFields } from "./TechnicalSectionFields";
 
 interface SectionLetterInputProps {
   id: string;
@@ -9,19 +8,23 @@ interface SectionLetterInputProps {
   onChange: (value: string) => void;
   isTechnical: boolean;
   onTechnicalChange: (value: boolean) => void;
-  /** Hides the "Técnica" checkbox for grades that cannot be technical. */
+  specialty: string;
+  onSpecialtyChange: (value: string) => void;
+  /** Hides the "Técnica" fields for grades that cannot be technical. */
   allowTechnical: boolean;
   onAdd: () => void;
   autoFocus?: boolean;
 }
 
-/** One-letter section input with the optional "Técnica" checkbox and the add button. */
+/** One-letter section input with the optional "Técnica" fields and the add button. */
 export function SectionLetterInput({
   id,
   value,
   onChange,
   isTechnical,
   onTechnicalChange,
+  specialty,
+  onSpecialtyChange,
   allowTechnical,
   onAdd,
   autoFocus,
@@ -43,21 +46,19 @@ export function SectionLetterInput({
         className="h-9 text-center uppercase w-16"
         autoFocus={autoFocus}
       />
-      {allowTechnical && (
-        <div className="flex items-center gap-1.5">
-          <Checkbox
-            id={`${id}-technical`}
-            checked={isTechnical}
-            onCheckedChange={(checked) => onTechnicalChange(checked === true)}
-          />
-          <Label htmlFor={`${id}-technical`} className="text-sm font-normal cursor-pointer">
-            Técnica
-          </Label>
-        </div>
-      )}
       <Button type="button" size="sm" onClick={onAdd} disabled={!value.trim()} className="h-9">
         +
       </Button>
+      {allowTechnical && (
+        <TechnicalSectionFields
+          id={id}
+          isTechnical={isTechnical}
+          onTechnicalChange={onTechnicalChange}
+          specialty={specialty}
+          onSpecialtyChange={onSpecialtyChange}
+          onEnter={onAdd}
+        />
+      )}
     </div>
   );
 }

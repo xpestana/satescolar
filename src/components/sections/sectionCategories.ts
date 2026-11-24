@@ -14,6 +14,7 @@ export interface SchoolSection {
   grade_level: GradeLevel;
   name: string;
   is_technical: boolean;
+  technical_specialty: string | null;
 }
 
 export interface GradeCategory {
@@ -25,6 +26,7 @@ export interface GradeCategory {
 export interface PendingSection {
   name: string;
   isTechnical: boolean;
+  specialty: string;
 }
 
 export const GRADE_CATEGORIES: GradeCategory[] = [
@@ -80,4 +82,30 @@ export function categoryGradeLabel(grade: GradeLevel): string {
 /** Only secondary (1er–6to Año) sections can be marked as técnica. */
 export function gradeAllowsTechnical(grade: string): boolean {
   return resolveGradeLevelKind(grade) === "secondary";
+}
+
+export interface TechnicalFields {
+  is_technical: boolean;
+  technical_specialty: string | null;
+}
+
+export interface TechnicalFieldsResult {
+  /** Message to show when the fields cannot be saved; `null` when they are valid. */
+  error: string | null;
+  fields: TechnicalFields;
+}
+
+const NON_TECHNICAL: TechnicalFields = { is_technical: false, technical_specialty: null };
+
+/**
+ * Columns to save for a section's técnica flag. A técnica section needs its specialty; a
+ * non-técnica one (or a grade that cannot be técnica) always stores `false` / `null`.
+ */
+export function buildTechnicalFields(grade: string, isTechnical: boolean, specialty: string): TechnicalFieldsResult {
+  if (!isTechnical || !gradeAllowsTechnical(grade)) {
+    return { error: null, fields: NON_TECHNICAL };
+  }
+  const normalized = specialty.trim().replace(/\s+/g, " ");
+  if (!normalized) return { error: "Indica la especialidad de la sección técnica.", fields: NON_TECHNICAL };
+  return { error: null, fields: { is_technical: true, technical_specialty: normalized } };
 }

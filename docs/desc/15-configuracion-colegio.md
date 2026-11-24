@@ -55,6 +55,11 @@ inscripciones, notas, asistencias y pagos se apoyan en año escolar + sección +
   sección de Secundaria se marca el check **"Técnica"**. Las secciones que existían antes del
   campo quedaron como no técnicas (incluido 6to Año); se cambia editando la sección.
   Solo Secundaria admite el check (`gradeAllowsTechnical`).
+- **Especialidad (`sections.technical_specialty`, text, nullable):** al marcar "Técnica" aparece el
+  campo **Especialidad** (obligatorio; se recorta y se normalizan espacios). Una sección no técnica
+  guarda siempre `is_technical = false` y `technical_specialty = NULL`
+  (`buildTechnicalFields` en `sectionCategories.ts`). Hoy solo se muestra en el modal de secciones
+  (`A (Técnica) · Informática`); se usará en las planillas de resumen final de la técnica.
 - **Cómo se imprime:** la marca va pegada al **nombre de la sección**, no al grado:
   `1er Año - A (Técnica)`; las no técnicas no cambian. Usa siempre los helpers de
   `src/lib/gradeLevels.ts`: `sectionDisplayName` ("A (Técnica)"), `formatSectionLabel`

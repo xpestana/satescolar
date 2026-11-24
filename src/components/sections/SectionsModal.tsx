@@ -4,7 +4,6 @@ import { X } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { sectionDisplayName } from "@/lib/gradeLevels";
 import { SectionLetterInput } from "./SectionLetterInput";
+import { TechnicalSectionFields } from "./TechnicalSectionFields";
 import {
+  buildTechnicalFields,
   categoryGradeLabel,
   gradeAllowsTechnical,
   type GradeCategory,
@@ -40,20 +41,24 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
 
   const [newSectionName, setNewSectionName] = useState("");
   const [newSectionTechnical, setNewSectionTechnical] = useState(false);
+  const [newSectionSpecialty, setNewSectionSpecialty] = useState("");
   const [pendingSections, setPendingSections] = useState<Record<string, PendingSection[]>>({});
   const [activeGrade, setActiveGrade] = useState<string>("");
   const [editingSection, setEditingSection] = useState<SchoolSection | null>(null);
   const [editingName, setEditingName] = useState("");
   const [editingTechnical, setEditingTechnical] = useState(false);
+  const [editingSpecialty, setEditingSpecialty] = useState("");
 
   // Reset everything each time the modal opens for a new target.
   useEffect(() => {
     setNewSectionName("");
     setNewSectionTechnical(false);
+    setNewSectionSpecialty("");
     setPendingSections({});
     setEditingSection(null);
     setEditingName("");
     setEditingTechnical(false);
+    setEditingSpecialty("");
     if (target?.kind === "category") setActiveGrade(target.category.levels[0]?.value || "");
     else if (target?.kind === "grade") setActiveGrade(target.grade);
     else setActiveGrade("");
@@ -64,15 +69,17 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
   const createSectionsMutation = useMutation({
     mutationFn: async ({ grade, items }: { grade: GradeLevel; items: PendingSection[] }) => {
       if (!schoolId) throw new Error("No school selected");
-      const allowTechnical = gradeAllowsTechnical(grade);
-      const { error } = await supabase.from("sections").insert(
-        items.map((item) => ({
+      const rows = items.map((item) => {
+        const technical = buildTechnicalFields(grade, item.isTechnical, item.specialty);
+        if (technical.error) throw new Error(technical.error);
+        return {
           school_id: schoolId,
           grade_level: grade,
           name: item.name.trim().toUpperCase(),
-          is_technical: allowTechnical && item.isTechnical,
-        })),
-      );
+          ...technical.fields,
+        };
+      });
+      const { error } = await supabase.from("sections").insert(rows);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -91,13 +98,22 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
   });
 
   const updateSectionMutation = useMutation({
-    mutationFn: async ({ section, name, isTechnical }: { section: SchoolSection; name: string; isTechnical: boolean }) => {
+    mutationFn: async ({
+      section,
+      name,
+      isTechnical,
+      specialty,
+    }: {
+      section: SchoolSection;
+      name: string;
+      isTechnical: boolean;
+      specialty: string;
+    }) => {
+      const technical = buildTechnicalFields(section.grade_level, isTechnical, specialty);
+      if (technical.error) throw new Error(technical.error);
       const { error } = await supabase
         .from("sections")
-        .update({
-          name: name.trim().toUpperCase(),
-          is_technical: gradeAllowsTechnical(section.grade_level) && isTechnical,
-        })
+        .update({ name: name.trim().toUpperCase(), ...technical.fields })
         .eq("id", section.id);
       if (error) throw error;
     },
@@ -134,10 +150,20 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
       toast({ variant: "destructive", title: "Error", description: "Esta sección ya existe." });
       return;
     }
-    const item: PendingSection = { name: normalized, isTechnical: gradeAllowsTechnical(grade) && newSectionTechnical };
+    const technical = buildTechnicalFields(grade, newSectionTechnical, newSectionSpecialty);
+    if (technical.error) {
+      toast({ variant: "destructive", title: "Falta la especialidad", description: technical.error });
+      return;
+    }
+    const item: PendingSection = {
+      name: normalized,
+      isTechnical: technical.fields.is_technical,
+      specialty: technical.fields.technical_specialty ?? "",
+    };
     setPendingSections((prev) => ({ ...prev, [grade]: [...(prev[grade] || []), item] }));
     setNewSectionName("");
     setNewSectionTechnical(false);
+    setNewSectionSpecialty("");
   };
 
   const removePendingSection = (grade: string, name: string) => {
@@ -164,6 +190,7 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
     setEditingSection(section);
     setEditingName(section.name);
     setEditingTechnical(!!section.is_technical);
+    setEditingSpecialty(section.technical_specialty ?? "");
   };
 
   const cancelEditing = () => {
@@ -173,13 +200,30 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
 
   const saveEditing = () => {
     if (!editingSection || !editingName.trim()) return;
-    updateSectionMutation.mutate({ section: editingSection, name: editingName, isTechnical: editingTechnical });
+    const technical = buildTechnicalFields(editingSection.grade_level, editingTechnical, editingSpecialty);
+    if (technical.error) {
+      toast({ variant: "destructive", title: "Falta la especialidad", description: technical.error });
+      return;
+    }
+    updateSectionMutation.mutate({
+      section: editingSection,
+      name: editingName,
+      isTechnical: editingTechnical,
+      specialty: editingSpecialty,
+    });
   };
 
   const selectGrade = (grade: string) => {
     setActiveGrade(grade);
     setNewSectionName("");
     setNewSectionTechnical(false);
+    setNewSectionSpecialty("");
+  };
+
+  /** Modal-only label: "A (Técnica) · Informática". Elsewhere the app prints "A (Técnica)". */
+  const sectionLabelWithSpecialty = (name: string, isTechnical: boolean, specialty: string | null) => {
+    const label = sectionDisplayName({ name, is_technical: isTechnical });
+    return isTechnical && specialty ? `${label} · ${specialty}` : label;
   };
 
   const renderPending = (grade: GradeLevel, label: string) => {
@@ -190,7 +234,7 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
         <Label className="w-full text-xs text-muted-foreground">{label}</Label>
         {pending.map((p) => (
           <Badge key={p.name} variant="default" className="gap-1">
-            {sectionDisplayName({ name: p.name, is_technical: p.isTechnical })}
+            {sectionLabelWithSpecialty(p.name, p.isTechnical, p.specialty)}
             <button type="button" onClick={() => removePendingSection(grade, p.name)} className="ml-1 hover:text-destructive">
               <X className="h-3 w-3" />
             </button>
@@ -214,7 +258,7 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
               className="cursor-pointer hover:bg-secondary/80"
               onClick={() => startEditing(s)}
             >
-              {sectionDisplayName(s)}
+              {sectionLabelWithSpecialty(s.name, !!s.is_technical, s.technical_specialty)}
             </Badge>
           ))}
         </div>
@@ -234,6 +278,11 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
       onTechnicalChange={(value) => {
         if (activeGrade !== grade) selectGrade(grade);
         setNewSectionTechnical(value);
+      }}
+      specialty={activeGrade === grade ? newSectionSpecialty : ""}
+      onSpecialtyChange={(value) => {
+        if (activeGrade !== grade) selectGrade(grade);
+        setNewSectionSpecialty(value);
       }}
       allowTechnical={gradeAllowsTechnical(grade)}
       onAdd={() => addSectionToGrade(grade)}
@@ -261,7 +310,7 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
                 <Label className="font-medium w-20">Grado:</Label>
                 <span className="text-muted-foreground">{categoryGradeLabel(editingSection.grade_level)}</span>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <Label className="font-medium w-20">Sección:</Label>
                 <Input
                   value={editingName}
@@ -271,16 +320,14 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
                   autoFocus
                 />
                 {gradeAllowsTechnical(editingSection.grade_level) && (
-                  <div className="flex items-center gap-1.5">
-                    <Checkbox
-                      id="editing-section-technical"
-                      checked={editingTechnical}
-                      onCheckedChange={(checked) => setEditingTechnical(checked === true)}
-                    />
-                    <Label htmlFor="editing-section-technical" className="text-sm font-normal cursor-pointer">
-                      Técnica
-                    </Label>
-                  </div>
+                  <TechnicalSectionFields
+                    id="editing-section"
+                    isTechnical={editingTechnical}
+                    onTechnicalChange={setEditingTechnical}
+                    specialty={editingSpecialty}
+                    onSpecialtyChange={setEditingSpecialty}
+                    onEnter={saveEditing}
+                  />
                 )}
               </div>
               <div className="flex justify-end gap-2">
@@ -315,8 +362,8 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-sm font-medium">Sección:</Label>
+                        <div className="flex items-start gap-2">
+                          <Label className="text-sm font-medium pt-2.5">Sección:</Label>
                           {renderLetterInput(grade.value)}
                         </div>
                         {hasPending && (
@@ -345,8 +392,8 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
                 <Label className="font-medium w-20">Grado:</Label>
                 <span className="text-muted-foreground">{categoryGradeLabel(target.grade)}</span>
               </div>
-              <div className="flex items-center gap-4">
-                <Label className="font-medium w-20">Sección:</Label>
+              <div className="flex items-start gap-4">
+                <Label className="font-medium w-20 pt-2.5">Sección:</Label>
                 {renderLetterInput(target.grade, true)}
               </div>
               {renderPending(target.grade, "Secciones a crear:")}
