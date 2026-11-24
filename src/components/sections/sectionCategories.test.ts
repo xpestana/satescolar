@@ -1,5 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { buildTechnicalFields, gradeAllowsTechnical } from "./sectionCategories";
+import { buildTechnicalFields, gradeAllowsTechnical, isSectionTaken } from "./sectionCategories";
+
+describe("isSectionTaken", () => {
+  const existing = [
+    { name: "A", is_technical: false },
+    { name: "B", is_technical: null },
+    { name: "C", is_technical: true },
+  ];
+
+  it("allows the same letter once as regular and once as técnica", () => {
+    expect(isSectionTaken(existing, "A", true)).toBe(false);
+    expect(isSectionTaken(existing, "C", false)).toBe(false);
+  });
+
+  it("rejects the same letter with the same type", () => {
+    expect(isSectionTaken(existing, "a", false)).toBe(true);
+    expect(isSectionTaken(existing, "B", false)).toBe(true);
+    expect(isSectionTaken(existing, "C", true)).toBe(true);
+  });
+
+  it("accepts any letter in an empty grade", () => {
+    expect(isSectionTaken([], "A", false)).toBe(false);
+  });
+});
 
 describe("gradeAllowsTechnical", () => {
   it("allows every secondary year and nothing else", () => {

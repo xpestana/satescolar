@@ -84,6 +84,20 @@ export function gradeAllowsTechnical(grade: string): boolean {
   return resolveGradeLevelKind(grade) === "secondary";
 }
 
+/**
+ * A letter can exist twice in the same grade: once as a regular section and once as a técnica
+ * one ("1er Año - A" and "1er Año - A (Técnica)"). Mirrors the DB unique key
+ * (school_id, grade_level, name, is_technical).
+ */
+export function isSectionTaken(
+  gradeSections: { name: string; is_technical?: boolean | null }[],
+  name: string,
+  isTechnical: boolean,
+): boolean {
+  const normalized = name.trim().toUpperCase();
+  return gradeSections.some((s) => s.name === normalized && !!s.is_technical === isTechnical);
+}
+
 export interface TechnicalFields {
   is_technical: boolean;
   technical_specialty: string | null;

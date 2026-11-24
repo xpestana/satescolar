@@ -76,3 +76,9 @@ export function formatSectionLabel(section: SectionLabelLike | null | undefined)
 export function formatGradeSectionLabel(section: SectionLabelLike | null | undefined): string {
   return section ? `${gradeLabel(section.grade_level)} - ${sectionDisplayName(section)}` : "";
 }
+
+/** Section part of a file name: "A" or "A_Tecnica", so a regular and a técnica "A" never collide. */
+export function sectionFileToken(section: SectionNameLike | null | undefined): string {
+  if (!section?.name) return "";
+  return section.is_technical ? `${section.name}_Tecnica` : section.name;
+}

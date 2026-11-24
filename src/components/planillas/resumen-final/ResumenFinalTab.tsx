@@ -26,7 +26,7 @@ import { DEFAULT_PRIMARY_COD, isPrimaryGradeLevel } from "@/lib/resumen-final-le
 import { fetchResumenFinalPrimariaDocxData } from "@/hooks/useResumenFinalPrimariaDocxData";
 import { generateResumenFinalPrimariaDocx } from "@/lib/resumen-final-primaria-docx";
 import { defaultFechaRemisionIso, isoToPlanillaDate } from "@/lib/resumen-final-remision";
-import { sectionDisplayName } from "@/lib/gradeLevels";
+import { sectionDisplayName, sectionFileToken } from "@/lib/gradeLevels";
 
 const gradeLabel = (gradeLevel: string) => GRADE_LABELS[gradeLevel] ?? gradeLevel;
 
@@ -208,7 +208,7 @@ export function ResumenFinalTab() {
       if (downloadPart) {
         const [file] = await buildFiles([downloadPart]);
         const label = gradeLabel(downloadPart.section.grade_level);
-        const filename = `Resumen_Final_${label}_${downloadPart.section.name}_P${downloadPart.parte}.docx`;
+        const filename = `Resumen_Final_${label}_${sectionFileToken(downloadPart.section)}_P${downloadPart.parte}.docx`;
         downloadBlob(file.blob, filename.replace(/\s+/g, "_"));
       } else {
         const yearLabel = (schoolYears.find(y => y.id === selectedYearId)?.year_range ?? selectedYearId).replace(/\//g, "-");

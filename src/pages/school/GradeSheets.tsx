@@ -25,7 +25,7 @@ import jsPDF from "jspdf";
 import { addArialFont } from "@/lib/pdf-fonts";
 import { ModuleGate } from "@/components/modules/ModuleGate";
 import { ModuleLockIcon } from "@/components/modules/ModuleLockIcon";
-import { sectionDisplayName } from "@/lib/gradeLevels";
+import { sectionDisplayName, sectionFileToken } from "@/lib/gradeLevels";
 
 export default function GradeSheets() {
   const { schoolId } = useSchoolId();
@@ -276,7 +276,7 @@ export default function GradeSheets() {
       generateSabanaPdf(doc, sectionDisplayName(section), section.grade_level, year?.year_range || "", data, false, selectedMomento, school?.name || "", sabanaConfig);
       const momentoLabel = selectedMomento === "definitiva" ? "Definitiva" : `Momento_${selectedMomento}`;
       const schoolName = (school?.name || "Colegio").replace(/\s+/g, "_");
-      doc.save(`Sabana_de_Notas_${schoolName}_${GRADE_LABELS[section.grade_level]}_Seccion_${section.name}_${momentoLabel}_${year?.year_range || ""}.pdf`);
+      doc.save(`Sabana_de_Notas_${schoolName}_${GRADE_LABELS[section.grade_level]}_Seccion_${sectionFileToken(section)}_${momentoLabel}_${year?.year_range || ""}.pdf`);
       toast.success("PDF descargado exitosamente");
     } catch (err) {
       console.error(err);

@@ -55,6 +55,11 @@ inscripciones, notas, asistencias y pagos se apoyan en año escolar + sección +
   sección de Secundaria se marca el check **"Técnica"**. Las secciones que existían antes del
   campo quedaron como no técnicas (incluido 6to Año); se cambia editando la sección.
   Solo Secundaria admite el check (`gradeAllowsTechnical`).
+- **Letras repetidas:** en un mismo grado una letra puede existir **una vez normal y una vez
+  técnica** (`1er Año - A` y `1er Año - A (Técnica)`). La clave única es
+  `(school_id, grade_level, name, is_technical)`; el modal valida igual con `isSectionTaken`.
+  Los nombres de archivo usan `sectionFileToken` (`A` / `A_Tecnica`) para no pisarse, y la
+  importación (`import-school-data`) inscribe en la sección normal del grado.
 - **Especialidad (`sections.technical_specialty`, text, nullable):** al marcar "Técnica" aparece el
   campo **Especialidad** (obligatorio; se recorta y se normalizan espacios). Una sección no técnica
   guarda siempre `is_technical = false` y `technical_specialty = NULL`

@@ -5,6 +5,7 @@ import {
   formatSectionLabel,
   formatGradeSectionLabel,
   sectionDisplayName,
+  sectionFileToken,
   NUMERIC_GRADES,
 } from "./gradeLevels";
 
@@ -94,5 +95,13 @@ describe("formatGradeSectionLabel", () => {
       "1er Año - A (Técnica)",
     );
     expect(formatGradeSectionLabel(null)).toBe("");
+  });
+});
+
+describe("sectionFileToken", () => {
+  it("keeps regular and technical sections apart in file names", () => {
+    expect(sectionFileToken({ name: "A" })).toBe("A");
+    expect(sectionFileToken({ name: "A", is_technical: true })).toBe("A_Tecnica");
+    expect(sectionFileToken(null)).toBe("");
   });
 });

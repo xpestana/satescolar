@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import FinalGradesTab from "@/components/grades/FinalGradesTab";
 import { downloadBachilleratoBoleta, downloadAllBachilleratoBoletas, downloadBachilleratoBoletaDefinitiva, downloadAllBachilleratoBoletasDefinitiva } from "@/lib/bachilleratoBoleta";
 import { downloadPrimaryDescriptiveBoleta, downloadAllPrimaryDescriptiveBoletas } from "@/lib/primaryDescriptiveBoleta";
-import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES, formatSectionLabel, sectionDisplayName, formatGradeSectionLabel } from "@/lib/gradeLevels";
+import { GRADE_LABELS, NUMERIC_GRADES, PRIMARY_GRADES, SECONDARY_GRADES, formatSectionLabel, sectionDisplayName, formatGradeSectionLabel, sectionFileToken } from "@/lib/gradeLevels";
 import RepresentativeVisibilityTab from "@/components/grades/RepresentativeVisibilityTab";
 import PdfPreviewDialog from "@/components/grades/PdfPreviewDialog";
 import DiagnosisTab from "@/components/diagnosis/DiagnosisTab";
@@ -579,7 +579,7 @@ export default function GradesConsultation() {
                                   });
                                   await openBoletaPreview(
                                     html,
-                                    `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
+                                    `Boletas_${sectionFileToken(sectionData) || "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
                                     `Sección ${sectionDisplayName(sectionData)} — todas las boletas`,
                                   );
                                 } finally {
@@ -616,7 +616,7 @@ export default function GradesConsultation() {
                                   });
                                   await openBoletaPreview(
                                     html,
-                                    `Boletas_${sectionData?.name ?? "seccion"}_Definitiva_${yearRange}.pdf`,
+                                    `Boletas_${sectionFileToken(sectionData) || "seccion"}_Definitiva_${yearRange}.pdf`,
                                     `Sección ${sectionDisplayName(sectionData)} — Definitiva Final`,
                                   );
                                 } finally {
@@ -656,7 +656,7 @@ export default function GradesConsultation() {
                                   });
                                   await openBoletaPreview(
                                     html,
-                                    `Boletas_${sectionData?.name ?? "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
+                                    `Boletas_${sectionFileToken(sectionData) || "seccion"}_M${selectedMomento}_${yearRange}.pdf`,
                                     `Sección ${sectionDisplayName(sectionData)} — todas las boletas`,
                                   );
                                 } finally {
@@ -696,7 +696,7 @@ export default function GradesConsultation() {
                                   });
                                   await openBoletaPreview(
                                     html,
-                                    `Boletas_${sectionData?.name ?? "seccion"}_Definitiva_${yearRange}.pdf`,
+                                    `Boletas_${sectionFileToken(sectionData) || "seccion"}_Definitiva_${yearRange}.pdf`,
                                     `Sección ${sectionDisplayName(sectionData)} — Definitiva Final`,
                                   );
                                 } finally {

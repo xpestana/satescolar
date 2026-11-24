@@ -15,6 +15,7 @@ import { TechnicalSectionFields } from "./TechnicalSectionFields";
 import {
   buildTechnicalFields,
   categoryGradeLabel,
+  isSectionTaken,
   gradeAllowsTechnical,
   type GradeCategory,
   type GradeLevel,
@@ -91,7 +92,7 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
         variant: "destructive",
         title: "Error",
         description: error.message.includes("duplicate")
-          ? "Una o más secciones ya existen."
+          ? "Una o más secciones ya existen con esa letra y tipo (normal o técnica)."
           : "No se pudieron crear las secciones.",
       });
     },
@@ -128,7 +129,7 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
         variant: "destructive",
         title: "Error",
         description: error.message.includes("duplicate")
-          ? "Ya existe una sección con ese nombre."
+          ? "Ya existe una sección con esa letra y tipo (normal o técnica)."
           : "No se pudo actualizar la sección.",
       });
     },
@@ -141,18 +142,21 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
       toast({ variant: "destructive", title: "Formato inválido", description: "La sección debe ser una sola letra (A-Z)." });
       return;
     }
-    const pending = pendingSections[grade] || [];
-    if (pending.some((p) => p.name === normalized)) {
-      toast({ variant: "destructive", title: "Error", description: "Ya agregaste esta sección." });
-      return;
-    }
-    if (getSectionsForGrade(grade).some((s) => s.name === normalized)) {
-      toast({ variant: "destructive", title: "Error", description: "Esta sección ya existe." });
-      return;
-    }
     const technical = buildTechnicalFields(grade, newSectionTechnical, newSectionSpecialty);
     if (technical.error) {
       toast({ variant: "destructive", title: "Falta la especialidad", description: technical.error });
+      return;
+    }
+    // The same letter may exist once as a regular section and once as a técnica one.
+    const isTechnical = technical.fields.is_technical;
+    const label = sectionDisplayName({ name: normalized, is_technical: isTechnical });
+    const pending = pendingSections[grade] || [];
+    if (pending.some((p) => p.name === normalized && p.isTechnical === isTechnical)) {
+      toast({ variant: "destructive", title: "Error", description: `Ya agregaste la sección ${label}.` });
+      return;
+    }
+    if (isSectionTaken(getSectionsForGrade(grade), normalized, isTechnical)) {
+      toast({ variant: "destructive", title: "Error", description: `La sección ${label} ya existe.` });
       return;
     }
     const item: PendingSection = {
@@ -166,8 +170,11 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
     setNewSectionSpecialty("");
   };
 
-  const removePendingSection = (grade: string, name: string) => {
-    setPendingSections((prev) => ({ ...prev, [grade]: (prev[grade] || []).filter((p) => p.name !== name) }));
+  const removePendingSection = (grade: string, target: PendingSection) => {
+    setPendingSections((prev) => ({
+      ...prev,
+      [grade]: (prev[grade] || []).filter((p) => !(p.name === target.name && p.isTechnical === target.isTechnical)),
+    }));
   };
 
   const saveSectionsForGrade = (grade: GradeLevel) => {
@@ -205,6 +212,13 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
       toast({ variant: "destructive", title: "Falta la especialidad", description: technical.error });
       return;
     }
+    const name = editingName.trim().toUpperCase();
+    const others = getSectionsForGrade(editingSection.grade_level).filter((s) => s.id !== editingSection.id);
+    if (isSectionTaken(others, name, technical.fields.is_technical)) {
+      const label = sectionDisplayName({ name, is_technical: technical.fields.is_technical });
+      toast({ variant: "destructive", title: "Error", description: `La sección ${label} ya existe.` });
+      return;
+    }
     updateSectionMutation.mutate({
       section: editingSection,
       name: editingName,
@@ -233,9 +247,9 @@ export function SectionsModal({ target, onClose, schoolId, sections }: SectionsM
       <div className="flex flex-wrap gap-1">
         <Label className="w-full text-xs text-muted-foreground">{label}</Label>
         {pending.map((p) => (
-          <Badge key={p.name} variant="default" className="gap-1">
+          <Badge key={`${p.name}-${p.isTechnical}`} variant="default" className="gap-1">
             {sectionLabelWithSpecialty(p.name, p.isTechnical, p.specialty)}
-            <button type="button" onClick={() => removePendingSection(grade, p.name)} className="ml-1 hover:text-destructive">
+            <button type="button" onClick={() => removePendingSection(grade, p)} className="ml-1 hover:text-destructive">
               <X className="h-3 w-3" />
             </button>
           </Badge>

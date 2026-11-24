@@ -244,9 +244,13 @@ export default async function handler(req: Request): Promise<Response> {
     {
       const { data: existingSections } = await supabaseAdmin
         .from("sections")
-        .select("id, grade_level, name")
+        .select("id, grade_level, name, is_technical")
         .eq("school_id", schoolId);
-      for (const s of existingSections ?? []) {
+      // Regular sections first, so imported students land in the non-técnica section of the grade.
+      const ordered = [...(existingSections ?? [])].sort(
+        (a, b) => Number(!!a.is_technical) - Number(!!b.is_technical),
+      );
+      for (const s of ordered) {
         // First section found for a grade level wins (we reuse it for enrollment).
         if (!sectionByLevel.has(s.grade_level)) sectionByLevel.set(s.grade_level, s.id);
       }
@@ -268,6 +272,7 @@ export default async function handler(req: Request): Promise<Response> {
           .select("id")
           .eq("school_id", schoolId)
           .eq("grade_level", level)
+          .eq("is_technical", false)
           .limit(1)
           .maybeSingle();
         if (again) {
