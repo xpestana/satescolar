@@ -56,7 +56,7 @@ export type DocumentCount = Record<DocumentKind | "unknown", number>;
 export interface DemographicsBlock {
   key: string;
   title: string;
-  /** Rows share the same age range across every block, like the original sheet. */
+  /** Every age in scope (shared by all blocks); printing drops the ages with no students. */
   ages: AgeCount[];
   bySex: SexCount;
   byDocument: DocumentCount;

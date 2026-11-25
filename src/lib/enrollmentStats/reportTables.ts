@@ -32,17 +32,22 @@ export interface EnrollmentStatsSheet {
 export const NO_BIRTH_DATE_LABEL = "Sin fecha";
 export const UNKNOWN_SEX_LABEL = "S/D";
 
-export interface SexColumnsOptions {
-  /** Adds the "S/D" (sex not recorded) column. Only when some student lacks it. */
-  showUnknownSex: boolean;
-}
+/** Rows whose counts are all zero are not printed (keeps 80+ countries or empty ages out). */
+const hasStudents = (counts: SexCount) => counts.total > 0;
 
-function sexHead(firstColumn: string, { showUnknownSex }: SexColumnsOptions): string[] {
-  return [firstColumn, "M", "F", ...(showUnknownSex ? [UNKNOWN_SEX_LABEL] : []), "Total"];
-}
-
-function sexCells(label: ReportCell, counts: SexCount, { showUnknownSex }: SexColumnsOptions): ReportCell[] {
-  return [label, counts.male, counts.female, ...(showUnknownSex ? [counts.unknown] : []), counts.total];
+/** The "S/D" (sex not recorded) column only appears in tables that have such students. */
+function sexColumns(firstColumn: string, total: SexCount) {
+  const showUnknownSex = total.unknown > 0;
+  return {
+    head: [firstColumn, "M", "F", ...(showUnknownSex ? [UNKNOWN_SEX_LABEL] : []), "Total"],
+    cells: (label: ReportCell, counts: SexCount): ReportCell[] => [
+      label,
+      counts.male,
+      counts.female,
+      ...(showUnknownSex ? [counts.unknown] : []),
+      counts.total,
+    ],
+  };
 }
 
 /** Label + value in the last column, blanks in between (summary rows under the age table). */
@@ -50,57 +55,56 @@ function summaryRow(label: string, value: number, width: number): ReportCell[] {
   return [label, ...Array<ReportCell>(width - 2).fill(""), value];
 }
 
-export function demographicsTable(block: DemographicsBlock, options: SexColumnsOptions): ReportTable {
-  const head = sexHead("Edad", options);
-  const width = head.length;
-  const body = block.ages.map((a) => sexCells(a.age ?? NO_BIRTH_DATE_LABEL, a.counts, options));
-  const documents: [string, number][] = [
+export function demographicsTable(block: DemographicsBlock): ReportTable {
+  const ages = block.ages.filter((a) => hasStudents(a.counts));
+  const { head, cells } = sexColumns("Edad", block.bySex);
+  const summary: [string, number][] = [
+    ["Masculino", block.bySex.male],
+    ["Femenino", block.bySex.female],
+    ["Sin sexo", block.bySex.unknown],
     ["CI", block.byDocument.CI],
     ["CE", block.byDocument.CE],
     ["Pasaporte", block.byDocument.P],
+    ["Sin documento", block.byDocument.unknown],
   ];
-  if (block.byDocument.unknown > 0) documents.push(["Sin documento", block.byDocument.unknown]);
 
   return {
     title: block.title,
     head,
-    body,
+    body: ages.map((a) => cells(a.age ?? NO_BIRTH_DATE_LABEL, a.counts)),
     foot: [
-      sexCells("TOTAL", block.bySex, options),
-      summaryRow("Masculino", block.bySex.male, width),
-      summaryRow("Femenino", block.bySex.female, width),
-      ...(options.showUnknownSex ? [summaryRow("Sin sexo", block.bySex.unknown, width)] : []),
-      ...documents.map(([label, value]) => summaryRow(label, value, width)),
+      cells("TOTAL", block.bySex),
+      ...summary.filter(([, value]) => value > 0).map(([label, value]) => summaryRow(label, value, head.length)),
     ],
   };
 }
 
-export function answerTable(field: FieldBreakdown, options: SexColumnsOptions): ReportTable {
+export function answerTable(field: FieldBreakdown): ReportTable {
+  const { head, cells } = sexColumns("Respuesta", field.total);
   return {
     title: field.label,
-    head: sexHead("Respuesta", options),
-    body: field.answers.map((a) => sexCells(a.label, a.counts, options)),
-    foot: [sexCells("TOTAL", field.total, options)],
+    head,
+    body: field.answers.filter((a) => hasStudents(a.counts)).map((a) => cells(a.label, a.counts)),
+    foot: [cells("TOTAL", field.total)],
   };
 }
 
 /**
  * Sheets exported to Excel/PDF: the demographics sheet (sections, then grade/group/grand totals,
- * like the official form) and the form answers by sex.
+ * like the official form) and the form answers by sex. Fields nobody answered are left out.
  */
 export function buildReportSheets(stats: EnrollmentStats, answers: FieldBreakdown[]): EnrollmentStatsSheet[] {
-  const options: SexColumnsOptions = { showUnknownSex: stats.hasUnknownSex };
   const blocks = [...stats.sectionBlocks, ...stats.gradeBlocks, ...stats.groupBlocks, stats.total];
   return [
     {
       name: "Matrícula",
       title: "Matrícula por edad, sexo y documento de identidad",
-      tables: blocks.map((block) => demographicsTable(block, options)),
+      tables: blocks.map(demographicsTable),
     },
     {
       name: "Respuestas",
       title: "Respuestas del formulario por sexo",
-      tables: answers.map((field) => answerTable(field, options)),
+      tables: answers.filter((field) => hasStudents(field.total)).map(answerTable),
     },
   ];
 }

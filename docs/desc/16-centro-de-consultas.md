@@ -66,7 +66,9 @@ caché de React Query (cambio de filtro instantáneo).
 - **Bloques:** uno por sección (orden de grado, letra, técnica tras su par normal); con "Todos los
   grados" además uno por grado y subtotales por nivel; si hay Secundaria, **Total Media General** y
   **Total Media Técnica** (por `sections.is_technical`); siempre **Total**.
-  Todas las tablas comparten la misma escala de edades.
+- **Sin ceros:** no se imprimen filas en cero (edades, respuestas —p. ej. países—, CE/Pasaporte/
+  Sin sexo/Sin documento); la columna "S/D" solo aparece en la tabla que la necesita y se omiten los
+  campos que nadie respondió. La fila TOTAL siempre se muestra. Aplica igual a pantalla, Excel y PDF.
 - **Respuestas por sexo:** campos del formulario de estudiantes visibles de tipo `checkbox` o
   `select` con `options` fijas, excluyendo `genero`, `sexo`, `tipo_documento`, `nivel_grado`
   (los cubre el cuadro). Los selects geográficos (sin `options`, guardan UUID) quedan fuera.
