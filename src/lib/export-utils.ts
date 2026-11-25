@@ -5,6 +5,13 @@ import QRCode from "qrcode";
 import { buildAttendanceScanUrl } from "@/lib/attendance-url";
 import { resolveImageToPngDataUrl } from "@/lib/image-resolve";
 import { sectionDisplayName } from "@/lib/gradeLevels";
+import {
+  DEFAULT_PDF_FOOTER,
+  DEFAULT_PDF_HEADER,
+  PDF_MARGIN,
+  drawPdfSchoolFooter,
+  drawPdfSchoolHeader,
+} from "@/lib/pdfSchoolBranding";
 
 interface ExportColumn {
   key: string;
@@ -112,112 +119,12 @@ export async function downloadPDF(
   footerConfig?: PdfFooterConfig
 ) {
   // Default: show everything if no config provided
-  const hc: PdfHeaderConfig = headerConfig ?? {
-    show_logo: true, show_name: true, show_dea_code: true,
-    show_statistical_code: true, show_address: true, show_phone: true, show_rif: true,
-  };
-  const fc: PdfFooterConfig = footerConfig ?? {
-    show_address: true, show_phone: true, show_rif: true,
-  };
+  const hc = headerConfig ?? DEFAULT_PDF_HEADER;
+  const fc = footerConfig ?? DEFAULT_PDF_FOOTER;
   const isLandscape = columns.length > 5;
   const doc = new jsPDF({ orientation: isLandscape ? "landscape" : "portrait" });
-  const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 14;
-  let startY = 15;
-
-  if (schoolInfo) {
-    const now = new Date();
-    const dateStr = `Fecha de emisión: ${now.toLocaleDateString("es-VE", {
-      year: "numeric", month: "2-digit", day: "2-digit",
-    })} ${now.toLocaleTimeString("es-VE", { hour: "2-digit", minute: "2-digit" })}`;
-
-    // Date top-right
-    doc.setFontSize(8);
-    doc.setTextColor(100);
-    doc.text(dateStr, pageWidth - margin, startY, { align: "right" });
-
-    // Logo
-    let textX = margin;
-    if (hc.show_logo !== false && schoolInfo.logoUrl) {
-      const logoBase64 = await loadImageAsBase64(schoolInfo.logoUrl);
-      if (logoBase64) {
-        doc.addImage(logoBase64, "PNG", margin, startY + 2, 22, 22);
-        textX = margin + 26;
-      }
-    }
-
-    // Institution info
-    const infoX = textX;
-    let infoY = startY + 5;
-
-    doc.setFontSize(9);
-    doc.setTextColor(0);
-    doc.text("República Bolivariana de Venezuela", infoX, infoY);
-    infoY += 5;
-
-    if (hc.show_name !== false) {
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text(schoolInfo.name.toUpperCase(), infoX, infoY);
-      infoY += 5;
-    }
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(60);
-
-    // Codes line
-    const codeParts: string[] = [];
-    if (hc.show_dea_code !== false) codeParts.push(`Código DEA: ${schoolInfo.deaCode}`);
-    if (hc.show_statistical_code !== false && schoolInfo.statisticalCode) codeParts.push(`Código Estadístico: ${schoolInfo.statisticalCode}`);
-    if (codeParts.length > 0) {
-      doc.text(codeParts.join("  -  "), infoX, infoY);
-      infoY += 4;
-    }
-
-    // RIF in header
-    if (hc.show_rif !== false && schoolInfo.rif) {
-      doc.text(`RIF: ${schoolInfo.rif}`, infoX, infoY);
-      infoY += 4;
-    }
-
-    // Address line
-    if (hc.show_address !== false) {
-      const addressParts = [schoolInfo.address];
-      if (schoolInfo.parish) addressParts.push(`Parroquia: ${schoolInfo.parish}`);
-      if (schoolInfo.municipality) addressParts.push(`Municipio: ${schoolInfo.municipality}`);
-      if (schoolInfo.city) addressParts.push(`Ciudad: ${schoolInfo.city}`);
-      if (schoolInfo.state) addressParts.push(`Estado: ${schoolInfo.state}`);
-      const addressLine = addressParts.filter(Boolean).join("   ");
-      const maxWidth = pageWidth - infoX - margin;
-      const addressLines = doc.splitTextToSize(addressLine, maxWidth);
-      doc.text(addressLines, infoX, infoY);
-      infoY += addressLines.length * 4;
-    }
-
-    // Phone in header
-    if (hc.show_phone !== false && schoolInfo.phone) {
-      doc.text(`Tel: ${schoolInfo.phone}`, infoX, infoY);
-      infoY += 4;
-    }
-
-    // Separator line
-    infoY += 2;
-    doc.setDrawColor(41, 128, 185);
-    doc.setLineWidth(0.5);
-    doc.line(margin, infoY, pageWidth - margin, infoY);
-
-    startY = infoY + 6;
-
-    // Report title
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Reporte de ${filename}`, pageWidth / 2, startY, { align: "center" });
-    doc.setFont("helvetica", "normal");
-    startY += 8;
-  }
+  let startY = schoolInfo ? await drawPdfSchoolHeader(doc, schoolInfo, hc, `Reporte de ${filename}`) : 15;
 
   if (startY > pageHeight * 0.7) {
     doc.addPage();
@@ -230,41 +137,8 @@ export async function downloadPDF(
     styles: { fontSize: 7, cellPadding: 2, overflow: "linebreak", cellWidth: "wrap" },
     headStyles: { fillColor: [41, 128, 185], fontSize: 7 },
     horizontalPageBreak: true,
-    margin: { top: startY, left: margin, right: margin, bottom: 20 },
-    didDrawPage: (data) => {
-      const currentPageHeight = doc.internal.pageSize.getHeight();
-      const pageCount = (doc as any).internal.getNumberOfPages();
-
-      // School footer info
-      if (schoolInfo) {
-        const footerParts: string[] = [];
-        if (fc.show_address !== false) {
-          const addrParts = [schoolInfo.address];
-          if (schoolInfo.parish) addrParts.push(`Parroquia: ${schoolInfo.parish}`);
-          if (schoolInfo.municipality) addrParts.push(`Municipio: ${schoolInfo.municipality}`);
-          if (schoolInfo.state) addrParts.push(schoolInfo.state);
-          footerParts.push(addrParts.filter(Boolean).join(", "));
-        }
-        if (fc.show_phone !== false && schoolInfo.phone) footerParts.push(`Tel: ${schoolInfo.phone}`);
-        if (fc.show_rif !== false && schoolInfo.rif) footerParts.push(`RIF: ${schoolInfo.rif}`);
-
-        if (footerParts.length > 0) {
-          doc.setFontSize(6);
-          doc.setTextColor(130);
-          doc.text(footerParts.join("  |  "), pageWidth / 2, currentPageHeight - 12, { align: "center" });
-        }
-      }
-
-      // Page number
-      doc.setFontSize(7);
-      doc.setTextColor(150);
-      doc.text(
-        `Página ${data.pageNumber} de ${pageCount}`,
-        pageWidth / 2,
-        currentPageHeight - 8,
-        { align: "center" }
-      );
-    },
+    margin: { top: startY, left: PDF_MARGIN, right: PDF_MARGIN, bottom: 20 },
+    didDrawPage: (data) => drawPdfSchoolFooter(doc, schoolInfo, fc, data.pageNumber),
   });
 
   // Blob + anchor download works reliably in PWA/standalone; doc.save() often fails silently.
@@ -577,7 +451,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   };
 }
 
-function triggerDownload(blob: Blob, filename: string) {
+export function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

@@ -97,7 +97,7 @@ const navSections: NavSection[] = [
       { label: "Familias", href: "/registros/familias", icon: UsersRound, requiredRole: "school", permission: "families.view" },
       { label: "Inscripciones", href: "/inscripciones", icon: ClipboardCheck, requiredRole: "school", permission: "enrollments.view" },
       { label: "Docentes", href: "/registros/docentes", icon: BookOpen, requiredRole: "school", permission: "teachers.view", module: TEACHING_MODULES },
-      { label: "Búsqueda Avanzada", href: "/registros/busqueda-avanzada", icon: Search, requiredRole: "school" },
+      { label: "Centro de Consultas", href: "/registros/centro-consultas", icon: Search, requiredRole: "school" },
     ],
   },
   {

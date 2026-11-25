@@ -86,7 +86,10 @@ qué datos existen de cada persona (ver [03](03-familias-y-representantes.md),
 
 Esquema de `form_fields`: `field_name`, `field_label`, `field_type` (enum `field_type`),
 `form_type`, `group_id`, `field_order`, `is_required`, `is_visible`, `options` (JSON, para
-selects), `placeholder`. Hay **campos protegidos** (siempre obligatorios, no eliminables).
+selects), `placeholder`. Hay **campos protegidos** (siempre obligatorios, no eliminables;
+`src/lib/protected-fields.ts`). En estudiantes incluyen **`fecha_nacimiento`** y **`genero`**
+(o `sexo`), porque la Estadística de matrícula calcula edad y sexo de ellos
+(ver [16-centro-de-consultas](16-centro-de-consultas.md)).
 
 **Tipo de documento (`tipo_documento`, select):** las opciones viven en `form_fields.options`
 (el editor no las cambia). Por defecto: estudiantes `V`, `E`, `CE`, `P`; representantes y docentes

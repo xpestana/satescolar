@@ -2,9 +2,6 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSchoolId } from "@/hooks/useSchoolId";
-import logoBlack from "@/assets/logo-black.svg";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,7 +17,9 @@ import StudentGradeAccessToggle from "@/components/students/StudentGradeAccessTo
 import { studentFullName } from "@/lib/studentName";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet, type PdfHeaderConfig, type PdfFooterConfig } from "@/lib/export-utils";
+import { downloadCSV, downloadExcel, downloadPDF, downloadCarnet } from "@/lib/export-utils";
+import { useSchoolYears } from "@/hooks/useSchoolYears";
+import { usePdfSchoolBranding } from "@/hooks/usePdfSchoolBranding";
 import { ViewRecordModal } from "@/components/search/ViewRecordModal";
 import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { ViewTeacherModal } from "@/components/search/ViewTeacherModal";
@@ -108,7 +107,8 @@ function SortableHeaderCell({ col }: { col: ColumnDef }) {
   );
 }
 
-export default function AdvancedSearch() {
+/** "Búsqueda avanzada" tab of the Centro de Consultas: every student/representative/teacher field. */
+export function AdvancedSearchTab() {
   const { schoolId, isLoading: schoolLoading } = useSchoolId();
   const queryClient = useQueryClient();
   const { data: carnetConfig } = useCarnetConfig(schoolId);
@@ -124,19 +124,8 @@ export default function AdvancedSearch() {
   const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
 
-  const { data: schoolYears = [] } = useQuery({
-    queryKey: ["school-years-all", schoolId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("school_years")
-        .select("*")
-        .eq("school_id", schoolId!)
-        .order("year_range", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!schoolId,
-  });
+  const { data: schoolYears = [] } = useSchoolYears(schoolId);
+  const { school: schoolInfo, schoolInfo: pdfSchoolInfo, headerConfig, footerConfig } = usePdfSchoolBranding(schoolId);
 
   // Enrollments of the selected school year: student_id -> grade label of its section
   const { data: yearEnrollments } = useQuery({
@@ -324,36 +313,6 @@ export default function AdvancedSearch() {
     const newOrder = arrayMove(currentKeys, oldIndex, newIndex);
     saveOrder(newOrder);
   };
-
-  // Fetch school info for PDF header
-  const { data: schoolInfo } = useQuery({
-    queryKey: ["school-info-export", schoolId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("schools")
-        .select("name, dea_code, statistical_code, address, logo_url, institution_type, phone, rif, states(name), municipalities(name), cities(name), parishes(name)")
-        .eq("id", schoolId!)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!schoolId,
-  });
-
-  // Fetch planilla general config for PDF header/footer
-  const { data: planillaConfig } = useQuery({
-    queryKey: ["planilla-general-config", schoolId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("planilla_general_config" as any)
-        .select("header_config, footer_config")
-        .eq("school_id", schoolId!)
-        .single();
-      if (error && error.code !== "PGRST116") throw error;
-      return data as unknown as { header_config: PdfHeaderConfig; footer_config: PdfFooterConfig } | null;
-    },
-    enabled: !!schoolId,
-  });
 
   // Fetch active school year for carnet
   const { data: activeSchoolYear } = useQuery({
@@ -582,23 +541,7 @@ export default function AdvancedSearch() {
 
   const handleExportPDF = () => {
     const { cols, rows } = getExportData();
-    const institutionType = schoolInfo?.institution_type === "public" ? "Unidad Educativa" :
-      schoolInfo?.institution_type === "private" ? "Unidad Educativa Privada" :
-      schoolInfo?.institution_type === "subsidized" ? "Unidad Educativa Subvencionada" : "Unidad Educativa";
-    const pdfSchoolInfo = schoolInfo ? {
-      name: `${institutionType} ${schoolInfo.name}`,
-      deaCode: schoolInfo.dea_code,
-      statisticalCode: schoolInfo.statistical_code,
-      address: schoolInfo.address,
-      phone: schoolInfo.phone,
-      rif: schoolInfo.rif,
-      state: (schoolInfo.states as any)?.name || "",
-      municipality: (schoolInfo.municipalities as any)?.name || "",
-      city: (schoolInfo.cities as any)?.name || "",
-      parish: (schoolInfo.parishes as any)?.name || "",
-      logoUrl: schoolInfo.logo_url || undefined,
-    } : undefined;
-    downloadPDF(cols, rows, typeLabel, pdfSchoolInfo, planillaConfig?.header_config, planillaConfig?.footer_config);
+    downloadPDF(cols, rows, typeLabel, pdfSchoolInfo, headerConfig, footerConfig);
   };
 
   const handleEditRecord = (record: any) => {
@@ -618,14 +561,10 @@ export default function AdvancedSearch() {
     const fd = (record.form_data ?? {}) as Record<string, any>;
     const name = [fd.primer_nombre, fd.segundo_nombre, fd.primer_apellido, fd.segundo_apellido]
       .filter(Boolean).join(" ") || "Sin nombre";
-    
-    const institutionType = schoolInfo?.institution_type === "public" ? "Unidad Educativa" :
-      schoolInfo?.institution_type === "private" ? "Unidad Educativa Privada" :
-      schoolInfo?.institution_type === "subsidized" ? "Unidad Educativa Subvencionada" : "Unidad Educativa";
 
     const locationParts = [
-      (schoolInfo?.cities as any)?.name,
-      (schoolInfo?.states as any)?.name,
+      schoolInfo?.cities?.name,
+      schoolInfo?.states?.name,
     ].filter(Boolean);
 
     const entityType = formType === "student" ? "student" : formType === "representative" ? "representative" : "teacher";
@@ -672,9 +611,7 @@ export default function AdvancedSearch() {
   const isLoading = schoolLoading || recordsLoading;
 
   return (
-    <DashboardLayout>
-      <PageHeader title="Búsqueda Avanzada" breadcrumbs={[{ label: "Comunidad Escolar" }, { label: "Búsqueda Avanzada" }]} />
-
+    <>
       <div className="space-y-4">
         {/* Tabs + controls */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
@@ -975,6 +912,6 @@ export default function AdvancedSearch() {
           getTextValue={getTextValue}
         />
       )}
-    </DashboardLayout>
+    </>
   );
 }

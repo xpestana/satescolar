@@ -18,7 +18,7 @@ import FamiliesList from "./pages/school/FamiliesList";
 import EditFamily from "./pages/school/EditFamily";
 import AddStudent from "./pages/school/AddStudent";
 import AddRepresentative from "./pages/school/AddRepresentative";
-import AdvancedSearch from "./pages/school/AdvancedSearch";
+import ConsultationCenter from "./pages/school/ConsultationCenter";
 import SubjectsList from "./pages/school/SubjectsList";
 import SubjectAssignments from "./pages/school/SubjectAssignments";
 import TeachersList from "./pages/school/TeachersList";
@@ -224,13 +224,14 @@ const App = () => (
                 }
               />
               <Route
-                path="/registros/busqueda-avanzada"
+                path="/registros/centro-consultas"
                 element={
                   <ProtectedRoute requiredRole="school">
-                    <AdvancedSearch />
+                    <ConsultationCenter />
                   </ProtectedRoute>
                 }
               />
+              <Route path="/registros/busqueda-avanzada" element={<Navigate to="/registros/centro-consultas" replace />} />
               <Route
                 path="/registros/areas"
                 element={

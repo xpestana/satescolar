@@ -20,7 +20,7 @@ import { useSchoolModules } from "@/hooks/useSchoolModules";
  *
  * Presentational on purpose: the caller owns the data (see `useStudentGradeBlock`) so a list can
  * resolve every student with a single query instead of one per row. Rendered from the family
- * sheet, from Búsqueda Avanzada and from the visibility tab of Notas y Boletas.
+ * sheet, from the Centro de Consultas (Búsqueda avanzada tab) and from the visibility tab of Notas y Boletas.
  */
 
 interface StudentGradeAccessToggleProps {

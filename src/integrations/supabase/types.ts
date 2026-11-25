@@ -6353,32 +6353,38 @@ export type Database = {
       }
       students: {
         Row: {
+          birth_date: string | null
           created_at: string
           document_id: string | null
           family_id: string
           form_data: Json | null
           id: string
           photo_url: string | null
+          sex: Database["public"]["Enums"]["student_sex"] | null
           status: Database["public"]["Enums"]["student_status"]
           updated_at: string
         }
         Insert: {
+          birth_date?: string | null
           created_at?: string
           document_id?: string | null
           family_id: string
           form_data?: Json | null
           id?: string
           photo_url?: string | null
+          sex?: Database["public"]["Enums"]["student_sex"] | null
           status?: Database["public"]["Enums"]["student_status"]
           updated_at?: string
         }
         Update: {
+          birth_date?: string | null
           created_at?: string
           document_id?: string | null
           family_id?: string
           form_data?: Json | null
           id?: string
           photo_url?: string | null
+          sex?: Database["public"]["Enums"]["student_sex"] | null
           status?: Database["public"]["Enums"]["student_status"]
           updated_at?: string
         }
@@ -6694,6 +6700,26 @@ export type Database = {
           remaining_original_amount: number
         }[]
       }
+      get_enrollment_answer_breakdown: {
+        Args: { p_school_id: string; p_school_year_id: string }
+        Returns: {
+          answer: string
+          field_name: string
+          section_id: string
+          sex: Database["public"]["Enums"]["student_sex"]
+          total: number
+        }[]
+      }
+      get_enrollment_demographics: {
+        Args: { p_school_id: string; p_school_year_id: string }
+        Returns: {
+          age: number
+          document_kind: string
+          section_id: string
+          sex: Database["public"]["Enums"]["student_sex"]
+          total: number
+        }[]
+      }
       get_delinquent_balances_for_family: {
         Args: {
           _family_id: string
@@ -6956,6 +6982,7 @@ export type Database = {
         | "5_ano"
         | "6_ano"
       institution_type: "public" | "private" | "subsidized" | "other"
+      student_sex: "male" | "female"
       student_status: "active" | "suspended" | "graduated" | "completed"
     }
     CompositeTypes: {
@@ -7121,6 +7148,7 @@ export const Constants = {
         "6_ano",
       ],
       institution_type: ["public", "private", "subsidized", "other"],
+      student_sex: ["male", "female"],
       student_status: ["active", "suspended", "graduated", "completed"],
     },
   },

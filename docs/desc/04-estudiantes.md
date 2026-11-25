@@ -40,6 +40,9 @@ sus estudiantes; el colegio los gestiona a través de familias, inscripciones y 
     `primer_apellido`, `segundo_apellido`. El nombre a mostrar se arma
     `[primer_nombre, primer_apellido].filter(Boolean).join(" ")` (patrón usado en toda la app;
     ver búsqueda en `PaymentRegistration.tsx` y la tabla de "Últimos Pagos" en [12-pagos](12-pagos.md)).
+- `birth_date` (`date`) y `sex` (enum `student_sex`): copias tipadas de `form_data.fecha_nacimiento`
+  y `form_data.genero` que mantiene el trigger `students_sync_demographics`; alimentan la
+  Estadística de matrícula ([16](16-centro-de-consultas.md)). No se editan directo.
 - `student_grade_access` — **bloqueo del acceso del representante a notas y boletas**
   (PK `student_id`): `school_id`, `is_blocked`, `reason`. No es una columna de `students` a
   propósito: el representante tiene `UPDATE` sobre `students` sin restricción de columnas y
@@ -54,7 +57,7 @@ estudiante concreto. El interruptor está en **cuatro sitios**, todos sobre `stu
 y con el mismo componente `StudentGradeAccessToggle`:
 
 1. Ficha de la familia (`ViewFamilyModal`), junto al selector de estado del estudiante.
-2. Búsqueda Avanzada (`/registros/busqueda-avanzada`), pestaña Estudiantes → columna Acciones.
+2. Centro de Consultas (`/registros/centro-consultas`), pestaña Búsqueda avanzada → Estudiantes → columna Acciones.
 3. `/notas/consulta` → pestaña "Visibilidad para Representantes", como lista de todos los
    estudiantes inscritos en el año escolar.
 4. Lista de familias (`/registros/familias`) → columna Acciones, ícono de candado: abre

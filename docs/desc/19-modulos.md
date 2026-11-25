@@ -58,7 +58,7 @@ Las secciones siguen los módulos, con lo gratis primero:
 
 | Sección | Ítems | Módulo |
 |---|---|---|
-| Comunidad Escolar | Familias, Inscripciones, Docentes, Búsqueda Avanzada | Registro (Docentes: `TEACHING_MODULES`) |
+| Comunidad Escolar | Familias, Inscripciones, Docentes, Centro de Consultas | Registro (Docentes: `TEACHING_MODULES`) |
 | Académico | Áreas, Asignación de Áreas, Notas y Boletas, Planillas, Supervisión Aulas | `TEACHING_MODULES`, `grades`, mixto, `virtual_classroom` |
 | Asistencias | Escáner QR, Registro de Asistencias, Dashboard Asistencia | `attendance` |
 | Pagos | Dashboard, Registro, Estado de Cuenta, Morosos, Ingresos, Reporte | `payments` |

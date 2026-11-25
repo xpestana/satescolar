@@ -319,7 +319,7 @@ Cuarta pestaña de `/notas/consulta`, **"Visibilidad para Representantes"**
    tabla `student_grade_access`. El bloqueo aplica a todos los años y momentos.
 
 El mismo bloqueo por estudiante se opera desde **la ficha de la familia**
-(`ViewFamilyModal`, junto al estado del estudiante), desde **Búsqueda Avanzada**
+(`ViewFamilyModal`, junto al estado del estudiante), desde el **Centro de Consultas** (pestaña Búsqueda avanzada)
 (`AdvancedSearch`, columna Acciones, solo en la pestaña Estudiantes) y desde **la lista de
 familias** (`FamiliesList` → `FamilyGradeAccessDialog`, ícono de candado: lista los estudiantes
 de la familia para bloquear solo al que corresponda). Los cuatro puntos comparten el componente

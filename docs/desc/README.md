@@ -95,7 +95,7 @@ La lógica de servidor vive en `supabase/functions/` (Deno). Cada archivo de tem
 | 13 | [13-correos.md](13-correos.md) | Correos y plantillas |
 | 14 | [14-carnet.md](14-carnet.md) | Carnet |
 | 15 | [15-configuracion-colegio.md](15-configuracion-colegio.md) | Configuración del colegio |
-| 16 | [16-busqueda-avanzada.md](16-busqueda-avanzada.md) | Búsqueda avanzada |
+| 16 | [16-centro-de-consultas.md](16-centro-de-consultas.md) | Centro de Consultas (búsqueda avanzada y estadística de matrícula) |
 | 17 | [17-importacion-de-datos.md](17-importacion-de-datos.md) | Importación de datos |
 | 18 | [18-dashboards.md](18-dashboards.md) | Dashboards por rol |
 | 19 | [19-modulos.md](19-modulos.md) | Módulos habilitables por colegio (venta por módulos) |

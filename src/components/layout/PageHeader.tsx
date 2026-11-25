@@ -48,7 +48,7 @@ const DESCRIPTIONS: Array<[string, string]> = [
   ["Estudiantes Morosos", "Detecta a tiempo los casos morosos y actúa con información financiera precisa."],
   ["Estudiantes", "Visualiza, organiza y actualiza la información de cada estudiante con total facilidad."],
   ["Inscripciones", "Centraliza el proceso de inscripción y haz seguimiento del estatus de cada estudiante en tiempo real."],
-  ["Búsqueda Avanzada", "Encuentra cualquier dato del colegio en segundos con filtros inteligentes y precisos."],
+  ["Centro de Consultas", "Encuentra cualquier dato del colegio y obtén la matrícula por edad, sexo y documento en segundos."],
 
   // Administrativo / pagos
   ["Dashboard de Pagos", "Visualiza la salud financiera del colegio con métricas claras y reportes en tiempo real."],

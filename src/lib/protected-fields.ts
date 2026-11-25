@@ -15,7 +15,8 @@ export const PROTECTED_FIELDS: Record<ProtectedFormType, string[]> = {
     "tipo_documento", "documento", "cedula", "cedula_escolar",
     "primer_nombre", "nombres",
     "primer_apellido", "segundo_apellido", "apellidos",
-    "fecha_nacimiento",
+    // Edad y sexo alimentan la estadística de matrícula (columnas students.birth_date / sex).
+    "fecha_nacimiento", "genero", "sexo",
   ],
   teacher: [
     "tipo_documento", "documento", "cedula",

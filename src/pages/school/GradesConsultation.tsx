@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useSchoolId } from "@/hooks/useSchoolId";
+import { useSchoolSections } from "@/hooks/useSchoolSections";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -86,19 +87,7 @@ export default function GradesConsultation() {
   });
 
   // Sections
-  const { data: sections = [] } = useQuery({
-    queryKey: ["school-sections-list", schoolId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("sections")
-        .select("id, name, grade_level, is_technical")
-        .eq("school_id", schoolId!)
-        .order("grade_level")
-        .order("name");
-      return data || [];
-    },
-    enabled: !!schoolId,
-  });
+  const { data: sections = [] } = useSchoolSections(schoolId);
 
   const selectedSubjectIsGcrp = subjects.find(s => s.id === selectedSubject)?.subject_type === "gcrp";
   // GCRP áreas are picked by teacher; the diagnosis tab ignores the área and always works by section.

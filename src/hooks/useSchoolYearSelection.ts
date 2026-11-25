@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import {
   readPreferredSchoolYearId,
   rememberSchoolYearChoice,
   resolveSchoolYearId,
 } from "@/lib/schoolYearPreference";
+import { useSchoolYears, type SchoolYearOption } from "@/hooks/useSchoolYears";
 
-export interface SchoolYearOption {
-  id: string;
-  year_range: string;
-  is_active: boolean;
-  [key: string]: any;
-}
+export type { SchoolYearOption };
 
 /**
  * School years of a school plus the currently selected one.
@@ -28,19 +22,7 @@ export interface SchoolYearOption {
  * remembered choice it starts on the active year (or the most recent one if none is active).
  */
 export function useSchoolYearSelection(schoolId: string | null | undefined) {
-  const { data: schoolYears = [], isLoading } = useQuery({
-    queryKey: ["school-years-all", schoolId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("school_years")
-        .select("*")
-        .eq("school_id", schoolId!)
-        .order("year_range", { ascending: false });
-      if (error) throw error;
-      return (data || []) as SchoolYearOption[];
-    },
-    enabled: !!schoolId,
-  });
+  const { data: schoolYears = [], isLoading } = useSchoolYears(schoolId);
 
   const [selectedYearId, setSelectedYearIdState] = useState("");
 
