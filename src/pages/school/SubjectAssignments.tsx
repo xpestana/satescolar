@@ -24,6 +24,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardSkeleton } from "@/components/ui/loading-skeletons";
 import { sectionDisplayName } from "@/lib/gradeLevels";
+import { getSubjectTypeLabel, getSubjectTypeShortLabel } from "@/lib/subjectType";
 
 interface SchoolYear { id: string; year_range: string; is_active: boolean; }
 interface Subject { id: string; name: string; subject_type: string; is_suspended: boolean; }
@@ -528,7 +529,7 @@ export default function SubjectAssignments() {
                             <>
                               <TableCell rowSpan={items.length} className="font-medium align-top border-r">{a.subjectName}</TableCell>
                               <TableCell rowSpan={items.length} className="align-top border-r">
-                                <Badge variant={a.subjectType === "gcrp" ? "default" : "secondary"}>{a.subjectType === "gcrp" ? "GCRP" : "Regular"}</Badge>
+                                <Badge variant={a.subjectType === "gcrp" ? "default" : "secondary"} className="whitespace-nowrap" title={getSubjectTypeLabel(a.subjectType)}>{getSubjectTypeShortLabel(a.subjectType)}</Badge>
                               </TableCell>
                             </>
                           )}
@@ -601,7 +602,7 @@ export default function SubjectAssignments() {
                     }}
                   >
                     {s.name}
-                    <span className="ml-1 opacity-60">({s.subject_type === "gcrp" ? "GCRP" : "Regular"})</span>
+                    <span className="ml-1 opacity-60">({getSubjectTypeShortLabel(s.subject_type)})</span>
                   </Badge>
                 ))}
               </div>

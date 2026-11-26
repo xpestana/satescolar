@@ -20,6 +20,7 @@ import {
 import { BookOpen, CheckCircle2, AlertCircle, ClipboardList, FileEdit, History } from "lucide-react";
 import { EvaluationPlanModal } from "@/components/teacher/EvaluationPlanModal";
 import { GRADE_LABELS, SECONDARY_GRADES, sectionDisplayName } from "@/lib/gradeLevels";
+import { getSubjectTypeShortLabel } from "@/lib/subjectType";
 import { useSchoolModules } from "@/hooks/useSchoolModules";
 import { isDiagnosisGrade } from "@/lib/diagnosisEligibility";
 import { useSectionDiagnosisAssignments } from "@/hooks/useSectionDiagnosisAssignments";
@@ -334,7 +335,7 @@ export default function TeacherSubjects() {
                               variant={a.subject?.subject_type === "gcrp" ? "secondary" : "outline"}
                               className="text-xs"
                             >
-                              {a.subject?.subject_type === "gcrp" ? "GCRP" : "Regular"}
+                              {getSubjectTypeShortLabel(a.subject?.subject_type)}
                             </Badge>
                             <Badge variant="outline" className="text-xs">
                               {getEvaluationLabel(a)}
