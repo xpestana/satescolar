@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { verifyServerSession } from "@/lib/sessionGuard";
 
 /** Minimum time between two checks triggered by the tab becoming visible again. */
@@ -10,7 +10,14 @@ export const SESSION_CHECK_INTERVAL_MS = 5 * 60 * 1000;
  * was revoked on the server is cleared locally, so the user goes to the login screen instead of
  * using an app where every Edge Function answers "No autorizado".
  */
-export function useServerSessionCheck(userId: string | null | undefined): void {
+export function useServerSessionCheck(
+  userId: string | null | undefined,
+  /** Also run when the tab comes back after the interval (e.g. refresh the user's context). */
+  onTabReturn?: () => void,
+): void {
+  const onTabReturnRef = useRef(onTabReturn);
+  onTabReturnRef.current = onTabReturn;
+
   useEffect(() => {
     if (!userId) return;
 
@@ -22,6 +29,7 @@ export function useServerSessionCheck(userId: string | null | undefined): void {
       if (Date.now() - lastCheck < SESSION_CHECK_INTERVAL_MS) return;
       lastCheck = Date.now();
       void verifyServerSession();
+      onTabReturnRef.current?.();
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);

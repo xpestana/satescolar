@@ -84,6 +84,32 @@ Para el rol `school` existe además un sistema de **permisos granulares** por pe
 > Al agregar una pantalla de docente o representante que consulte una tabla nueva, revisa que esa
 > tabla tenga una política **propia** para ese rol. Ya no se cuela por la del personal.
 
+## Contexto del usuario (`get_my_context`) y caché
+Todo lo que la app necesita saber del usuario antes de dibujar una pantalla llega en **una sola**
+petición: `rpc get_my_context()` devuelve `role`, `role_school_id` (`user_roles.school_id`),
+`school_id` (el colegio según el rol: personal, docente vía `teachers`, representante vía
+`families` → `family_schools`), `is_owner`, `teacher_id`, `family_id`, los `modules` del colegio y
+los `permissions` de un sub-usuario. Antes eran 5–7 consultas encadenadas (~3 s).
+
+- `SECURITY INVOKER`: cada tabla se lee con el RLS de quien llama (lo mismo que leían las consultas
+  sueltas). Solo `authenticated` puede ejecutarla (se revoca a `anon`).
+- Rol, docente y familia se resuelven **solo si hay exactamente una fila**, igual que los
+  `maybeSingle()`/`single()` que reemplaza: con duplicados el usuario queda sin rol/colegio, en vez
+  de que una fila creada por otro (el personal puede insertar `teachers`/`families`) decida qué
+  colegio ve.
+- `AuthProvider` (`src/hooks/useAuth.tsx`) expone `context` y `refreshContext`. Lo guarda en
+  `localStorage` (`satescolar:user-context:v1`, una sola entrada, atada al `userId`;
+  `src/lib/userContext.ts`): al recargar pinta al instante con lo guardado y revalida en segundo
+  plano. Se borra al cerrar sesión, y otro usuario (impersonación) nunca lee la entrada de otro.
+  **Solo decide qué se muestra**: los datos siguen protegidos por RLS.
+- Se vuelve a pedir al regresar a la pestaña tras `SESSION_CHECK_INTERVAL_MS` (mismo oyente que
+  `useServerSessionCheck`), por si cambiaron módulos o permisos.
+- `useSchoolId`, `useCurrentSchoolId`, `useSchoolModules` y `usePermissions` leen del contexto (sin
+  consultas propias); `useRepresentativeFamily` y `useSchoolData` piden sus detalles en paralelo.
+- Panel de cada rol: `roleHomePath` (`src/lib/roleHome.ts`), usado por Login, `ProtectedRoute`,
+  `ModuleGate` y la impersonación. Id del usuario para columnas de auditoría: `getCurrentUserId`
+  (`src/lib/currentUser.ts`, lee la sesión local; la validez la comprueba `verifyServerSession`).
+
 ## Cierre de sesión e impersonación
 - `signOut` usa **`scope: 'local'`**: cierra solo la sesión de **este navegador**. supabase-js
   usa `global` por defecto, que borra **todas** las sesiones del usuario en el servidor.

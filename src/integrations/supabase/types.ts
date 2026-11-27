@@ -6707,6 +6707,7 @@ export type Database = {
         Args: { p_school_year_id: string }
         Returns: Json
       }
+      get_my_context: { Args: never; Returns: Json }
       get_enrollment_answer_breakdown: {
         Args: { p_school_id: string; p_school_year_id: string }
         Returns: {

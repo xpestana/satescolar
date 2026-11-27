@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId as currentUserId } from "@/lib/currentUser";
 import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
 import type {
   AmountMode,
@@ -38,11 +39,6 @@ export interface TaxConfig {
   parameters: TaxParameters[];
   concepts: IslrConcept[];
   rates: IslrRateVersion[];
-}
-
-async function currentUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getUser();
-  return data?.user?.id ?? null;
 }
 
 /** Withholding settings of a school. Every school starts with both taxes off. */

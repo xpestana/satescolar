@@ -40,6 +40,17 @@ describe("useServerSessionCheck", () => {
     expect(verifyServerSession).toHaveBeenCalledTimes(2);
   });
 
+  it("runs the tab-return callback together with the re-check, not on the first check", () => {
+    const onTabReturn = vi.fn();
+    renderHook(() => useServerSessionCheck("u1", onTabReturn));
+    expect(onTabReturn).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(SESSION_CHECK_INTERVAL_MS + 1);
+    setVisibility("visible");
+    expect(verifyServerSession).toHaveBeenCalledTimes(2);
+    expect(onTabReturn).toHaveBeenCalledTimes(1);
+  });
+
   it("stops listening after unmount", () => {
     const { unmount } = renderHook(() => useServerSessionCheck("u1"));
     unmount();

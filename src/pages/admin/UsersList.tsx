@@ -42,6 +42,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/data-pagination";
 import { supabase } from "@/integrations/supabase/client";
+import { roleHomePath } from "@/lib/roleHome";
 import { TableSkeleton } from "@/components/ui/loading-skeletons";
 import { toast } from "sonner";
 import { invokeEdgeFunction } from "@/lib/invokeEdgeFunction";
@@ -491,12 +492,7 @@ export default function UsersList() {
         if (!sessionData.session) throw new Error("No se pudo establecer la sesión");
 
         const targetRole = (data.role as UserRole) || role;
-        const dashboardByRole: Record<UserRole, string> = {
-          school: "/school/dashboard",
-          teacher: "/teacher/dashboard",
-          representative: "/representative/dashboard",
-        };
-        const redirectTo = dashboardByRole[targetRole] ?? "/login";
+        const redirectTo = roleHomePath(targetRole === "school" || targetRole === "teacher" || targetRole === "representative" ? targetRole : null);
 
         toast.success(`Sesión iniciada como ${userName}`);
         setTimeout(() => {

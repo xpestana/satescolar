@@ -11,7 +11,9 @@ import { MemoryRouter } from "react-router-dom";
 
 const inserts: Array<{ table: string; payload: unknown }> = [];
 
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" }, userRole: "school" }) }));
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({ user: { id: "u1" }, userRole: "school", loading: false, context: { roleSchoolId: "sc1", schoolId: "sc1" } }),
+}));
 vi.mock("@/components/layout/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));

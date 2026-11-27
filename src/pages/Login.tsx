@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
+import { roleHomePath } from "@/lib/roleHome";
 import logoBlack from "@/assets/logo-black.svg";
 import futuristicBg from "@/assets/futuristic.jpg";
 import { toast } from "sonner";
@@ -30,19 +31,7 @@ export default function Login() {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user && userRole) {
-      if (userRole === "admin") {
-        navigate("/dashboard", { replace: true });
-      } else if (userRole === "school") {
-        navigate("/school/dashboard", { replace: true });
-      } else if (userRole === "representative") {
-        navigate("/representative/dashboard", { replace: true });
-      } else if (userRole === "teacher") {
-        navigate("/teacher/dashboard", { replace: true });
-      } else {
-        navigate("/dashboard", { replace: true });
-      }
-    }
+    if (user && userRole) navigate(roleHomePath(userRole), { replace: true });
   }, [user, userRole, navigate]);
 
   const form = useForm<LoginFormValues>({

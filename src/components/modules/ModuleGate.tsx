@@ -7,17 +7,13 @@ import { useSchoolModules } from "@/hooks/useSchoolModules";
 import type { ModuleKey, SellableModuleKey } from "@/lib/modules/moduleCatalog";
 import { isRequirementMet, pitchedModule, requirementModules, type ModuleRequirement } from "@/lib/modules/moduleRequirement";
 import { LockedModuleOverlay } from "./LockedModuleOverlay";
+import { roleHomePath } from "@/lib/roleHome";
 
 interface ModuleGateProps {
   /** A module, or a list meaning "any of these". */
   module: ModuleRequirement;
   children: ReactNode;
 }
-
-const ROLE_HOME = {
-  teacher: "/teacher/dashboard",
-  representative: "/representative/dashboard",
-} as const;
 
 /**
  * Renders `children` only when the school has `module` active.
@@ -43,7 +39,7 @@ export function ModuleGate({ module, children }: ModuleGateProps) {
   if (!isResolved) return <>{children}</>;
 
   if (userRole === "teacher" || userRole === "representative") {
-    return <Navigate to={ROLE_HOME[userRole]} replace />;
+    return <Navigate to={roleHomePath(userRole)} replace />;
   }
 
   const pitched = pitchedModule(module);

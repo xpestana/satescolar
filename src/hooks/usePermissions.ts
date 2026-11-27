@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo } from "react";
 import { useAuth } from "./useAuth";
 
 export interface PermissionScope {
@@ -20,58 +19,25 @@ interface PermissionsResult {
   loading: boolean;
 }
 
+/**
+ * Permissions of a school user. The owner flag and a sub-user's permission items come with the
+ * auth context (`get_my_context`), so there are no extra requests here.
+ */
 export function usePermissions(): PermissionsResult {
-  const { user, userRole } = useAuth();
+  const { user, userRole, context, loading: authLoading } = useAuth();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["user-permissions", user?.id],
-    enabled: !!user?.id && userRole === "school",
-    staleTime: 60_000,
-    queryFn: async () => {
-      // is_owner?
-      const { data: roleRow } = await supabase
-        .from("user_roles")
-        .select("is_owner, school_id")
-        .eq("user_id", user!.id)
-        .eq("role", "school")
-        .maybeSingle();
+  const isOwner = userRole === "school" && !!context?.isOwner;
 
-      const isOwner = !!roleRow?.is_owner;
-
-      if (isOwner) {
-        return { isOwner: true, items: [] as Array<{ key: string; scope: any }> };
-      }
-
-      // sub-user: load assigned profiles -> items
-      const { data: assigns } = await supabase
-        .from("school_user_profiles")
-        .select("profile_id")
-        .eq("user_id", user!.id);
-
-      const profileIds = (assigns ?? []).map((a: any) => a.profile_id);
-      if (profileIds.length === 0) return { isOwner: false, items: [] };
-
-      const { data: items } = await supabase
-        .from("permission_profile_items")
-        .select("permission_key, scope")
-        .in("profile_id", profileIds);
-
-      return {
-        isOwner: false,
-        items: (items ?? []).map((i: any) => ({ key: i.permission_key, scope: i.scope })),
-      };
-    },
-  });
-
-  const isOwner = !!data?.isOwner;
-  const permissions = new Map<string, PermissionScope[]>();
-  if (data && !isOwner) {
-    for (const it of data.items) {
-      const arr = permissions.get(it.key) ?? [];
+  const permissions = useMemo(() => {
+    const map = new Map<string, PermissionScope[]>();
+    if (userRole !== "school" || !context || context.isOwner) return map;
+    for (const it of context.permissions) {
+      const arr = map.get(it.key) ?? [];
       arr.push((it.scope ?? {}) as PermissionScope);
-      permissions.set(it.key, arr);
+      map.set(it.key, arr);
     }
-  }
+    return map;
+  }, [userRole, context]);
 
   const has = (key: string) => {
     if (userRole !== "school") return false;
@@ -94,5 +60,5 @@ export function usePermissions(): PermissionsResult {
     });
   };
 
-  return { isOwner, permissions, has, hasInScope, loading: isLoading };
+  return { isOwner, permissions, has, hasInScope, loading: !!user && !context && authLoading };
 }

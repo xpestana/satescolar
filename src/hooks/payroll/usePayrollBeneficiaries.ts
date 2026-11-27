@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/currentUser";
 import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
 import type { BeneficiaryPayload } from "@/lib/payroll/withholdings/beneficiaryFormSchema";
 import type { PayrollBeneficiary } from "@/lib/payroll/types";
@@ -30,10 +31,10 @@ export function usePayrollBeneficiaries(schoolId: string | null | undefined) {
   const createBeneficiary = useMutation({
     mutationFn: async (input: BeneficiaryInput): Promise<string> => {
       if (!schoolId) throw new Error("Colegio no resuelto");
-      const { data: userData } = await supabase.auth.getUser();
+      const createdBy = await getCurrentUserId();
       const { data, error } = await supabase
         .from("payroll_beneficiaries")
-        .insert({ ...input, school_id: schoolId, created_by: userData?.user?.id ?? null })
+        .insert({ ...input, school_id: schoolId, created_by: createdBy })
         .select("id")
         .single();
       if (error) throw toPayrollError(error);

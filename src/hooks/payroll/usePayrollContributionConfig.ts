@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId as currentUserId } from "@/lib/currentUser";
 import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
 import {
   DEFAULT_CONTRIBUTION_PARAMETERS,
@@ -10,11 +11,6 @@ import {
 const KEY = "payroll-contribution-config";
 
 export type ContributionParametersInput = Omit<ContributionParameters, "id" | "school_id" | "created_at">;
-
-async function currentUserId(): Promise<string | null> {
-  const { data } = await supabase.auth.getUser();
-  return data?.user?.id ?? null;
-}
 
 /** IVSS, paro forzoso and FAOV of a school. Every school starts with them off. */
 export function usePayrollContributionConfig(schoolId: string | null | undefined) {

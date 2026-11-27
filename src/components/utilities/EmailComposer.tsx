@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/currentUser";
 import { useSchoolId } from "@/hooks/useSchoolId";
 import { useSchoolData } from "@/hooks/useSchoolData";
 import { useCarnetConfig } from "@/hooks/useCarnetConfig";
@@ -225,10 +226,10 @@ export function EmailComposer() {
 
     // Save to history regardless of success/failure
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const sentBy = await getCurrentUserId();
       await supabase.from("email_history").insert({
         school_id: schoolId!,
-        sent_by: user!.id,
+        sent_by: sentBy!,
         recipients: recipients as any,
         subject,
         body_html: html,

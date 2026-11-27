@@ -2,8 +2,8 @@ import { ReactNode, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { PageLoadingSkeleton } from "@/components/ui/loading-skeletons";
-
-type AppRole = "admin" | "school" | "representative" | "teacher";
+import { roleHomePath } from "@/lib/roleHome";
+import type { AppRole } from "@/lib/userContext";
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -37,11 +37,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     }
 
     if (requiredRole && userRole && userRole !== requiredRole) {
-      if (userRole === "admin") navigate("/dashboard");
-      else if (userRole === "school") navigate("/school/dashboard");
-      else if (userRole === "representative") navigate("/representative/dashboard");
-      else if (userRole === "teacher") navigate("/teacher/dashboard");
-      else navigate("/login");
+      navigate(roleHomePath(userRole));
     }
   }, [user, loading, userRole, requiredRole, navigate]);
 

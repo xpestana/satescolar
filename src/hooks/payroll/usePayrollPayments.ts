@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getCurrentUserId } from "@/lib/currentUser";
 import type { Json } from "@/integrations/supabase/types";
 import { toPayrollError } from "@/lib/payroll/withholdings/friendlyPayrollError";
 import { salaryReceiptPdfBase64 } from "@/lib/payroll/generateSalaryReceiptPdf";
@@ -124,8 +125,7 @@ export function usePayrollPayments(
   const approvePayment = useMutation({
     mutationFn: async (paymentId: string) => {
       if (!schoolId) throw new Error("Colegio no resuelto");
-      const { data: userData } = await supabase.auth.getUser();
-      const actorId = userData?.user?.id ?? null;
+      const actorId = await getCurrentUserId();
       const { error } = await supabase
         .from("payroll_payments")
         .update({ status: "approved", approved_by: actorId, approved_at: new Date().toISOString() })
