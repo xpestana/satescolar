@@ -60,7 +60,8 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
   const { data: todayRecords = [], isLoading: loadingToday } = useAttendanceByDate(
     schoolId,
     sectionId ? [sectionId] : [],
-    assignmentId && momento ? TODAY : undefined
+    assignmentId && momento ? TODAY : undefined,
+    subjectId ? [subjectId] : []
   );
 
   // When assignment/momento changes OR today's records load, populate statusMap
@@ -113,6 +114,7 @@ export function RegisterTab({ assignments, schoolId }: RegisterTabProps) {
       entity_id: student.studentId,
       entity_type: "student",
       school_id: schoolId,
+      school_year_id: selectedAssignment!.school_year!.id,
       section_id: selectedAssignment!.section!.id,
       subject_id: selectedAssignment!.subject!.id,
       momento: Number(momento),

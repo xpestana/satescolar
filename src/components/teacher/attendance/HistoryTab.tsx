@@ -54,6 +54,11 @@ export function HistoryTab({ assignments, schoolId, allStudentsBySection }: Hist
     [assignments]
   );
 
+  const subjectIds = useMemo(
+    () => Array.from(new Set(assignments.map((a) => a.subject?.id).filter((id): id is string => !!id))),
+    [assignments]
+  );
+
   const filterAssignment = filterAssignmentId !== "all"
     ? assignments.find((a) => a.id === filterAssignmentId) ?? null
     : null;
@@ -61,17 +66,22 @@ export function HistoryTab({ assignments, schoolId, allStudentsBySection }: Hist
   const activeSectionIds = filterAssignment
     ? ([filterAssignment.section?.id].filter(Boolean) as string[])
     : sectionIds;
+  const activeSubjectIds = filterAssignment
+    ? ([filterAssignment.subject?.id].filter(Boolean) as string[])
+    : subjectIds;
 
   const { data: daysWithRecords = [] } = useAttendanceDaysWithRecords(
     schoolId,
     activeSectionIds,
-    month
+    month,
+    activeSubjectIds
   );
 
   const { data: dayRecords = [], isLoading: loadingRecords } = useAttendanceByDate(
     schoolId,
     activeSectionIds,
-    selectedDate
+    selectedDate,
+    activeSubjectIds
   );
 
   const updateRecord = useUpdateAttendanceRecord();

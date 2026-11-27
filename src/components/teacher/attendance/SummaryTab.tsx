@@ -32,6 +32,8 @@ interface SummaryTabProps {
   isLoading: boolean;
   schoolId: string;
   sectionIds: string[];
+  subjectIds: string[];
+  schoolYearId: string | null;
   studentNameLookup: Map<string, string>;
 }
 
@@ -73,6 +75,8 @@ function StudentHistoryDialog({
   studentName,
   schoolId,
   sectionIds,
+  subjectIds,
+  schoolYearId,
   subjectLookup,
 }: {
   open: boolean;
@@ -81,9 +85,11 @@ function StudentHistoryDialog({
   studentName: string;
   schoolId: string;
   sectionIds: string[];
+  subjectIds: string[];
+  schoolYearId: string | null;
   subjectLookup: Map<string, string>;
 }) {
-  const { data: history = [] } = useStudentAttendanceHistory(schoolId, studentId, sectionIds);
+  const { data: history = [] } = useStudentAttendanceHistory(schoolId, studentId, sectionIds, subjectIds, schoolYearId);
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -149,13 +155,15 @@ export function SummaryTab({
   isLoading,
   schoolId,
   sectionIds,
+  subjectIds,
+  schoolYearId,
   studentNameLookup,
 }: SummaryTabProps) {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   const subjectLookup = new Map<string, string>(); // populated from parent if needed
 
-  const topAbsent = (summary?.absencesByStudent ?? [])
+  const topAbsent = [...(summary?.absencesByStudent ?? [])]
     .sort((a, b) => b.absences - a.absences)
     .slice(0, 10)
     .map((s) => ({
@@ -321,6 +329,8 @@ export function SummaryTab({
           studentName={selectedStudent.name}
           schoolId={schoolId}
           sectionIds={sectionIds}
+          subjectIds={subjectIds}
+          schoolYearId={schoolYearId}
           subjectLookup={subjectLookup}
         />
       )}

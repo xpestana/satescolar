@@ -43,6 +43,7 @@ export type Database = {
           notification_sent: boolean
           record_type: string
           school_id: string
+          school_year_id: string | null
           section_id: string | null
           status: string
           subject_id: string | null
@@ -61,6 +62,7 @@ export type Database = {
           notification_sent?: boolean
           record_type?: string
           school_id: string
+          school_year_id?: string | null
           section_id?: string | null
           status?: string
           subject_id?: string | null
@@ -79,6 +81,7 @@ export type Database = {
           notification_sent?: boolean
           record_type?: string
           school_id?: string
+          school_year_id?: string | null
           section_id?: string | null
           status?: string
           subject_id?: string | null
@@ -6699,6 +6702,10 @@ export type Database = {
           rate_updated_at: string
           remaining_original_amount: number
         }[]
+      }
+      get_teacher_attendance_summary: {
+        Args: { p_school_year_id: string }
+        Returns: Json
       }
       get_enrollment_answer_breakdown: {
         Args: { p_school_id: string; p_school_year_id: string }

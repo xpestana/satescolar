@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { mapAttendanceSummary } from "@/lib/teacherAttendanceScope";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ export interface AttendanceBatchItem {
   entity_id: string;
   entity_type: "student";
   school_id: string;
+  school_year_id: string;
   section_id: string;
   subject_id: string;
   momento: number;
@@ -124,10 +126,11 @@ export function useEnrolledStudents(
 export function useAttendanceByDate(
   schoolId: string | undefined,
   sectionIds: string[],
-  date: Date | undefined
+  date: Date | undefined,
+  subjectIds: string[] = []
 ) {
   return useQuery({
-    queryKey: ["attendance-by-date", schoolId, sectionIds, date ? format(date, "yyyy-MM-dd") : null],
+    queryKey: ["attendance-by-date", schoolId, sectionIds, subjectIds, date ? format(date, "yyyy-MM-dd") : null],
     queryFn: async () => {
       const dateStr = format(date!, "yyyy-MM-dd");
       const { data, error } = await supabase
@@ -137,24 +140,26 @@ export function useAttendanceByDate(
         .eq("entity_type", "student")
         .eq("record_type", "manual")
         .eq("attendance_date", dateStr)
-        .in("section_id", sectionIds);
+        .in("section_id", sectionIds)
+        .in("subject_id", subjectIds);
       if (error) throw error;
       return (data ?? []) as AttendanceRecord[];
     },
-    enabled: !!schoolId && sectionIds.length > 0 && !!date,
+    enabled: !!schoolId && sectionIds.length > 0 && subjectIds.length > 0 && !!date,
   });
 }
 
 export function useAttendanceDaysWithRecords(
   schoolId: string | undefined,
   sectionIds: string[],
-  month: Date
+  month: Date,
+  subjectIds: string[] = []
 ) {
   const monthStart = format(startOfMonth(month), "yyyy-MM-dd");
   const monthEnd = format(endOfMonth(month), "yyyy-MM-dd");
 
   return useQuery({
-    queryKey: ["attendance-days-records", schoolId, sectionIds, monthStart],
+    queryKey: ["attendance-days-records", schoolId, sectionIds, subjectIds, monthStart],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance_records")
@@ -164,12 +169,13 @@ export function useAttendanceDaysWithRecords(
         .eq("record_type", "manual")
         .gte("attendance_date", monthStart)
         .lte("attendance_date", monthEnd)
-        .in("section_id", sectionIds);
+        .in("section_id", sectionIds)
+        .in("subject_id", subjectIds);
       if (error) throw error;
       const unique = new Set((data ?? []).map((r) => r.attendance_date));
       return Array.from(unique).map((d) => new Date(d + "T12:00:00"));
     },
-    enabled: !!schoolId && sectionIds.length > 0,
+    enabled: !!schoolId && sectionIds.length > 0 && subjectIds.length > 0,
   });
 }
 
@@ -240,81 +246,36 @@ export function useBulkUpdateMomento() {
   });
 }
 
-export interface AttendanceSummary {
-  totalSessions: number;
-  totalAbsences: number;
-  attendanceRate: number;
-  absencesByStudent: Array<{ studentId: string; fullName: string; absences: number; total: number }>;
-  absencesByWeek: Array<{ week: string; absences: number; present: number }>;
-}
+export type { AttendanceSummary } from "@/lib/teacherAttendanceScope";
 
-export function useAttendanceSummary(
-  schoolId: string | undefined,
-  sectionIds: string[]
-) {
+/**
+ * Totals for the Resumen tab, aggregated in the database by
+ * `get_teacher_attendance_summary` (only the caller's own section × subject
+ * assignments of that school year). Pass `enabled: false` until the tab is open.
+ */
+export function useAttendanceSummary(schoolYearId: string | null | undefined, enabled = true) {
   return useQuery({
-    queryKey: ["attendance-summary", schoolId, sectionIds],
+    queryKey: ["attendance-summary", schoolYearId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("attendance_records")
-        .select("entity_id, status, attendance_date, section_id")
-        .eq("school_id", schoolId!)
-        .eq("entity_type", "student")
-        .eq("record_type", "manual")
-        .in("section_id", sectionIds);
+      const { data, error } = await supabase.rpc("get_teacher_attendance_summary", {
+        p_school_year_id: schoolYearId!,
+      });
       if (error) throw error;
-
-      const records = data ?? [];
-      const total = records.length;
-      const absences = records.filter((r) => r.status === "absent").length;
-
-      // Per student aggregation (entity_id only — names resolved at render time)
-      const byStudent = new Map<string, { absences: number; total: number }>();
-      for (const r of records) {
-        const cur = byStudent.get(r.entity_id) ?? { absences: 0, total: 0 };
-        cur.total++;
-        if (r.status === "absent") cur.absences++;
-        byStudent.set(r.entity_id, cur);
-      }
-
-      // Per week aggregation (last 8 weeks)
-      const byWeek = new Map<string, { absences: number; present: number }>();
-      for (const r of records) {
-        const d = new Date(r.attendance_date + "T12:00:00");
-        const monday = new Date(d);
-        monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-        const key = format(monday, "dd/MM");
-        const cur = byWeek.get(key) ?? { absences: 0, present: 0 };
-        if (r.status === "absent") cur.absences++;
-        else cur.present++;
-        byWeek.set(key, cur);
-      }
-
-      return {
-        totalSessions: total,
-        totalAbsences: absences,
-        attendanceRate: total > 0 ? Math.round(((total - absences) / total) * 100) : 100,
-        absencesByStudent: Array.from(byStudent.entries()).map(([studentId, v]) => ({
-          studentId,
-          fullName: studentId,
-          ...v,
-        })),
-        absencesByWeek: Array.from(byWeek.entries())
-          .slice(-8)
-          .map(([week, v]) => ({ week, ...v })),
-      } as AttendanceSummary;
+      return mapAttendanceSummary(data);
     },
-    enabled: !!schoolId && sectionIds.length > 0,
+    enabled: enabled && !!schoolYearId,
   });
 }
 
 export function useStudentAttendanceHistory(
   schoolId: string | undefined,
   studentId: string | undefined,
-  sectionIds: string[]
+  sectionIds: string[],
+  subjectIds: string[],
+  schoolYearId: string | null | undefined
 ) {
   return useQuery({
-    queryKey: ["student-attendance-history", schoolId, studentId],
+    queryKey: ["student-attendance-history", schoolId, studentId, schoolYearId, subjectIds],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("attendance_records")
@@ -322,11 +283,13 @@ export function useStudentAttendanceHistory(
         .eq("school_id", schoolId!)
         .eq("entity_id", studentId!)
         .eq("record_type", "manual")
+        .eq("school_year_id", schoolYearId!)
         .in("section_id", sectionIds)
+        .in("subject_id", subjectIds)
         .order("attendance_date", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!schoolId && !!studentId && sectionIds.length > 0,
+    enabled: !!schoolId && !!studentId && !!schoolYearId && sectionIds.length > 0 && subjectIds.length > 0,
   });
 }

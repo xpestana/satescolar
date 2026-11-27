@@ -15,6 +15,7 @@ import { RegisterTab } from "@/components/teacher/attendance/RegisterTab";
 import { HistoryTab } from "@/components/teacher/attendance/HistoryTab";
 import { SummaryTab } from "@/components/teacher/attendance/SummaryTab";
 import { ClipboardList, History, BarChart2 } from "lucide-react";
+import { getAttendanceScope } from "@/lib/teacherAttendanceScope";
 
 // ─── Helper: resolve full name from form_data ────────────────────────────────
 
@@ -117,19 +118,18 @@ export default function TeacherAttendance() {
   const { teacher, schoolId } = useTeacherData();
   const [tab, setTab] = useState("register");
 
-  const { data: assignments = [] } = useTeacherAssignments(teacher?.id);
+  const { data: allAssignments = [] } = useTeacherAssignments(teacher?.id);
 
-  const sectionIds = useMemo(
-    () =>
-      assignments
-        .map((a) => a.section?.id)
-        .filter((id): id is string => !!id),
-    [assignments]
+  // One school year at a time (the active one): sections are reused across years.
+  const { assignments, sectionIds, subjectIds, schoolYearId } = useMemo(
+    () => getAttendanceScope(allAssignments),
+    [allAssignments]
   );
 
+  // Aggregated in the database; only fetched once the Resumen tab is opened.
   const { data: summaryData, isLoading: summaryLoading } = useAttendanceSummary(
-    schoolId ?? undefined,
-    sectionIds
+    schoolYearId,
+    tab === "summary"
   );
 
   return (
@@ -195,6 +195,8 @@ export default function TeacherAttendance() {
                       isLoading={summaryLoading}
                       schoolId={schoolId}
                       sectionIds={sectionIds}
+                      subjectIds={subjectIds}
+                      schoolYearId={schoolYearId}
                       studentNameLookup={studentNameLookup}
                     />
                   );

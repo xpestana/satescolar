@@ -57,6 +57,26 @@ registro manual y dashboard analítico. El docente registra asistencia de sus á
 - `src/pages/AttendanceScan.tsx`
 - `src/components/attendance/...`
 
+## Asistencia del docente (`/teacher/asistencias`)
+Cada registro manual guarda **sección × materia × año escolar × momento × fecha**
+(`attendance_records.section_id`, `subject_id`, `school_year_id`, `momento`). El año escolar es
+necesario porque **las secciones se reutilizan entre años** (`sections` no tiene año).
+Clave única: `(entity_id, attendance_date, section_id, subject_id, momento)`.
+
+- La pantalla trabaja con **un solo año escolar**: el activo, o el más reciente si no hay activo
+  (`getAttendanceScope` en `src/lib/teacherAttendanceScope.ts`).
+- Registrar e Historial filtran por las **secciones y materias del docente**, no solo por sección
+  (antes se mezclaban las materias de otros docentes de la misma sección).
+- **Resumen** se calcula en la base de datos con `get_teacher_attendance_summary(p_school_year_id)`
+  (`SECURITY INVOKER`, limitado a las asignaciones del docente que llama) y solo se pide al abrir la
+  pestaña. Antes descargaba todos los registros de la sección (todos los años y materias), los
+  sumaba en el navegador y quedaba cortado por el límite de filas de PostgREST.
+- Índice parcial `idx_attendance_manual_scope (section_id, subject_id, school_year_id, attendance_date)`
+  para registros manuales de estudiantes.
+- Migración `20261127120000_attendance_school_year_summary.sql`: rellena `school_year_id` de los
+  registros existentes desde la inscripción del estudiante en esa sección o, si no, desde la única
+  asignación (sección, materia). Los que quedan ambiguos siguen con `NULL` y no cuentan en el Resumen.
+
 ## Módulo `attendance`
 - Las rutas `/utilidades/escaner-qr`, `/utilidades/asistencias`, `/utilidades/asistencias-dashboard`
   y `/teacher/asistencias` van envueltas en `<ModuleRoute module="attendance">`.
