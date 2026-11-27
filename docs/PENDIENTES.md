@@ -66,6 +66,36 @@ no cruza a otros colegios. Lo que falla es la separación de funciones dentro de
 
 ---
 
+## 2. El skeleton de carga debe depender de los datos de la pantalla, no del inicio de sesión (UX)
+
+**Prioridad:** media · **Detectado:** 2026-11-27, después del commit `1a3479b`.
+**Temas:** [00-autenticacion-y-roles](desc/00-autenticacion-y-roles.md).
+
+### Qué pasa
+Con el contexto del usuario en caché (`get_my_context` + `localStorage`), `AuthProvider` deja
+`loading = false` casi al instante. `ProtectedRoute` solo muestra `PageLoadingSkeleton` mientras
+`loading` es verdadero, así que **el skeleton ya casi no aparece**: la pantalla se dibuja enseguida
+con el marco (encabezado, pestañas, tablas o selectores vacíos) y los datos llegan después.
+Las cifras mejoraron (los datos se piden a ~0,9 s en lugar de ~3,9 s), pero **se percibe más lento**:
+antes el skeleton "llenaba" la espera y la pantalla aparecía completa de una vez. Ahora se ve un
+marco vacío que se va rellenando.
+
+### Cómo abordarlo (propuesta)
+- El skeleton tiene que reflejar la carga de los **endpoints de la pantalla** (consultas de
+  React Query), no la carga del front ni la del inicio de sesión:
+  - en cada página, mostrar su skeleton mientras sus consultas principales estén en `isLoading`
+    (como ya hacen algunas con `TableSkeleton` o `DashboardSkeleton`), en lugar de pintar tablas o
+    selectores vacíos;
+  - o un patrón común, por ejemplo `<PageDataGate queries={[...]}>`, o `useIsFetching` acotado por
+    `queryKey`, para no repetirlo pantalla por pantalla.
+- No devolverle la espera a `ProtectedRoute`: el inicio de sesión debe seguir siendo inmediato.
+- Revisar primero las pantallas más usadas: panel de cada rol, Asistencias (Registrar),
+  Mis Áreas, Notas, Familias y Pagos.
+- Medir después: tiempo hasta que la pantalla muestra datos reales, y que no haya "saltos" de
+  vacío → lleno.
+
+---
+
 ## Otros cabos sueltos (menores)
 
 - **Datos de prueba en el colegio demo** (creados para los videos tutoriales del 2026-11-26/27):
