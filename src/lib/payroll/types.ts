@@ -3,7 +3,7 @@
 
 import type { PaymentRegime, PersonType, VatWithholdingMode } from "./withholdings/types";
 
-export type PayrollCategory = "teacher" | "admin" | "worker" | "supplier" | "other";
+export type PayrollCategory = "teacher" | "admin" | "worker" | "board" | "supplier" | "other";
 export type ConceptKind = "earning" | "deduction";
 export type PayrollCurrency = "VES" | "USD";
 export type PayrollPaymentStatus = "draft" | "approved" | "paid" | "voided";
@@ -116,6 +116,7 @@ export const CATEGORY_LABELS: Record<PayrollCategory, string> = {
   teacher: "Docente",
   admin: "Administrativo",
   worker: "Obrero",
+  board: "Junta directiva y socios",
   supplier: "Proveedor",
   other: "Otros",
 };

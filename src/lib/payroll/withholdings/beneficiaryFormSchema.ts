@@ -11,7 +11,7 @@ import type { PaymentRegime, PersonType, VatWithholdingMode } from "./types";
 export const NO_ISLR_CONCEPT = "none";
 
 export const beneficiaryFormBaseSchema = z.object({
-  category: z.enum(["teacher", "admin", "worker", "supplier", "other"]),
+  category: z.enum(["teacher", "admin", "worker", "board", "supplier", "other"]),
   regime: z.enum(["payroll", "invoice"]),
   teacherMode: z.enum(["linked", "payroll_only"]),
   teacherId: z.string(),

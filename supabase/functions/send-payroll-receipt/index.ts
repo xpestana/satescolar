@@ -25,6 +25,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   teacher: "Docente",
   admin: "Administrativo",
   worker: "Obrero",
+  board: "Junta directiva y socios",
   supplier: "Proveedor",
   other: "Otros",
 };
